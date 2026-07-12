@@ -1,61 +1,58 @@
 import * as S from './sprites';
 
-// The map is a 28x16 tile grid. Each tile is 4 characters wide and 2 lines
-// tall, so the ground layer is a 112x32 character field. Entities are
-// positioned at tile coordinates; horizontal placement uses `ch` units and
-// vertical placement uses `em` units (line-height: 1) so everything stays
-// locked to the monospace character grid.
+// The map is a tile grid. Each tile is 4 characters wide and 2 lines tall, so
+// the ground layer is (MAP_W*4) x (MAP_H*2) characters. Entities are positioned
+// at tile coordinates; horizontal placement uses `ch` units and vertical
+// placement uses `em` units (line-height: 1) so everything stays locked to the
+// monospace character grid.
 export const MAP_W = 80;
-export const MAP_H = 80;
+export const MAP_H = 100;
 export const TILE_CH = 4; // chars per tile (x)
 export const TILE_LN = 2; // lines per tile (y)
-export const GROUND_W = MAP_W * TILE_CH; // 112
-export const GROUND_H = MAP_H * TILE_LN; // 32
+export const GROUND_W = MAP_W * TILE_CH;
+export const GROUND_H = MAP_H * TILE_LN;
 
 export type ItemType = 'flower' | 'stone' | 'apple' | 'cactus' | 'fern' | 'iceflower';
 export type EntityKind = ItemType | 'appleTree' | 'emptyTree' | 'shop' | 'cat' | 'house';
 
 // ---------------------------------------------------------------------------
-// Biomes: temperature/moisture value-noise maps derive a biome per tile.
-// Deterministic and pure — the biome map never changes at runtime.
+// The island: a single concrete landmass surrounded by ocean, split into big
+// contiguous regions (loosely modelled on Hawai'i's Big Island climate zones).
+// Deterministic and pure — the map never changes at runtime.
 // ---------------------------------------------------------------------------
 
-export type Biome = 'meadow' | 'desert' | 'jungle' | 'tundra' | 'rocky';
+export type Region = 'ocean' | 'beach' | 'meadow' | 'jungle' | 'desert' | 'rocky' | 'tundra';
 
-function hash2(x: number, y: number, seed: number): number {
-  let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 2246822519);
-  h = Math.imul(h ^ (h >>> 13), 3266489917);
-  h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
+// island body: an ellipse with a gentle, deterministic coastline wobble
+const ISLAND = { cx: 40, cy: 50, rx: 36, ry: 44 };
+
+function islandNd(tx: number, ty: number): number {
+  const dx = (tx - ISLAND.cx) / ISLAND.rx;
+  const dy = (ty - ISLAND.cy) / ISLAND.ry;
+  const wobble =
+    0.06 * Math.sin(tx * 0.45) + 0.05 * Math.cos(ty * 0.5) + 0.04 * Math.sin((tx + ty) * 0.3);
+  return Math.sqrt(dx * dx + dy * dy) - wobble;
 }
 
-function valueNoise(x: number, y: number, scale: number, seed: number): number {
-  const gx = Math.floor(x / scale);
-  const gy = Math.floor(y / scale);
-  const fx = x / scale - gx;
-  const fy = y / scale - gy;
-  const s = (t: number) => t * t * (3 - 2 * t);
-  const a = hash2(gx, gy, seed);
-  const b = hash2(gx + 1, gy, seed);
-  const c = hash2(gx, gy + 1, seed);
-  const d = hash2(gx + 1, gy + 1, seed);
-  const u = s(fx);
-  const v = s(fy);
-  return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+export function isWater(tx: number, ty: number): boolean {
+  return islandNd(tx, ty) > 1;
 }
 
-// the village and its surroundings are always friendly meadow
-const VILLAGE = { x: 24, y: 6, r: 15 };
+// big region anchors
+const VILLAGE = { x: 32, y: 30, r: 12 }; // home meadow, kept friendly
+const VOLCANO = { x: 40, y: 54, r: 13 }; // central lava fields
+const SUMMIT = { x: 40, y: 54, r: 4 }; // snow-capped peak on the volcano
 
-export function biomeAt(tx: number, ty: number): Biome {
+export function regionAt(tx: number, ty: number): Region {
+  const nd = islandNd(tx, ty);
+  if (nd > 1) return 'ocean';
+  if (nd > 0.9) return 'beach'; // coastal sand ring
   if (Math.hypot(tx - VILLAGE.x, ty - VILLAGE.y) < VILLAGE.r) return 'meadow';
-  const temp = valueNoise(tx, ty, 26, 911);
-  const moist = valueNoise(tx, ty, 26, 353);
-  if (temp > 0.6 && moist < 0.5) return 'desert';
-  if (temp < 0.4) return 'tundra';
-  if (moist > 0.62) return 'jungle';
-  if (moist < 0.34) return 'rocky';
-  return 'meadow';
+  if (Math.hypot(tx - SUMMIT.x, ty - SUMMIT.y) < SUMMIT.r) return 'tundra';
+  if (Math.hypot(tx - VOLCANO.x, ty - VOLCANO.y) < VOLCANO.r) return 'rocky';
+  if (tx >= 46) return 'jungle'; // wet east side
+  if (ty >= 52) return 'desert'; // dry south-west
+  return 'meadow'; // grassland north / north-west
 }
 
 export interface Ent {
@@ -78,8 +75,8 @@ export function spriteTiles(sprite: string[]) {
 
 export const PLAYER_T = spriteTiles(S.PLAYER);
 
-// An entity's footprint is the bottom row of tiles it covers. Only
-// footprints collide, so the player can walk "behind" tall sprites.
+// An entity's footprint is the bottom row of tiles it covers. Only footprints
+// collide, so the player can walk "behind" tall sprites.
 export function footprint(e: { x: number; y: number; sprite: string[] }) {
   const { wT, hT } = spriteTiles(e.sprite);
   return { row: e.y + hT - 1, x0: e.x, x1: e.x + wT - 1 };
@@ -98,50 +95,49 @@ export function near(
   return Math.max(dc, Math.abs(f.row - prow));
 }
 
-// Permanent, hand-placed world structures. These never regenerate.
+// Permanent, hand-placed structures. The village sits in its meadow (NW);
+// apple/empty trees are scattered across the green regions. All are on land.
 export const STRUCT_ENTS: Ent[] = [
-  { id: 'shop', kind: 'shop', x: 30, y: 2, sprite: S.SHOP, interactable: true },
-  { id: 'house', kind: 'house', x: 12, y: 2, sprite: S.HOUSE, interactable: true },
-  { id: 'cat', kind: 'cat', x: 27, y: 4, sprite: S.CAT, interactable: true },
-  { id: 'atree', kind: 'appleTree', x: 3, y: 1, sprite: S.APPLE_TREE, interactable: true },
-  { id: 'atree2', kind: 'appleTree', x: 46, y: 20, sprite: S.APPLE_TREE, interactable: true },
-  { id: 'atree3', kind: 'appleTree', x: 6, y: 40, sprite: S.APPLE_TREE, interactable: true },
-  { id: 'atree4', kind: 'appleTree', x: 64, y: 8, sprite: S.APPLE_TREE, interactable: true },
-  { id: 'atree5', kind: 'appleTree', x: 58, y: 62, sprite: S.APPLE_TREE, interactable: true },
-  { id: 'etree1', kind: 'emptyTree', x: 10, y: 9, sprite: S.TREE2, interactable: true },
-  { id: 'etree2', kind: 'emptyTree', x: 23, y: 8, sprite: S.TREE3, interactable: true },
-  { id: 'etree3', kind: 'emptyTree', x: 42, y: 6, sprite: S.TREE2, interactable: true },
-  { id: 'etree4', kind: 'emptyTree', x: 8, y: 22, sprite: S.TREE3, interactable: true },
-  { id: 'etree5', kind: 'emptyTree', x: 30, y: 44, sprite: S.TREE2, interactable: true },
-  { id: 'etree6', kind: 'emptyTree', x: 48, y: 50, sprite: S.TREE3, interactable: true },
-  { id: 'etree7', kind: 'emptyTree', x: 16, y: 56, sprite: S.TREE2, interactable: true },
-  { id: 'etree8', kind: 'emptyTree', x: 70, y: 28, sprite: S.TREE3, interactable: true },
-  { id: 'etree9', kind: 'emptyTree', x: 58, y: 44, sprite: S.TREE2, interactable: true },
-  { id: 'etree10', kind: 'emptyTree', x: 36, y: 70, sprite: S.TREE3, interactable: true },
-  { id: 'etree11', kind: 'emptyTree', x: 72, y: 66, sprite: S.TREE2, interactable: true },
+  { id: 'house', kind: 'house', x: 28, y: 32, sprite: S.HOUSE, interactable: true },
+  { id: 'shop', kind: 'shop', x: 40, y: 30, sprite: S.SHOP, interactable: true },
+  { id: 'cat', kind: 'cat', x: 35, y: 33, sprite: S.CAT, interactable: true },
+  { id: 'atree1', kind: 'appleTree', x: 24, y: 26, sprite: S.APPLE_TREE, interactable: true },
+  { id: 'atree2', kind: 'appleTree', x: 44, y: 26, sprite: S.APPLE_TREE, interactable: true },
+  { id: 'atree3', kind: 'appleTree', x: 54, y: 42, sprite: S.APPLE_TREE, interactable: true },
+  { id: 'atree4', kind: 'appleTree', x: 26, y: 44, sprite: S.APPLE_TREE, interactable: true },
+  { id: 'atree5', kind: 'appleTree', x: 58, y: 60, sprite: S.APPLE_TREE, interactable: true },
+  { id: 'etree1', kind: 'emptyTree', x: 22, y: 40, sprite: S.TREE2, interactable: true },
+  { id: 'etree2', kind: 'emptyTree', x: 20, y: 48, sprite: S.TREE3, interactable: true },
+  { id: 'etree3', kind: 'emptyTree', x: 46, y: 36, sprite: S.TREE2, interactable: true },
+  { id: 'etree4', kind: 'emptyTree', x: 52, y: 34, sprite: S.TREE3, interactable: true },
+  { id: 'etree5', kind: 'emptyTree', x: 58, y: 48, sprite: S.TREE2, interactable: true },
+  { id: 'etree6', kind: 'emptyTree', x: 62, y: 58, sprite: S.TREE3, interactable: true },
+  { id: 'etree7', kind: 'emptyTree', x: 52, y: 66, sprite: S.TREE2, interactable: true },
+  { id: 'etree8', kind: 'emptyTree', x: 30, y: 22, sprite: S.TREE3, interactable: true },
+  { id: 'etree9', kind: 'emptyTree', x: 42, y: 44, sprite: S.TREE2, interactable: true },
+  { id: 'etree10', kind: 'emptyTree', x: 60, y: 68, sprite: S.TREE3, interactable: true },
+  { id: 'etree11', kind: 'emptyTree', x: 34, y: 66, sprite: S.TREE2, interactable: true },
 ];
 
 // Wild spawns regenerate deterministically per growth window: same window →
-// same layout. Ids embed the window number so saved "removed" exceptions
-// self-invalidate when the window changes. Each biome has its own spawn
-// pool, so what you find depends on where you explore.
-const BIOME_POOL: Record<Biome, { kind: EntityKind; sprite: string[]; count: number }[]> = {
+// same layout. Each land region has its own spawn pool, so what you find
+// depends on where you explore. Ocean/beach never spawn flora.
+type SpawnRegion = 'meadow' | 'desert' | 'jungle' | 'tundra' | 'rocky';
+
+const REGION_POOL: Record<SpawnRegion, { kind: EntityKind; sprite: string[]; count: number }[]> = {
   meadow: [
     { kind: 'flower', sprite: S.FLOWER, count: 8 },
-    { kind: 'stone', sprite: S.STONE, count: 5 },
+    { kind: 'stone', sprite: S.STONE, count: 4 },
   ],
   desert: [
-    { kind: 'cactus', sprite: S.CACTUS, count: 7 },
+    { kind: 'cactus', sprite: S.CACTUS, count: 8 },
     { kind: 'stone', sprite: S.STONE, count: 4 },
   ],
   jungle: [
-    { kind: 'fern', sprite: S.FERN, count: 8 },
+    { kind: 'fern', sprite: S.FERN, count: 9 },
     { kind: 'flower', sprite: S.FLOWER, count: 3 },
   ],
-  tundra: [
-    { kind: 'iceflower', sprite: S.ICEFLOWER, count: 7 },
-    { kind: 'stone', sprite: S.STONE, count: 3 },
-  ],
+  tundra: [{ kind: 'iceflower', sprite: S.ICEFLOWER, count: 6 }],
   rocky: [{ kind: 'stone', sprite: S.STONE, count: 9 }],
 };
 
@@ -149,28 +145,21 @@ export function wildSpawns(window: number): Ent[] {
   const rnd = mulberry32((window | 0) * 7919 + 23);
   const taken = STRUCT_ENTS.map((e) => footprint(e));
   const out: Ent[] = [];
-  for (const biome of Object.keys(BIOME_POOL) as Biome[]) {
-    for (const { kind, sprite, count } of BIOME_POOL[biome]) {
+  for (const region of Object.keys(REGION_POOL) as SpawnRegion[]) {
+    for (const { kind, sprite, count } of REGION_POOL[region]) {
       const { wT, hT } = spriteTiles(sprite);
       for (let i = 0; i < count; i++) {
-        // rejection sampling: keep rolling spots until one lands in the
-        // right biome and doesn't clash with anything already placed
+        // rejection sampling: keep rolling spots until one lands in the right
+        // region (which is never ocean) and doesn't clash with anything placed
         for (let attempt = 0; attempt < 60; attempt++) {
           const x = Math.floor(rnd() * (MAP_W - wT));
           const y = Math.floor(rnd() * (MAP_H - hT));
-          if (biomeAt(x + Math.floor(wT / 2), y + Math.floor(hT / 2)) !== biome) continue;
+          if (regionAt(x + Math.floor(wT / 2), y + Math.floor(hT / 2)) !== region) continue;
           const f = footprint({ x, y, sprite });
           const clash = taken.some((t) => t.row === f.row && f.x0 <= t.x1 && f.x1 >= t.x0);
           if (clash) continue;
           taken.push(f);
-          out.push({
-            id: `${kind}-${biome}-${window}-${i}`,
-            kind,
-            x,
-            y,
-            sprite,
-            interactable: true,
-          });
+          out.push({ id: `${kind}-${region}-${window}-${i}`, kind, x, y, sprite, interactable: true });
           break;
         }
       }
@@ -179,8 +168,8 @@ export function wildSpawns(window: number): Ent[] {
   return out;
 }
 
-// The player starts in front of their house.
-export const PLAYER_SPAWN = { x: 13, y: 5 };
+// The player starts in front of their house (south side), on land.
+export const PLAYER_SPAWN = { x: 29, y: 37 };
 
 function mulberry32(a: number) {
   return function () {
@@ -192,53 +181,60 @@ function mulberry32(a: number) {
   };
 }
 
-// each biome scatters its own texture characters onto the ground
-const BIOME_SCATTER: Record<Biome, { chars: string[]; density: number }> = {
-  meadow: { chars: ['.', ':', '"', '.', "'", '.'], density: 0.045 },
-  desert: { chars: ['.', '~', "'", '.', '~'], density: 0.03 },
-  jungle: { chars: ['"', '#', '*', '"', ':', '"'], density: 0.09 },
-  tundra: { chars: ['*', '.', "'", '.', '*'], density: 0.035 },
-  rocky: { chars: ['^', '.', ',', 'o', '^'], density: 0.055 },
+// ---------------------------------------------------------------------------
+// Ground rendering. Each land region is its own character layer (so it can be
+// coloured independently in CSS), and the ocean is a set of phase-shifted wave
+// frames the app cycles through for a gentle animation.
+// ---------------------------------------------------------------------------
+
+type LandRegion = Exclude<Region, 'ocean'>;
+
+const SCATTER: Record<LandRegion, { chars: string[]; density: number }> = {
+  beach: { chars: ['.', ':', '.', "'", ' '], density: 0.1 },
+  meadow: { chars: ['.', ':', '"', "'", ',', '.'], density: 0.06 },
+  jungle: { chars: ['#', '*', '"', ':', '&', '#'], density: 0.15 },
+  desert: { chars: ['.', '~', "'", '.'], density: 0.05 },
+  rocky: { chars: ['^', 'o', ',', '.', '^'], density: 0.1 },
+  tundra: { chars: ['*', '.', "'", '*'], density: 0.09 },
 };
 
-function genGround(): string {
+const emptyGrid = () => Array.from({ length: GROUND_H }, () => Array<string>(GROUND_W).fill(' '));
+const joinGrid = (g: string[][]) => g.map((r) => r.join('')).join('\n');
+
+function genLandLayers(): { region: LandRegion; text: string }[] {
   const rnd = mulberry32(1337);
-  const g: string[][] = Array.from({ length: GROUND_H }, () =>
-    Array<string>(GROUND_W).fill(' '),
-  );
-  // per-biome texture scatter
+  const grids: Record<LandRegion, string[][]> = {
+    beach: emptyGrid(),
+    meadow: emptyGrid(),
+    jungle: emptyGrid(),
+    desert: emptyGrid(),
+    rocky: emptyGrid(),
+    tundra: emptyGrid(),
+  };
   for (let y = 0; y < GROUND_H; y++) {
     for (let x = 0; x < GROUND_W; x++) {
-      const { chars, density } = BIOME_SCATTER[biomeAt(Math.floor(x / TILE_CH), Math.floor(y / TILE_LN))];
-      if (rnd() < density) g[y][x] = chars[Math.floor(rnd() * chars.length)];
+      const r = regionAt(Math.floor(x / TILE_CH), Math.floor(y / TILE_LN));
+      if (r === 'ocean') continue;
+      const sc = SCATTER[r];
+      if (rnd() < sc.density) grids[r][y][x] = sc.chars[Math.floor(rnd() * sc.chars.length)];
     }
   }
-  // two winding paths, spaced across the map's height
-  for (const base of [Math.round(GROUND_H * 0.3), Math.round(GROUND_H * 0.72)]) {
-    for (let x = 0; x < GROUND_W; x++) {
-      const cy = base + Math.round(Math.sin(x / 13) * 2.2);
-      if (rnd() < 0.92) g[cy][x] = '~';
-      if (rnd() < 0.7) g[cy + 1][x] = '~';
-    }
-  }
-  // bush clusters, scattered proportionally to the map area
-  const centers: number[][] = [];
-  const nClusters = Math.round((GROUND_W * GROUND_H) / 1400);
-  for (let i = 0; i < nClusters; i++) {
-    centers.push([Math.floor(rnd() * GROUND_W), Math.floor(rnd() * GROUND_H)]);
-  }
-  for (const [cx, cy] of centers) {
-    // bushes only grow where it's green
-    const b = biomeAt(Math.floor(cx / TILE_CH), Math.floor(cy / TILE_LN));
-    if (b !== 'meadow' && b !== 'jungle') continue;
-    const n = 5 + Math.floor(rnd() * 5);
-    for (let i = 0; i < n; i++) {
-      const x = cx + Math.floor(rnd() * 7) - 3;
-      const y = cy + Math.floor(rnd() * 3) - 1;
-      if (x >= 0 && x < GROUND_W && y >= 0 && y < GROUND_H) g[y][x] = '#';
-    }
-  }
-  return g.map((r) => r.join('')).join('\n');
+  return (Object.keys(grids) as LandRegion[]).map((region) => ({ region, text: joinGrid(grids[region]) }));
 }
 
-export const GROUND_TEXT = genGround();
+function genOceanFrame(phase: number): string {
+  const g = emptyGrid();
+  for (let y = 0; y < GROUND_H; y++) {
+    for (let x = 0; x < GROUND_W; x++) {
+      if (!isWater(Math.floor(x / TILE_CH), Math.floor(y / TILE_LN))) continue;
+      const w = Math.sin(x * 0.5 + y * 0.35 + phase * 1.4);
+      g[y][x] = w > 0.55 ? ' ' : '~';
+    }
+  }
+  return joinGrid(g);
+}
+
+// land colour layers (back-to-front order doesn't matter — regions don't overlap)
+export const LAND_LAYERS = genLandLayers();
+// wave animation frames the app cycles through
+export const OCEAN_FRAMES = [0, 1, 2, 3].map(genOceanFrame);

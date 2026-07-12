@@ -1,0 +1,969 @@
+[
+  {
+    "name": "Sunny Clover",
+    "category": "plant",
+    "sprite": [
+      "\\|/",
+      " | ",
+      "_|_"
+    ]
+  },
+  {
+    "name": "Puffcap Mushroom",
+    "category": "plant",
+    "sprite": [
+      "  o  ",
+      "oOOOo",
+      " | | ",
+      "  |  "
+    ]
+  },
+  {
+    "name": "Dew Grass",
+    "category": "plant",
+    "sprite": [
+      "  ***  ",
+      "  *.*  ",
+      " *.*.* ",
+      " *.*.*"
+    ]
+  },
+  {
+    "name": "Buttercup Sprout",
+    "category": "plant",
+    "sprite": [
+      "  *  ",
+      "  |  ",
+      " /|\\ "
+    ]
+  },
+  {
+    "name": "Pebble Moss",
+    "category": "plant",
+    "sprite": [
+      "  @@  ",
+      "@@@@@",
+      "@@@@@@",
+      "  @@"
+    ]
+  },
+  {
+    "name": "Whistling Reed",
+    "category": "plant",
+    "sprite": [
+      "  /|\\  ",
+      "  / \\  ",
+      "   |   ",
+      "  ~o~  "
+    ]
+  },
+  {
+    "name": "Firefly Fern",
+    "category": "plant",
+    "sprite": [
+      "  *.",
+      ".~V~.",
+      "  |",
+      "  |"
+    ]
+  },
+  {
+    "name": "Honeybell Flower",
+    "category": "plant",
+    "sprite": [
+      "\\|/",
+      " | ",
+      "_|_"
+    ]
+  },
+  {
+    "name": "Moonpetal Lily",
+    "category": "plant",
+    "sprite": [
+      "  ◇  ",
+      "  |  ",
+      " /|\\ ",
+      " | | "
+    ]
+  },
+  {
+    "name": "Chatterleaf Bush",
+    "category": "plant",
+    "sprite": [
+      "\\|/",
+      " | ",
+      "_|_"
+    ]
+  },
+  {
+    "name": "Blueberry Bramble",
+    "category": "plant",
+    "sprite": [
+      "  ~~~ ",
+      "~o o~o",
+      "~o~o~o",
+      " ~~~~ "
+    ]
+  },
+  {
+    "name": "Crystal Thistle",
+    "category": "plant",
+    "sprite": [
+      "  /\\  ",
+      "<>**<>",
+      "  ||  ",
+      "  ||  "
+    ]
+  },
+  {
+    "name": "Emberbloom",
+    "category": "plant",
+    "sprite": [
+      "  *|*  ",
+      "  /|\\  ",
+      " /*|*\\ ",
+      " /***\\ "
+    ]
+  },
+  {
+    "name": "Whisperwillow Sapling",
+    "category": "plant",
+    "sprite": [
+      "  ~~~  ",
+      "  |~|  ",
+      " ~|||||~",
+      "  |||  "
+    ]
+  },
+  {
+    "name": "Glasswing Orchid",
+    "category": "plant",
+    "sprite": [
+      "  /\\  ",
+      "<(@@)>",
+      "  ||  ",
+      "  ||  "
+    ]
+  },
+  {
+    "name": "Stormroot Vine",
+    "category": "plant",
+    "sprite": [
+      "\\|/",
+      " | ",
+      "_|_"
+    ]
+  },
+  {
+    "name": "Starseed Blossom",
+    "category": "plant",
+    "sprite": [
+      "\\|/",
+      " | ",
+      "_|_"
+    ]
+  },
+  {
+    "name": "Evergold Tree Sprout",
+    "category": "plant",
+    "sprite": [
+      "  *  ",
+      "  |  ",
+      " /|\\ ",
+      " / \\ "
+    ]
+  },
+  {
+    "name": "Dreamvine Orchid",
+    "category": "plant",
+    "sprite": [
+      "\\|/",
+      " | ",
+      "_|_"
+    ]
+  },
+  {
+    "name": "Phoenix Fern",
+    "category": "plant",
+    "sprite": [
+      "  /\\  ",
+      "  ||  ",
+      " /||\\ ",
+      " *||* "
+    ]
+  },
+  {
+    "name": "Puddle Duck",
+    "category": "pets",
+    "sprite": [
+      "  ~~~  ",
+      "  (o)  ",
+      " /|||\\",
+      "  |||  "
+    ]
+  },
+  {
+    "name": "Meadow Mouse",
+    "category": "pets",
+    "sprite": [
+      "  /\\_/\\",
+      "  o o ",
+      "  > < ",
+      "  \\_-_/"
+    ]
+  },
+  {
+    "name": "Pebble Snail",
+    "category": "pets",
+    "sprite": [
+      "  @@",
+      ".o@@",
+      "  @@"
+    ]
+  },
+  {
+    "name": "Sock Bunny",
+    "category": "pets",
+    "sprite": [
+      " /\\_/\\",
+      "(o o)",
+      " > ^ <",
+      "  | |"
+    ]
+  },
+  {
+    "name": "Dust Kitten",
+    "category": "pets",
+    "sprite": [
+      "~^~^~",
+      "(o.o)",
+      "(   )",
+      "_| |_"
+    ]
+  },
+  {
+    "name": "Twig Beetle",
+    "category": "pets",
+    "sprite": [
+      "  /\\_/\\",
+      "  |o o|",
+      "  | > |",
+      "  |___|"
+    ]
+  },
+  {
+    "name": "Moth Lantern",
+    "category": "pets",
+    "sprite": [
+      "  ◇◇  ",
+      "◇◇◇◇◇◇",
+      " ◇◇◇◇ ",
+      "  ◇◇  "
+    ]
+  },
+  {
+    "name": "Garden Toad",
+    "category": "pets",
+    "sprite": [
+      "  @@  ",
+      "@(o)@ ",
+      "  ^^  "
+    ]
+  },
+  {
+    "name": "Barn Sparrow",
+    "category": "pets",
+    "sprite": [
+      "  ^-^  ",
+      "(o o) ",
+      " |_| ",
+      "  |||"
+    ]
+  },
+  {
+    "name": "Moon Hare",
+    "category": "pets",
+    "sprite": [
+      "  /\\_/\\",
+      "  (o o)",
+      "  (=^=)",
+      "   )~("
+    ]
+  },
+  {
+    "name": "Ember Fox",
+    "category": "pets",
+    "sprite": [
+      "/^-^\\",
+      "(o.o)",
+      " |_|"
+    ]
+  },
+  {
+    "name": "Whisper Owl",
+    "category": "pets",
+    "sprite": [
+      "  /\\_/\\",
+      "  (o.o)",
+      "  (   )",
+      "   \\|/"
+    ]
+  },
+  {
+    "name": "Jelly Slime",
+    "category": "pets",
+    "sprite": [
+      "~o~o~",
+      "o~o~o",
+      "~o~o~",
+      "o~~~o"
+    ]
+  },
+  {
+    "name": "Star Snail",
+    "category": "pets",
+    "sprite": [
+      "/^-^\\",
+      "(o.o)",
+      " |_|"
+    ]
+  },
+  {
+    "name": "Cloud Sheep",
+    "category": "pets",
+    "sprite": [
+      "/^-^\\",
+      "(o.o)",
+      " |_|"
+    ]
+  },
+  {
+    "name": "Glass Deer",
+    "category": "pets",
+    "sprite": [
+      "  /\\  ",
+      "<>  <>",
+      "  ||  ",
+      "  /\\ "
+    ]
+  },
+  {
+    "name": "Ink Raven",
+    "category": "pets",
+    "sprite": [
+      "  ~~  ",
+      "(o o)",
+      "[___]",
+      "  |  "
+    ]
+  },
+  {
+    "name": "Tide Turtle",
+    "category": "pets",
+    "sprite": [
+      "  ~~  ",
+      "(o_o)",
+      "  ^^  "
+    ]
+  },
+  {
+    "name": "Aurora Stag",
+    "category": "pets",
+    "sprite": [
+      "  /\\  ",
+      " /  \\ ",
+      "<(@@)>",
+      " \\||/ "
+    ]
+  },
+  {
+    "name": "Sun Phoenix",
+    "category": "pets",
+    "sprite": [
+      "  /\\\\  ",
+      "<(##)>",
+      "  \\/  ",
+      "(====)"
+    ]
+  },
+  {
+    "name": "Straw Sunhat",
+    "category": "clothing",
+    "sprite": [
+      "  ~~~~ ",
+      "~~~~~~~",
+      "  | | ",
+      "  | | "
+    ]
+  },
+  {
+    "name": "Woolly Mittens",
+    "category": "clothing",
+    "sprite": [
+      "  /\\  ",
+      "<|  |>",
+      "  \\/  "
+    ]
+  },
+  {
+    "name": "Patchwork Scarf",
+    "category": "clothing",
+    "sprite": [
+      "~^~^~^~",
+      "^~^~^~^",
+      "~^~^~^~"
+    ]
+  },
+  {
+    "name": "Muddy Rain Boots",
+    "category": "clothing",
+    "sprite": [
+      "  ||  ",
+      "_|  |_",
+      "| ## |",
+      "| ## |"
+    ]
+  },
+  {
+    "name": "Knit Beanie",
+    "category": "clothing",
+    "sprite": [
+      "  /\\  ",
+      "<|  |>",
+      "  ||  "
+    ]
+  },
+  {
+    "name": "Cotton Apron",
+    "category": "clothing",
+    "sprite": [
+      "  ___  ",
+      "_|   |_",
+      " | | | ",
+      " |_|_|"
+    ]
+  },
+  {
+    "name": "Buttoned Vest",
+    "category": "clothing",
+    "sprite": [
+      "[::::]",
+      "| O |",
+      "[::::]"
+    ]
+  },
+  {
+    "name": "Striped Socks",
+    "category": "clothing",
+    "sprite": [
+      "  ||  ",
+      "  ||  ",
+      " |  | ",
+      " |  | "
+    ]
+  },
+  {
+    "name": "Linen Tunic",
+    "category": "clothing",
+    "sprite": [
+      " ___ ",
+      "/___\\",
+      "\\___/"
+    ]
+  },
+  {
+    "name": "Cozy Slippers",
+    "category": "clothing",
+    "sprite": [
+      "  /\\_/\\",
+      "  |  |",
+      "  |__|",
+      "  \\/\\/"
+    ]
+  },
+  {
+    "name": "Embroidered Shawl",
+    "category": "clothing",
+    "sprite": [
+      "  /\\  ",
+      "_/  \\_",
+      "\\    /",
+      "  \\/  "
+    ]
+  },
+  {
+    "name": "Feathered Cap",
+    "category": "clothing",
+    "sprite": [
+      "  /\\  ",
+      "<|~~|>",
+      "  ||  "
+    ]
+  },
+  {
+    "name": "Leather Satchel Belt",
+    "category": "clothing",
+    "sprite": [
+      "  /-\\  ",
+      "  |O|  ",
+      " /| |\\",
+      "  / \\ "
+    ]
+  },
+  {
+    "name": "Moonlit Cloak",
+    "category": "clothing",
+    "sprite": [
+      " ___ ",
+      "/___\\",
+      "\\___/"
+    ]
+  },
+  {
+    "name": "Silver Locket Necklace",
+    "category": "clothing",
+    "sprite": [
+      " ___ ",
+      "/___\\",
+      "\\___/"
+    ]
+  },
+  {
+    "name": "Dragonscale Gloves",
+    "category": "clothing",
+    "sprite": [
+      "  /\\ ",
+      " /  \\",
+      "/    \\",
+      "\\  /\\/"
+    ]
+  },
+  {
+    "name": "Starwoven Cape",
+    "category": "clothing",
+    "sprite": [
+      " ___ ",
+      "/___\\",
+      "\\___/"
+    ]
+  },
+  {
+    "name": "Phoenix Feather Boa",
+    "category": "clothing",
+    "sprite": [
+      "  /\\\\  ",
+      "<(##)>",
+      "  \\/  ",
+      "~~~~~"
+    ]
+  },
+  {
+    "name": "Crown of Whispering Leaves",
+    "category": "clothing",
+    "sprite": [
+      "  ~~~  ",
+      "~*O*O*~",
+      "  |M|  ",
+      "  | |  "
+    ]
+  },
+  {
+    "name": "Robe of the Eternal Harvest",
+    "category": "clothing",
+    "sprite": [
+      "  ~~~  ",
+      "  /|\\  ",
+      " /|||\\",
+      "  |||  "
+    ]
+  },
+  {
+    "name": "Rickety Cart",
+    "category": "vehicle",
+    "sprite": [
+      "  []  ",
+      "_|  |_",
+      "(O  O)"
+    ]
+  },
+  {
+    "name": "Garden Wheelbarrow",
+    "category": "vehicle",
+    "sprite": [
+      "  ___  ",
+      "_|   |_",
+      "  | |  ",
+      "  |_|  "
+    ]
+  },
+  {
+    "name": "Bicycle Built for Two",
+    "category": "vehicle",
+    "sprite": [
+      "  __o",
+      " -\\<,",
+      "(*)/(*)"
+    ]
+  },
+  {
+    "name": "Mail Wagon",
+    "category": "vehicle",
+    "sprite": [
+      "  ___   ",
+      "_|___|_ ",
+      "(_____) "
+    ]
+  },
+  {
+    "name": "Hay Cart",
+    "category": "vehicle",
+    "sprite": [
+      "  [===]",
+      "  |O O|",
+      "__-----"
+    ]
+  },
+  {
+    "name": "Pony Trap",
+    "category": "vehicle",
+    "sprite": [
+      "  /|\\  ",
+      "_/ | \\_",
+      "  |_|  ",
+      "  / \\ "
+    ]
+  },
+  {
+    "name": "Rowboat",
+    "category": "vehicle",
+    "sprite": [
+      "  ~~~  ",
+      "  /|\\  ",
+      " /   \\ ",
+      "(_____)"
+    ]
+  },
+  {
+    "name": "Sled",
+    "category": "vehicle",
+    "sprite": [
+      "  /\\  ",
+      "_/  \\_",
+      "[    ]",
+      "^^^^^^"
+    ]
+  },
+  {
+    "name": "Scooter",
+    "category": "vehicle",
+    "sprite": [
+      "  O-O  ",
+      "  | |  ",
+      " /| |\\",
+      "  | |  "
+    ]
+  },
+  {
+    "name": "Steam Trolley",
+    "category": "vehicle",
+    "sprite": [
+      "  |==|  ",
+      "_[__]_",
+      "(o)(o)",
+      "======="
+    ]
+  },
+  {
+    "name": "Hot Air Balloon",
+    "category": "vehicle",
+    "sprite": [
+      "  /\\  ",
+      "./  \\.",
+      "| () |",
+      "  ||  "
+    ]
+  },
+  {
+    "name": "Canal Barge",
+    "category": "vehicle",
+    "sprite": [
+      "  __o",
+      " -\\<,",
+      "(*)/(*)"
+    ]
+  },
+  {
+    "name": "Windmill Kite Cart",
+    "category": "vehicle",
+    "sprite": [
+      "  /\\  ",
+      "<>◇<>",
+      "  ||  ",
+      "_||_"
+    ]
+  },
+  {
+    "name": "Clockwork Unicycle",
+    "category": "vehicle",
+    "sprite": [
+      "  /|\\",
+      "  | |",
+      " /   \\",
+      "(  O  )"
+    ]
+  },
+  {
+    "name": "Firefly Lantern Boat",
+    "category": "vehicle",
+    "sprite": [
+      "  /\\_/\\",
+      "  |@@|",
+      "  |  |",
+      "_/|==|\\_"
+    ]
+  },
+  {
+    "name": "Cloud Skiff",
+    "category": "vehicle",
+    "sprite": [
+      "  ~~^~~",
+      " /=====\\",
+      "{o  o}",
+      " \\___/"
+    ]
+  },
+  {
+    "name": "Turtle-Drawn Carriage",
+    "category": "vehicle",
+    "sprite": [
+      "  ╱╲╲  ",
+      "◯◯◯◯◯◯",
+      "  ║║║  "
+    ]
+  },
+  {
+    "name": "Star Wagon",
+    "category": "vehicle",
+    "sprite": [
+      "  __o",
+      " -\\<,",
+      "(*)/(*)"
+    ]
+  },
+  {
+    "name": "Mushroom Trolley",
+    "category": "vehicle",
+    "sprite": [
+      "  /\\_/\\",
+      "  |()| ",
+      "_/|  |\\_",
+      "(_|  |_)"
+    ]
+  },
+  {
+    "name": "Moonlit Comet Sleigh",
+    "category": "vehicle",
+    "sprite": [
+      "  __o",
+      " -\\<,",
+      "(*)/(*)"
+    ]
+  },
+  {
+    "name": "Dew Berry",
+    "category": "food",
+    "sprite": [
+      "  o o  ",
+      "o o o o",
+      " o o o ",
+      "  ~~~  "
+    ]
+  },
+  {
+    "name": "Bread Root",
+    "category": "food",
+    "sprite": [
+      "  ***  ",
+      "*     *",
+      "*  *  *",
+      " ***** "
+    ]
+  },
+  {
+    "name": "Puffcap Mushroom",
+    "category": "food",
+    "sprite": [
+      "  ◯◯◯",
+      "◯◯◯◯◯",
+      "  |||"
+    ]
+  },
+  {
+    "name": "Honey Pod",
+    "category": "food",
+    "sprite": [
+      "  /\\  ",
+      "  ||  ",
+      " /  \\ ",
+      "(    )"
+    ]
+  },
+  {
+    "name": "Cloud Turnip",
+    "category": "food",
+    "sprite": [
+      " ___ ",
+      "(   )",
+      "(___)"
+    ]
+  },
+  {
+    "name": "Sunpetal Fruit",
+    "category": "food",
+    "sprite": [
+      "  @@  ",
+      "@@@@@",
+      "@@@@@ ",
+      "  @  "
+    ]
+  },
+  {
+    "name": "Mossy Egg",
+    "category": "food",
+    "sprite": [
+      "  ~~  ",
+      "~~~~~",
+      "~~~~~",
+      "  ~~"
+    ]
+  },
+  {
+    "name": "Sugar Cabbage",
+    "category": "food",
+    "sprite": [
+      "  ~~~  ",
+      "~~~~~~~",
+      "~~~O~~~",
+      "  ~~~  "
+    ]
+  },
+  {
+    "name": "Riverclam Cake",
+    "category": "food",
+    "sprite": [
+      "  ~~~  ",
+      "  /~\\  ",
+      " |~~| ",
+      " /  \\ "
+    ]
+  },
+  {
+    "name": "Nutty Acorn Bun",
+    "category": "food",
+    "sprite": [
+      "  ◯◯  ",
+      "◯◯◯◯◯◯",
+      "  ◯◯  ",
+      "   ◯   "
+    ]
+  },
+  {
+    "name": "Star Grapes",
+    "category": "food",
+    "sprite": [
+      "  *-*  ",
+      "*-o-o-*",
+      "  *-*  ",
+      "   o   "
+    ]
+  },
+  {
+    "name": "Whistling Pear",
+    "category": "food",
+    "sprite": [
+      "  ~~  ",
+      "  ()  ",
+      " (==) ",
+      " /  \\"
+    ]
+  },
+  {
+    "name": "Moonfin Roe",
+    "category": "food",
+    "sprite": [
+      "  o o  ",
+      "(o   o)",
+      "  o o  "
+    ]
+  },
+  {
+    "name": "Emberroot Stew Base",
+    "category": "food",
+    "sprite": [
+      "  ~~~  ",
+      "~[***]~",
+      "~[***]~",
+      " ~***~ "
+    ]
+  },
+  {
+    "name": "Velvet Fig",
+    "category": "food",
+    "sprite": [
+      "  ◆◆  ",
+      "◆◆◆◆◆◆",
+      "◆◆◆◆◆◆",
+      " ◆◆◆ "
+    ]
+  },
+  {
+    "name": "Dragonpepper",
+    "category": "food",
+    "sprite": [
+      "  /\\  ",
+      "  ||  ",
+      " /||\\ ",
+      "<-||->"
+    ]
+  },
+  {
+    "name": "Silverleaf Tea Bloom",
+    "category": "food",
+    "sprite": [
+      "  ※ ※ ",
+      "  ※※ ",
+      " ◇◇◇ ",
+      "  ◆  "
+    ]
+  },
+  {
+    "name": "Golden Yolk Truffle",
+    "category": "food",
+    "sprite": [
+      "  ◆◆  ",
+      "◆◆◆◆◆◆",
+      "◆◆◆◆◆◆",
+      " ◆◆◆◆ "
+    ]
+  },
+  {
+    "name": "Phoenixberry",
+    "category": "food",
+    "sprite": [
+      "  /\\  ",
+      "<(##)>",
+      "  \\/  ",
+      "  ||  "
+    ]
+  },
+  {
+    "name": "Ancient Starloaf",
+    "category": "food",
+    "sprite": [
+      "  *   * ",
+      "  /   \\",
+      "[~~~~~]",
+      "  \\_-_/"
+    ]
+  }
+]

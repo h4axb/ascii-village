@@ -10,7 +10,7 @@ export const PLAYER = [
 export const CAT = [
   ' /\\_/\\',
   '( o.o )',
-  ' > ^ ',
+  ' > ^ <',
 ];
 
 export const FLOWER = [

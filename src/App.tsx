@@ -7,7 +7,9 @@ import {
   MAP_H,
   GROUND_W,
   GROUND_H,
-  GROUND_TEXT,
+  LAND_LAYERS,
+  OCEAN_FRAMES,
+  isWater,
   STRUCT_ENTS,
   wildSpawns,
   PLAYER_SPAWN,
@@ -18,6 +20,22 @@ import {
 import type { Ent, ItemType } from './world';
 import { getFunFact, getPrice, getShopStock, craftItem, CATEGORIES } from './llm';
 import type { Category, ShopItem, OwnedItem } from './llm';
+import {
+  GARDEN,
+  SLOTS,
+  gardenFence,
+  gardenBlocks,
+  gardenTarget,
+  nearestCropSlot,
+  inGarden,
+  createCrop,
+  cropStatus,
+  advanceStage,
+  slotSprite,
+  EMPTY_SLOT,
+  PLANTABLE_BASE,
+} from './farm';
+import type { PlantedCrop, Doors, DoorId } from './farm';
 import {
   defaultTimeConfig,
   worldTime,
@@ -108,7 +126,7 @@ const STORAGE_SLOTS = 5;
 // Camera viewport in world units (ch / lines). This is the default "frame";
 // the mouse wheel can zoom out down to the whole map and back, never closer.
 const VIEW_W = 112;
-const VIEW_H = 32;
+const VIEW_H = 40; // taller viewport → aspect closer to a screen, less letterbox
 const MAX_ZOOM = 1;
 const MIN_ZOOM = Math.max(VIEW_W / GROUND_W, VIEW_H / GROUND_H);
 const ZOOM_STEP = 0.1;
@@ -151,6 +169,7 @@ type Modal =
   | { t: 'craft'; ownedId: string }
   | { t: 'houseMenu'; sel: number }
   | { t: 'storage'; slot: number; sel: number; menuOpen: boolean }
+  | { t: 'crop'; slot: number }
   | null;
 
 const FRESH_SHOP: Modal = {
@@ -218,6 +237,8 @@ function Game() {
   const [removed, setRemoved] = useState<Set<string>>(() => new Set(saved?.removedIds ?? []));
   const [shaken, setShaken] = useState<Set<string>>(() => new Set(saved?.shaken ?? []));
   const [dynamicEnts, setDynamicEnts] = useState<Ent[]>([]);
+  const [crops, setCrops] = useState<PlantedCrop[]>(() => saved?.plantedCrops ?? []);
+  const [doors, setDoors] = useState<Doors>(() => saved?.doors ?? { top: false, bottom: false });
   const [modal, setModal] = useState<Modal>(null);
   const [bubble, setBubble] = useState<Bubble>(null);
   const [shaking, setShaking] = useState<string | null>(null);
@@ -248,7 +269,8 @@ function Game() {
   const ents = useMemo(
     () => [
       ...STRUCT_ENTS,
-      ...wildSpawns(growthWindow).filter((e) => !removed.has(e.id)),
+      // wild spawns skip the garden footprint so nothing sprouts inside the fence
+      ...wildSpawns(growthWindow).filter((e) => !removed.has(e.id) && !inGarden(e.x, e.y)),
       ...dynamicEnts.filter((e) => !removed.has(e.id)),
     ],
     [growthWindow, removed, dynamicEnts],
@@ -275,12 +297,13 @@ function Game() {
     equippedId: equipped?.ownedId ?? null,
     removedIds: [...removed],
     shaken: [...shaken],
-    plantedCrops: [],
+    plantedCrops: crops,
+    doors,
   });
   useEffect(() => {
     const t = window.setTimeout(() => writeSave(snapRef.current()), 2000);
     return () => window.clearTimeout(t);
-  }, [player, inv, money, storages, bag, equipped, removed, shaken]);
+  }, [player, inv, money, storages, bag, equipped, removed, shaken, crops, doors]);
   useEffect(() => {
     const flush = () => writeSave(snapRef.current());
     const onVis = () => {
@@ -335,9 +358,11 @@ function Game() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       const coarse = window.matchMedia('(hover: none), (pointer: coarse)').matches;
-      const availW = window.innerWidth - 12;
-      const availH = window.innerHeight - 24 - (coarse ? 170 : 12);
-      const scale = Math.min(1, availW / w, availH / h);
+      const availW = window.innerWidth - 8;
+      const availH = window.innerHeight - 8 - (coarse ? 150 : 0);
+      // fill the screen (no upscale cap) — the field's aspect is close to a
+      // screen's, so this leaves only thin side bars rather than big black ones
+      const scale = Math.min(availW / w, availH / h);
       setDims({ w, h, scale });
     };
     compute();
@@ -358,12 +383,25 @@ function Game() {
         const f = footprint(e);
         if (f.row === prow && nx <= f.x1 && nx + PLAYER_T.wT - 1 >= f.x0) return p;
       }
+      // the garden fence blocks movement except through open doors
+      if (gardenBlocks(nx, ny, PLAYER_T.wT, PLAYER_T.hT, doorsRef.current)) return p;
+      // ocean blocks movement unless riding something that floats (a boat)
+      const floating = equippedRef.current?.equip?.mode === 'vehicle' && !!equippedRef.current.equip.float;
+      if (!floating) {
+        for (let ty = ny; ty < ny + PLAYER_T.hT; ty++) {
+          for (let tx = nx; tx < nx + PLAYER_T.wT; tx++) {
+            if (isWater(tx, ty)) return p;
+          }
+        }
+      }
       return { x: nx, y: ny };
     });
   }
 
   const entsRef = useRef(ents);
   entsRef.current = ents;
+  const doorsRef = useRef(doors);
+  doorsRef.current = doors;
   const modalRef = useRef(modal);
   modalRef.current = modal;
 
@@ -483,6 +521,35 @@ function Game() {
     return best ? best.e : null;
   }, [ents, player]);
 
+  // garden door the player is next to (or null)
+  const gTarget = useMemo(
+    () => gardenTarget(player.x, player.y, PLAYER_T.wT, PLAYER_T.hT),
+    [player],
+  );
+
+  // the planted crop the player is standing next to — each plant is its own
+  // interactable, watered/inspected individually
+  const cropSlot = useMemo(
+    () => nearestCropSlot(player.x, player.y, PLAYER_T.wT, PLAYER_T.hT, crops.map((c) => c.slot)),
+    [player, crops],
+  );
+
+  // grow / wilt crops on every world-clock tick
+  useEffect(() => {
+    setCrops((cs) => {
+      let changed = false;
+      const next = cs.map((c) => {
+        const st = advanceStage(c, wt);
+        if (st !== c.stage) {
+          changed = true;
+          return { ...c, stage: st };
+        }
+        return c;
+      });
+      return changed ? next : cs;
+    });
+  }, [wt]);
+
   function collect(e: Ent) {
     // wild spawns are derived, so collecting = recording an exception
     setRemoved((s) => new Set(s).add(e.id));
@@ -533,6 +600,16 @@ function Game() {
   function doF() {
     if (bubble) {
       setBubble(null);
+      return;
+    }
+    // a planted crop right next to you opens its own care/water panel
+    if (cropSlot >= 0) {
+      setModal({ t: 'crop', slot: cropSlot });
+      return;
+    }
+    // otherwise a garden door toggles open/closed
+    if (gTarget) {
+      toggleDoor(gTarget.door);
       return;
     }
     const t = fTarget;
@@ -630,16 +707,14 @@ function Game() {
 
   function equipOwned(owned: OwnedItem) {
     if (!owned.equip) return;
-    if (owned.equip.waterOnly) {
-      setModal(null);
-      showToast("I can't use it here.");
-      return;
-    }
     if (owned.equip.mode === 'pet') {
       setPetPos({ x: Math.max(0, player.x - 2), y: player.y });
     }
     setEquipped(owned);
     setModal(null);
+    if (owned.equip.mode === 'vehicle' && owned.equip.float) {
+      showToast('you can sail onto the water now!');
+    }
   }
 
   function unequip() {
@@ -743,15 +818,13 @@ function Game() {
     if (m.t === 'detailOwned') {
       const owned = bag.find((o) => o.ownedId === m.ownedId);
       if (!owned) return null;
-      const isEquipped = equipped?.ownedId === owned.ownedId;
-      const opts =
-        owned.kind === 'token' ? ['Use token'] : owned.equip ? [isEquipped ? 'Unequip' : 'Equip'] : [];
-      if (opts.length === 0) return null;
+      const { labels, pick } = ownedOptList(owned);
+      if (labels.length === 0) return null;
       return {
         sel: m.sel,
-        n: opts.length,
+        n: labels.length,
         upd: (s) => ({ ...m, sel: s }),
-        go: () => ownedAction(owned),
+        go: (s) => pick(s),
       };
     }
     return null;
@@ -766,6 +839,101 @@ function Game() {
     } else {
       equipOwned(owned);
     }
+  }
+
+  // Options for an owned item's detail panel (shared by keyboard + click).
+  function ownedOptList(owned: OwnedItem): { labels: string[]; pick: (i: number) => void } {
+    const isEquipped = equipped?.ownedId === owned.ownedId;
+    const canPlant = owned.kind !== 'token' && (owned.category === 'plant' || owned.category === 'food');
+    const labels: string[] = [];
+    if (owned.kind === 'token') labels.push('Use token');
+    else if (owned.equip) labels.push(isEquipped ? 'Unequip' : 'Equip');
+    if (canPlant) labels.push('Plant in garden');
+    return {
+      labels,
+      pick: (i) => (labels[i] === 'Plant in garden' ? plantOwned(owned) : ownedAction(owned)),
+    };
+  }
+
+  // ---- farming ----
+  function freeSlot(): number {
+    for (let i = 0; i < SLOTS.length; i++) if (!crops.some((c) => c.slot === i)) return i;
+    return -1;
+  }
+
+  function plantBase(it: ItemType) {
+    if (inv[it] <= 0) return;
+    const slot = freeSlot();
+    if (slot < 0) {
+      setModal(null);
+      showToast('the garden bed is full!');
+      return;
+    }
+    setInv((v) => ({ ...v, [it]: v[it] - 1 }));
+    setCrops((cs) => [
+      ...cs,
+      createCrop(slot, ITEM_INFO[it].name, ITEM_SPRITES[it], 'plant', { kind: 'base', it }, wt),
+    ]);
+    setModal(null);
+    showToast(`planted a ${ITEM_INFO[it].name.toLowerCase()}!`);
+  }
+
+  function plantOwned(o: OwnedItem) {
+    const slot = freeSlot();
+    if (slot < 0) {
+      setModal(null);
+      showToast('the garden bed is full!');
+      return;
+    }
+    setBag((b) => b.filter((x) => x.ownedId !== o.ownedId));
+    if (equipped?.ownedId === o.ownedId) unequip();
+    setCrops((cs) => [...cs, createCrop(slot, o.name, o.sprite, o.category, { kind: 'owned', item: o }, wt)]);
+    setModal(null);
+    showToast(`planted ${o.name}!`);
+  }
+
+  function toggleDoor(d: DoorId) {
+    setDoors((ds) => ({ ...ds, [d]: !ds[d] }));
+  }
+
+  // Water crops (all growing ones, or just the given slot). Needs the can.
+  function waterCrops(slot?: number) {
+    if (equipped?.tool !== 'water') {
+      showToast('equip your watering can first!');
+      return;
+    }
+    const targets = crops.filter(
+      (c) => c.stage === 'growing' && (slot === undefined || c.slot === slot),
+    );
+    if (targets.length === 0) {
+      showToast('nothing to water right now.');
+      return;
+    }
+    const ids = new Set(targets.map((c) => c.id));
+    setCrops((cs) => cs.map((c) => (ids.has(c.id) ? { ...c, lastWateredAt: wt } : c)));
+    showToast(`splash! watered ${targets.length} plant${targets.length > 1 ? 's' : ''}.`);
+  }
+
+  function harvestCrop(slot: number) {
+    const c = crops.find((x) => x.slot === slot);
+    if (!c || c.stage !== 'ready') return;
+    setCrops((cs) => cs.filter((x) => x.slot !== slot));
+    if (c.harvest.kind === 'base') {
+      const it = c.harvest.it;
+      setInv((v) => ({ ...v, [it]: v[it] + 2 }));
+      showToast(`harvested 2 ${ITEM_INFO[it].name.toLowerCase()}!`);
+    } else {
+      const item = c.harvest.item;
+      setBag((b) => [...b, { ...item, ownedId: `own-${Date.now()}` }]);
+      showToast(`harvested ${item.name}!`);
+    }
+    setModal(null);
+  }
+
+  function clearCrop(slot: number) {
+    setCrops((cs) => cs.filter((x) => x.slot !== slot));
+    setModal(null);
+    showToast('cleared the withered plant.');
   }
 
   // ---- keyboard ----
@@ -851,6 +1019,12 @@ function Game() {
   const speedMult = equipped?.equip?.mode === 'vehicle' ? (equipped.equip.speedMult ?? 1) : 1;
   const stepDur = ((dash ? DASH_MS : WALK_MS) * speedMult) / 1000;
 
+  // Attachment sockets on the player rig (in the rig's own char grid). Derived
+  // from the sprite, not a magic number, so they stay correct if the art changes.
+  const playerW = Math.max(...character.sprite.map((l) => l.length));
+  const HAND_X = playerW - 2; // ~ right-hand column
+  const HAND_Y = 1; // second sprite line ≈ arm height
+
   const timeStr = formatWorldTime(wt);
   const secsToRefresh = Math.ceil((HOUR_MS - (wt % HOUR_MS)) / 1000);
   const refreshStr = `${String(Math.floor(secsToRefresh / 60)).padStart(2, '0')}:${String(
@@ -900,7 +1074,70 @@ function Game() {
                   transition: `left ${stepDur}s linear, top ${stepDur}s linear, transform 0.15s ease`,
                 }}
               >
-              <pre className="ground">{GROUND_TEXT}</pre>
+              <OceanLayer />
+              {LAND_LAYERS.map((l) => (
+                <pre key={l.region} className={'ground region-' + l.region}>
+                  {l.text}
+                </pre>
+              ))}
+
+              {/* garden: fence + doors, then a sprite per bed slot */}
+              <pre
+                className="garden-fence"
+                style={{
+                  left: `${GARDEN.x0 * TILE_CH}ch`,
+                  top: `${GARDEN.y0 * TILE_LN}em`,
+                  zIndex: GARDEN.y0,
+                }}
+              >
+                {gardenFence(doors).join('\n')}
+              </pre>
+              {SLOTS.map((s, i) => {
+                const c = crops.find((cr) => cr.slot === i);
+                const spr = c ? slotSprite(c, wt) : EMPTY_SLOT;
+                const thirsty = c && c.stage === 'growing' && cropStatus(c, wt).thirsty;
+                return (
+                  <pre
+                    key={`slot-${i}`}
+                    className={
+                      'crop-slot' + (c ? ' ' + c.stage : ' empty') + (thirsty ? ' thirsty' : '')
+                    }
+                    style={{
+                      left: `${s.x * TILE_CH}ch`,
+                      top: `${s.y * TILE_LN}em`,
+                      zIndex: s.y + 1,
+                    }}
+                  >
+                    {spr.join('\n')}
+                  </pre>
+                );
+              })}
+              {crops.map((c) => {
+                const st = cropStatus(c, wt);
+                const badge =
+                  c.stage === 'ready'
+                    ? 'ready!'
+                    : c.stage === 'failed'
+                      ? 'x'
+                      : st.thirsty
+                        ? 'water!'
+                        : '';
+                if (!badge) return null;
+                const s = SLOTS[c.slot];
+                return (
+                  <div
+                    key={`badge-${c.id}`}
+                    className={'crop-badge ' + c.stage + (st.thirsty ? ' thirsty' : '')}
+                    style={{
+                      left: `${s.x * TILE_CH}ch`,
+                      top: `${Math.max(0, s.y * TILE_LN - 1)}em`,
+                      zIndex: 450,
+                    }}
+                  >
+                    {badge}
+                  </div>
+                );
+              })}
 
               {ents.map((e) => (
                 <pre
@@ -938,36 +1175,13 @@ function Game() {
                 </pre>
               )}
 
-              {equipped?.equip?.mode === 'vehicle' && (
-                <pre
-                  className="ent gear"
-                  style={{
-                    left: `${player.x * TILE_CH - 1}ch`,
-                    top: `${player.y * TILE_LN + 2}em`,
-                    zIndex: player.y + PLAYER_T.hT,
-                    transitionDuration: `${stepDur}s`,
-                  }}
-                >
-                  {equipped.sprite.join('\n')}
-                </pre>
-              )}
-
-              {equipped?.equip?.mode === 'hold' && (
-                <pre
-                  className="ent held"
-                  style={{
-                    left: `${player.x * TILE_CH + 7}ch`,
-                    top: `${player.y * TILE_LN + 1}em`,
-                    zIndex: player.y + PLAYER_T.hT,
-                    transitionDuration: `${stepDur}s`,
-                  }}
-                >
-                  {equipped.sprite.join('\n')}
-                </pre>
-              )}
-
-              <pre
-                className="ent player"
+              {/* Player rig: the ONLY element positioned in world space. The
+                  player sprite and any attached gear/held items are children
+                  with fixed offsets in the rig's own grid, so they can never
+                  desync from the player or from each other. Only the rig moves;
+                  visual sizing is done with transform, never font-size. */}
+              <div
+                className="player-rig"
                 style={{
                   left: `${player.x * TILE_CH}ch`,
                   top: `${player.y * TILE_LN}em`,
@@ -975,8 +1189,20 @@ function Game() {
                   transitionDuration: `${stepDur}s`,
                 }}
               >
-                {character.sprite.join('\n')}
-              </pre>
+                <pre className="player-sprite">{character.sprite.join('\n')}</pre>
+
+                {equipped?.equip?.mode === 'vehicle' && (
+                  <pre className="rig-gear" style={{ left: '-1ch', top: '2em' }}>
+                    {equipped.sprite.join('\n')}
+                  </pre>
+                )}
+
+                {equipped?.equip?.mode === 'hold' && (
+                  <pre className="rig-held" style={{ left: `${HAND_X}ch`, top: `${HAND_Y}em` }}>
+                    {equipped.sprite.join('\n')}
+                  </pre>
+                )}
+              </div>
 
               {toast && (
                 <div
@@ -991,17 +1217,23 @@ function Game() {
                 </div>
               )}
 
-              {fTarget && !modal && (
-                <div
-                  className="fpop"
-                  style={{
-                    left: `${fTarget.x * TILE_CH + 1}ch`,
-                    top: `${Math.max(0, fTarget.y * TILE_LN - 1.6)}em`,
-                  }}
-                >
-                  [F]
-                </div>
-              )}
+              {!modal &&
+                (cropSlot >= 0 || gTarget || fTarget) &&
+                (() => {
+                  // priority: the plant you're next to, then a door, then any entity
+                  const t = cropSlot >= 0 ? SLOTS[cropSlot] : (gTarget ?? fTarget!);
+                  return (
+                    <div
+                      className="fpop"
+                      style={{
+                        left: `${t.x * TILE_CH + 1}ch`,
+                        top: `${Math.max(0, t.y * TILE_LN - 1.6)}em`,
+                      }}
+                    >
+                      [F]
+                    </div>
+                  );
+                })()}
 
               {nothingEnt && (
                 <div
@@ -1051,7 +1283,16 @@ function Game() {
             </div>
           )}
 
-          {modal.t === 'detail' && <DetailPanel item={modal.item} />}
+          {modal.t === 'detail' && (
+            <DetailPanel
+              item={modal.item}
+              onPlant={
+                PLANTABLE_BASE.includes(modal.item) && inv[modal.item] > 0
+                  ? () => plantBase(modal.item)
+                  : undefined
+              }
+            />
+          )}
 
           {modal.t === 'dialog' && (
             <div className="panel dialog-panel">
@@ -1264,28 +1505,74 @@ function Game() {
             (() => {
               const owned = bag.find((o) => o.ownedId === modal.ownedId);
               if (!owned) return null;
-              const isEquipped = equipped?.ownedId === owned.ownedId;
-              const opts =
-                owned.kind === 'token'
-                  ? ['Use token']
-                  : owned.equip
-                    ? [isEquipped ? 'Unequip' : 'Equip']
-                    : [];
+              const { labels, pick } = ownedOptList(owned);
               return (
                 <div className="panel detail-panel">
                   <div className="panel-title">{owned.name}</div>
                   <pre className="detail-sprite">{owned.sprite.join('\n')}</pre>
                   <p className="detail-desc">{owned.desc}</p>
                   <p className="detail-fact">* {owned.funcDesc}</p>
-                  {opts.length > 0 && (
+                  {labels.length > 0 && (
                     <OptList
-                      opts={opts}
+                      opts={labels}
                       sel={modal.sel}
                       onSel={(i) => setModal({ ...modal, sel: i })}
-                      onPick={() => ownedAction(owned)}
+                      onPick={pick}
                     />
                   )}
                   <div className="hint">[Esc] back</div>
+                </div>
+              );
+            })()}
+
+          {modal.t === 'crop' &&
+            (() => {
+              const c = crops.find((x) => x.slot === modal.slot);
+              if (!c) return null;
+              const st = cropStatus(c, wt);
+              const mins = (ms: number) => Math.max(0, Math.ceil(ms / 60000));
+              return (
+                <div className="panel detail-panel">
+                  <div className="panel-title">{c.name}</div>
+                  <pre className="detail-sprite">{slotSprite(c, wt).join('\n')}</pre>
+                  <p className="detail-fact">* {c.care.hint}</p>
+                  <div className="crop-status">
+                    {c.stage === 'ready' ? (
+                      <span className="ok">Fully grown — ready to harvest!</span>
+                    ) : c.stage === 'failed' ? (
+                      <span className="bad">It withered from thirst. Clear the slot to replant.</span>
+                    ) : (
+                      <>
+                        <div>growth: {Math.round(st.progress * 100)}% &#183; matures in ~{mins(st.msToMature)} min</div>
+                        <div className={st.thirsty ? 'bad' : 'ok'}>
+                          {st.thirsty
+                            ? `thirsty! water within ~${mins(st.msToFail)} min or it wilts`
+                            : `watered &#183; next water in ~${mins(st.msToDue)} min`}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <OptList
+                    opts={
+                      c.stage === 'ready'
+                        ? ['Harvest', 'Back']
+                        : c.stage === 'failed'
+                          ? ['Clear slot', 'Back']
+                          : ['Water', 'Back']
+                    }
+                    sel={0}
+                    onSel={() => {}}
+                    onPick={(i) => {
+                      if (i === 1) {
+                        setModal(null);
+                        return;
+                      }
+                      if (c.stage === 'ready') harvestCrop(c.slot);
+                      else if (c.stage === 'failed') clearCrop(c.slot);
+                      else waterCrops(c.slot);
+                    }}
+                  />
+                  <div className="hint">[Esc] close &#183; walk up to each plant to tend it</div>
                 </div>
               );
             })()}
@@ -1472,7 +1759,7 @@ function CraftPanel({
   );
 }
 
-function DetailPanel({ item }: { item: ItemType }) {
+function DetailPanel({ item, onPlant }: { item: ItemType; onPlant?: () => void }) {
   const [fact, setFact] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
@@ -1490,6 +1777,9 @@ function DetailPanel({ item }: { item: ItemType }) {
       <pre className="detail-sprite">{ITEM_SPRITES[item].join('\n')}</pre>
       <p className="detail-desc">{ITEM_INFO[item].desc}</p>
       <p className="detail-fact">* fun fact: {fact ?? '...'}</p>
+      {onPlant && (
+        <OptList opts={['Plant in garden']} sel={0} onSel={() => {}} onPick={onPlant} />
+      )}
       <div className="hint">[Esc] back</div>
     </div>
   );
@@ -1653,6 +1943,17 @@ function StoragePanel({
       </div>
     </div>
   );
+}
+
+// Cycles the pre-rendered ocean wave frames. Self-contained so the animation
+// re-renders only this layer, not the whole game.
+function OceanLayer() {
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    const iv = window.setInterval(() => setPhase((p) => (p + 1) % OCEAN_FRAMES.length), 600);
+    return () => window.clearInterval(iv);
+  }, []);
+  return <pre className="ocean">{OCEAN_FRAMES[phase]}</pre>;
 }
 
 function TouchControls({

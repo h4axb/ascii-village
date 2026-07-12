@@ -212,7 +212,7 @@ pre {
   font-size: 14px;
   line-height: 1;
   width: 112ch;
-  height: 32em;
+  height: 40em; /* must match VIEW_H in App.tsx */
   overflow: hidden;
   transition: filter 3s ease;
 }
@@ -243,6 +243,47 @@ pre {
   color: #454545;
   white-space: pre;
   line-height: 1;
+}
+
+/* per-region ground colours (each region is its own layer) */
+.region-beach {
+  color: #c9b98a;
+}
+.region-meadow {
+  color: #6a9a4e;
+}
+.region-jungle {
+  color: #3f7a3a;
+}
+.region-desert {
+  color: #c2a35a;
+}
+.region-rocky {
+  color: #6d6a66;
+}
+.region-tundra {
+  color: #cdd6e2;
+}
+
+/* the ocean sits behind every land layer and gently shimmers as its wave
+   frames cycle */
+.ocean {
+  position: absolute;
+  inset: 0;
+  color: #3f74a8;
+  white-space: pre;
+  line-height: 1;
+  animation: sea 4s ease-in-out infinite;
+}
+
+@keyframes sea {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .ent {
@@ -314,12 +355,36 @@ pre {
     top 0.1s linear;
 }
 
-.ent.held {
+/* Player rig — the only element positioned in world space. Attachments hang
+   off it as children, so they can never desync from the player. Visual sizing
+   is done with transform ONLY (never font-size, which would shrink the ch/em
+   grid the children are positioned on and reintroduce the drift bug). */
+.player-rig {
+  position: absolute;
+  transition-property: left, top;
+  transition-timing-function: linear;
+}
+
+.player-rig > pre {
+  position: absolute;
+  white-space: pre;
+  line-height: 1;
+  left: 0;
+  top: 0;
+}
+
+.player-sprite {
+  color: #fff;
+}
+
+.rig-gear {
+  color: #bfbfbf;
+}
+
+.rig-held {
   color: #dcdcdc;
-  font-size: 9px;
-  transition:
-    left 0.1s linear,
-    top 0.1s linear;
+  transform: scale(0.7);
+  transform-origin: center left;
 }
 
 .shaking {
@@ -979,4 +1044,165 @@ pre {
   height: 62px;
   border-radius: 50%;
   font-size: 20px;
+}
+
+/* ---------- garden / farming ---------- */
+
+.garden-fence {
+  position: absolute;
+  white-space: pre;
+  line-height: 1;
+  color: #8a6d4b; /* wood tone */
+}
+
+.crop-slot {
+  position: absolute;
+  white-space: pre;
+  line-height: 1;
+  color: #6bbf59; /* growing green */
+}
+
+.crop-slot.empty {
+  color: #4a4a4a;
+}
+
+.crop-slot.ready {
+  color: #9bee74;
+  text-shadow: 0 0 6px rgba(155, 238, 116, 0.6);
+}
+
+.crop-slot.failed {
+  color: #8a6a4a;
+}
+
+.crop-slot.thirsty {
+  color: #d3bd57; /* dry yellow */
+}
+
+.crop-badge {
+  position: absolute;
+  font-size: 8px;
+  font-weight: bold;
+  padding: 0 3px;
+  color: #0a0a0a;
+  background: #d3bd57;
+  white-space: nowrap;
+}
+
+.crop-badge.ready {
+  background: #9bee74;
+  animation: bob 1s infinite;
+}
+
+.crop-badge.thirsty {
+  background: #d3bd57;
+  animation: bob 1s infinite;
+}
+
+.crop-badge.failed {
+  background: #8a5a4a;
+  color: #fff;
+}
+
+/* bed modal */
+.bed-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.bed-slot {
+  border: 1px solid #3d3d3d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  min-height: 74px;
+  justify-content: center;
+}
+
+.bed-slot.filled {
+  cursor: pointer;
+}
+
+.bed-slot.filled:hover {
+  background: #161616;
+}
+
+.bed-slot.empty {
+  opacity: 0.5;
+}
+
+.bed-slot.ready {
+  border-color: #6ea84f;
+}
+
+.bed-slot.thirsty {
+  border-color: #a08f3c;
+}
+
+.bed-slot.failed {
+  border-color: #7a4b3d;
+}
+
+.bed-slot .mini {
+  font-size: 9px;
+  color: #cfcfcf;
+}
+
+.bed-name {
+  font-size: 10px;
+  color: #ccc;
+  text-align: center;
+}
+
+.bed-state {
+  font-size: 9px;
+  text-align: center;
+  color: #888;
+}
+
+.bed-state.ready {
+  color: #9bee74;
+}
+
+.bed-state.thirsty {
+  color: #d3bd57;
+}
+
+.bed-state.failed {
+  color: #cf8a72;
+}
+
+.bed-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.bed-btn {
+  padding: 5px 14px;
+  border: 1px solid #4a6ea0;
+  color: #cfe0ff;
+}
+
+.bed-btn:hover {
+  background: #16233a;
+}
+
+.crop-status {
+  margin-top: 8px;
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.5;
+  color: #aaa;
+}
+
+.crop-status .ok {
+  color: #8fe36b;
+}
+
+.crop-status .bad {
+  color: #e0a24a;
 }

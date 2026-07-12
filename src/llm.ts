@@ -1,6 +1,16 @@
-// TODO: replace with Anthropic API call.
-// This module mocks an LLM backend. Nothing else in the app knows (or may
-// know) whether these responses are mocked — same async interface either way.
+// LLM backend for the shop/craft/detail features.
+//
+// If an API key is configured (VITE_LLM_API_KEY in .env) these functions call
+// a real OpenAI-compatible model via ./llmClient. If not — or if the call
+// fails for any reason — they fall back to the built-in mock responses below.
+// Nothing else in the app knows (or may know) which path ran: same async
+// interface either way.
+
+import { llmEnabled, chat, chatJSON, MODELS } from './llmClient';
+// Build-time-generated static data (produced offline by scripts/build-*.mjs).
+// The shop samples from these; if they're empty, it falls back to ITEM_POOL.
+import catalogData from './data/catalog.json';
+import spritesData from './data/sprites.json';
 
 const FACTS: Record<string, string[]> = {
   flower: [
@@ -54,7 +64,7 @@ const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 // Shop stock + craft tokens (mocked LLM generation)
 // ---------------------------------------------------------------------------
 
-export const CATEGORIES = ['plant', 'pets', 'clothing', 'vehicle', 'food'] as const;
+export const CATEGORIES = ['plant', 'pets', 'clothing', 'vehicle', 'food', 'utensils'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 // An item instance the player owns (bought or crafted).
@@ -69,10 +79,11 @@ export interface ShopItem {
   funcDesc: string; // what the item does — shown as subtext everywhere
   price: number;
   kind: 'item' | 'token';
+  tool?: 'water'; // utensils that act as tools (e.g. the watering can)
   equip: null | {
     mode: 'vehicle' | 'hold' | 'pet';
     speedMult?: number; // vehicles: movement interval multiplier (<1 = faster)
-    waterOnly?: boolean; // e.g. boats — unusable until water exists
+    float?: boolean; // boats/rafts — lets the player travel onto ocean water
   };
 }
 
@@ -101,7 +112,7 @@ const ITEM_POOL: Record<Category, Omit<ShopItem, 'id' | 'kind'>[]> = {
   vehicle: [
     { name: 'Bicycle', category: 'vehicle', sprite: ['  __o', '  -\\<,', '(*)/(*)'], desc: 'Two wheels of freedom.', funcDesc: 'ride it to move much faster.', price: 30, equip: { mode: 'vehicle', speedMult: 0.55 } },
     { name: 'Skateboard', category: 'vehicle', sprite: [' ______', ' o    o'], desc: 'No brakes. Never had them.', funcDesc: 'ride it to move faster.', price: 22, equip: { mode: 'vehicle', speedMult: 0.7 } },
-    { name: 'Sail Boat', category: 'vehicle', sprite: ['   |\\', '   |_\\', ' \\____/'], desc: 'A small boat with a proud sail.', funcDesc: 'can only be used on water.', price: 35, equip: { mode: 'vehicle', speedMult: 0.6, waterOnly: true } },
+    { name: 'Sail Boat', category: 'vehicle', sprite: ['   |\\', '   |_\\', ' \\____/'], desc: 'A small boat with a proud sail.', funcDesc: 'equip it to sail out onto the ocean.', price: 35, equip: { mode: 'vehicle', speedMult: 0.6, float: true } },
     { name: 'Hand Wagon', category: 'vehicle', sprite: ['[____]', ' o  o'], desc: 'Squeaky but reliable.', funcDesc: 'ride it to move a bit faster.', price: 20, equip: { mode: 'vehicle', speedMult: 0.85 } },
   ],
   food: [
@@ -109,6 +120,11 @@ const ITEM_POOL: Record<Category, Omit<ShopItem, 'id' | 'kind'>[]> = {
     { name: 'Berry Pie', category: 'food', sprite: ['  ~ ~', ' ~~~~~', '(_____)'], desc: 'Still warm in the middle.', funcDesc: 'a tasty snack. share it maybe.', price: 7, equip: { mode: 'hold' } },
     { name: 'Cheese', category: 'food', sprite: ['  ___', ' /o_o\\', ' |___|'], desc: 'Aged to perfection.', funcDesc: 'a tasty snack. mice approve.', price: 5, equip: { mode: 'hold' } },
     { name: 'Honey Jar', category: 'food', sprite: [' [=]', '(###)', '(___)'], desc: 'Liquid gold from local bees.', funcDesc: 'a tasty snack. sticky though.', price: 9, equip: { mode: 'hold' } },
+  ],
+  utensils: [
+    { name: 'Watering Can', category: 'utensils', sprite: ['  __', ' /  |__', '(o___,_)'], desc: 'A little tin watering can.', funcDesc: 'equip it, then press F at the garden bed to water your crops.', price: 15, tool: 'water', equip: { mode: 'hold' } },
+    { name: 'Trowel', category: 'utensils', sprite: ['  __', ' (==)', '  ||'], desc: 'For turning soil.', funcDesc: 'hold it and feel like a proper gardener.', price: 8, equip: { mode: 'hold' } },
+    { name: 'Basket', category: 'utensils', sprite: [' \\___/', ' |###|', ' \\___/'], desc: 'A woven harvest basket.', funcDesc: 'hold it to carry your harvest in style.', price: 9, equip: { mode: 'hold' } },
   ],
 };
 
@@ -118,6 +134,7 @@ const TOKEN_PRICES: Record<Category, number> = {
   clothing: 15,
   vehicle: 35,
   food: 10,
+  utensils: 14,
 };
 
 function seededRand(seed: number) {
@@ -135,7 +152,10 @@ function seededRand(seed: number) {
 export async function getShopStock(category: Category, hourSeed: number): Promise<ShopItem[]> {
   await delay(300);
   const rnd = seededRand(hourSeed * 131 + CATEGORIES.indexOf(category) * 17 + 5);
-  const pool = [...ITEM_POOL[category]];
+  // Prefer the generated catalog; fall back to the hardcoded pool if it's empty
+  // (e.g. the build scripts haven't been run).
+  const source = GENERATED_POOL[category].length > 0 ? GENERATED_POOL[category] : ITEM_POOL[category];
+  const pool = [...source];
   const picked: ShopItem[] = [];
   for (let i = 0; i < 3 && pool.length > 0; i++) {
     const idx = Math.floor(rnd() * pool.length);
@@ -164,29 +184,75 @@ const CATEGORY_WORDS: Record<Category, string[]> = {
   clothing: ['hat', 'scarf', 'boots', 'shirt', 'cape', 'coat', 'glove', 'sock', 'dress', 'jacket'],
   vehicle: ['bike', 'bicycle', 'boat', 'ship', 'canoe', 'kayak', 'skateboard', 'cart', 'wagon', 'sled', 'car', 'scooter'],
   food: ['bread', 'pie', 'cake', 'cheese', 'soup', 'apple', 'berry', 'honey', 'cookie', 'stew', 'sandwich'],
+  utensils: ['can', 'watering', 'trowel', 'basket', 'pot', 'bucket', 'shovel', 'rake', 'hoe', 'spade'],
 };
 
 const WATER_WORDS = ['boat', 'ship', 'canoe', 'kayak', 'raft'];
 const FAST_WORDS = ['bike', 'bicycle', 'scooter'];
 
+// ---------------------------------------------------------------------------
+// Generated catalog → shop pool (built offline; see scripts/build-*.mjs)
+// ---------------------------------------------------------------------------
+
+type CatalogEntry = { name: string; rarity: string; desc: string; funcDesc: string; basePrice: number; category: string };
+type SpriteEntry = { name: string; category: string; sprite: string[] };
+
+const CATEGORY_FALLBACK_SPRITE: Record<Category, string[]> = {
+  plant: ['\\|/', ' | ', '_|_'],
+  pets: ['/^-^\\', '(o.o)', ' |_|'],
+  clothing: [' ___ ', '/___\\', '\\___/'],
+  vehicle: ['  __o', ' -\\<,', '(*)/(*)'],
+  food: [' ___ ', '(   )', '(___)'],
+  utensils: ['  __', ' (==)', '  ||'],
+};
+
+// Derive an equip mode from the category (the catalog doesn't store one).
+function equipFor(category: Category, name: string): ShopItem['equip'] {
+  const p = name.toLowerCase();
+  if (category === 'vehicle') {
+    const water = WATER_WORDS.some((w) => p.includes(w));
+    const fast = FAST_WORDS.some((w) => p.includes(w));
+    return { mode: 'vehicle', speedMult: fast ? 0.55 : 0.7, float: water };
+  }
+  if (category === 'pets') return { mode: 'pet' };
+  return { mode: 'hold' };
+}
+
+// Join catalog + sprites into the same shape ITEM_POOL uses, grouped by category.
+const GENERATED_POOL: Record<Category, Omit<ShopItem, 'id' | 'kind'>[]> = (() => {
+  const spriteMap = new Map<string, string[]>();
+  for (const s of spritesData as SpriteEntry[]) spriteMap.set(`${s.category}:${s.name}`, s.sprite);
+
+  const pool = { plant: [], pets: [], clothing: [], vehicle: [], food: [], utensils: [] } as Record<Category, Omit<ShopItem, 'id' | 'kind'>[]>;
+  for (const e of catalogData as CatalogEntry[]) {
+    if (!(CATEGORIES as readonly string[]).includes(e.category)) continue;
+    const cat = e.category as Category;
+    pool[cat].push({
+      name: e.name,
+      category: cat,
+      sprite: spriteMap.get(`${cat}:${e.name}`) ?? CATEGORY_FALLBACK_SPRITE[cat],
+      desc: e.desc,
+      funcDesc: e.funcDesc,
+      price: Math.max(1, Math.round(e.basePrice) || 1),
+      equip: equipFor(cat, e.name),
+    });
+  }
+  return pool;
+})();
+
 export type CraftResult = { ok: true; item: ShopItem } | { ok: false; reply: string };
 
-// Craft anything the player describes, as long as it fits the token's
-// category. Mocked: keyword checks stand in for real LLM judgement.
-export async function craftItem(category: Category, prompt: string): Promise<CraftResult> {
-  await delay(900);
+// Pick a sprite + default equip/funcDesc for a freshly crafted item. Sprites
+// are hand-drawn ASCII we don't trust an LLM to produce, so we always reuse a
+// template from the category pool. `overrides` lets the LLM path tweak the
+// vehicle behavior (water-only / fast) it inferred from the prompt.
+function buildCraftedItem(
+  category: Category,
+  name: string,
+  prompt: string,
+  overrides?: { water?: boolean; fast?: boolean; funcDesc?: string },
+): ShopItem {
   const p = prompt.toLowerCase();
-  const fitsOwn = CATEGORY_WORDS[category].some((w) => p.includes(w));
-  const other = CATEGORIES.find(
-    (c) => c !== category && CATEGORY_WORDS[c].some((w) => p.includes(w)),
-  );
-  if (!fitsOwn && other) {
-    return {
-      ok: false,
-      reply: `hmm... that sounds more like a ${other} thing. this token only crafts ${category} stuff. try again?`,
-    };
-  }
-  const name = prompt.trim().slice(0, 18).replace(/^\w/, (c) => c.toUpperCase()) || 'Mystery Thing';
   const rnd = seededRand(Array.from(prompt).reduce((a, c) => a + c.charCodeAt(0), category.length));
   const pool = ITEM_POOL[category];
   const template = pool[Math.floor(rnd() * pool.length)];
@@ -194,10 +260,10 @@ export async function craftItem(category: Category, prompt: string): Promise<Cra
   let funcDesc: string;
   switch (category) {
     case 'vehicle': {
-      const water = WATER_WORDS.some((w) => p.includes(w));
-      const fast = FAST_WORDS.some((w) => p.includes(w));
-      equip = { mode: 'vehicle', speedMult: fast ? 0.55 : 0.7, waterOnly: water };
-      funcDesc = water ? 'can only be used on water.' : 'ride it to move faster.';
+      const water = overrides?.water ?? WATER_WORDS.some((w) => p.includes(w));
+      const fast = overrides?.fast ?? FAST_WORDS.some((w) => p.includes(w));
+      equip = { mode: 'vehicle', speedMult: fast ? 0.55 : 0.7, float: water };
+      funcDesc = water ? 'sail it out onto the ocean.' : 'ride it to move faster.';
       break;
     }
     case 'pets':
@@ -216,32 +282,162 @@ export async function craftItem(category: Category, prompt: string): Promise<Cra
       equip = { mode: 'hold' };
       funcDesc = 'a homemade snack. probably edible.';
       break;
+    case 'utensils':
+      equip = { mode: 'hold' };
+      funcDesc = /water/.test(p) ? 'equip it, then press F at the garden bed to water crops.' : 'a handy garden utensil. hold it.';
+      break;
   }
+  const tool: ShopItem['tool'] = category === 'utensils' && /water/.test(p) ? 'water' : undefined;
   return {
-    ok: true,
-    item: {
-      id: `craft-${Date.now()}`,
-      name,
-      category,
-      sprite: template.sprite,
-      desc: `Custom-crafted from a ${category} token.`,
-      funcDesc,
-      price: 0,
-      kind: 'item',
-      equip,
-    },
+    id: `craft-${Date.now()}`,
+    name,
+    category,
+    sprite: template.sprite,
+    desc: `Custom-crafted from a ${category} token.`,
+    funcDesc: overrides?.funcDesc?.trim() || funcDesc,
+    price: 0,
+    kind: 'item',
+    tool,
+    equip,
   };
 }
 
-export async function getFunFact(itemName: string): Promise<string> {
-  await delay(400);
+// Craft anything the player describes, as long as it fits the token's
+// category. Uses the LLM to judge category-fit and name the item when a key is
+// configured; otherwise falls back to the keyword-based mock below.
+export async function craftItem(category: Category, prompt: string): Promise<CraftResult> {
+  if (llmEnabled) {
+    try {
+      const r = await chatJSON<{
+        fits: boolean;
+        otherCategory?: string;
+        name?: string;
+        funcDesc?: string;
+        water?: boolean;
+        fast?: boolean;
+      }>(
+        [
+          {
+            role: 'system',
+            content:
+              'You run the crafting bench in a cozy ASCII village game. A token can only craft ' +
+              `things in its category. The categories are: ${CATEGORIES.join(', ')}. ` +
+              'Given the token category and the player\'s description, reply with JSON only:\n' +
+              '{"fits": boolean, "otherCategory": string|null, "name": string, "funcDesc": string, ' +
+              '"water": boolean, "fast": boolean}\n' +
+              '- fits: does the description belong to the token category?\n' +
+              '- otherCategory: if it clearly belongs to a DIFFERENT listed category, name it, else null.\n' +
+              '- name: a short cute item name, max 18 chars, Title Case.\n' +
+              '- funcDesc: one lowercase playful sentence about what it does, under 12 words.\n' +
+              '- water: true only for boats/rafts (vehicle category).\n' +
+              '- fast: true for fast vehicles like bikes/scooters (vehicle category).',
+          },
+          { role: 'user', content: `Token category: ${category}\nPlayer wants to craft: ${prompt}` },
+        ],
+        // Runtime crafting: Haiku by default (fast, cheap, structured). If the
+        // "three closest options" feel dumb in playtesting, change MODELS.fast
+        // to MODELS.smart on this one line — nothing else moves.
+        { temperature: 0.8, maxTokens: 120, model: MODELS.fast },
+      );
+
+      if (!r.fits) {
+        const other =
+          r.otherCategory && (CATEGORIES as readonly string[]).includes(r.otherCategory)
+            ? r.otherCategory
+            : null;
+        return {
+          ok: false,
+          reply: other
+            ? `hmm... that sounds more like a ${other} thing. this token only crafts ${category} stuff. try again?`
+            : `hmm... that doesn't quite fit a ${category} token. try describing a ${category} thing?`,
+        };
+      }
+      const name = (r.name?.trim() || prompt.trim()).slice(0, 18).replace(/^\w/, (c) => c.toUpperCase()) || 'Mystery Thing';
+      return {
+        ok: true,
+        item: buildCraftedItem(category, name, prompt, { water: r.water, fast: r.fast, funcDesc: r.funcDesc }),
+      };
+    } catch (err) {
+      console.warn('[llm] craftItem fell back to mock:', err);
+      // fall through to the mock below
+    }
+  }
+
+  await delay(900);
+  const p = prompt.toLowerCase();
+  const fitsOwn = CATEGORY_WORDS[category].some((w) => p.includes(w));
+  const other = CATEGORIES.find(
+    (c) => c !== category && CATEGORY_WORDS[c].some((w) => p.includes(w)),
+  );
+  if (!fitsOwn && other) {
+    return {
+      ok: false,
+      reply: `hmm... that sounds more like a ${other} thing. this token only crafts ${category} stuff. try again?`,
+    };
+  }
+  const name = prompt.trim().slice(0, 18).replace(/^\w/, (c) => c.toUpperCase()) || 'Mystery Thing';
+  return { ok: true, item: buildCraftedItem(category, name, prompt) };
+}
+
+function mockFunFact(itemName: string): string {
   const facts = FACTS[itemName] ?? ['Not much is known about this item.'];
   return facts[Math.floor(Math.random() * facts.length)];
 }
 
-export async function getPrice(itemName: string): Promise<number> {
-  await delay(400);
+export async function getFunFact(itemName: string): Promise<string> {
+  if (!llmEnabled) {
+    await delay(400);
+    return mockFunFact(itemName);
+  }
+  try {
+    return await chat(
+      [
+        {
+          role: 'system',
+          content:
+            'You give short, delightful fun facts for a cozy ASCII farming game. ' +
+            'Reply with ONE surprising, true-sounding fact in a single sentence, under 20 words. ' +
+            'No preamble, no quotes, no emoji.',
+        },
+        { role: 'user', content: `Fun fact about: ${itemName}` },
+      ],
+      { temperature: 0.9, maxTokens: 60 },
+    );
+  } catch (err) {
+    console.warn('[llm] getFunFact fell back to mock:', err);
+    return mockFunFact(itemName);
+  }
+}
+
+function mockPrice(itemName: string): number {
   const base = BASE_PRICE[itemName] ?? 1;
   // slight random variance: -1, 0, or +1
   return Math.max(1, base + Math.floor(Math.random() * 3) - 1);
+}
+
+export async function getPrice(itemName: string): Promise<number> {
+  if (!llmEnabled) {
+    await delay(400);
+    return mockPrice(itemName);
+  }
+  try {
+    const { price } = await chatJSON<{ price: number }>(
+      [
+        {
+          role: 'system',
+          content:
+            'You are a friendly shopkeeper in a cozy ASCII village game. Price small ' +
+            'foraged items in coins, roughly 1-15. Reply with JSON only: {"price": <integer>}.',
+        },
+        { role: 'user', content: `How many coins for a ${itemName}?` },
+      ],
+      { temperature: 0.7, maxTokens: 20 },
+    );
+    const n = Math.round(Number(price));
+    if (!Number.isFinite(n) || n < 1) throw new Error(`bad price: ${price}`);
+    return Math.min(99, n);
+  } catch (err) {
+    console.warn('[llm] getPrice fell back to mock:', err);
+    return mockPrice(itemName);
+  }
 }

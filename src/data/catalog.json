@@ -1,0 +1,802 @@
+[
+  {
+    "name": "Sunny Clover",
+    "rarity": "common",
+    "desc": "A cheerful little clover that turns to face the morning light.",
+    "funcDesc": "gives villagers a tiny mood boost when nibbled on.",
+    "basePrice": 3,
+    "category": "plant"
+  },
+  {
+    "name": "Puffcap Mushroom",
+    "rarity": "common",
+    "desc": "A soft round mushroom that releases a gentle poof of spores when tapped.",
+    "funcDesc": "pops a harmless cloud that makes nearby critters giggle.",
+    "basePrice": 4,
+    "category": "plant"
+  },
+  {
+    "name": "Dew Grass",
+    "rarity": "common",
+    "desc": "Slender grass blades that always seem to hold a single sparkling droplet.",
+    "funcDesc": "refills a watering can with a splash of fresh dew.",
+    "basePrice": 3,
+    "category": "plant"
+  },
+  {
+    "name": "Buttercup Sprout",
+    "rarity": "common",
+    "desc": "A tiny yellow sprout that hums with quiet contentment.",
+    "funcDesc": "brews into a mild tea that soothes tired farmers.",
+    "basePrice": 4,
+    "category": "plant"
+  },
+  {
+    "name": "Pebble Moss",
+    "rarity": "common",
+    "desc": "A cushiony moss that grows happily over old stones and forgotten paths.",
+    "funcDesc": "softens rocky tiles so villagers can nap on them.",
+    "basePrice": 3,
+    "category": "plant"
+  },
+  {
+    "name": "Whistling Reed",
+    "rarity": "common",
+    "desc": "A hollow reed that sings a soft note whenever the wind passes through.",
+    "funcDesc": "can be carved into a tiny whistle for calling pets.",
+    "basePrice": 5,
+    "category": "plant"
+  },
+  {
+    "name": "Firefly Fern",
+    "rarity": "uncommon",
+    "desc": "A feathery fern that glimmers faintly after dusk like caught starlight.",
+    "funcDesc": "lights up dim garden paths just enough to see your feet.",
+    "basePrice": 9,
+    "category": "plant"
+  },
+  {
+    "name": "Honeybell Flower",
+    "rarity": "uncommon",
+    "desc": "A dangling bell-shaped bloom that drips with sweet golden nectar.",
+    "funcDesc": "attracts friendly bees who help pollinate your whole farm.",
+    "basePrice": 10,
+    "category": "plant"
+  },
+  {
+    "name": "Moonpetal Lily",
+    "rarity": "uncommon",
+    "desc": "A pale lily that only opens its petals under moonlight.",
+    "funcDesc": "brewed into a calming potion that helps villagers sleep deeply.",
+    "basePrice": 12,
+    "category": "plant"
+  },
+  {
+    "name": "Chatterleaf Bush",
+    "rarity": "uncommon",
+    "desc": "A bush whose leaves rustle in patterns that almost sound like gossip.",
+    "funcDesc": "warns you with a rustle whenever someone sneaks into your garden.",
+    "basePrice": 11,
+    "category": "plant"
+  },
+  {
+    "name": "Blueberry Bramble",
+    "rarity": "uncommon",
+    "desc": "A thorny bramble bursting with plump, tart little blueberries.",
+    "funcDesc": "yields a handful of berries perfect for jam-making contests.",
+    "basePrice": 8,
+    "category": "plant"
+  },
+  {
+    "name": "Crystal Thistle",
+    "rarity": "rare",
+    "desc": "A spiky thistle whose petals have hardened into tiny glittering crystals.",
+    "funcDesc": "can be ground into shimmer-dust for enchanting simple tools.",
+    "basePrice": 20,
+    "category": "plant"
+  },
+  {
+    "name": "Emberbloom",
+    "rarity": "rare",
+    "desc": "A fiery orange flower that stays warm to the touch even in winter.",
+    "funcDesc": "keeps a small room cozy for a full chilly night.",
+    "basePrice": 22,
+    "category": "plant"
+  },
+  {
+    "name": "Whisperwillow Sapling",
+    "rarity": "rare",
+    "desc": "A tiny willow that seems to murmur old forgotten lullabies in the breeze.",
+    "funcDesc": "soothes crying babies and grumpy livestock alike.",
+    "basePrice": 25,
+    "category": "plant"
+  },
+  {
+    "name": "Glasswing Orchid",
+    "rarity": "rare",
+    "desc": "An elegant orchid with petals so translucent they catch rainbows in sunlight.",
+    "funcDesc": "prized by collectors for its dazzling display at village fairs.",
+    "basePrice": 24,
+    "category": "plant"
+  },
+  {
+    "name": "Stormroot Vine",
+    "rarity": "rare",
+    "desc": "A hardy vine that crackles faintly with static after a thunderstorm.",
+    "funcDesc": "charges tiny gadgets when draped near a windowsill.",
+    "basePrice": 21,
+    "category": "plant"
+  },
+  {
+    "name": "Starseed Blossom",
+    "rarity": "legendary",
+    "desc": "A rare flower said to have grown from a fallen star, glowing softly through the night.",
+    "funcDesc": "grants a wish-like blessing to one lucky villager per season.",
+    "basePrice": 45,
+    "category": "plant"
+  },
+  {
+    "name": "Evergold Tree Sprout",
+    "rarity": "legendary",
+    "desc": "A miniature sapling with leaves of shimmering gold that never wilt.",
+    "funcDesc": "slowly generates a trickle of coins if planted and cared for.",
+    "basePrice": 55,
+    "category": "plant"
+  },
+  {
+    "name": "Dreamvine Orchid",
+    "rarity": "legendary",
+    "desc": "A mysterious orchid whose fragrance is said to pull sweet dreams from the air.",
+    "funcDesc": "lets villagers share a dream together when brewed as tea.",
+    "basePrice": 50,
+    "category": "plant"
+  },
+  {
+    "name": "Phoenix Fern",
+    "rarity": "legendary",
+    "desc": "An ancient fern that bursts into gentle flame and regrows anew each dawn.",
+    "funcDesc": "regrows itself endlessly, never truly dying no matter what.",
+    "basePrice": 60,
+    "category": "plant"
+  },
+  {
+    "name": "Puddle Duck",
+    "rarity": "common",
+    "desc": "A cheerful duckling that quacks at every rain puddle it finds.",
+    "funcDesc": "waddles around leaving tiny wet footprints everywhere.",
+    "basePrice": 4,
+    "category": "pets"
+  },
+  {
+    "name": "Meadow Mouse",
+    "rarity": "common",
+    "desc": "A tiny mouse with a nose for clover and mischief.",
+    "funcDesc": "nibbles your garden fence when it thinks nobody's looking.",
+    "basePrice": 3,
+    "category": "pets"
+  },
+  {
+    "name": "Pebble Snail",
+    "rarity": "common",
+    "desc": "A slow, sweet snail whose shell looks like a painted river stone.",
+    "funcDesc": "leaves sparkly trails that make great treasure maps.",
+    "basePrice": 3,
+    "category": "pets"
+  },
+  {
+    "name": "Sock Bunny",
+    "rarity": "common",
+    "desc": "A fluffy bunny that hoards odd socks for its cozy burrow.",
+    "funcDesc": "steals one sock from every laundry line it hops past.",
+    "basePrice": 5,
+    "category": "pets"
+  },
+  {
+    "name": "Dust Kitten",
+    "rarity": "common",
+    "desc": "A soft grey kitten born from sunlit attic dust.",
+    "funcDesc": "sneezes little puffs of glitter when it's happy.",
+    "basePrice": 6,
+    "category": "pets"
+  },
+  {
+    "name": "Twig Beetle",
+    "rarity": "common",
+    "desc": "A tiny beetle disguised as a wandering twig.",
+    "funcDesc": "clicks its shell like tiny castanets when excited.",
+    "basePrice": 3,
+    "category": "pets"
+  },
+  {
+    "name": "Moth Lantern",
+    "rarity": "common",
+    "desc": "A gentle moth whose wings glow like a paper lantern at dusk.",
+    "funcDesc": "lights up dim garden paths just by fluttering nearby.",
+    "basePrice": 7,
+    "category": "pets"
+  },
+  {
+    "name": "Garden Toad",
+    "rarity": "common",
+    "desc": "A round toad who guards the vegetable patch like a tiny knight.",
+    "funcDesc": "croaks proudly whenever a snail dares cross its lettuce.",
+    "basePrice": 4,
+    "category": "pets"
+  },
+  {
+    "name": "Barn Sparrow",
+    "rarity": "common",
+    "desc": "A chirpy sparrow that nests in the rafters of every barn it visits.",
+    "funcDesc": "sings off-key lullabies that somehow still work.",
+    "basePrice": 4,
+    "category": "pets"
+  },
+  {
+    "name": "Moon Hare",
+    "rarity": "uncommon",
+    "desc": "A silvery hare said to hop between moonbeams on clear nights.",
+    "funcDesc": "thumps its foot to summon a little shower of stardust.",
+    "basePrice": 14,
+    "category": "pets"
+  },
+  {
+    "name": "Ember Fox",
+    "rarity": "uncommon",
+    "desc": "A warm-furred fox with a tail that flickers like campfire light.",
+    "funcDesc": "curls up by your feet and toasts marshmallows with its tail.",
+    "basePrice": 16,
+    "category": "pets"
+  },
+  {
+    "name": "Whisper Owl",
+    "rarity": "uncommon",
+    "desc": "A quiet owl that speaks only in soft, secretive hoots.",
+    "funcDesc": "tells you tomorrow's weather if you ask it nicely.",
+    "basePrice": 15,
+    "category": "pets"
+  },
+  {
+    "name": "Jelly Slime",
+    "rarity": "uncommon",
+    "desc": "A wobbly, translucent slime that jiggles happily in the sun.",
+    "funcDesc": "bounces into any container and holds its shape for snacks.",
+    "basePrice": 12,
+    "category": "pets"
+  },
+  {
+    "name": "Star Snail",
+    "rarity": "uncommon",
+    "desc": "A snail whose shell holds a tiny swirling galaxy inside.",
+    "funcDesc": "hums faint constellations while it slowly explores your shelf.",
+    "basePrice": 17,
+    "category": "pets"
+  },
+  {
+    "name": "Cloud Sheep",
+    "rarity": "uncommon",
+    "desc": "A fluffy sheep so light it occasionally drifts a few inches off the ground.",
+    "funcDesc": "sheds soft cloud-fluff that never seems to run out.",
+    "basePrice": 13,
+    "category": "pets"
+  },
+  {
+    "name": "Glass Deer",
+    "rarity": "rare",
+    "desc": "A delicate deer with antlers of clear, singing crystal.",
+    "funcDesc": "chimes a gentle melody with every careful step it takes.",
+    "basePrice": 28,
+    "category": "pets"
+  },
+  {
+    "name": "Ink Raven",
+    "rarity": "rare",
+    "desc": "A sleek raven whose feathers drip like fresh calligraphy ink.",
+    "funcDesc": "writes tiny secret messages wherever it perches.",
+    "basePrice": 25,
+    "category": "pets"
+  },
+  {
+    "name": "Tide Turtle",
+    "rarity": "rare",
+    "desc": "An ancient turtle whose shell holds a miniature tide pool ecosystem.",
+    "funcDesc": "carries a whole tiny beach around on its back.",
+    "basePrice": 30,
+    "category": "pets"
+  },
+  {
+    "name": "Aurora Stag",
+    "rarity": "legendary",
+    "desc": "A majestic stag whose antlers ripple with borrowed northern lights.",
+    "funcDesc": "paints the night sky above your farm whenever it wanders out.",
+    "basePrice": 50,
+    "category": "pets"
+  },
+  {
+    "name": "Sun Phoenix",
+    "rarity": "legendary",
+    "desc": "A radiant phoenix that rises anew each morning with the village sunrise.",
+    "funcDesc": "warms the whole village square just by stretching its wings.",
+    "basePrice": 60,
+    "category": "pets"
+  },
+  {
+    "name": "Straw Sunhat",
+    "rarity": "common",
+    "desc": "A wide-brimmed hat woven from golden farm straw, perfect for lazy afternoons.",
+    "funcDesc": "keeps the sun out of your eyes and the hay in your hair.",
+    "basePrice": 4,
+    "category": "clothing"
+  },
+  {
+    "name": "Woolly Mittens",
+    "rarity": "common",
+    "desc": "Thick mittens knitted from freshly sheared village wool.",
+    "funcDesc": "warms chilly paws faster than a cup of cocoa.",
+    "basePrice": 3,
+    "category": "clothing"
+  },
+  {
+    "name": "Patchwork Scarf",
+    "rarity": "common",
+    "desc": "A cheerful scarf stitched together from leftover fabric scraps.",
+    "funcDesc": "wraps snugly around your neck and shows off your love of thrift.",
+    "basePrice": 4,
+    "category": "clothing"
+  },
+  {
+    "name": "Muddy Rain Boots",
+    "rarity": "common",
+    "desc": "Sturdy boots that have already made peace with every puddle in town.",
+    "funcDesc": "lets you stomp through mud without a single complaint.",
+    "basePrice": 5,
+    "category": "clothing"
+  },
+  {
+    "name": "Knit Beanie",
+    "rarity": "common",
+    "desc": "A soft little beanie topped with a bouncy pom-pom.",
+    "funcDesc": "keeps your head toasty and your pom-pom bouncing.",
+    "basePrice": 4,
+    "category": "clothing"
+  },
+  {
+    "name": "Cotton Apron",
+    "rarity": "common",
+    "desc": "A simple apron dusted with flour from countless kitchen mishaps.",
+    "funcDesc": "catches spills before they ruin your favorite shirt.",
+    "basePrice": 3,
+    "category": "clothing"
+  },
+  {
+    "name": "Buttoned Vest",
+    "rarity": "common",
+    "desc": "A tidy vest with brass buttons polished by loving hands.",
+    "funcDesc": "adds a dash of dapper to any farmer's outfit.",
+    "basePrice": 5,
+    "category": "clothing"
+  },
+  {
+    "name": "Striped Socks",
+    "rarity": "common",
+    "desc": "Cheerful striped socks that never quite match each other.",
+    "funcDesc": "keeps toes warm and mismatched on purpose.",
+    "basePrice": 3,
+    "category": "clothing"
+  },
+  {
+    "name": "Linen Tunic",
+    "rarity": "common",
+    "desc": "A breathable tunic ideal for tending gardens under the summer sun.",
+    "funcDesc": "lets you weed the garden without breaking a sweat.",
+    "basePrice": 4,
+    "category": "clothing"
+  },
+  {
+    "name": "Cozy Slippers",
+    "rarity": "common",
+    "desc": "Fluffy slippers shaped like sleepy little bunnies.",
+    "funcDesc": "turns every walk to the fridge into a soft hop.",
+    "basePrice": 4,
+    "category": "clothing"
+  },
+  {
+    "name": "Embroidered Shawl",
+    "rarity": "uncommon",
+    "desc": "A shawl embroidered with tiny blooming flowers by the village seamstress.",
+    "funcDesc": "adds a touch of elegance to fireside gatherings.",
+    "basePrice": 11,
+    "category": "clothing"
+  },
+  {
+    "name": "Feathered Cap",
+    "rarity": "uncommon",
+    "desc": "A jaunty cap adorned with a single bright feather.",
+    "funcDesc": "makes every hello feel like a grand entrance.",
+    "basePrice": 12,
+    "category": "clothing"
+  },
+  {
+    "name": "Leather Satchel Belt",
+    "rarity": "uncommon",
+    "desc": "A rugged belt with a small satchel for carrying foraged treasures.",
+    "funcDesc": "holds your acorns, berries, and secrets alike.",
+    "basePrice": 13,
+    "category": "clothing"
+  },
+  {
+    "name": "Moonlit Cloak",
+    "rarity": "uncommon",
+    "desc": "A cloak that seems to shimmer faintly under starlight.",
+    "funcDesc": "makes nighttime strolls feel a little magical.",
+    "basePrice": 15,
+    "category": "clothing"
+  },
+  {
+    "name": "Silver Locket Necklace",
+    "rarity": "uncommon",
+    "desc": "A delicate locket holding a tiny pressed flower inside.",
+    "funcDesc": "keeps a small memory close to your heart.",
+    "basePrice": 14,
+    "category": "clothing"
+  },
+  {
+    "name": "Dragonscale Gloves",
+    "rarity": "rare",
+    "desc": "Gloves crafted from shimmering scales said to be shed by a friendly dragon.",
+    "funcDesc": "lets you handle hot pots without a single yelp.",
+    "basePrice": 24,
+    "category": "clothing"
+  },
+  {
+    "name": "Starwoven Cape",
+    "rarity": "rare",
+    "desc": "A cape threaded with strands that twinkle like distant stars.",
+    "funcDesc": "turns heads and catches wishes wherever you wander.",
+    "basePrice": 27,
+    "category": "clothing"
+  },
+  {
+    "name": "Phoenix Feather Boa",
+    "rarity": "rare",
+    "desc": "A boa made from feathers rumored to glow warm even in winter.",
+    "funcDesc": "keeps you toasty and fabulously dramatic all season.",
+    "basePrice": 29,
+    "category": "clothing"
+  },
+  {
+    "name": "Crown of Whispering Leaves",
+    "rarity": "legendary",
+    "desc": "An ancient crown woven from leaves that murmur old forest secrets.",
+    "funcDesc": "lets you hear the forest's gossip if you listen closely.",
+    "basePrice": 48,
+    "category": "clothing"
+  },
+  {
+    "name": "Robe of the Eternal Harvest",
+    "rarity": "legendary",
+    "desc": "A radiant robe stitched from threads blessed by the village's oldest harvest festival.",
+    "funcDesc": "makes crops grow a little sweeter wherever you wander.",
+    "basePrice": 58,
+    "category": "clothing"
+  },
+  {
+    "name": "Rickety Cart",
+    "rarity": "common",
+    "desc": "An old wooden cart that creaks with every turn but never quite falls apart.",
+    "funcDesc": "hauls your goods around town while making delightfully spooky squeaky noises.",
+    "basePrice": 4,
+    "category": "vehicle"
+  },
+  {
+    "name": "Garden Wheelbarrow",
+    "rarity": "common",
+    "desc": "A trusty single-wheeled helper perfect for hauling flowers and vegetables.",
+    "funcDesc": "lets you tote pumpkins twice your size without breaking a sweat.",
+    "basePrice": 3,
+    "category": "vehicle"
+  },
+  {
+    "name": "Bicycle Built for Two",
+    "rarity": "common",
+    "desc": "A cheerful tandem bike painted in mismatched patches of color.",
+    "funcDesc": "doubles the fun, and the pedaling, for you and a friend.",
+    "basePrice": 6,
+    "category": "vehicle"
+  },
+  {
+    "name": "Mail Wagon",
+    "rarity": "common",
+    "desc": "A sturdy little wagon that always smells faintly of fresh parchment.",
+    "funcDesc": "zips letters and parcels across town before the ink even dries.",
+    "basePrice": 5,
+    "category": "vehicle"
+  },
+  {
+    "name": "Hay Cart",
+    "rarity": "common",
+    "desc": "A rustic cart piled high with golden hay and the occasional sleepy cat.",
+    "funcDesc": "rolls slow and steady, perfect for lazy countryside afternoons.",
+    "basePrice": 4,
+    "category": "vehicle"
+  },
+  {
+    "name": "Pony Trap",
+    "rarity": "common",
+    "desc": "A dainty two-wheeled carriage pulled by a very opinionated pony.",
+    "funcDesc": "trots you around town while judging your fashion choices.",
+    "basePrice": 7,
+    "category": "vehicle"
+  },
+  {
+    "name": "Rowboat",
+    "rarity": "common",
+    "desc": "A little wooden boat that bobs happily along the village pond.",
+    "funcDesc": "paddles you across the water at a leisurely, splashy pace.",
+    "basePrice": 5,
+    "category": "vehicle"
+  },
+  {
+    "name": "Sled",
+    "rarity": "common",
+    "desc": "A simple wooden sled worn smooth by countless snowy winters.",
+    "funcDesc": "slides you down hills with zero brakes and maximum giggles.",
+    "basePrice": 3,
+    "category": "vehicle"
+  },
+  {
+    "name": "Scooter",
+    "rarity": "common",
+    "desc": "A wobbly little scooter with a bell that rings a bit too enthusiastically.",
+    "funcDesc": "gets you around town quick, provided you can keep your balance.",
+    "basePrice": 4,
+    "category": "vehicle"
+  },
+  {
+    "name": "Steam Trolley",
+    "rarity": "uncommon",
+    "desc": "A charming little trolley that puffs cheerful clouds of steam as it trundles along its tracks.",
+    "funcDesc": "chugs along fixed rails, tooting its whistle at every corner.",
+    "basePrice": 14,
+    "category": "vehicle"
+  },
+  {
+    "name": "Hot Air Balloon",
+    "rarity": "uncommon",
+    "desc": "A patchwork balloon that drifts lazily above rooftops, trailing ribbons in the wind.",
+    "funcDesc": "floats you gently skyward for the best view of the village.",
+    "basePrice": 16,
+    "category": "vehicle"
+  },
+  {
+    "name": "Canal Barge",
+    "rarity": "uncommon",
+    "desc": "A flower-draped barge that glides quietly through the village's winding canals.",
+    "funcDesc": "ferries goods and gossip along the water at a peaceful crawl.",
+    "basePrice": 12,
+    "category": "vehicle"
+  },
+  {
+    "name": "Windmill Kite Cart",
+    "rarity": "uncommon",
+    "desc": "A quirky cart fitted with spinning kite-sails that catch every passing breeze.",
+    "funcDesc": "zooms forward whenever the wind decides to cooperate.",
+    "basePrice": 15,
+    "category": "vehicle"
+  },
+  {
+    "name": "Clockwork Unicycle",
+    "rarity": "uncommon",
+    "desc": "A brass unicycle powered by a tiny, ticking clockwork heart.",
+    "funcDesc": "needs winding every mile but never complains about the workout.",
+    "basePrice": 13,
+    "category": "vehicle"
+  },
+  {
+    "name": "Firefly Lantern Boat",
+    "rarity": "uncommon",
+    "desc": "A tiny boat lit by a swarm of friendly fireflies who insist on riding along.",
+    "funcDesc": "lights your way home through the darkest village nights.",
+    "basePrice": 17,
+    "category": "vehicle"
+  },
+  {
+    "name": "Cloud Skiff",
+    "rarity": "rare",
+    "desc": "A silvery little skiff that somehow floats on nothing but soft morning mist.",
+    "funcDesc": "sails through the clouds as if gravity simply forgot to apply.",
+    "basePrice": 28,
+    "category": "vehicle"
+  },
+  {
+    "name": "Turtle-Drawn Carriage",
+    "rarity": "rare",
+    "desc": "An ancient tortoise pulls this mossy carriage with the patience of a thousand years.",
+    "funcDesc": "arrives eventually, fashionably late but wonderfully dignified.",
+    "basePrice": 24,
+    "category": "vehicle"
+  },
+  {
+    "name": "Star Wagon",
+    "rarity": "rare",
+    "desc": "A wagon whose wheels leave a trail of twinkling stardust behind them.",
+    "funcDesc": "rolls you home under a sky it seems to borrow light from.",
+    "basePrice": 30,
+    "category": "vehicle"
+  },
+  {
+    "name": "Mushroom Trolley",
+    "rarity": "rare",
+    "desc": "A trolley grown from a giant, glowing mushroom cap, favored by woodland folk.",
+    "funcDesc": "bounces along on springy fungal wheels that never go flat.",
+    "basePrice": 26,
+    "category": "vehicle"
+  },
+  {
+    "name": "Moonlit Comet Sleigh",
+    "rarity": "legendary",
+    "desc": "A radiant sleigh said to be carved from a fallen comet, granting safe travel under any moon.",
+    "funcDesc": "streaks across the sky leaving a trail of stardust and envious neighbors.",
+    "basePrice": 55,
+    "category": "vehicle"
+  },
+  {
+    "name": "Dew Berry",
+    "rarity": "common",
+    "desc": "A tiny berry that glistens with morning dew no matter the hour.",
+    "funcDesc": "tastes like sunrise and gives a tiny happy hiccup.",
+    "basePrice": 4,
+    "category": "food"
+  },
+  {
+    "name": "Bread Root",
+    "rarity": "common",
+    "desc": "A knobby vegetable that smells faintly of a fresh-baked loaf.",
+    "funcDesc": "crumbles like toast and pairs well with butter jokes.",
+    "basePrice": 5,
+    "category": "food"
+  },
+  {
+    "name": "Puffcap Mushroom",
+    "rarity": "common",
+    "desc": "A round little mushroom that sighs a soft puff of spores when picked.",
+    "funcDesc": "squeaks when squeezed and leaves a faint sparkle dust.",
+    "basePrice": 3,
+    "category": "food"
+  },
+  {
+    "name": "Honey Pod",
+    "rarity": "common",
+    "desc": "A pod bursting with slow-dripping golden honey.",
+    "funcDesc": "sticky sweet stuff that attracts three grateful bees.",
+    "basePrice": 6,
+    "category": "food"
+  },
+  {
+    "name": "Cloud Turnip",
+    "rarity": "common",
+    "desc": "A pale turnip so light it nearly floats out of the basket.",
+    "funcDesc": "bobs gently and boils into fluffy mash.",
+    "basePrice": 4,
+    "category": "food"
+  },
+  {
+    "name": "Sunpetal Fruit",
+    "rarity": "common",
+    "desc": "A citrus fruit shaped like a tiny sun with warm orange rind.",
+    "funcDesc": "zesty snack that perks up sleepy villagers.",
+    "basePrice": 5,
+    "category": "food"
+  },
+  {
+    "name": "Mossy Egg",
+    "rarity": "common",
+    "desc": "An egg wrapped naturally in a thin coat of soft green moss.",
+    "funcDesc": "cracks open with a earthy little pop.",
+    "basePrice": 4,
+    "category": "food"
+  },
+  {
+    "name": "Sugar Cabbage",
+    "rarity": "common",
+    "desc": "A cabbage so sweet children mistake it for candy.",
+    "funcDesc": "crunches sugary and pairs well with everything.",
+    "basePrice": 3,
+    "category": "food"
+  },
+  {
+    "name": "Riverclam Cake",
+    "rarity": "common",
+    "desc": "A savory little cake shaped like a smiling clam shell.",
+    "funcDesc": "chewy treat that smells faintly of the sea.",
+    "basePrice": 6,
+    "category": "food"
+  },
+  {
+    "name": "Nutty Acorn Bun",
+    "rarity": "common",
+    "desc": "A soft roll baked around a whole roasted acorn.",
+    "funcDesc": "nutty surprise hidden in every warm bite.",
+    "basePrice": 5,
+    "category": "food"
+  },
+  {
+    "name": "Star Grapes",
+    "rarity": "uncommon",
+    "desc": "Tiny grapes that twinkle faintly like distant stars at dusk.",
+    "funcDesc": "pop with a shimmer and taste of cool night air.",
+    "basePrice": 12,
+    "category": "food"
+  },
+  {
+    "name": "Whistling Pear",
+    "rarity": "uncommon",
+    "desc": "A pear that hums a soft note when the wind passes through its core.",
+    "funcDesc": "toots gently when bitten, startling nearby chickens.",
+    "basePrice": 14,
+    "category": "food"
+  },
+  {
+    "name": "Moonfin Roe",
+    "rarity": "uncommon",
+    "desc": "Pearly fish eggs that glow faintly under moonlight.",
+    "funcDesc": "pops on the tongue with a cool silvery fizz.",
+    "basePrice": 16,
+    "category": "food"
+  },
+  {
+    "name": "Emberroot Stew Base",
+    "rarity": "uncommon",
+    "desc": "A fiery red root that keeps simmering long after it's picked.",
+    "funcDesc": "stays warm all day, perfect for lazy campfires.",
+    "basePrice": 13,
+    "category": "food"
+  },
+  {
+    "name": "Velvet Fig",
+    "rarity": "uncommon",
+    "desc": "A plush fig with skin as soft as a well-loved blanket.",
+    "funcDesc": "squishy sweet bite that somehow feels like a hug.",
+    "basePrice": 15,
+    "category": "food"
+  },
+  {
+    "name": "Dragonpepper",
+    "rarity": "rare",
+    "desc": "A tiny pepper said to hold a spark of ancient dragonfire.",
+    "funcDesc": "one bite and you'll be breathing tiny smoke rings for hours.",
+    "basePrice": 28,
+    "category": "food"
+  },
+  {
+    "name": "Silverleaf Tea Bloom",
+    "rarity": "rare",
+    "desc": "A flower whose petals brew into the calmest tea in the village.",
+    "funcDesc": "steeps into pure tranquility, no kettle whistle needed.",
+    "basePrice": 25,
+    "category": "food"
+  },
+  {
+    "name": "Golden Yolk Truffle",
+    "rarity": "rare",
+    "desc": "A rare fungus that tastes exactly like a perfectly fried egg.",
+    "funcDesc": "chefs weep tiny joyful tears when they find one.",
+    "basePrice": 30,
+    "category": "food"
+  },
+  {
+    "name": "Phoenixberry",
+    "rarity": "legendary",
+    "desc": "A blazing berry that regrows on its bush the instant it's eaten.",
+    "funcDesc": "never runs out, much to every merchant's confusion.",
+    "basePrice": 45,
+    "category": "food"
+  },
+  {
+    "name": "Ancient Starloaf",
+    "rarity": "legendary",
+    "desc": "A bread said to have been baked by the very first village baker under a falling star.",
+    "funcDesc": "never goes stale and grants one wish-worthy nap afterward.",
+    "basePrice": 55,
+    "category": "food"
+  }
+]

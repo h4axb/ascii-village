@@ -5,6 +5,7 @@
 
 import type { ItemType } from './world';
 import type { OwnedItem } from './llm';
+import type { PlantedCrop, Doors } from './farm';
 
 export interface SaveState {
   version: 1;
@@ -22,8 +23,9 @@ export interface SaveState {
   // world exceptions (window-scoped ids self-invalidate when windows change)
   removedIds: string[];
   shaken: string[];
-  // step 5 (farming) extends this same object
-  plantedCrops: unknown[];
+  // step 5 (farming): planted crops + garden door states
+  plantedCrops: PlantedCrop[];
+  doors?: Doors;
 }
 
 const KEY = 'ascii-village-save';

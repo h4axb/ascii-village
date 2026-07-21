@@ -41,6 +41,13 @@ export function formatWorldTime(wt: number): string {
 // day/night cycle — drives a brightness tint on the world layer
 export type DayPhase = 'dawn' | 'day' | 'dusk' | 'night';
 
+// HUD clock icon: night runs 18:00-06:00, daylight the rest. Coarser than
+// dayPhaseOf on purpose — the icon is only ever a sun or a moon.
+export function isNightOf(wt: number): boolean {
+  const h = new Date(wt).getHours();
+  return h >= 18 || h < 6;
+}
+
 export function dayPhaseOf(wt: number): DayPhase {
   const h = new Date(wt).getHours();
   if (h >= 6 && h < 8) return 'dawn';

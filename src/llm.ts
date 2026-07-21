@@ -6,11 +6,26 @@
 // Nothing else in the app knows (or may know) which path ran: same async
 // interface either way.
 
-import { llmEnabled, chat, chatJSON, MODELS } from './llmClient';
+import { llmEnabled, chat, chatJSON, chatStream, MODELS } from './llmClient';
 // Build-time-generated static data (produced offline by scripts/build-*.mjs).
 // The shop samples from these; if they're empty, it falls back to ITEM_POOL.
 import catalogData from './data/catalog.json';
 import spritesData from './data/sprites.json';
+// Sprite generation pipeline (text-only → validate → retries → error).
+import {
+  parseSpec,
+  resolveStyle,
+  instanceFromSpec,
+  makeSprite,
+  screenCraftPrompt,
+  suggestAlternatives,
+  type CraftLog,
+} from './craft';
+import { generateReferenceImage } from './imageGen';
+
+// Structured log, one record per generation. Kept in memory + echoed to the
+// console; read it for playtest analysis.
+export const craftLog: CraftLog[] = [];
 
 const FACTS: Record<string, string[]> = {
   flower: [
@@ -80,6 +95,8 @@ export interface ShopItem {
   price: number;
   kind: 'item' | 'token';
   tool?: 'water'; // utensils that act as tools (e.g. the watering can)
+  color?: string; // crafted items: player-chosen colour (CSS colour)
+  scale?: number; // crafted items: player-chosen size multiplier
   equip: null | {
     mode: 'vehicle' | 'hold' | 'pet';
     speedMult?: number; // vehicles: movement interval multiplier (<1 = faster)
@@ -240,7 +257,19 @@ const GENERATED_POOL: Record<Category, Omit<ShopItem, 'id' | 'kind'>[]> = (() =>
   return pool;
 })();
 
-export type CraftResult = { ok: true; item: ShopItem } | { ok: false; reply: string };
+export type CraftResult =
+  | { ok: true; item: ShopItem; refImage?: string }
+  // `suggestions`: up to 3 alternative craft prompts (shown as clickable
+  // buttons). Present only on BENIGN failures — never on category mismatches
+  // or blocked (sensitive) input.
+  | { ok: false; reply: string; suggestions?: string[] };
+
+// Live-progress hooks the crafting UI can pass into craftItem.
+export interface CraftUiHooks {
+  onStage?: (stage: 'image' | 'drawing' | 'retrying') => void;
+  onLine?: (line: string, index: number, level: 0 | 1 | 2) => void;
+  onImage?: (dataUrl: string) => void;
+}
 
 // Pick a sprite + default equip/funcDesc for a freshly crafted item. Sprites
 // are hand-drawn ASCII we don't trust an LLM to produce, so we always reuse a
@@ -302,64 +331,112 @@ function buildCraftedItem(
   };
 }
 
-// Craft anything the player describes, as long as it fits the token's
-// category. Uses the LLM to judge category-fit and name the item when a key is
-// configured; otherwise falls back to the keyword-based mock below.
-export async function craftItem(category: Category, prompt: string): Promise<CraftResult> {
-  if (llmEnabled) {
-    try {
-      const r = await chatJSON<{
-        fits: boolean;
-        otherCategory?: string;
-        name?: string;
-        funcDesc?: string;
-        water?: boolean;
-        fast?: boolean;
-      }>(
-        [
-          {
-            role: 'system',
-            content:
-              'You run the crafting bench in a cozy ASCII village game. A token can only craft ' +
-              `things in its category. The categories are: ${CATEGORIES.join(', ')}. ` +
-              'Given the token category and the player\'s description, reply with JSON only:\n' +
-              '{"fits": boolean, "otherCategory": string|null, "name": string, "funcDesc": string, ' +
-              '"water": boolean, "fast": boolean}\n' +
-              '- fits: does the description belong to the token category?\n' +
-              '- otherCategory: if it clearly belongs to a DIFFERENT listed category, name it, else null.\n' +
-              '- name: a short cute item name, max 18 chars, Title Case.\n' +
-              '- funcDesc: one lowercase playful sentence about what it does, under 12 words.\n' +
-              '- water: true only for boats/rafts (vehicle category).\n' +
-              '- fast: true for fast vehicles like bikes/scooters (vehicle category).',
-          },
-          { role: 'user', content: `Token category: ${category}\nPlayer wants to craft: ${prompt}` },
-        ],
-        // Runtime crafting: Haiku by default (fast, cheap, structured). If the
-        // "three closest options" feel dumb in playtesting, change MODELS.fast
-        // to MODELS.smart on this one line — nothing else moves.
-        { temperature: 0.8, maxTokens: 120, model: MODELS.fast },
-      );
+// craft spec category → the game's token category (only the clear mappings;
+// anything else is allowed on any token)
+const CRAFT_TO_TOKEN: Partial<Record<string, Category>> = {
+  creature: 'pets', plant: 'plant', food: 'food', clothing: 'clothing',
+  vehicle: 'vehicle', weapon: 'utensils', tool: 'utensils', container: 'utensils',
+  gem: 'utensils', potion: 'utensils', instrument: 'utensils', furniture: 'utensils',
+};
 
-      if (!r.fits) {
-        const other =
-          r.otherCategory && (CATEGORIES as readonly string[]).includes(r.otherCategory)
-            ? r.otherCategory
-            : null;
+// Craft anything the player describes. With an LLM key set, this runs the
+// generate → validate → shared-store → fail pipeline and produces a real
+// per-prompt sprite (plus the player's colour/size). Offline, it falls back to
+// the keyword-based mock below so the game still crafts.
+export async function craftItem(category: Category, prompt: string, ui?: CraftUiHooks): Promise<CraftResult> {
+  if (llmEnabled) {
+    const spec = parseSpec(prompt);
+    const wanted = CRAFT_TO_TOKEN[spec.category];
+    if (wanted && wanted !== category) {
+      return {
+        ok: false,
+        reply: `hmm... that sounds more like a ${wanted} thing. this token only crafts ${category} stuff. try again?`,
+      };
+    }
+    try {
+      // PRE-FLIGHT SCREEN — one cheap call making every judgment needed
+      // before generation (category fit + content safety + size class; the
+      // size classification used to be its own call inside makeSprite, so
+      // this is net-zero extra calls). A mismatch or blocked prompt bails
+      // here for ~$0.00002 instead of a full wasted generation.
+      const screened = await screenCraftPrompt(prompt, category, chatJSON, {
+        model: MODELS.fast,
+        fallbackModel: MODELS.fastFallback,
+      });
+      if (screened.sensitive) {
+        // deliberately NO suggestions on blocked input
         return {
           ok: false,
-          reply: other
-            ? `hmm... that sounds more like a ${other} thing. this token only crafts ${category} stuff. try again?`
-            : `hmm... that doesn't quite fit a ${category} token. try describing a ${category} thing?`,
+          reply: "let's keep it cozy in my shop... i won't craft that one. try something friendlier?",
         };
       }
-      const name = (r.name?.trim() || prompt.trim()).slice(0, 18).replace(/^\w/, (c) => c.toUpperCase()) || 'Mystery Thing';
-      return {
-        ok: true,
-        item: buildCraftedItem(category, name, prompt, { water: r.water, fast: r.fast, funcDesc: r.funcDesc }),
-      };
+      if (!screened.fit) {
+        // deliberately NO suggestions on a category mismatch
+        return {
+          ok: false,
+          reply: screened.tokenHint
+            ? `hmm... "${prompt}" feels more like a ${screened.tokenHint} thing. this token only crafts ${category} stuff, purr.`
+            : `hmm... "${prompt}" doesn't really feel like a ${category} thing. this token only crafts ${category} stuff. try again?`,
+        };
+      }
+
+      // Text-only → validate → retries. If every attempt fails, sprite is
+      // null and the player gets an honest error message (no template
+      // stand-in, no silent substitution — deliberate).
+      // strategy:'text-only' — dropped the image-mediated step: it was both
+      // expensive (vision tokens) and counterproductive (over-specifying
+      // visual detail from a reference image was hurting sprite quality, not
+      // helping). genImage/onImage/onStage('image') stay wired but go
+      // unused — keeps the A/B capability available if image-mediated
+      // generation is worth revisiting later; just flip strategy back.
+      const { sprite, log, refImage, error } = await makeSprite(prompt, category, {
+        genImage: generateReferenceImage,
+        chatStream, // streaming Stage 2 transport (per-line validation + fail-fast)
+        classify: async () => screened.sizeClass, // already decided by the screen
+        model: MODELS.smart, // ASCII sprite generation — primary
+        modelFallback: MODELS.smartFallback, // used only if the primary fails before any output
+        strategy: 'text-only',
+        onStage: ui?.onStage,
+        onLine: ui?.onLine,
+        onImage: ui?.onImage,
+      });
+      craftLog.push(log);
+      console.info('[craft]', log);
+
+      if (!sprite) {
+        // BENIGN failure (sensitive/mismatch were filtered above): let Mitchy
+        // offer three strategy-diverse alternatives as clickable options.
+        const s = await suggestAlternatives(prompt, category, error ?? 'generation failed', chatJSON, {
+          model: MODELS.fast,
+          fallbackModel: MODELS.fastFallback,
+        });
+        if (s) return { ok: false, reply: s.intro, suggestions: s.options };
+        return {
+          ok: false,
+          reply:
+            `oops... i tried a few times but couldn't get "${prompt}" right ` +
+            `(${error ?? 'generation failed'}). maybe describe it a bit differently?`,
+        };
+      }
+
+      const name =
+        (sprite.name && sprite.name.trim()) ||
+        prompt.trim().slice(0, 18).replace(/^\w/, (c) => c.toUpperCase()) ||
+        'Mystery Thing';
+      const item = buildCraftedItem(category, name, prompt);
+      item.sprite = sprite.lines; // the freshly generated sprite
+      // colour still comes from the player's words; size is baked into the
+      // sprite's own dimensions (sizeClass), so no CSS scale needed.
+      const style = resolveStyle(instanceFromSpec(spec, item.id));
+      if (style.color) item.color = style.color;
+      item.desc = `Freshly crafted from a ${category} token.`;
+      return { ok: true, item, refImage };
     } catch (err) {
-      console.warn('[llm] craftItem fell back to mock:', err);
-      // fall through to the mock below
+      console.warn('[craft] pipeline error:', err);
+      return {
+        ok: false,
+        reply: "oops... something went wrong on my workbench. give it another try in a moment?",
+      };
     }
   }
 
@@ -395,17 +472,87 @@ export async function getFunFact(itemName: string): Promise<string> {
         {
           role: 'system',
           content:
-            'You give short, delightful fun facts for a cozy ASCII farming game. ' +
+            'You give short, delightful fun facts for Asciia Bay, a cozy ASCII island-farming game. ' +
             'Reply with ONE surprising, true-sounding fact in a single sentence, under 20 words. ' +
             'No preamble, no quotes, no emoji.',
         },
         { role: 'user', content: `Fun fact about: ${itemName}` },
       ],
-      { temperature: 0.9, maxTokens: 60 },
+      { temperature: 0.9, maxTokens: 60, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
     );
   } catch (err) {
     console.warn('[llm] getFunFact fell back to mock:', err);
     return mockFunFact(itemName);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mitchy — the shopkeeper cat NPC. Her chatter is generated by Haiku (fast,
+// cheap, characterful), with static fallback lines when offline or on error.
+// ---------------------------------------------------------------------------
+
+const MITCHY_FALLBACK = [
+  'purrr... nice weather today, huh?',
+  'shake the apple tree. trust me.',
+  'i buy almost anything. ALMOST.',
+  'being a shopkeeper cat is honest work.',
+  'flowers sell well this season.',
+];
+
+// Free-form chat with Mitchy WHILE she crafts — replies to what the player
+// actually typed, in character, without touching the running pipeline.
+export async function mitchyChat(message: string): Promise<string> {
+  const fallback = MITCHY_FALLBACK[Math.floor(Math.random() * MITCHY_FALLBACK.length)];
+  if (!llmEnabled) {
+    await delay(300);
+    return fallback;
+  }
+  try {
+    const line = await chat(
+      [
+        {
+          role: 'system',
+          content:
+            'You are Mitchy, a cozy, witty shopkeeper CAT in Asciia Bay, a cozy ASCII island-village game. You are ' +
+            'currently BUSY crafting an item for the villager and chatting while you work. ' +
+            'Reply to what they said in lowercase, one short line under 20 words, playful and a ' +
+            'little sassy, occasionally slipping in a "purr". No emoji, no quotes, no preamble.',
+        },
+        { role: 'user', content: message },
+      ],
+      { temperature: 1, maxTokens: 50, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
+    );
+    return line || fallback;
+  } catch (err) {
+    console.warn('[llm] mitchyChat fell back to static:', err);
+    return fallback;
+  }
+}
+
+export async function getMitchyLine(context = 'a casual idle'): Promise<string> {
+  const fallback = MITCHY_FALLBACK[Math.floor(Math.random() * MITCHY_FALLBACK.length)];
+  if (!llmEnabled) {
+    await delay(300);
+    return fallback;
+  }
+  try {
+    const line = await chat(
+      [
+        {
+          role: 'system',
+          content:
+            'You are Mitchy, a cozy, witty shopkeeper CAT in Asciia Bay, a cozy ASCII island-village game. ' +
+            'Speak in lowercase, one short line under 18 words, playful and a little sassy, ' +
+            'occasionally slipping in a "purr". No emoji, no quotes, no preamble.',
+        },
+        { role: 'user', content: `Say ${context} line to the villager who just walked up.` },
+      ],
+      { temperature: 1, maxTokens: 40, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
+    );
+    return line || fallback;
+  } catch (err) {
+    console.warn('[llm] getMitchyLine fell back to static:', err);
+    return fallback;
   }
 }
 
@@ -426,7 +573,7 @@ export async function getPrice(itemName: string): Promise<number> {
         {
           role: 'system',
           content:
-            'You are a friendly shopkeeper in a cozy ASCII village game. Price small ' +
+            'You are a friendly shopkeeper in Asciia Bay, a cozy ASCII island-village game. Price small ' +
             'foraged items in coins, roughly 1-15. Reply with JSON only: {"price": <integer>}.',
         },
         { role: 'user', content: `How many coins for a ${itemName}?` },

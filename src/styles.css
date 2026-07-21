@@ -13,7 +13,14 @@ body,
 body {
   background: #0a0a0a;
   color: #ddd;
-  font-family: 'Courier New', ui-monospace, Menlo, Consolas, monospace;
+  /* Sprite font. The FACE SET (kaomoji: ・ω・ etc.) must render SINGLE-WIDTH or
+     the sprite grid bends — a CJK-aware monospace does this. 'Sarasa Mono' is
+     the recommended install (halfwidth kaomoji); 'Cascadia Code' is a good
+     fallback. If neither is present the browser uses a generic monospace where
+     kaomoji may be fullwidth — in that case the runtime alignment check simply
+     rejects kaomoji sprites, so the grid never breaks. Plain ASCII is
+     single-width in every monospace, so existing sprites are unaffected. */
+  font-family: 'Sarasa Mono', 'Cascadia Code', 'Courier New', ui-monospace, Menlo, Consolas, monospace;
   overflow: hidden;
 }
 
@@ -75,112 +82,296 @@ pre {
 /* ---------- layout ---------- */
 
 .app {
+  /* The header and the touch/keyboard hint are position:fixed (out of flow),
+     so reserve their space here — that makes .stage's measured box the TRUE
+     free area the game can fill (App.tsx measures it to size the viewport). */
+  /* The HUD is an overlay now, so the header reserves no space and the world
+     runs edge to edge (as in the design sketch). */
+  --hdr-h: 0px;
+  --foot-h: 22px;
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-top: var(--hdr-h);
+  padding-bottom: var(--foot-h);
 }
 
-.hdr {
+@media (hover: none), (pointer: coarse) {
+  .app {
+    --foot-h: 150px; /* on-screen d-pad / action buttons */
+  }
+}
+
+/* ---------- HUD overlay ----------
+   Floats above the world (the world now fills the whole screen). The
+   container itself never eats clicks; each control switches pointer events
+   back on for itself. Sizes live in custom properties here, but the ORBIT
+   GEOMETRY is owned by App.tsx (HUD_AVATAR / HUD_BTN / ORBIT_R / angles) and
+   handed in per item as --tx/--ty, so there is one source of truth. */
+.hud {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-  background: transparent;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
   text-shadow:
     0 0 6px #0a0a0a,
     0 0 3px #0a0a0a;
-  z-index: 1000;
 }
 
-.hdr-left {
+/* --- top-left: title card + clock --- */
+.hud-tl {
+  position: absolute;
+  top: 18px;
+  left: 20px;
   display: flex;
   flex-direction: column;
-  line-height: 1.3;
+  gap: 12px;
+  align-items: flex-start;
 }
 
-.hdr-title {
-  color: #666;
-  font-size: 12px;
+.hud-clock {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-left: 10px;
+  border-left: 1px solid #555;
+}
+
+.hud-clock-icon {
+  width: 18px;
+  height: 18px;
+  color: #e8c06a; /* sun */
+}
+
+.hud-clock.night .hud-clock-icon {
+  color: #9fb6d8; /* moon */
+}
+
+.hud-clock-time {
+  color: #e6e6e6;
+  font-size: 17px;
   letter-spacing: 2px;
 }
 
-.hdr-time {
-  color: #999;
-  font-size: 11px;
-  letter-spacing: 1px;
-}
-
-.hdr-right {
+/* --- bottom-left: avatar + planetary menu + coins --- */
+.hud-bl {
+  position: absolute;
+  left: 26px;
+  bottom: 22px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 16px;
+  align-items: flex-start;
 }
 
-.hdr-coin {
-  width: 20px;
-  height: 20px;
-  border: 1px solid #888;
+.hud-avatar-wrap {
+  position: relative;
+}
+
+.hud-avatar {
+  width: var(--hud-avatar);
+  height: var(--hud-avatar);
+  padding: 0;
+  border: 1px solid #9a9a9a;
   border-radius: 50%;
+  background: rgba(10, 10, 10, 0.55);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 12px;
+  pointer-events: auto;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
-.hdr-money {
-  color: #fff;
-  font-size: 16px;
-  min-width: 24px;
+.hud-avatar:hover,
+.hud-avatar[aria-expanded='true'] {
+  border-color: #fff;
+  background: rgba(22, 22, 22, 0.8);
 }
 
-.hdr-avatar {
-  width: 48px;
-  height: 48px;
-  border: 1px solid #888;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  background: #141414;
-  overflow: hidden;
-}
-
-.hdr-avatar pre {
-  font-size: 9px;
-  line-height: 1.15;
+/* line-height MUST match .player-rig > pre (1), or the same sprite reads with
+   different proportions here than it does in the world. Sized so the 7x3
+   player fills the circle: ~88px across, 63px down inside 104px; the widest
+   row sits on the circle's widest point so nothing clips. */
+.hud-avatar pre {
+  font-size: 21px;
+  line-height: 1;
   white-space: pre;
 }
 
-.hdr-x {
+/* zero-size anchor pinned to the avatar's centre — every orbit child
+   positions itself from here with translate(var(--tx), var(--ty)) */
+.hud-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+.hud-orbit-arcs {
+  position: absolute;
+  color: #6f6f6f;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-dasharray: 3 5;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.hud-orbit.open .hud-orbit-arcs {
+  opacity: 1;
+}
+
+/* Closed: collapsed at the avatar's centre. Open: flown out to its orbit
+   slot. Animating transform (not left/top) keeps it off the layout path. */
+.hud-orbit-item {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin-left: calc(var(--hud-btn) / -2);
+  margin-top: calc(var(--hud-btn) / -2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+  transform: translate(0, 0) scale(0.3);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.24s cubic-bezier(0.2, 0.9, 0.3, 1.25),
+    opacity 0.18s ease;
+}
+
+.hud-orbit.open .hud-orbit-item {
+  transform: translate(var(--tx), var(--ty)) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.hud-orbit-btn {
+  flex: none;
+  width: var(--hud-btn);
+  height: var(--hud-btn);
+  padding: 0;
+  border: 1px solid #9a9a9a;
+  border-radius: 50%;
+  background: rgba(10, 10, 10, 0.6);
+  color: #e6e6e6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.hud-orbit-btn:hover {
+  border-color: #fff;
+  color: #fff;
+  background: rgba(26, 26, 26, 0.85);
+}
+
+.hud-orbit-icon {
+  width: 22px;
+  height: 22px;
+}
+
+/* equipped item shown in the hand slot instead of the hand icon */
+.hud-orbit-btn pre {
+  font-size: 6px;
+  line-height: 1.1;
+  white-space: pre;
+}
+
+.hud-orbit-label {
+  color: #cfcfcf;
+  font-size: 12px;
+  letter-spacing: 3px;
+}
+
+/* equip / unequip popup — a flex sibling of the hand-slot button + label, so
+   it sits immediately to their right, vertically centred on the icon */
+.hud-hand-menu {
+  display: flex;
+  gap: 8px;
+  margin-left: 4px;
+  padding: 8px;
+  border: 1px solid #6a6a6a;
+  background: rgba(8, 8, 8, 0.94);
+  pointer-events: auto;
+}
+
+.hud-hand-menu button {
+  padding: 6px 11px;
+  border: 1px solid #777;
+  color: #ddd;
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+
+.hud-hand-menu button:hover:not(:disabled) {
+  background: #1c1c1c;
+  color: #fff;
+}
+
+.hud-hand-menu button:disabled {
+  color: #484848;
+  border-color: #333;
+  cursor: not-allowed;
+}
+
+/* centred on the profile circle's axis (it spans the avatar's width) */
+.hud-coins {
+  width: var(--hud-avatar);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #e8c06a;
+}
+
+.hud-coin-icon {
+  width: 21px;
+  height: 21px;
+}
+
+.hud-coin-amount {
+  font-size: 17px;
+  letter-spacing: 2px;
+}
+
+.hud-x {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  padding: 4px 6px;
   border: none;
   color: #aaa;
   font-size: 16px;
-  padding: 2px 4px;
+  pointer-events: auto;
 }
 
-.hdr-x:hover {
+.hud-x:hover {
   color: #fff;
   background: none;
 }
 
-.hdr-x-spacer {
-  width: 30px;
+/* on touch, lift the whole bottom cluster clear of the on-screen d-pad */
+@media (hover: none), (pointer: coarse) {
+  .hud-bl {
+    bottom: 165px;
+  }
 }
 
 .stage {
   flex: 1;
+  min-height: 0; /* let the flex child actually shrink so clientHeight is real */
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-top: 8px;
   overflow: hidden;
 }
 
@@ -211,8 +402,8 @@ pre {
   position: relative;
   font-size: 14px;
   line-height: 1;
-  width: 112ch;
-  height: 40em; /* must match VIEW_H in App.tsx */
+  /* size is set inline from App.tsx (measured to fill the screen) — a fixed
+     ch/em size here is what forced the old letterboxed aspect ratio */
   overflow: hidden;
   transition: filter 3s ease;
 }
@@ -233,8 +424,15 @@ pre {
 /* the full map, moved around behind the .field viewport by the camera */
 .world {
   position: absolute;
+  left: 0;
+  top: 0;
   transform-origin: 0 0;
-  will-change: left, top, transform;
+  /* Camera pan lives in the TRANSFORM (translate), not left/top: animating
+     left/top re-runs layout for the whole 320x200-char world every frame and
+     lands glyphs on fractional baselines — that was the visible up/down shake.
+     A transform-only camera is composited on the GPU instead. */
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .ground {
@@ -247,7 +445,7 @@ pre {
 
 /* per-region ground colours (each region is its own layer) */
 .region-beach {
-  color: #c9b98a;
+  color: #e6cf7e; /* warm yellow sand */
 }
 .region-meadow {
   color: #6a9a4e;
@@ -267,13 +465,42 @@ pre {
 
 /* the ocean sits behind every land layer and gently shimmers as its wave
    frames cycle */
+/* Pool-caustics water, three stacked layers (colors matched to the
+   bright-pool reference): deep-blue specks in open water, softer cyan crease
+   edges, and the near-white crease web on top. */
 .ocean {
   position: absolute;
   inset: 0;
-  color: #3f74a8;
+  color: #2e7fb8;
   white-space: pre;
   line-height: 1;
   animation: sea 4s ease-in-out infinite;
+}
+
+.ocean-dim {
+  color: #62c2e6;
+  animation: none;
+}
+
+.ocean-foam {
+  color: #e9fbff;
+  animation: none;
+}
+
+/* shoreline surge (drawn OVER the sand): a dark wet-sand glaze left behind,
+   the translucent pale apron sheet, then the thick pure-white leading foam.
+   All frame-driven, so no CSS animation. */
+.shore-glaze {
+  color: rgba(70, 55, 25, 0.5);
+  animation: none;
+}
+.shore-sheet {
+  color: rgba(233, 251, 255, 0.55);
+  animation: none;
+}
+.shore-foam {
+  color: #ffffff;
+  animation: none;
 }
 
 @keyframes sea {
@@ -825,6 +1052,7 @@ pre {
 
 .craft-panel {
   max-width: 440px;
+  position: relative; /* anchors the .craft-confirm overlay */
 }
 
 .craft-log {
@@ -888,6 +1116,107 @@ pre {
 
 .craft-btns button {
   padding: 8px 14px;
+}
+
+/* live crafting progress: stage line, reference thumbnail, streaming sprite */
+.craft-live {
+  margin-top: 8px;
+  border: 1px dashed #3d3d3d;
+  padding: 8px;
+}
+
+.craft-stage {
+  color: #8fb3d9;
+  font-size: 11px;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  animation: sea 2s ease-in-out infinite; /* gentle pulse, reuses the ocean keyframes */
+}
+
+.craft-live-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.craft-ref {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border: 1px solid #3d3d3d;
+  background: #fff;
+  image-rendering: auto;
+}
+
+.craft-ref.small {
+  width: 56px;
+  height: 56px;
+}
+
+.craft-ref.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  background: #141414;
+  font-size: 20px;
+  animation: sea 1.2s ease-in-out infinite;
+}
+
+.craft-partial {
+  white-space: pre;
+  line-height: 1.1;
+  font-size: 11px;
+  color: #9bd08a;
+}
+
+.craft-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* Mitchy's 3 alternative-craft proposals after a failed craft. Deliberately
+   unnumbered equal-width buttons in one row — no visual ranking (the options
+   are strategy-diverse equals, and the array is shuffled server-side too). */
+.craft-suggest-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.craft-suggest {
+  flex: 1 1 0;
+  min-width: 100px;
+  padding: 8px 6px;
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+/* confirm-before-cancel overlay while a generation is running */
+.craft-confirm {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 5, 5, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.craft-confirm-box {
+  border: 4px double #888;
+  background: #0d0d0d;
+  padding: 16px 20px;
+  text-align: center;
+  max-width: 320px;
+}
+
+.craft-confirm-box .craft-btns {
+  justify-content: center;
 }
 
 .craft-btns button:hover {
@@ -1205,4 +1534,10 @@ pre {
 
 .crop-status .bad {
   color: #e0a24a;
+}
+
+/* equipPick mode: slots that can't go in the hand */
+.slot.disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
 }

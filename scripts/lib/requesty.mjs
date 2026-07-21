@@ -17,12 +17,16 @@
 const API_KEY = (process.env.VITE_LLM_API_KEY || '').trim();
 const BASE_URL = (process.env.VITE_LLM_BASE_URL || 'https://router.requesty.ai/v1').replace(/\/$/, '');
 
-// Build-time model tiers (kept separate from the runtime tiers on purpose).
+// Build-time model tiers. ONE model for everything (user directive): both
+// default to the same VITE_LLM_MODEL the runtime uses — flash-lite — with
+// BUILD_MODEL_* as optional per-script overrides. No hardcoded expensive
+// defaults: a missing env line can only ever mean "use the one model".
+const ONE_MODEL = (process.env.VITE_LLM_MODEL || 'google/gemini-2.5-flash-lite').trim();
 export const MODELS = {
-  // Quality-critical foundation everything else samples from.
-  catalog: (process.env.BUILD_MODEL_CATALOG || 'anthropic/claude-sonnet-5').trim(),
+  // Species catalog — the foundation everything else samples from.
+  catalog: (process.env.BUILD_MODEL_CATALOG || ONE_MODEL).trim(),
   // High-volume narrow extraction — tiny constrained JSON per species.
-  sprites: (process.env.BUILD_MODEL_SPRITES || 'anthropic/claude-haiku-4-5').trim(),
+  sprites: (process.env.BUILD_MODEL_SPRITES || ONE_MODEL).trim(),
 };
 
 if (!API_KEY) {

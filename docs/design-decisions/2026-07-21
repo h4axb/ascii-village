@@ -1,0 +1,62 @@
+## A) Gemini´s detailed description for wave behaviour
+
+1. The Incoming Surge (The Push)
+The Mesh Pattern: Out in the water, the surface is textured like a thick, flexible net or liquid lace. Dark patches of ocean are cradled inside an interconnected webbing of white froth.
+
+The Forward Spread: As a wave arrives, a broad, paper-thin sheet of pale, frothy liquid glides forward across the pale sand. It moves rapidly yet smoothly, like a soft silk blanket being pulled upward across a floor.
+
+The Leading Edge: The front boundary of the water isn't a straight line; it expands into soft, rounded, finger-like shapes that curve and reach across the slope of the beach.
+
+2. The Moment of Pause
+When the wave reaches its highest point on the shore, the forward motion gently decays.
+
+For a brief fraction of a second, the liquid holds still—stretched out at its maximum reach into a smooth, glowing apron over the sand.
+
+3. The Receding Slide (The Pull)
+The Downhill Retreat: Gravity takes over, and the sheet of water begins to slide backward toward the deeper ocean.
+
+Dissolving Foam: As it retreats, the wide sheet thins out and breaks back into smaller, swirling bubbles and loops of foam.
+
+The Glaze Left Behind: Where the wave retreated, the sand remains saturated—a sleek, darkened mirror reflecting the sky until the next surge arrives to cover it again.
+
+## B) Claude´s wave properties setting
+// The map is a tile grid. Each tile is 4 characters wide and 2 lines tall, so
+// the ground layer is (MAP_W*4) x (MAP_H*2) characters. Entities are positioned
+// at tile coordinates; horizontal placement uses `ch` units and vertical
+// placement uses `em` units (line-height: 1) so everything stays locked to the
+// monospace character grid.
+export const MAP_W = 80;
+export const MAP_H = 100;
+export const TILE_CH = 4; // chars per tile (x)
+export const TILE_LN = 2; // lines per tile (y)
+export const GROUND_W = MAP_W * TILE_CH;
+export const GROUND_H = MAP_H * TILE_LN; 
+- em or not?
+
+## C) fixed camera view and zoom
+1. Changed the camera´s logic from CSS to GPU handling the zooming in & out so it isn´t shaking but smooth.
+
+width: `${GROUND_W}ch`,
+height: `${GROUND_H}em`,
+
+2. The zoom follows freely the player´s mouse position now. Before it was capped to the player being inside the screen.
+
+transform: `translate3d(${-camX * zoom}ch, ${-camY * zoom}em, 0) scale(${zoom})`
+
+3. Added control with Space (desktop) and Double-tap (mobile) to recenter the camera to player.
+=> zoom freely and easily return camera view to player
+
+4. The screen fills the screen now with game instead rendering black border
+=> the view is less suffocating
+
+## D) UI Overlay of game
+
+I want UI that is as minimalistic as possible so player can see more game environment. Making it optional to show the icons for inventory, settings and hand slot.
+
+UI elements: clock, profile icon, wallet, setting, inventory, hand slot
+UI layout: planetary alignment of three buttons: setting, inventory and hand slot when user profile gets clicked.
+
+## E) fixed profile icon 
+
+The profile icon uses the same size of character instead being fixed. 
+=> no matter what icon uploads; the icon is rendered proportionally right

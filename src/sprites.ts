@@ -112,18 +112,21 @@ export const HOUSE = [
   '+--+--+---+--+--+',
 ];
 
+// Landing banner: "ASCIIA" over "BAY", in the same figlet "standard"
+// letterforms as before. Letters carry their own padding and are simply
+// concatenated (no smushing), so every row of a block is the same length.
 export const TITLE = [
-  '    _    ____   ____ ___ ___',
-  '   / \\  / ___| / ___|_ _|_ _|',
-  '  / _ \\ \\___ \\| |    | | | |',
-  ' / ___ \\ ___) | |___ | | | |',
-  '/_/   \\_\\____/ \\____|___|___|',
+  '    _     ____    ____  ___  ___     _    ',
+  '   / \\   / ___|  / ___||_ _||_ _|   / \\   ',
+  '  / _ \\  \\___ \\ | |     | |  | |   / _ \\  ',
+  ' / ___ \\  ___) || |___  | |  | |  / ___ \\ ',
+  '/_/   \\_\\|____/  \\____||___||___|/_/   \\_\\',
   '',
-  '__     _____ _     _        _    ____ _____',
-  '\\ \\   / /_ _| |   | |      / \\  / ___| ____|',
-  ' \\ \\ / / | || |   | |     / _ \\| |  _|  _|',
-  '  \\ V /  | || |___| |___ / ___ \\ |_| | |___',
-  '   \\_/  |___|_____|_____/_/   \\_\\____|_____|',
+  ' ____      _    __   __',
+  '| __ )    / \\   \\ \\ / /',
+  '|  _ \\   / _ \\   \\ V / ',
+  '| |_) | / ___ \\   | |  ',
+  '|____/ /_/   \\_\\  |_|  ',
 ];
 
 // Builds an ASCII speech bubble with a tail pointing down-left, in the style:

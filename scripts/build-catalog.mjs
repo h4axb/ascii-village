@@ -26,7 +26,7 @@ const lists = await mapLimit(CATEGORIES, 3, async (category) => {
       {
         role: 'system',
         content:
-          'You design items for a cozy ASCII village game. Return JSON only: ' +
+          'You design items for Asciia Bay, a cozy ASCII island-village game. Return JSON only: ' +
           '{"species":[{"name","rarity","desc","funcDesc","basePrice"}]}. ' +
           'rarity is one of "common"|"uncommon"|"rare"|"legendary" (skew common). ' +
           'name: short Title Case. desc: one charming sentence. ' +

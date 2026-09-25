@@ -1,0 +1,65 @@
+## Must haves
+
+
+1. Intro [-]
+a) Character customization (21.09.26)
+-More clothing var? n
+-Will the character selection feel natural as part of the game? 
+A: Implicate in narrative when player can interact and put a loading screen to differentiate it with the rest of intro.
+
+-What should be before intro? 
+A: A starting screen with start button.
+-Mention AI already here? [ ]
+
+-How to communicate that the fit will be later the fit of game? Does that feel natural?
+A: Start with default fit (white shirt, blue shorts shoes, hat) at start. 
+Notify to choose full fit in order to save it? 
+When something major (shirt, short, shoes) is missing just wear in-game the default piece for that. n (you can never undress the mannequin)
+-How should the mannequin in virtual try on look like?
+A: Has to be genderless never sexual. So you can never undress the mannequin
+
+
+### Loading screen
+You could even make the loading text slightly more diegetic: Preparing your virtual fitting room…
+Then perhaps underneath, briefly cycling:
+Loading wardrobe…
+Preparing your look…
+
+### Dot anim
+Three equally sized white circular dots arranged horizontally. Each dot smoothly bounces upward and returns to its original position. The same bounce animation is applied to all three dots with a staggered delay from left to right, producing a continuous wave. Keep the dots' size and opacity constant; only animate their Y-position. The loop should feel soft and fluid, not springy or exaggerated.
+
+
+2. Crafting logic
+
+3. Quest Design (22.09.26-23.09.26)
+[x] PART 1: Player wakes up in ASCIIA BAY 
+[x] PART 2: Mitchy welcomes player and waits at boat 
+=> bug fix of intro b loop caused by autosave
+[] Explore the map and evantually get back to Mitchy
+[] Ship drifts away, pay Mitchy to use a craft token for a boat
+[] Sail to the shop isle
+[] Introducing the shop
+[] Quest list (plant, craft something to help crafting); a total of 4 craftings
+
+3a) [] Visual color adjustment, player rendering with bg, shore 
+
+
+4. User Feedback Form & Evaluation
+
+5. Start screen
+6. Settings - AI use
+7. Deploy (26.09.)
+
+
+## Bachelor:
+-Bachelortext
+-Kolloqium
+-Case Study 
+-Lofi & Hifi & UI Komponentenbibiliothek
+-Making of 5-7, Video Material 2-3
+
+## Job:
+-TG3 Case Study
+-Figma2Claude Code, FigJam
+-Bewerbungsanzeigen
+-Minijob/ Teilzeit Anzeigen

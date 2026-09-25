@@ -12,78 +12,86 @@ import type { Category, ShopItem } from './llm';
 
 // ---- garden geometry (tile coordinates) -----------------------------------
 // A fenced plot NORTH (above) of the house. The house sits at y32-35, so the
-// garden occupies y23-30 with a one-tile gap (y31) between them. The doors sit
-// on the LEFT of each rail (a walking corridor), and the planting beds fill the
-// RIGHT — so a plant is never in the doorway and plant/door interactions never
-// overlap.
-export const GARDEN = { x0: 28, y0: 23, x1: 39, y1: 30 } as const;
+// garden's home corner puts it at y23-30, a one-tile gap (y31) between them.
+//
+// The plot is described as ONE CORNER plus offsets, not four absolute edges,
+// because the whole thing is movable: the dev layout tool drags it as a single
+// structure (see the 'gardenbed' entry in STRUCT_ENTS) and everything below —
+// fence ring, gate, planting beds — has to travel with it. Read the live plot
+// through gardenAt(); GARDEN/DOOR_TILES/SLOTS are just the home-corner values,
+// kept for the many places where the garden never moves at runtime.
+export const GARDEN_HOME = { x: 28, y: 23 } as const;
 
-// door opening = three tiles wide, on the left side of each rail (the corridor).
-// The player enters here; the beds are kept clear of these columns.
-export const DOOR_TILES = { c0: 29, c1: 31 } as const;
+// NOT a free parameter: the size traces the baked bed picture (GARDEN_BED,
+// from garden-fence.svg). At GARDEN_BED_SCALE the art measures 10.91 x 7.99
+// tiles and its own fence ring lands exactly on this rectangle's edges — left
+// posts on the first column, right posts on the last, far rail on the first
+// row, near rail on the last. Change one without re-deriving the other and the
+// collider stops matching the fence you can see.
+export const GARDEN_SIZE = { w: 11, h: 8 } as const;
 
-export type DoorId = 'top' | 'bottom';
-export type Doors = { top: boolean; bottom: boolean }; // true = open
+// The gate: a single opening in the NEAR (bottom) rail, centred — that is
+// where the reference art draws it, between posts at doubled sprite columns
+// 118-127 and 186-195, which land three tiles wide at this offset from the
+// plot's left edge. The far rail has no opening at all, so this is the only
+// way in.
+const GATE_OFF = { c0: 4, c1: 6 } as const;
 
-// six planting spots on the RIGHT side, well clear of the door columns (29-31)
-// and both rails (y23, y30). Each is watered/inspected individually.
-export const SLOTS: { x: number; y: number }[] = [
-  { x: 33, y: 25 }, { x: 35, y: 25 }, { x: 37, y: 25 },
-  { x: 33, y: 27 }, { x: 35, y: 27 }, { x: 37, y: 27 },
-];
+// Six planting spots, three in each side bed, as offsets from the plot corner.
+// The gate corridor is deliberately left clear from the opening all the way to
+// the far rail, so a plant is never standing in the doorway and plant/gate
+// hit-areas never overlap. Interior soil is inset one tile all round; these sit
+// centred in the left bed and the right bed.
+const BED_OFF = [
+  { x: 2, y: 2 }, { x: 8, y: 2 },
+  { x: 2, y: 4 }, { x: 8, y: 4 },
+  { x: 2, y: 6 }, { x: 8, y: 6 },
+] as const;
+
+// One gate now, not the old top/bottom pair. Kept as a named id rather than a
+// bare boolean so the hover/click plumbing in interact.ts (which addresses
+// things by ref) needs no special case.
+export type DoorId = 'gate';
+export type Doors = { gate: boolean }; // true = open
+
+export interface GardenPlot {
+  rect: { x0: number; y0: number; x1: number; y1: number };
+  door: { c0: number; c1: number };
+  slots: { x: number; y: number }[];
+}
+
+// The whole plot resolved against a corner. Everything that needs to know where
+// the garden IS goes through here, so a dragged bed moves its fence, its gate
+// and its beds together or not at all.
+export function gardenAt(x: number, y: number): GardenPlot {
+  return {
+    rect: { x0: x, y0: y, x1: x + GARDEN_SIZE.w - 1, y1: y + GARDEN_SIZE.h - 1 },
+    door: { c0: x + GATE_OFF.c0, c1: x + GATE_OFF.c1 },
+    slots: BED_OFF.map((b) => ({ x: x + b.x, y: y + b.y })),
+  };
+}
+
+export const GARDEN_PLOT: GardenPlot = gardenAt(GARDEN_HOME.x, GARDEN_HOME.y);
+export const GARDEN = GARDEN_PLOT.rect;
+export const DOOR_TILES = GARDEN_PLOT.door;
+export const SLOTS = GARDEN_PLOT.slots;
 
 export const TILE_CH = 4;
 export const TILE_LN = 2;
 
-// ---- fence rendering ------------------------------------------------------
-// Returns the fence+soil overlay as an array of strings sized to the garden's
-// character box. Interior is a sparse soil texture; door gaps open/close.
-export function gardenFence(doors: Doors): string[] {
-  const wT = GARDEN.x1 - GARDEN.x0 + 1;
-  const hT = GARDEN.y1 - GARDEN.y0 + 1;
-  const W = wT * TILE_CH;
-  const H = hT * TILE_LN;
-  const dc0 = (DOOR_TILES.c0 - GARDEN.x0) * TILE_CH;
-  const dc1 = (DOOR_TILES.c1 - GARDEN.x0) * TILE_CH + (TILE_CH - 1);
-
-  const rail = (open: boolean) => {
-    let s = '';
-    for (let c = 0; c < W; c++) {
-      const inDoor = c >= dc0 && c <= dc1;
-      if (inDoor && open) s += ' ';
-      else s += c % 4 === 0 ? '+' : '=';
-    }
-    return s;
-  };
-
-  const rows: string[] = [];
-  for (let r = 0; r < H; r++) {
-    if (r === 0) rows.push(rail(doors.top));
-    else if (r === H - 1) rows.push(rail(doors.bottom));
-    else {
-      let s = '';
-      for (let c = 0; c < W; c++) {
-        if (c === 0 || c === W - 1) s += '|';
-        else s += (c + r) % 6 === 0 ? '.' : ' ';
-      }
-      rows.push(s);
-    }
-  }
-  return rows;
-}
-
 // ---- collision ------------------------------------------------------------
-// Is tile (tx,ty) a solid fence cell given the current door states?
-function solidFence(tx: number, ty: number, doors: Doors): boolean {
-  const { x0, y0, x1, y1 } = GARDEN;
+// Is tile (tx,ty) a solid fence cell given the current door state?
+function solidFence(tx: number, ty: number, doors: Doors, plot: GardenPlot): boolean {
+  const { x0, y0, x1, y1 } = plot.rect;
   const onTop = ty === y0 && tx >= x0 && tx <= x1;
   const onBottom = ty === y1 && tx >= x0 && tx <= x1;
   const onLeft = tx === x0 && ty >= y0 && ty <= y1;
   const onRight = tx === x1 && ty >= y0 && ty <= y1;
   if (!(onTop || onBottom || onLeft || onRight)) return false;
-  const inDoorCols = tx >= DOOR_TILES.c0 && tx <= DOOR_TILES.c1;
-  if (onTop && inDoorCols && doors.top) return false;
-  if (onBottom && inDoorCols && doors.bottom) return false;
+  // Only the near rail has an opening, and only while the gate is swung open —
+  // the far rail is solid pickets end to end in the art, so it never yields.
+  const inDoorCols = tx >= plot.door.c0 && tx <= plot.door.c1;
+  if (onBottom && inDoorCols && doors.gate) return false;
   return true;
 }
 
@@ -91,20 +99,17 @@ function solidFence(tx: number, ty: number, doors: Doors): boolean {
 // solid fence cell? Used to block movement through the fence.
 export function gardenBlocks(
   nx: number, ny: number, pw: number, ph: number, doors: Doors,
+  plot: GardenPlot = GARDEN_PLOT,
 ): boolean {
   for (let ty = ny; ty < ny + ph; ty++) {
     for (let tx = nx; tx < nx + pw; tx++) {
-      if (solidFence(tx, ty, doors)) return true;
+      if (solidFence(tx, ty, doors, plot)) return true;
     }
   }
   return false;
 }
 
 // ---- interaction targets --------------------------------------------------
-// The bed is no longer a single target — each planted crop is interacted with
-// individually (see nearestCropSlot). gardenTarget now only handles the doors.
-export type GardenTarget = { kind: 'door'; door: DoorId; x: number; y: number };
-
 // Chebyshev distance from the player box to a tile box.
 function boxDist(px: number, py: number, pw: number, ph: number, b: { x0: number; y0: number; x1: number; y1: number }): number {
   const dx = b.x0 > px + pw - 1 ? b.x0 - (px + pw - 1) : px > b.x1 ? px - b.x1 : 0;
@@ -117,36 +122,6 @@ export function tileDist(px: number, py: number, pw: number, ph: number, tx: num
   return boxDist(px, py, pw, ph, { x0: tx, y0: ty, x1: tx, y1: ty });
 }
 
-// The slot index of the planted crop the player is standing next to (or -1).
-// `occupied` is the set of slot indices that currently hold a crop.
-export function nearestCropSlot(px: number, py: number, pw: number, ph: number, occupied: number[]): number {
-  let best = -1;
-  let bestD = 2;
-  for (const i of occupied) {
-    const s = SLOTS[i];
-    const d = tileDist(px, py, pw, ph, s.x, s.y);
-    if (d <= 1 && d < bestD) {
-      best = i;
-      bestD = d;
-    }
-  }
-  return best;
-}
-
-// Nearest door the player can interact with (open/close), or null.
-export function gardenTarget(px: number, py: number, pw: number, ph: number): GardenTarget | null {
-  const topBox = { x0: DOOR_TILES.c0, y0: GARDEN.y0, x1: DOOR_TILES.c1, y1: GARDEN.y0 };
-  const botBox = { x0: DOOR_TILES.c0, y0: GARDEN.y1, x1: DOOR_TILES.c1, y1: GARDEN.y1 };
-  const dTop = boxDist(px, py, pw, ph, topBox);
-  const dBot = boxDist(px, py, pw, ph, botBox);
-
-  const cands: { t: GardenTarget; d: number }[] = [];
-  if (dTop <= 1) cands.push({ t: { kind: 'door', door: 'top', x: DOOR_TILES.c0, y: GARDEN.y0 }, d: dTop });
-  if (dBot <= 1) cands.push({ t: { kind: 'door', door: 'bottom', x: DOOR_TILES.c0, y: GARDEN.y1 }, d: dBot });
-  if (cands.length === 0) return null;
-  cands.sort((a, b) => a.d - b.d);
-  return cands[0].t;
-}
 
 // ---- plant care -----------------------------------------------------------
 const MIN = 60_000;
@@ -238,25 +213,39 @@ export interface CropStatus {
   progress: number; // 0..1 growth
 }
 
-export function cropStatus(c: PlantedCrop, wt: number): CropStatus {
+// ---- placed-item effects --------------------------------------------------
+// A crafted item placed near the beds can bend a slot's timings (see
+// craft/functions.ts). The three functions below take the already-aggregated,
+// already-clamped bundle for THIS slot and stay pure — App.tsx owns computing
+// it from placedItems. Defaulting to NO_EFFECT keeps every plain call valid.
+export interface SlotEffect {
+  growMult: number; // multiplies growMs — below 1 matures sooner
+  toleranceMult: number; // multiplies toleranceMs — above 1 survives thirst longer
+  yieldBonus: number; // extra crops at harvest
+}
+
+export const NO_EFFECT: SlotEffect = { growMult: 1, toleranceMult: 1, yieldBonus: 0 };
+
+export function cropStatus(c: PlantedCrop, wt: number, fx: SlotEffect = NO_EFFECT): CropStatus {
   const dueAt = c.lastWateredAt + c.care.waterEveryMs;
-  const failAt = dueAt + c.care.toleranceMs;
-  const matureAt = c.plantedAt + c.care.growMs;
+  const failAt = dueAt + c.care.toleranceMs * fx.toleranceMult;
+  const growMs = c.care.growMs * fx.growMult;
+  const matureAt = c.plantedAt + growMs;
   return {
     thirsty: wt > dueAt,
     msToDue: dueAt - wt,
     msToFail: failAt - wt,
     msToMature: matureAt - wt,
-    progress: Math.max(0, Math.min(1, (wt - c.plantedAt) / c.care.growMs)),
+    progress: Math.max(0, Math.min(1, (wt - c.plantedAt) / growMs)),
   };
 }
 
 // Pure stage transition, evaluated on the clock tick.
-export function advanceStage(c: PlantedCrop, wt: number): CropStage {
+export function advanceStage(c: PlantedCrop, wt: number, fx: SlotEffect = NO_EFFECT): CropStage {
   if (c.stage !== 'growing') return c.stage;
   const dueAt = c.lastWateredAt + c.care.waterEveryMs;
-  const failAt = dueAt + c.care.toleranceMs;
-  const matureAt = c.plantedAt + c.care.growMs;
+  const failAt = dueAt + c.care.toleranceMs * fx.toleranceMult;
+  const matureAt = c.plantedAt + c.care.growMs * fx.growMult;
   if (wt > failAt) return 'failed';
   if (wt >= matureAt) return 'ready';
   return 'growing';
@@ -270,10 +259,10 @@ const SPROUT_3 = ['\\|/', ' | '];
 const WILTED = ['x_x', '/|\\'];
 
 // The little sprite shown in a bed slot for the crop's current state.
-export function slotSprite(c: PlantedCrop, wt: number): string[] {
+export function slotSprite(c: PlantedCrop, wt: number, fx: SlotEffect = NO_EFFECT): string[] {
   if (c.stage === 'failed') return WILTED;
   if (c.stage === 'ready') return c.sprite;
-  const { progress } = cropStatus(c, wt);
+  const { progress } = cropStatus(c, wt, fx);
   if (progress < 0.34) return SPROUT_1;
   if (progress < 0.7) return SPROUT_2;
   return SPROUT_3;
@@ -302,9 +291,25 @@ export function createCrop(
 }
 
 // Base world items that make sense to plant (stone is excluded).
-export const PLANTABLE_BASE: ItemType[] = ['flower', 'cactus', 'fern', 'apple', 'iceflower'];
+export const PLANTABLE_BASE: ItemType[] = ['flower', 'cactus', 'fern', 'date', 'iceflower'];
 
 // Is an entity/spawn inside the garden footprint? Used to keep wild spawns out.
-export function inGarden(x: number, y: number): boolean {
-  return x >= GARDEN.x0 && x <= GARDEN.x1 && y >= GARDEN.y0 && y <= GARDEN.y1;
+export function inGarden(x: number, y: number, plot: GardenPlot = GARDEN_PLOT): boolean {
+  const { x0, y0, x1, y1 } = plot.rect;
+  return x >= x0 && x <= x1 && y >= y0 && y <= y1;
+}
+
+// Just the fence RING (rails and side posts), not the interior. Placement uses
+// this rather than inGarden so crafted items can sit among the beds — an
+// item's effect radius is measured to the crop slots, so it has to be able to
+// get near them (see placement.ts).
+export function isGardenFence(x: number, y: number, plot: GardenPlot = GARDEN_PLOT): boolean {
+  if (!inGarden(x, y, plot)) return false;
+  const { x0, y0, x1, y1 } = plot.rect;
+  return x === x0 || x === x1 || y === y0 || y === y1;
+}
+
+// A planting bed itself — kept clear so an item never sits on top of a crop.
+export function isCropSlot(x: number, y: number, plot: GardenPlot = GARDEN_PLOT): boolean {
+  return plot.slots.some((s) => s.x === x && s.y === y);
 }

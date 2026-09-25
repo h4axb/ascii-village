@@ -4,6 +4,42 @@
   padding: 0;
 }
 
+/* ===========================================================================
+   UI DESIGN SYSTEM — shared tokens for every modal/panel (inventory, shop,
+   storage, dialog, bed). NOT used by the always-on HUD overlay (avatar/orbit/
+   clock/coins), which stays its own minimal high-contrast circular-icon
+   style — a different UI layer (a permanent reticle, not a dialog) that the
+   reference screenshot doesn't cover.
+
+   Palette: a warm, dark forest-olive panel with a painted-wood border, cream
+   headings, muted sage body text, and a dusty-rose accent for the one
+   primary action per screen (Use / Sell / confirm) — everything else
+   (secondary buttons, tabs, list options) is an outline in the same rose or
+   sage rather than a competing colour, which is what makes it read as ONE
+   system rather than a pile of differently-styled controls. */
+:root {
+  --ui-bg: #262b1c;
+  --ui-bg-raise: #2f3521;
+  --ui-border: #6a5636;
+  --ui-border-soft: #4b5233;
+  --ui-radius: 22px;
+  --ui-radius-sm: 10px;
+  --ui-heading: #DEDDB6;
+  --ui-body: #a3b190;
+  --ui-muted: #707d5f;
+  --ui-accent: #c97367;
+  --ui-accent-hi: #d98c7e;
+  --ui-accent-ink: #fbf0e4;
+  --ui-slot-bg: #2f3521;
+  --ui-slot-border: #4b5233;
+  --ui-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  /* the world's own FLOWER_PLUS motif (sprites.ts), reused for every panel's
+     corner ornament so the UI chrome and the village decorations read as
+     the same hand */
+  --ui-petal: #F47F9D;
+  --ui-petal-core: #FFD166;
+}
+
 html,
 body,
 #root {
@@ -79,6 +115,60 @@ pre {
   color: #0a0a0a;
 }
 
+/* Continue + New Game, grouped tighter than the 28px .landing gap so they
+   read as one primary-action pair rather than two unrelated sections. */
+.landing-primary-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.landing-save-row {
+  display: flex;
+  gap: 10px;
+}
+
+/* New Game's destructive confirmation — Cancel/Start New Game side by side. */
+.landing-confirm-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+.settings-save-btn {
+  display: block;
+  margin: 14px 0 10px;
+}
+
+.landing-file-input {
+  display: none;
+}
+
+.landing-save-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #aaa;
+  border: 1px solid #444;
+  background: #111;
+}
+
+.landing-save-btn:hover:not(:disabled) {
+  color: #fff;
+  border-color: #888;
+}
+
+.landing-save-btn:disabled {
+  opacity: 0.4;
+}
+
+.landing-save-error {
+  color: #d98a7a;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
 /* ---------- layout ---------- */
 
 .app {
@@ -95,6 +185,19 @@ pre {
   overflow: hidden;
   padding-top: var(--hdr-h);
   padding-bottom: var(--foot-h);
+  /* The whole game is rendered as plain monospace text (ground glyphs, the
+     HUD clock, entity sprites) — without this, an ordinary click-drag
+     selects and highlights it like a page of text instead of panning the
+     camera or interacting, which reads as a solid blue wall over the map.
+     Text inputs (chat, naming, etc.) opt back in with user-select: text. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.app input,
+.app textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 @media (hover: none), (pointer: coarse) {
@@ -141,7 +244,7 @@ pre {
 .hud-clock-icon {
   width: 18px;
   height: 18px;
-  color: #e8c06a; /* sun */
+  color: var(--coin-accent); /* sun */
 }
 
 .hud-clock.night .hud-clock-icon {
@@ -152,6 +255,57 @@ pre {
   color: #e6e6e6;
   font-size: 17px;
   letter-spacing: 2px;
+}
+
+/* --- top-center: manual-save (Ctrl+S) indicator --- */
+.hud-tc {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e6e6e6;
+  font-size: 14px;
+  letter-spacing: 1px;
+  animation: save-flash 0.55s ease-out;
+}
+
+.hud-tc-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--coin-accent);
+  animation: save-icon-pulse 0.55s ease-out;
+}
+
+@keyframes save-flash {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes save-icon-pulse {
+  0% {
+    transform: scale(0.8);
+  }
+  40% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* --- bottom-left: avatar + planetary menu + coins --- */
@@ -175,11 +329,12 @@ pre {
   padding: 0;
   border: 1px solid #9a9a9a;
   border-radius: 50%;
-  background: rgba(10, 10, 10, 0.55);
-  color: #fff;
+  background: rgb(0, 0, 0);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden; /* clips the face crop to the circle — see the .hud-avatar pre note */
   pointer-events: auto;
   transition:
     border-color 0.15s ease,
@@ -189,15 +344,18 @@ pre {
 .hud-avatar:hover,
 .hud-avatar[aria-expanded='true'] {
   border-color: #fff;
-  background: rgba(22, 22, 22, 0.8);
+  background: rgb(0, 0, 0);
 }
 
 /* line-height MUST match .player-rig > pre (1), or the same sprite reads with
-   different proportions here than it does in the world. Sized so the 7x3
-   player fills the circle: ~88px across, 63px down inside 104px; the widest
-   row sits on the circle's widest point so nothing clips. */
+   different proportions here than it does in the world. The player's sampled
+   sprite is 44x22 — its face crop (top 18 rows) is still too wide to fit a
+   104px circle at a legible size without clipping, so this doesn't try to:
+   at 6px it's ~158x108px, slightly overflowing the circle on every side, and
+   overflow:hidden above trims it to a centred portrait-style crop instead of
+   shrinking the font until the whole rectangle fits (which was illegible). */
 .hud-avatar pre {
-  font-size: 21px;
+  font-size: 6px;
   line-height: 1;
   white-space: pre;
 }
@@ -253,30 +411,32 @@ pre {
   pointer-events: auto;
 }
 
+/* A solid disc of the slot's own colour, no outline — the icon art carries
+   the contrast, so a border would only fight it (see the design sketch). */
 .hud-orbit-btn {
   flex: none;
   width: var(--hud-btn);
   height: var(--hud-btn);
   padding: 0;
-  border: 1px solid #9a9a9a;
+  border: none;
   border-radius: 50%;
-  background: rgba(10, 10, 10, 0.6);
-  color: #e6e6e6;
+  background: var(--btn-tint, #b3b3d9);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
 
+/* No border to recolour any more — lift the disc instead so the hover still
+   reads without losing the flat, outline-free look. */
 .hud-orbit-btn:hover {
-  border-color: #fff;
-  color: #fff;
-  background: rgba(26, 26, 26, 0.85);
+  filter: brightness(1.15);
 }
 
 .hud-orbit-icon {
-  width: 22px;
-  height: 22px;
+  width: 34px;
+  height: 34px;
 }
 
 /* equipped item shown in the hand slot instead of the hand icon */
@@ -330,7 +490,7 @@ pre {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: #e8c06a;
+  color: var(--coin-accent);
 }
 
 .hud-coin-icon {
@@ -345,18 +505,24 @@ pre {
 
 .hud-x {
   position: absolute;
-  top: 16px;
-  right: 18px;
-  padding: 4px 6px;
+  top: 18px;
+  right: 20px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   border: none;
-  color: #aaa;
-  font-size: 16px;
+  background: var(--ui-accent);
+  color: var(--ui-accent-ink);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: auto;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
 }
 
 .hud-x:hover {
-  color: #fff;
-  background: none;
+  background: var(--ui-accent-hi);
 }
 
 /* on touch, lift the whole bottom cluster clear of the on-screen d-pad */
@@ -367,6 +533,10 @@ pre {
 }
 
 .stage {
+  position: relative; /* .dev-asset-panel anchors to THIS box (top/right corner
+    of the visible letterboxed game area) — without it, absolute positioning
+    falls through to the page/viewport instead, so the panel drifts away from
+    the stage whenever the letterbox doesn't fill the whole window. */
   flex: 1;
   min-height: 0; /* let the flex child actually shrink so clientHeight is real */
   display: flex;
@@ -405,20 +575,42 @@ pre {
   /* size is set inline from App.tsx (measured to fill the screen) — a fixed
      ch/em size here is what forced the old letterboxed aspect ratio */
   overflow: hidden;
-  transition: filter 3s ease;
 }
 
-/* day/night tint, derived from worldTime */
-.field.phase-dawn {
-  filter: brightness(0.85);
-}
+/* The dark backdrop behind the whole world. The world is ASCII signs on this
+   static dark canvas; only the signs themselves switch colour with the
+   day/night palette (the base fills and atmosphere overlays were removed for
+   exactly that reason).
 
-.field.phase-dusk {
-  filter: brightness(0.68);
+   --sky-bg is the single source of truth for this colour — the house/shop
+   occlusion background and the player sprite's outline shadow both read it
+   too (see .ent.house / .player-sprite below), so changing this one variable
+   re-syncs all three automatically instead of relying on hand-kept-in-sync
+   hardcoded hexes (which is how they drifted apart before). */
+:root {
+  --sky-bg: #596649;
+  /* the "sun" accent family — the clock icon, the coin HUD, and the coin
+     count all read as one warm accent because they share this one value;
+     previously three independent hardcoded #e8c06a literals that could
+     (and did, elsewhere in this file, see --sky-bg above) drift apart. */
+  --coin-accent: #F5C451;
+  /* Deliberately NOT tied to --sky-bg, unlike .ent.house's occlusion fill
+     just below — this is a thin outline RING around the player's own
+     glyphs (see .player-sprite), not a filled area, so its job has always
+     been edge contrast against whatever is nearby, not colour-matching
+     the ground. Pinning it to the ground colour (as it briefly was) softens
+     that contrast whenever the ground isn't near-black — same principle as
+     --coin-accent, a value worth a name so it's not hunted-for as a bare
+     literal, just intentionally independent of --sky-bg rather than synced
+     to it. */
+  --player-outline: #1c1104;
 }
-
-.field.phase-night {
-  filter: brightness(0.45);
+.sky-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--sky-bg);
 }
 
 /* the full map, moved around behind the .field viewport by the camera */
@@ -433,6 +625,29 @@ pre {
      A transform-only camera is composited on the GPU instead. */
   will-change: transform;
   backface-visibility: hidden;
+  /* The whole world is rendered as plain text glyphs (ground scatter, ponds,
+     bridges, foliage) — without this, a click-drag anywhere selects and
+     highlights that text like a browser page instead of panning/interacting,
+     which reads as a garish blue wall of selected characters over the map. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Dev world-editor ("E" panel) tile-grid overlay — see App.tsx for why this
+   is sized/positioned as a plain child of .world rather than given its own
+   camera math: it inherits the exact same pan/zoom transform as every
+   entity for free. One line every tile-width (4ch) and tile-height (2em),
+   matching TILE_CH/TILE_LN (world.ts) exactly. */
+.dev-tile-grid {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 50;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.16) 1px, transparent 1px);
+  background-size: 4ch 2em;
 }
 
 .ground {
@@ -443,74 +658,555 @@ pre {
   line-height: 1;
 }
 
-/* per-region ground colours (each region is its own layer) */
+/* per-region ground colours — one layer per region, each a fixed colour.
+   Deliberately separated bands (water → shallow → sand → wet-shoreline →
+   grass), each a clearly distinct hue/value rather than a gradient of
+   close-together tones — that separation is what makes the coastline read
+   from a distance instead of dissolving into one blob. */
 .region-beach {
-  color: #e6cf7e; /* warm yellow sand */
+  color: #E6D39B; /* warm pale cream-beige sand */
 }
-.region-meadow {
-  color: #6a9a4e;
+.region-sandgrain {
+  color: #F0DDA7; /* BRIGHT sand highlight, calm mid-beach texture only (see world.ts) */
 }
-.region-jungle {
-  color: #3f7a3a;
-}
-.region-desert {
-  color: #c2a35a;
-}
-.region-rocky {
-  color: #6d6a66;
-}
+/* the land terrain layers are the grass-highlight flecks over the island */
+.region-meadow,
+.region-jungle,
+.region-desert,
+.region-rocky,
 .region-tundra {
-  color: #cdd6e2;
+  color: #6E7A4E;
+}
+/* sparse lighter "sign" glyphs scattered across the TRUE island interior
+   (world.ts's ISLAND_SIGNS, nd <= 0.85 — well clear of the coastline bands
+   below) — a lighter tone than the base grass flecks. */
+.region-islandsigns {
+  color: #8CA06B;
+}
+/* Oblique interior "grass blade" signs (world.ts's GRASS_SIGN_CHARS,
+   nd < 0.7, two density tiers forming natural patches) — a cooler, slightly
+   darker tone than islandsigns above so the two layers stay visually
+   distinct where they're both eligible (both land, both clear of the
+   coastline bands). */
+.region-grasssigns {
+  color: #5C6B3E;
 }
 
-/* the ocean sits behind every land layer and gently shimmers as its wave
-   frames cycle */
-/* Pool-caustics water, three stacked layers (colors matched to the
-   bright-pool reference): deep-blue specks in open water, softer cyan crease
-   edges, and the near-white crease web on top. */
+/* STAGE 2 COASTLINE TRANSITION BANDS — see world.ts's EDGE_BANDS/
+   genLandLayers for the density curves. Each is a narrow, dense glyph band
+   peaking exactly on one VisualTerrain background boundary (world.ts's
+   COAST/visualTerrainAt), so the hard seam between two solid background
+   colours reads as an organic ASCII transition instead. */
+/* Terrain-glyph rework Layer B: the dense LIGHT-green inner coastline. Kept
+   distinctly lighter than both the base land fleck (#6E7A4E) and the old
+   "concentrated grass-edge" tone this replaced, so the coastal ring reads
+   as genuinely light green rather than just a slightly richer green. */
+.region-edgegrass {
+  color: #A9C17A;
+}
+/* Terrain-glyph rework Layer C: dense sand/yellow glyphs stacked ON TOP of
+   the light-green band above (see genLandLayers' paint-order comment) —
+   warm gold, distinct from both the light green underneath and the actual
+   beach's own cream tone further out. */
+.region-edgesandoverlay {
+  color: #E0B865;
+}
+/* Terrain-glyph rework Layer D: the dark coastal edge now has NO dedicated
+   background band (see world.ts's GRADIENT_STOPS) — this glyph colour is
+   the ONLY thing that makes the edge read as dark green. Kept the same
+   dark desaturated olive tone as before; only world.ts's density/coverage
+   and the background removal changed, not this colour. */
+.region-edgerim {
+  color: #333C2C; /* dark desaturated olive-green glyph tone — a shade of LAND, not brown soil */
+}
+.region-edgesandinner {
+  color: #D9B87E; /* rim-adjacent warm gold, sampled from shore3.svg's sand-core zone — connects rim to beach */
+}
+.region-edgesandouter {
+  color: #D8DBB8; /* pale sage-cream, sampled from shore3.svg's wet-sand/transition zone — the sand cools toward the water here, not staying one flat tone */
+}
+.region-seamwarm {
+  color: #C9D3B4; /* sand-facing half of the seam — sampled from shore3.svg's late transition zone, bridging outer sand into shallow water */
+}
+.region-seamcool {
+  color: #7EA6A8; /* water-facing half of the seam — matches shore3.svg's stable open-ocean tone (~#78a2ab) */
+}
+
+/* The ocean sits behind every land layer: a dense two-tone base lattice, a
+   shallow-water ring near the coast, and four tiers of caustic light
+   drifting across it (see OCEAN_CFG in world.ts). One <pre> per tone, so the
+   whole sea costs a handful of elements instead of a span per character.
+   Fixed colours — nothing here shifts with the clock any more, and nothing
+   here blends with --sky-bg: the water is meant to read as a completely
+   separate, vividly blue palette from the land, not tinted by it. */
 .ocean {
   position: absolute;
   inset: 0;
-  color: #2e7fb8;
   white-space: pre;
   line-height: 1;
-  animation: sea 4s ease-in-out infinite;
 }
 
-.ocean-dim {
-  color: #62c2e6;
-  animation: none;
+/* The base lattice — the body of the water, out past the shallow ring.
+   Saturated rather than dark: the sea should read as alive edge to edge,
+   not as gloom with bright spots on it. */
+.ocean-base {
+  color: #5592A0; /* deep water */
+}
+.ocean-base-lit {
+  color: #67A5AE; /* normal water — the lighter half of the base lattice split */
 }
 
-.ocean-foam {
-  color: #e9fbff;
-  animation: none;
+/* Shallow water: a ring hugging the coastline, spanning COAST.outerSandEnd
+   to COAST.shallowWaterEnd (world.ts's genOceanShallow) — starting OUTSIDE
+   the (now-wider) beach rather than underneath it, giving the water its own
+   visible water → shallow → sand banding the way the land side already has
+   one. Density lowered in Stage 3 so it reads calmer than the dense
+   sand/water seam just inland of it. */
+.ocean-shallow {
+  color: #8FC4C1;
 }
 
-/* shoreline surge (drawn OVER the sand): a dark wet-sand glaze left behind,
-   the translucent pale apron sheet, then the thick pure-white leading foam.
-   All frame-driven, so no CSS animation. */
-.shore-glaze {
-  color: rgba(70, 55, 25, 0.5);
-  animation: none;
+/* Caustics, dark to bright. The tiers are separated by HARD cutoffs (see `cuts`
+   in OCEAN_CFG), so each is a solid region with a crisp edge rather than a step
+   in a gradient — that separation is what makes them pop. Kept inside the
+   same deep→shallow hue family as the base/shallow tones above.
+   STAGE 3: c0/c1 are LOW-CONTRAST micro/soft-field tiers (close to the base
+   lattice on purpose — most of the caustic layer should read this way); c2
+   is the "soft texture field" tier; c3 is now gated in world.ts's
+   oceanCaustics() to a small number of irregular highlight clusters rather
+   than showing everywhere, so it can stay this pale without the whole sea
+   looking bright. */
+.ocean-c0 {
+  color: #5A96A2;
 }
-.shore-sheet {
-  color: rgba(233, 251, 255, 0.55);
-  animation: none;
+.ocean-c1 {
+  color: #6FA8AF;
 }
-.shore-foam {
-  color: #ffffff;
-  animation: none;
+.ocean-c2 {
+  color: #8FC4C1;
+}
+/* rare highlight-cluster tier only (see world.ts's cluster gate) */
+.ocean-c3 {
+  color: #C7E8E2;
 }
 
-@keyframes sea {
-  0%,
-  100% {
-    opacity: 0.85;
-  }
-  50% {
-    opacity: 1;
-  }
+/* The shoreline foam. Two bands on the same waterline and the same loop: the
+   bright leading crest, and a wider trailing wash behind it — what separates
+   them is glyph density, not colour, so the surf reads as one band of foam
+   with depth rather than two differently-tinted stripes. STAGE 3: shifted
+   from a pure pale-turquoise (matching .ocean-c3 exactly) toward a warmer
+   cream-turquoise blend, so the foam visually bridges cream sand -> pale
+   turquoise -> dusty blue water instead of reading as a harsh white/cyan
+   outline around the island. */
+.shore-foam,
+.shore-foam2 {
+  color: #D9E4CE;
+}
+
+/* dev-only tile readout for the alt+drag layout tool (see devLayout.ts).
+   pointer-events: none so it can never swallow a drag. */
+.layout-readout {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 900; 
+  padding: 3px 8px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #9adcc4;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(154, 220, 196, 0.35);
+  pointer-events: none;
+}
+
+/* dev-only world-asset editor panel (see devWorldAssets.ts / DevAssetPanel.tsx).
+   Same minimal, unobtrusive register as .layout-readout above — a personal
+   dev tool, not a polished player-facing panel. */
+.dev-asset-panel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 900;
+  /* ~2x the old 220px — room for the new Scene Markings tree alongside the
+     existing asset library, per the "more dev tools coming" note this was
+     widened for. Not a redesign: everything below still lays out the same
+     way, just with more horizontal room. */
+  width: 440px;
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  padding: 8px;
+  font-size: 11px;
+  color: #cfe0da;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(154, 220, 196, 0.35);
+  border-radius: 6px;
+}
+
+/* WORLD ASSETS | SCENE MARKINGS — the two top-level sections. Same visual
+   language as the existing .dev-asset-tabs (assets/insert image) one level
+   down, just a bit bolder since these are the primary section switch. */
+.dev-asset-outer-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.dev-asset-outer-tabs button {
+  flex: 1;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 5px;
+  opacity: 0.6;
+}
+.dev-asset-outer-tabs button.dev-asset-tab-active {
+  opacity: 1;
+  background: rgba(154, 220, 196, 0.18);
+}
+
+/* SCENE MARKINGS — the collapsible category > group > marker tree (see
+   DevAssetPanel.tsx's SceneMarkingsPanel / sceneMarkers.ts's
+   MARKER_REGISTRY). Indentation communicates depth instead of nested boxes,
+   so it stays legible even once many sequences are registered. */
+.dev-marker-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dev-marker-node-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 2px;
+  background: none;
+  border: none;
+  color: #cfe0da;
+}
+.dev-marker-node-toggle-group {
+  padding-left: 14px;
+  font-weight: 400;
+  opacity: 0.9;
+}
+.dev-marker-list {
+  padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+.dev-marker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.dev-marker-chip {
+  flex: 1;
+  padding: 3px 6px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: #ffb4b0;
+  background: rgba(255, 90, 80, 0.12);
+  border: 1px solid rgba(255, 90, 80, 0.4);
+  border-radius: 3px;
+  cursor: grab;
+  white-space: nowrap;
+}
+.dev-marker-status {
+  font-size: 9px;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+
+/* The in-world red marker itself (App.tsx, child of .world so it inherits
+   the same camera pan/zoom every entity gets — same convention as
+   .dev-tile-grid). Editor-only overlay, not a game entity: pointer-events
+   stay off since the Alt+drag reposition gesture is handled by tile-space
+   math (devSceneMarkers.ts), not by hit-testing this element directly. */
+.dev-marker-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.dev-marker-dot-circle {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ff3b3b;
+  border: 2px solid #fff;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
+}
+.dev-marker-dot-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.dev-asset-head {
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #9adcc4;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dev-asset-hint {
+  margin-left: auto;
+  font-weight: 400;
+  opacity: 0.6;
+  letter-spacing: normal;
+}
+.dev-asset-ghost-tag {
+  text-transform: uppercase;
+  font-size: 9px;
+}
+.dev-asset-ghost-controls {
+  margin-bottom: 8px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+.dev-asset-ghost-controls label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.dev-asset-ghost-controls input[type='range'] {
+  flex: 1;
+}
+.dev-asset-ghost-btns {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.dev-asset-ghost-btns button {
+  flex: 1;
+  font-size: 10px;
+  padding: 3px;
+}
+.dev-asset-btn-disabled {
+  opacity: 0.4;
+}
+.dev-asset-empty {
+  opacity: 0.6;
+  font-style: italic;
+}
+.dev-asset-group {
+  margin-bottom: 8px;
+}
+.dev-asset-group-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.dev-asset-variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dev-asset-variant {
+  width: 60px;
+}
+.dev-asset-variant-thumb {
+  position: relative;
+  width: 60px;
+  height: 44px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+.dev-asset-variant-thumb pre {
+  position: static;
+  transform: scale(0.4);
+  transform-origin: top left;
+  white-space: pre;
+  line-height: 1;
+}
+.dev-asset-solid-overlay {
+  position: absolute !important;
+  left: 0;
+  top: 0;
+  opacity: 0.6;
+  mix-blend-mode: screen;
+}
+.dev-asset-variant-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  opacity: 0.8;
+}
+.dev-asset-solid-toggle {
+  font-size: 9px;
+  padding: 0 3px;
+}
+.dev-asset-warnings {
+  font-size: 9px;
+  color: #e0b04a;
+}
+.dev-asset-drafts {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+.dev-asset-draft-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+}
+.dev-asset-dump-btn {
+  width: 100%;
+  margin-top: 4px;
+  font-size: 10px;
+  padding: 3px;
+}
+
+.dev-asset-undo-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+.dev-asset-undo-row button {
+  flex: 1;
+  font-size: 10px;
+  padding: 3px;
+}
+.dev-asset-undo-row button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dev-asset-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.dev-asset-tabs button {
+  flex: 1;
+  font-size: 10px;
+  padding: 4px;
+  opacity: 0.6;
+}
+.dev-asset-tabs button.dev-asset-tab-active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.dev-image-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dev-image-cost-note {
+  font-size: 9px;
+  color: #e0b04a;
+}
+.dev-image-tab input[type='file'] {
+  font-size: 10px;
+}
+.dev-image-preview {
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.dev-image-hint {
+  font-size: 10px;
+  padding: 3px;
+}
+.dev-image-group-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  margin-top: 4px;
+}
+.dev-image-group-name input {
+  flex: 1;
+  font-size: 10px;
+  padding: 2px;
+}
+.dev-image-variants {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.dev-image-variant {
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+.dev-image-variant-head {
+  font-size: 10px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.dev-image-variant-preview-box {
+  height: 64px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+}
+.dev-image-variant-preview {
+  transform-origin: center;
+}
+.dev-image-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  margin-top: 4px;
+}
+.dev-image-scale-row input[type='number'] {
+  width: 52px;
+  font-size: 10px;
+}
+.dev-image-tier {
+  opacity: 0.6;
+  margin-left: auto;
+}
+.dev-image-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.dev-image-color-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+}
+.dev-image-color-row input[type='color'] {
+  width: 20px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+.dev-image-manifest {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .ent {
@@ -518,6 +1214,15 @@ pre {
   white-space: pre;
   line-height: 1;
   color: #d6d6d6;
+  /* App.tsx's render offset (offX/offY) shifts any scaled-down entity's
+     left/top so shrinking it reads as pivoting around the sprite's
+     bottom-centre — that math only lines up with collisionBox()'s (world.ts)
+     unshifted e.x/e.y if the actual CSS pivot matches. Applied here on the
+     base class, not per-kind, so it covers every entity uniformly (a no-op
+     for the ones that never get `scale`) and can't be silently missed again
+     the way .ent.house/.ent.bridge were — that gap put their collider
+     several tiles off from the visible sprite. */
+  transform-origin: 50% 100%;
 }
 
 .ent.player {
@@ -527,45 +1232,222 @@ pre {
     top 0.1s linear;
 }
 
+/* Mitchy — light beige, so the cat reads as warm fur against the cooler
+   plant/water/arch tints rather than as another white UI element. Not in the
+   day/night themed categories: he keeps his own colour around the clock. */
 .ent.cat {
-  color: #fff;
+  color: #e9dcc1;
 }
 
-.ent.appleTree,
-.ent.emptyTree {
-  color: #9a9a9a;
+/* PLANT category — trees, flowers, ferns, cacti, ice-flowers share one colour.
+   The palm paints every cell from its own generated palette, so this only ever
+   shows through as the base for its uncoloured cells. */
+.ent.palm,
+.ent.flower,
+.ent.cactus,
+.ent.fern,
+.ent.iceflower,
+.ent.grasshalm,
+.ent.flowerplus {
+  /* Deliberately DISTINCT from the ground-fleck/terrain colour (.region-meadow
+     etc. and --sky-bg both land in the same muted-olive family) — this used
+     to match them exactly (#6E7A4E was shared with .region-meadow), which
+     was harmless when the backdrop was near-black and this colour only ever
+     showed on scattered text, but now that VisualTerrain paints a large SOLID
+     olive background (world.ts's CoastBackgroundLayer), any uncoloured plant
+     cell in the same hue reads as camouflaged rather than as a plant. Only
+     matters for cells without their own palette entry (most of these sprites
+     paint every cell from a real generated/hand-picked palette already —
+     this is purely the fallback for whatever's left uncoloured). */
+  color: #9BB86B;
 }
 
-.ent.flower {
-  color: #c9c9c9;
+/* The pond paints every cell from its own decoded palette (shore, reeds,
+   water), so this base colour only shows through on cells left uncoloured. */
+.ent.pond {
+  color: #6a7078;
 }
 
-.ent.cactus {
-  color: #b5b5b5;
+/* CRAFTED-ITEM TEXTURE MODIFIERS (see ColoredSprite.tsx's `texture` prop and
+   craft/spec.ts's textureModifierFor). 'shiny' needs per-glyph rendering
+   (handled in JS, not here); 'neon' and 'metallic' are pure CSS and apply to
+   any element wherever a crafted item's sprite is drawn — inventory slot,
+   detail panel, world entity, craft-modal card. 'matte'/unset gets no class
+   at all, i.e. the item's normal colours with no extra effect. */
+.tex-neon {
+  text-shadow:
+    0 0 3px currentColor,
+    0 0 7px currentColor;
+}
+.tex-metallic {
+  filter: grayscale(1) contrast(1.35) brightness(1.1);
 }
 
-.ent.fern {
-  color: #c0c0c0;
+/* PLACED ITEMS — free-form world placement (see placement.ts). Rotated
+   in place, not about the base .ent's bottom-centre pivot (right for
+   scale-shrink, wrong for "spins where it stands") — --place-rot is set
+   inline per item (App.tsx's PlacedItemView), 0/90/180/270deg. */
+.ent.placed {
+  transform-origin: 50% 50%;
+  transform: rotate(var(--place-rot, 0deg));
+  color: #cfcfcf;
 }
 
-.ent.iceflower {
-  color: #f2f2f2;
+/* Charging a push: a light wiggle around the same rotation, so it reads as
+   "straining against this" rather than a generic idle animation. */
+.ent.placed.pushing {
+  animation: push-wiggle 0.35s ease-in-out infinite;
+}
+@keyframes push-wiggle {
+  0%,
+  100% {
+    transform: rotate(var(--place-rot, 0deg));
+  }
+  50% {
+    transform: rotate(calc(var(--place-rot, 0deg) + 3deg));
+  }
 }
 
+.push-bar {
+  position: absolute;
+  height: 3px;
+  margin-top: 2px;
+  background: var(--ui-slot-border);
+  border: 1px solid var(--ui-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.push-bar-fill {
+  height: 100%;
+  background: var(--ui-accent);
+}
+
+/* The ghost preview while placement mode is active. No palette/colors are
+   passed to it (App.tsx), so the tint below always reads clearly regardless
+   of a crafted item's own colours — a deliberate simplification, not an
+   oversight. */
+.ent.ghost {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.ent.ghost.valid {
+  color: #7ee787;
+}
+.ent.ghost.invalid {
+  color: #e2726b;
+}
+/* dev-only world-asset editor: allowed but flagged (overlaps water/foam/
+   garden) — amber, distinct from both valid green and blocked red. */
+.ent.ghost.warn {
+  color: #e0b04a;
+}
+
+/* FORCE EVERY GLYPH INTO ONE CELL.
+   The tile is drawn with block and geometric characters (▨▩▤▥░▒ ║¦│ ●◍◕). Most
+   are East-Asian ambiguous width, and this font renders them DOUBLE width — so
+   without this the rows shear, and worse, they shear by different amounts as
+   the animation swaps glyphs each frame, which reads as the whole tile shaking.
+   Pinning each glyph to a 1ch box makes the font's own advance width
+   irrelevant. It needs one span per glyph (ColoredSprite's `perCell`), which is
+   why this is not the default — at 64,000 cells the ocean could not afford it,
+   but a single ~2,700-cell sprite can. */
+.ent.pond span {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+/* Same fix, same reason, for the flower's '█' petals — see FLOWER_PLUS in
+   sprites.ts. Tiny sprite (6x3), so perCell's one-span-per-glyph cost is a
+   non-issue here, unlike the ocean this pattern was first written for. */
+.ent.flowerplus span {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+/* Same fix again for the house — baked straight from a glyph-grid reference
+   SVG (house_taller.svg), so it inherits whatever density-ramp characters
+   (†·¤‡¬§Ø etc.) that reference happened to use, unfiltered. */
+.ent.house span {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+/* And again for the cliff, baked from cliff.svg's own glyph grid — same
+   density-ramp characters, same shearing without this.
+
+   Deliberately NO `background` here, unlike .ent.house: the crown's top rows
+   are sparse grass tufts meant to feather into the meadow around them, and a
+   filled box would cut that edge off with a hard rectangle. The face below is
+   ~98% dense, so the handful of ground glyphs that do show through read as
+   texture rather than as see-through holes. */
+.ent.cliff {
+  color: #6f7a52;
+}
+
+.ent.cliff span {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+/* Interaction zones painted over another sprite — the clothesline garments
+   and the front door all live inside the house's own picture, so these exist
+   only to give those parts something to hover and click. opacity (not
+   visibility/display) is what keeps them in hit-testing while invisible. */
+.ent.hotspot {
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Invisible walls (the house's deck edges). Not clickable, so pointer-events
+   are off — otherwise they'd swallow clicks meant for the picture behind. */
+.ent.blocker {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ARCHITECTURE category — houses, shops, buildings. This is only the
+   fallback tint for any uncoloured cell — the actual roof/wall/window/door
+   colours are baked per-cell into the hand-transcribed sprite data
+   (src/data/house.json's palette), not painted by CSS region tiers. */
+.ent.shop,
+.ent.house {
+  color: #E4D6B5;
+}
+
+/* .ent.house no longer gets a rectangular `background: var(--sky-bg)` —
+   ColoredSprite's solidCells (see App.tsx's house render call) now gives
+   every drawn house cell its OWN per-cell background instead, so the
+   building occludes the ground along its actual silhouette rather than a
+   box, and correctly matches whatever VisualTerrain band it's standing on
+   instead of only ever matching the single hardcoded --sky-bg tone.
+   .ent.shop is NOT converted in this pass (see the task this came from) —
+   it keeps the old rectangular occlusion, on its own selector now that the
+   shared rule above no longer carries a background at all. */
+.ent.shop {
+  background: var(--sky-bg);
+}
+
+/* stone stays its own natural colour (not in the themed categories) */
 .ent.stone {
   color: #8a8a8a;
 }
 
-.ent.shop {
-  color: #cfcfcf;
-}
-
-.ent.house {
-  color: #cfcfcf;
-}
-
-.ent.apple {
-  color: #ececec;
+/* dates = food → keep their own colour (like living things & utensils). The
+   bunch paints its own golds; this is just the base for anything uncoloured. */
+.ent.date {
+  color: #f5b731;
 }
 
 .ent.pet {
@@ -588,8 +1470,15 @@ pre {
    grid the children are positioned on and reintroduce the drift bug). */
 .player-rig {
   position: absolute;
-  transition-property: left, top;
+  left: 0;
+  top: 0;
+  /* camera pan lives in the TRANSFORM, and so does the player now — animating
+     left/top re-ran layout every frame and janked the sprite behind the
+     smoothly-composited camera. transform-only keeps it on the GPU. */
+  transition-property: transform;
   transition-timing-function: linear;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .player-rig > pre {
@@ -602,6 +1491,37 @@ pre {
 
 .player-sprite {
   color: #fff;
+  /* pivot the PLAYER_SCALE shrink on the feet, not the sprite's centre —
+     same reasoning as the base .ent rule, and the App.tsx offX/offY math
+     that keeps this pivot lined up with the player's actual tile position. */
+  transform-origin: 50% 100%;
+  /* Standing on the cottage, the house's dense glyph texture shows through the
+     transparent gaps inside the player's own glyphs and breaks up the
+     silhouette — that's what reads as the character being "faded out" (it
+     isn't: nothing here sets opacity, and .player-rig's z-index already wins).
+     The player's own sprite is only ~30% ink (source: PLAYER is 48x28 =
+     1344 cells, ~423 of them coloured) — mostly genuine transparent gaps
+     between glyphs, by design, not a mostly-solid sprite. The original fix
+     here was three offset RINGS of hard, unblurred shadows at 1/2/3px in all
+     8 directions: at the glyph pitch this sprite renders at (well before the
+     PLAYER_SCALE transform shrinks the whole rig down — text-shadow px
+     values are relative to that pre-scale size, so a "3px" shadow is really
+     over a third of a character cell), that many rings in that many
+     directions reliably bled INTO most of those transparent gaps too, not
+     just around the sprite's outer silhouette — which is what read as a
+     solid dark backing behind the character instead of a thin per-glyph
+     outline. Cut down to a single 1px, 4-direction ring: still enough edge
+     definition to keep the character legible against busy/matching-colour
+     terrain (the actual goal), without swallowing the sprite's own
+     transparent cells the way three 8-directional rings did. Reads
+     --player-outline, NOT --sky-bg — deliberately: this ring's job is edge
+     contrast against whatever is nearby (the house, dense ground texture,
+     anything), which needs to stay strong regardless of the ground's own
+     colour. See --player-outline's own comment in :root for why that's a
+     different call than .ent.house's background fill, which DOES need to
+     track --sky-bg exactly. */
+  text-shadow:
+    1px 0 0 var(--player-outline), -1px 0 0 var(--player-outline), 0 1px 0 var(--player-outline), 0 -1px 0 var(--player-outline);
 }
 
 .rig-gear {
@@ -616,7 +1536,7 @@ pre {
 
 .shaking {
   animation: shake 0.6s ease-in-out;
-  transform-origin: 50% 100%;
+  /* transform-origin: 50% 100% now comes from the base .ent rule */
 }
 
 @keyframes shake {
@@ -683,7 +1603,10 @@ pre {
   border: 1px solid #777;
   padding: 1px 6px;
   z-index: 500;
-  white-space: nowrap;
+  /* short messages ("oh nothing...") stay on one line; longer ones (the
+     palm's "already picked" text) wrap instead of running off-screen */
+  max-width: 220px;
+  white-space: normal;
 }
 
 .bubble {
@@ -697,10 +1620,10 @@ pre {
 
 .overlay {
   position: fixed;
-  inset: 64px 0 0 0;
+  inset: 0; /* HUD is an overlay now (header no longer reserves 64px) */
   background: rgba(5, 5, 5, 0.78);
   display: flex;
-  align-items: flex-start;
+  align-items: flex-start; /* stays top-aligned so tall scrollable modals don't clip */
   justify-content: center;
   z-index: 900;
   overflow: auto;
@@ -708,35 +1631,128 @@ pre {
 }
 
 .panel {
-  background: #0d0d0d;
-  border: 4px double #888;
-  padding: 16px;
+  position: relative;
+  background: var(--ui-bg);
+  border: 3px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  padding: 22px 26px;
   max-width: 620px;
   width: 100%;
+  box-shadow: var(--ui-shadow);
+  /* the four corner flowers — one radial-gradient "bloom" per corner, so
+     every panel gets the ornament for free with no extra markup. Each bloom
+     is a small centre dot (--ui-petal-core) ringed by four petal dots
+     (--ui-petal), echoing FLOWER_PLUS's own 5-cell plus shape. */
+  --bloom:
+    radial-gradient(circle 3.5px at center, var(--ui-petal-core) 99%, transparent 100%),
+    radial-gradient(circle 4px at center, var(--ui-petal) 99%, transparent 100%),
+    radial-gradient(circle 4px at center, var(--ui-petal) 99%, transparent 100%),
+    radial-gradient(circle 4px at center, var(--ui-petal) 99%, transparent 100%),
+    radial-gradient(circle 4px at center, var(--ui-petal) 99%, transparent 100%);
+  background-image: var(--bloom), var(--bloom), var(--bloom), var(--bloom);
+  background-repeat: no-repeat;
+  background-size: 9px 9px;
+  background-position:
+    14px 14px, 14px 3px, 14px 25px, 3px 14px, 25px 14px,
+    calc(100% - 23px) 14px, calc(100% - 23px) 3px, calc(100% - 23px) 25px, calc(100% - 34px) 14px, calc(100% - 12px) 14px,
+    14px calc(100% - 23px), 14px calc(100% - 34px), 14px calc(100% - 12px), 3px calc(100% - 23px), 25px calc(100% - 23px),
+    calc(100% - 23px) calc(100% - 23px), calc(100% - 23px) calc(100% - 34px), calc(100% - 23px) calc(100% - 12px), calc(100% - 34px) calc(100% - 23px), calc(100% - 12px) calc(100% - 23px);
 }
 
 .panel-title {
   text-align: center;
-  color: #fff;
-  letter-spacing: 2px;
-  margin-bottom: 14px;
+  color: var(--ui-heading);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
 }
 
 .hint {
-  margin-top: 12px;
-  color: #666;
+  margin-top: 14px;
+  color: var(--ui-muted);
   font-size: 11px;
   text-align: center;
+}
+
+/* Circular close badge, reused wherever a panel needs its own [x] (the shop
+   header, the merged inventory panel) — same rose accent as every primary
+   button, so "this ends the screen" reads as one consistent affordance. */
+.panel-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--ui-bg);
+  background: var(--ui-accent);
+  color: var(--ui-accent-ink);
+  font-size: 15px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  z-index: 5;
+}
+
+.panel-close:hover {
+  background: var(--ui-accent-hi);
+}
+
+/* ---- shared button kinds — every action across every panel is one of
+   these two, so "what will this button do" reads the same everywhere:
+   primary = the one highlighted action per screen (Use, Sell, confirm),
+   secondary = anything else (Drop, cancel, back). ---- */
+.btn {
+  padding: 10px 16px;
+  border-radius: var(--ui-radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-align: center;
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  background: var(--ui-accent);
+  color: var(--ui-accent-ink);
+  border-color: var(--ui-accent);
+}
+
+.btn-primary:hover {
+  background: var(--ui-accent-hi);
+}
+
+.btn-primary:disabled {
+  background: var(--ui-slot-bg);
+  border-color: var(--ui-border-soft);
+  color: var(--ui-muted);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--ui-body);
+  border-color: var(--ui-border-soft);
+}
+
+.btn-secondary:hover {
+  background: var(--ui-bg-raise);
+  color: var(--ui-heading);
 }
 
 .inv-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 4px;
+  gap: 6px;
 }
 
 .slot {
-  border: 1px solid #3d3d3d;
+  background: var(--ui-slot-bg);
+  border: 1px solid var(--ui-slot-border);
+  border-radius: var(--ui-radius-sm);
   aspect-ratio: 1;
   position: relative;
   display: flex;
@@ -747,31 +1763,36 @@ pre {
 }
 
 .slot.filled {
-  border-color: #999;
   cursor: pointer;
 }
 
 .slot.filled:hover {
-  background: #1a1a1a;
+  border-color: var(--ui-body);
+}
+
+.slot.sel {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 1px var(--ui-accent);
 }
 
 .mini {
   font-size: 5px;
   line-height: 1;
   white-space: pre;
-  color: #ddd;
+  color: var(--ui-heading);
   overflow: hidden;
   max-width: 100%;
 }
 
 .count {
   position: absolute;
-  right: 2px;
-  bottom: 1px;
+  right: 4px;
+  bottom: 3px;
   font-size: 10px;
-  color: #fff;
-  background: #0d0d0d;
-  padding: 0 1px;
+  font-weight: 600;
+  color: var(--ui-heading);
+  background: none;
+  padding: 0;
 }
 
 .pick {
@@ -780,35 +1801,51 @@ pre {
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;
-  background: #111;
-  border: 1px solid #999;
+  margin-top: 4px;
+  background: var(--ui-bg-raise);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  padding: 4px;
 }
 
 .pick .opts {
   margin-top: 0;
 }
 
+/* The item's name atop a .pick popup — only the placed-item pickup menu uses
+   this today (App.tsx), but it's generic enough for any future .pick that
+   wants a label above its options. */
+.pick-name {
+  padding: 2px 6px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ui-heading);
+  white-space: nowrap;
+}
+
 .pick .opt {
-  padding: 5px 12px;
+  padding: 6px 14px;
+  border-radius: 6px;
 }
 
 .opts {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-top: 6px;
+  gap: 3px;
+  margin-top: 8px;
 }
 
 .opt {
-  padding: 3px 8px;
+  padding: 6px 10px;
   white-space: pre;
   cursor: pointer;
-  color: #aaa;
+  color: var(--ui-body);
+  border-radius: 6px;
 }
 
 .opt.sel {
-  color: #fff;
-  background: #1e1e1e;
+  color: var(--ui-heading);
+  background: var(--ui-bg-raise);
 }
 
 /* storage */
@@ -824,27 +1861,30 @@ pre {
 }
 
 .sec-label {
-  color: #666;
+  color: var(--ui-muted);
   font-size: 11px;
   letter-spacing: 2px;
   margin: 10px 0 4px;
 }
 
-.slot.sel {
-  border-color: #fff;
-}
+/* storage's keyboard-nav cursor reuses the same selected-slot look as the
+   inventory grid (see the base .slot.sel rule) — no separate override needed
+   here any more; this rule used to say `border-color: #fff` before the
+   design-system pass, which is why it's worth a comment now that it's gone:
+   don't reintroduce a one-off colour for what is the same "this one's
+   highlighted" state everywhere else in the UI. */
 
 .sel-arrow {
   position: absolute;
   left: 2px;
   top: 0;
-  color: #fff;
+  color: var(--ui-accent);
   font-size: 12px;
   z-index: 5;
 }
 
 .inv-grid.drop {
-  outline: 1px dashed #aaa;
+  outline: 1px dashed var(--ui-accent);
   outline-offset: 3px;
 }
 
@@ -855,7 +1895,7 @@ pre {
   white-space: pre;
   font-size: 6px;
   line-height: 1;
-  color: #fff;
+  color: var(--ui-heading);
   transform: translate(-50%, -50%);
 }
 
@@ -870,7 +1910,7 @@ pre {
   font-size: 26px;
   line-height: 1.05;
   white-space: pre;
-  color: #fff;
+  color: var(--ui-heading);
   text-align: left;
   display: inline-block;
 }
@@ -879,8 +1919,14 @@ pre {
   font-size: 16px;
 }
 
+/* the cat portraits match the cat in the world (.ent.cat); the house portrait
+   keeps the panel's default heading colour */
+.portrait.cat {
+  color: #e9dcc1;
+}
+
 .dialog-name {
-  color: #888;
+  color: var(--ui-muted);
   margin: 6px 0 12px;
   letter-spacing: 2px;
 }
@@ -902,31 +1948,33 @@ pre {
 
 .shop-tabs {
   position: absolute;
-  right: -58px;
+  right: -52px;
   top: 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .shop-tab {
-  width: 54px;
-  padding: 18px 6px;
-  background: #ddd;
-  color: #0a0a0a;
-  border: 1px solid #888;
-  border-left: none;
-  font-size: 14px;
+  width: 48px;
+  padding: 16px 6px;
+  background: var(--ui-bg-raise);
+  color: var(--ui-body);
+  border: 1px solid var(--ui-border-soft);
+  border-radius: var(--ui-radius-sm);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .shop-tab.active {
-  background: #1c1c1c;
-  color: #fff;
+  background: var(--ui-accent);
+  color: var(--ui-accent-ink);
+  border-color: var(--ui-accent);
 }
 
-.shop-tab:hover {
-  background: #fff;
-  color: #0a0a0a;
+.shop-tab:hover:not(.active) {
+  color: var(--ui-heading);
+  border-color: var(--ui-body);
 }
 
 .shop-hdr {
@@ -940,11 +1988,68 @@ pre {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  color: #999;
+  color: var(--ui-muted);
   font-size: 12px;
 }
 
 /* buy tab */
+
+/* The universal craft token — one fixed offer above the category tabs,
+   rather than a copy prepended to every category's rotating stock. */
+.token-offer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  background: var(--ui-bg-raise);
+  border: 1px solid var(--ui-accent);
+  border-radius: 8px;
+}
+
+.token-offer:hover {
+  background: var(--ui-bg-hover, var(--ui-bg-raise));
+}
+
+.token-offer.spent {
+  opacity: 0.45;
+  border-color: var(--ui-border-soft);
+}
+
+.token-offer .mini {
+  font-size: 8px;
+}
+
+.token-offer-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.token-offer-text .token-tag {
+  position: static;
+  align-self: flex-start;
+}
+
+.token-offer-name {
+  font-size: 12px;
+  color: var(--ui-head);
+}
+
+.token-offer-sub {
+  font-size: 10px;
+  color: var(--ui-body);
+  opacity: 0.8;
+}
+
+.token-offer-left {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--ui-body);
+  opacity: 0.8;
+}
 
 .cat-row {
   display: flex;
@@ -954,21 +2059,23 @@ pre {
 }
 
 .cat-tag {
-  background: #ddd;
-  color: #0a0a0a;
-  border: 1px solid #888;
-  padding: 6px 18px;
-  font-size: 13px;
+  background: var(--ui-bg-raise);
+  color: var(--ui-body);
+  border: 1px solid var(--ui-border-soft);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 12px;
 }
 
 .cat-tag.active {
-  background: #1c1c1c;
-  color: #fff;
+  background: var(--ui-accent);
+  color: var(--ui-accent-ink);
+  border-color: var(--ui-accent);
 }
 
-.cat-tag:hover {
-  background: #fff;
-  color: #0a0a0a;
+.cat-tag:hover:not(.active) {
+  color: var(--ui-heading);
+  border-color: var(--ui-body);
 }
 
 .buy-grid {
@@ -991,59 +2098,55 @@ pre {
 
 .buy-name {
   font-size: 10px;
-  color: #bbb;
+  color: var(--ui-body);
   text-align: center;
 }
 
 .token-tag {
   position: absolute;
-  left: 2px;
-  top: 2px;
+  left: 3px;
+  top: 3px;
   font-size: 8px;
-  color: #0a0a0a;
-  background: #ddd;
-  padding: 0 3px;
+  color: var(--ui-accent-ink);
+  background: var(--ui-accent);
+  border-radius: 4px;
+  padding: 1px 4px;
   z-index: 2;
 }
 
 .equipped-tag {
   position: absolute;
-  right: 2px;
-  top: 2px;
+  right: 3px;
+  top: 3px;
   font-size: 8px;
-  color: #0a0a0a;
-  background: #fff;
-  padding: 0 3px;
+  color: var(--ui-bg);
+  background: var(--ui-heading);
+  border-radius: 4px;
+  padding: 1px 4px;
   z-index: 2;
 }
 
 .price-tri {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 0;
-  height: 0;
-  border-left: 40px solid transparent;
-  border-bottom: 24px solid #ddd;
+  display: none;
 }
 
 .price {
   position: absolute;
-  right: 2px;
-  bottom: 1px;
-  color: #0a0a0a;
+  right: 4px;
+  bottom: 3px;
+  color: var(--ui-heading);
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 700;
   z-index: 1;
 }
 
 .confirm-price {
-  color: #fff;
+  color: var(--ui-heading);
   margin-bottom: 6px;
 }
 
 .poor {
-  color: #999;
+  color: var(--ui-muted);
   font-size: 12px;
   margin-bottom: 4px;
 }
@@ -1226,25 +2329,36 @@ pre {
 
 .shop-hdr-title {
   flex: 1;
-  color: #fff;
-  letter-spacing: 2px;
+  color: var(--ui-heading);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 1px;
 }
 
 .shop-hdr-money {
-  color: #fff;
+  color: var(--ui-heading);
   margin-right: 18px;
 }
 
+/* shop's close badge sits INSIDE the header row (not floated off the panel
+   corner like .panel-close) — same rose-circle look, different anchor,
+   since the shop already reserves header space for it. */
 .shop-x {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
   border: none;
-  color: #aaa;
-  font-size: 15px;
-  padding: 2px 4px;
+  background: var(--ui-accent);
+  color: var(--ui-accent-ink);
+  font-size: 13px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .shop-x:hover {
-  color: #fff;
-  background: none;
+  background: var(--ui-accent-hi);
 }
 
 .shop-top {
@@ -1259,22 +2373,168 @@ pre {
   white-space: pre;
   font-size: 11px;
   line-height: 1.15;
-  color: #fff;
+  color: var(--ui-heading);
 }
 
 .shop-hint {
-  color: #999;
+  color: var(--ui-body);
   padding-top: 12px;
   line-height: 2;
 }
 
 .shop-hint span {
-  color: #555;
+  color: var(--ui-muted);
   font-size: 11px;
 }
 
 .offer .opts {
   margin-top: 4px;
+}
+
+/* ---- inventory: item grid + detail sidebar, side by side in one panel
+   (see the merged 'inventory'/'detail'/'detailOwned' render in App.tsx) ---- */
+
+.inv-body {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.inv-body .inv-grid {
+  flex: 1;
+  min-width: 0;
+}
+
+.inv-detail-side {
+  flex: none;
+  width: 216px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inv-detail-empty {
+  align-self: stretch;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  padding: 16px;
+  color: var(--ui-muted);
+  font-size: 12px;
+  text-align: center;
+  background: var(--ui-bg-raise);
+  border: 1px dashed var(--ui-border-soft);
+  border-radius: var(--ui-radius-sm);
+}
+
+.inv-detail-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 118px;
+  background: var(--ui-bg-raise);
+  border: 1px solid var(--ui-border-soft);
+  border-radius: var(--ui-radius-sm);
+  margin-bottom: 12px;
+}
+
+.inv-detail-icon .detail-sprite {
+  margin: 0;
+}
+
+.inv-detail-name {
+  color: var(--ui-heading);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.inv-detail-desc {
+  color: var(--ui-body);
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.inv-detail-fact {
+  color: var(--ui-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+/* Prompt-memory tags (crafted items only) — a lightweight tooltip so a
+   player can see what they typed alongside a few inferred traits, without a
+   separate history UI. See DetailOwnedSide (App.tsx) and craftDescribe
+   (llm.ts). */
+/* A crafted item's translated mechanical effect, under its flavour text. */
+.inv-detail-effect {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--ui-body);
+  background: var(--ui-slot-bg);
+  border: 1px solid var(--ui-accent);
+  border-radius: 6px;
+}
+
+.inv-detail-effect-head {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ui-accent);
+}
+
+.inv-detail-effect-hint {
+  font-size: 10px;
+  color: var(--ui-muted);
+}
+
+.inv-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.tag-chip {
+  font-size: 10px;
+  color: var(--ui-muted);
+  background: var(--ui-slot-bg);
+  border: 1px solid var(--ui-slot-border);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.inv-detail-qty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  margin-top: auto;
+  border-top: 1px solid var(--ui-border-soft);
+  color: var(--ui-body);
+  font-size: 12px;
+}
+
+.inv-detail-qty b {
+  color: var(--ui-heading);
+  font-size: 14px;
+}
+
+.inv-detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.inv-detail-actions .btn {
+  width: 100%;
 }
 
 /* detail */
@@ -1290,17 +2550,17 @@ pre {
   white-space: pre;
   line-height: 1;
   font-size: 12px;
-  color: #eee;
+  color: var(--ui-heading);
   margin: 4px 0 12px;
 }
 
 .detail-desc {
-  color: #bbb;
+  color: var(--ui-body);
   margin-bottom: 10px;
 }
 
 .detail-fact {
-  color: #8f8f8f;
+  color: var(--ui-muted);
   font-size: 12px;
   min-height: 2.4em;
 }
@@ -1377,11 +2637,30 @@ pre {
 
 /* ---------- garden / farming ---------- */
 
-.garden-fence {
+/* The garden bed is a baked, per-cell-coloured sprite (see GARDEN_BED in
+   sprites.ts), so unlike the procedural fence it replaced it needs the same
+   treatment as .ent.house: a bottom-centre pivot for the scale-down, and every
+   glyph pinned to exactly one cell so the double-width characters in its
+   density ramp don't shear the rows. */
+.garden-bed {
   position: absolute;
   white-space: pre;
   line-height: 1;
-  color: #8a6d4b; /* wood tone */
+  transform-origin: 50% 100%;
+  color: #8a6d4b;
+  /* No rectangular background here any more — ColoredSprite's solidCells
+     (see App.tsx's garden-bed render call) now gives every drawn cell its
+     own per-cell background instead, same as the house, so it occludes the
+     ground along its actual silhouette and matches whatever VisualTerrain
+     band it's standing on instead of one hardcoded ground colour. */
+}
+
+.garden-bed span {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  overflow: hidden;
+  vertical-align: top;
 }
 
 .crop-slot {
@@ -1389,6 +2668,12 @@ pre {
   white-space: pre;
   line-height: 1;
   color: #6bbf59; /* growing green */
+}
+
+.door-hitbox {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .crop-slot.empty {
@@ -1441,7 +2726,9 @@ pre {
 }
 
 .bed-slot {
-  border: 1px solid #3d3d3d;
+  background: var(--ui-slot-bg);
+  border: 1px solid var(--ui-slot-border);
+  border-radius: var(--ui-radius-sm);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1456,13 +2743,17 @@ pre {
 }
 
 .bed-slot.filled:hover {
-  background: #161616;
+  border-color: var(--ui-body);
 }
 
 .bed-slot.empty {
   opacity: 0.5;
 }
 
+/* status colours stay distinct from the neutral panel palette on purpose —
+   these are functional feedback (ready to harvest / needs water / withered),
+   not decoration, the same way .crop-status .ok/.bad stay their own colours
+   below */
 .bed-slot.ready {
   border-color: #6ea84f;
 }
@@ -1477,19 +2768,19 @@ pre {
 
 .bed-slot .mini {
   font-size: 9px;
-  color: #cfcfcf;
+  color: var(--ui-heading);
 }
 
 .bed-name {
   font-size: 10px;
-  color: #ccc;
+  color: var(--ui-body);
   text-align: center;
 }
 
 .bed-state {
   font-size: 9px;
   text-align: center;
-  color: #888;
+  color: var(--ui-muted);
 }
 
 .bed-state.ready {
@@ -1511,13 +2802,17 @@ pre {
 }
 
 .bed-btn {
-  padding: 5px 14px;
-  border: 1px solid #4a6ea0;
-  color: #cfe0ff;
+  padding: 8px 16px;
+  border-radius: var(--ui-radius-sm);
+  border: 1px solid var(--ui-accent);
+  color: var(--ui-accent-ink);
+  background: var(--ui-accent);
+  font-weight: 600;
+  font-size: 13px;
 }
 
 .bed-btn:hover {
-  background: #16233a;
+  background: var(--ui-accent-hi);
 }
 
 .crop-status {
@@ -1525,7 +2820,7 @@ pre {
   font-size: 12px;
   text-align: center;
   line-height: 1.5;
-  color: #aaa;
+  color: var(--ui-body);
 }
 
 .crop-status .ok {
@@ -1541,3 +2836,642 @@ pre {
   opacity: 0.28;
   cursor: not-allowed;
 }
+
+/* ===========================================================================
+   Mitchy's Workshop — crafting modal (CraftModal.tsx). Fixed-size modal inside
+   .overlay. Stage clips the drawer so it cannot cover header or composer.
+   =========================================================================== */
+.cw {
+  /* Pulls its accent/border tones from the shared design system (see :root
+     above) rather than its own one-off gold — every OTHER modal's "this is
+     the highlighted thing" colour is the same rose, so Mitchy's Workshop
+     reads as part of the same app instead of a visually separate tool. The
+     inner layout (message bubbles, drawer, cards) stays as it is; it's a
+     much larger, more complex surface than the reference covers, so this is
+     a colour/shape pass at the root, not a full rebuild. */
+  --accent: var(--ui-accent);
+  --line: var(--ui-border-soft);
+  --line2: var(--ui-border);
+  width: 940px;
+  max-width: 92vw;
+  height: 620px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-bg);
+  border: 3px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  overflow: hidden;
+  position: relative;
+}
+
+.cw-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.cw-title { color: #fff; font-size: 15px; letter-spacing: 2px; }
+.cw-token { display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12px; }
+.cw-token-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.cw-token-name { color: #ddd; text-transform: capitalize; }
+.cw-token-scope { color: #777; }
+.cw-x {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: var(--ui-accent);
+  color: var(--ui-accent-ink);
+  font-size: 13px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cw-x:hover { background: var(--ui-accent-hi); }
+
+.cw-stage { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+.cw-thread {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cw-turn { display: flex; gap: 10px; max-width: 640px; }
+.cw-turn.me { flex-direction: row-reverse; align-self: flex-end; }
+.cw-avatar {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  overflow: hidden;
+}
+.cw-avatar pre { font-size: 7px; line-height: 1.1; white-space: pre; }
+/* the player's face crop is the sampled 44x18 sprite (see sprites.ts) — far
+   bigger than MITCHY_FACE (CAT.slice(0,2), ~9x2), which the 7px rule above
+   still fits fine, so this needs its own much smaller size rather than
+   changing the shared rule. Still overflows the 34x34 box (already clipped
+   by .cw-avatar's overflow:hidden) — a badge-sized crop, not the whole face. */
+.cw-avatar pre.cw-face-player { font-size: 3px; }
+.cw-bubble { min-width: 0; }
+.cw-label { font-size: 9px; letter-spacing: 2px; color: #777; margin-bottom: 3px; }
+.cw-turn.mitchy .cw-label { color: var(--accent); }
+.cw-turn.me .cw-label { text-align: right; }
+.cw-body { color: #d6d6d6; font-size: 13px; line-height: 1.5; }
+.cw-turn.me .cw-body {
+  background: #171717;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 11px;
+}
+
+.cw-card {
+  margin-top: 8px;
+  max-width: 420px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #101010;
+}
+.cw-sprite-box {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #050505;
+  border: 1px solid #222;
+  border-radius: 6px;
+  padding: 8px;
+}
+.cw-sprite-box.big { min-height: 150px; }
+.cw-sprite-box pre { white-space: pre; line-height: 1; color: #fff; font-size: 13px; }
+.cw-card-name { color: #fff; margin-top: 8px; font-size: 13px; letter-spacing: 1px; }
+.cw-card-punch { color: #9a9a9a; font-style: italic; font-size: 12px; margin-top: 2px; }
+.cw-card-status { color: var(--accent); font-size: 11px; margin-top: 7px; }
+.cw-progress-text { color: #8fb3d9; font-size: 11px; margin-top: 7px; }
+.cw-ellipsis::after { content: "..."; animation: cw-blink 1.1s steps(4) infinite; }
+@keyframes cw-blink {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+.cw-progress-bar { margin-top: 6px; height: 3px; background: #1c1c1c; border-radius: 2px; overflow: hidden; }
+.cw-progress-bar span {
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: var(--accent);
+  animation: cw-slide 1.3s ease-in-out infinite;
+}
+@keyframes cw-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(320%); }
+}
+
+/* auto-fit, not a fixed 3 — suggestions are filtered for craftability, so
+   sometimes only 1 or 2 survive and they should still fill the row. */
+.cw-alts { margin-top: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+.cw-alt {
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px;
+  background: #101010;
+  color: #ddd;
+}
+.cw-alt:hover { border-color: var(--accent); background: #161206; }
+.cw-alt-name { font-size: 12px; line-height: 1.35; }
+.cw-alt-pick { color: var(--accent); font-size: 10px; margin-top: 6px; }
+.cw-alts-note { color: #7f7f7f; font-size: 11px; margin-top: 8px; }
+
+.cw-composer { flex: none; border-top: 1px solid var(--line); padding: 12px 14px; }
+.cw-input-row { display: flex; gap: 8px; }
+.cw-input {
+  flex: 1;
+  padding: 9px 11px;
+  background: #060606;
+  border: 1px solid var(--line2);
+  color: #eee;
+  font: inherit;
+  font-size: 13px;
+}
+.cw-input:disabled { opacity: 0.5; }
+.cw-send, .cw-close-btn {
+  padding: 9px 16px;
+  border: 1px solid var(--line2);
+  color: #fff;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.cw-send:hover, .cw-close-btn:hover { background: #1c1c1c; }
+.cw-hint { color: #777; font-size: 11px; margin-top: 8px; }
+.cw-done-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+.cw-drawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 340px;
+  transform: translateX(100%);
+  transition: transform 0.24s ease;
+}
+.cw-drawer.open { transform: translateX(0); }
+.cw-bookmark {
+  position: absolute;
+  left: -42px;
+  bottom: 26px;
+  width: 42px;
+  height: 46px;
+  border: 1px solid var(--line2);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  background: #141414;
+  color: var(--accent);
+  font-size: 18px;
+}
+.cw-bookmark:hover { background: #1e1e1e; }
+.cw-drawer-inner {
+  height: 100%;
+  background: #0a0a0a;
+  border-left: 1px solid var(--line2);
+  display: flex;
+  flex-direction: column;
+}
+.cw-drawer-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  color: #ddd;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.cw-drawer-count { color: #777; font-size: 11px; }
+.cw-back { border: none; color: #ccc; font-size: 12px; padding: 0; }
+.cw-back:hover { color: #fff; background: none; }
+.cw-drawer-list { flex: 1; overflow-y: auto; padding: 6px; }
+.cw-empty { color: #666; font-size: 12px; padding: 16px; text-align: center; }
+.cw-day {
+  position: sticky;
+  top: 0;
+  background: #0a0a0a;
+  color: #888;
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 6px 6px 4px;
+}
+.cw-hrow {
+  display: flex;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 6px;
+  padding: 7px;
+  color: #ddd;
+}
+.cw-hrow:hover { background: #151515; }
+.cw-hthumb {
+  flex: none;
+  width: 50px;
+  height: 44px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #050505;
+  border: 1px solid #222;
+  border-radius: 4px;
+  font-size: 5px;
+  line-height: 1;
+  white-space: pre;
+}
+.cw-hrow-text { min-width: 0; flex: 1; }
+.cw-hrow-name {
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cw-hrow-prompt {
+  color: #888;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cw-hrow-meta { color: #5f5f5f; font-size: 10px; margin-top: 2px; }
+.cw-detail { flex: 1; overflow-y: auto; padding: 12px; }
+.cw-detail-name { color: #fff; margin-top: 10px; font-size: 14px; letter-spacing: 1px; }
+.cw-detail-punch { color: #9a9a9a; font-style: italic; font-size: 12px; margin-top: 3px; }
+.cw-detail-meta {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #bbb;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cw-detail-meta span { color: #6f6f6f; margin-right: 6px; }
+.cw-again {
+  margin-top: 14px;
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.cw-again:hover:not(:disabled) { background: #161206; }
+.cw-again:disabled { opacity: 0.4; border-color: var(--line); color: #555; cursor: not-allowed; }
+.cw-footnote { color: #666; font-size: 10px; margin-top: 8px; text-align: center; }
+
+.cw-popup-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 4, 4, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+.cw-popup {
+  width: 330px;
+  max-width: 90vw;
+  background: #0d0d0d;
+  border: 4px double #999;
+  padding: 14px;
+  text-align: center;
+  animation: cw-pop 0.2s ease;
+}
+@keyframes cw-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.cw-popup-bar {
+  color: #888;
+  font-size: 10px;
+  letter-spacing: 3px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+.cw-popup-prompt { color: #8a8a8a; font-size: 11px; font-style: italic; margin-bottom: 10px; }
+.cw-popup-name { color: #fff; margin-top: 10px; font-size: 14px; letter-spacing: 1px; }
+.cw-popup-punch { color: #9a9a9a; font-style: italic; font-size: 12px; margin-top: 3px; }
+.cw-popup-btns { display: flex; gap: 10px; margin-top: 14px; }
+.cw-popup-btns button {
+  flex: 1;
+  padding: 9px;
+  border: 1px solid var(--line2);
+  color: #fff;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.cw-popup-btns button:hover { background: #1c1c1c; }
+.cw-confirm {
+  width: 330px;
+  max-width: 90vw;
+  background: #0d0d0d;
+  border: 4px double #999;
+  padding: 16px;
+  text-align: center;
+}
+.cw-confirm-text { color: #fff; font-size: 13px; }
+.cw-confirm-sub { color: var(--accent); font-size: 11px; margin-top: 8px; }
+.cw-confirm-btns { display: flex; gap: 10px; margin-top: 14px; }
+.cw-confirm-btns button {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--line2);
+  color: #ddd;
+  font-size: 12px;
+}
+.cw-confirm-btns button:hover { background: #1c1c1c; color: #fff; }
+
+.cw button:focus-visible,
+.cw input:focus-visible,
+.cw-popup button:focus-visible,
+.cw-confirm button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cw-drawer,
+  .cw-popup,
+  .cw-progress-bar span,
+  .cw-ellipsis::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* =========================================================================
+   Unified intro, stages 15-18 — the "wake up, meet Mitchy" onboarding
+   cinematic (src/introPartB.ts, App.tsx's runIntro, DialogueBox.tsx,
+   NameEntryPanel.tsx, Letterbox.tsx, GameMap.tsx). Stages 1-14 (the laptop/
+   MYLL prologue) live in src/IntroA.tsx and render on top of this, covering
+   it entirely, so it can safely start already-opaque with no visible seam
+   at the handoff. All colours below are --ui-* tokens, same system every
+   other panel uses.
+   ========================================================================= */
+
+/* Full-screen black cover, visible from stage 15's start through the
+   eye-opening reveal (see runIntro's `blackout` state) — fades via its
+   own opacity transition, driven inline (duration = EYE_OPEN_MS). */
+.cinematic-blackout {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 9985;
+  pointer-events: none;
+}
+
+/* Bottom-center dialogue/name-entry mount point. */
+.introb-dialogue-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 8vh;
+  display: flex;
+  justify-content: center;
+  /* Above Letterbox (10001, Letterbox.tsx) so dialogue/name entry stay
+     readable and clickable over the bars during stages 15-18. Below the
+     DEV Skip Intro button (10010, App.tsx) so it always stays reachable. */
+  z-index: 10005;
+  pointer-events: none;
+  padding: 0 16px;
+}
+
+.introb-dialogue-wrap .panel {
+  pointer-events: auto;
+}
+
+.introb-dialogue {
+  max-width: 460px;
+  cursor: pointer;
+}
+
+/* Test-mode only (?introB=1 — see DialogueBox's `locked` prop): clicks are
+   ignored and the box auto-advances on a timer, so the pointer cursor
+   would be misleading here. */
+.introb-dialogue.introb-locked {
+  cursor: default;
+}
+
+.introb-dialogue-text {
+  color: var(--ui-body);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.introb-dialogue-next {
+  margin-top: 12px;
+  color: var(--ui-muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+/* Yellow keyword-highlight span — {KEY:...}/{SETTINGS_CONTROLS} tokens in
+   dialogue text. Matches the game's existing yellow accent
+   (--ui-petal-core / the sprite-baked #FFD166 "shirt-yellow"), not a new hue. */
+.key-hl {
+  color: var(--ui-petal-core);
+  font-weight: 700;
+}
+
+.introb-name-entry {
+  max-width: 340px;
+  text-align: center;
+}
+
+.introb-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
+  padding: 10px 12px;
+  background: var(--ui-slot-bg);
+  border: 1px solid var(--ui-slot-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-heading);
+  font-size: 14px;
+  text-align: center;
+}
+
+.introb-name-input:focus {
+  outline: none;
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 1px var(--ui-accent);
+}
+
+/* =========================================================================
+   Intro Stage A narration — the internal-monologue text synced to the
+   laptop/MYLL prologue's cinematic beats (src/introNarrationData.ts, the ONE
+   authoritative narration source for the whole unified intro, not just
+   Stage A; IntroA.tsx). Deliberately NOT styled like
+   .introb-dialogue/DialogueBox: no speaker-name label, no "click to
+   continue" affordance, no choices — it must read as the protagonist's
+   own thoughts, not as another character talking to the player. A
+   bottom-center black chat box, fixed against the viewport (this is
+   portaled to document.body from IntroA.tsx, escaping its own root's
+   stacking context, so a page-level z-index here actually means something
+   relative to siblings like the DEV Skip Intro button). No letterbox
+   involved: Stage A doesn't use one (see App.tsx's <Letterbox/> render),
+   this box just floats over the scene art directly. */
+.introa-narration-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 6vh;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10002; /* below the DEV Skip Intro button (10010, App.tsx) */
+  padding: 0 8%;
+}
+
+/* FIXED size — same box for every beat, never resizes by text length.
+   Measured (real browser, not estimated) against the single longest line
+   across all of introNarrationData.ts's stages — "I knew all this AI stuff was
+   changing things, but... I didn't think I'd feel it this much." (90
+   chars, the 'rejection-email' stage's 'rejection-3' beat) — which wraps
+   to exactly 2 lines at this width/font,
+   60.8px of text. Height = that + the box's own top/bottom padding, with a
+   little rounding headroom. If a future edit (including a future DEV Intro
+   Editor) introduces a longer line, re-measure and bump this height —
+   anything that still wraps to <=2 lines needs no change. */
+.introa-narration-box {
+  width: min(640px, 84vw);
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  border-radius: 10px;
+  padding: 0 26px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.introa-narration-box.visible {
+  opacity: 1;
+}
+
+.introa-narration-text {
+  margin: 0;
+  text-align: center;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  font-weight: 500;
+  font-size: clamp(14px, 1.6vw, 19px);
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  color: #fff;
+  white-space: pre-wrap;
+}
+
+.introb-name-submit {
+  margin-top: 12px;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Transient "M — Map" contextual hint, shown once right after Part B hands
+   control back. Pure CSS fade so App.tsx only has to mount/unmount it. */
+.map-hint-toast {
+  position: fixed;
+  top: 14vh;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 9980;
+  pointer-events: none;
+  color: var(--ui-heading);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  animation: mapHintFade var(--map-hint-ms, 3200ms) ease forwards;
+}
+
+.map-hint-toast-inner {
+  background: var(--ui-bg);
+  border: 2px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  padding: 8px 14px;
+  box-shadow: var(--ui-shadow);
+}
+
+@keyframes mapHintFade {
+  0% { opacity: 0; transform: translateY(-6px); }
+  10% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---- the M map overlay ---- */
+.game-map-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 5, 5, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9970;
+  overflow: auto;
+  padding: 24px 8px;
+}
+
+.game-map-panel {
+  max-width: none;
+}
+
+.game-map-viewport {
+  position: relative;
+  border-radius: var(--ui-radius-sm);
+  overflow: hidden;
+  background: #142530;
+}
+
+.game-map-canvas {
+  position: absolute;
+  image-rendering: pixelated;
+}
+
+.map-head {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid var(--ui-accent);
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.map-head pre {
+  font-size: 3px;
+  line-height: 1;
+  white-space: pre;
+}
+

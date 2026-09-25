@@ -1,0 +1,44 @@
+{
+  "groups": [
+    {
+      "group": "bridge-svg",
+      "sourceImage": "bridge_600b.svg",
+      "variants": [
+        {
+          "slug": "bridge-svg-a",
+          "dataFile": "bridge-svg-a.json",
+          "suggestedKind": "bridge",
+          "sizeTier": "large",
+          "suggestedScale": 0.4,
+          "spriteDims": { "w": 76, "h": 38 },
+          "warnings": [
+            "Mechanically decoded from a pre-rendered glyph SVG (scripts/svg-glyph-to-asset.mjs), not a curated ArtStyleGuide §2 palette -- 581 per-tone palette keys instead of the usual small hand-picked set.",
+            "Uses the same density-ramp character set as house/cliff (†,‡,§,¤,¥,Ø,¬,etc.) -- will need perCell rendering + a `.ent.bridge-svg span{width:1ch}` CSS rule to avoid row-shearing, same treatment those already require.",
+            "No collision (solid) mask generated -- advisory only, add one in the placement editor before trusting overlap.",
+            "suggestedKind reuses the existing 'bridge' EntityKind (already wired/CSS'd via the procedural bridge) since this is just an alternate bridge design -- confirm that's actually desired before committing; if not, treat as a new kind and follow the full wiring checklist."
+          ]
+        }
+      ]
+    },
+    {
+      "group": "pond",
+      "sourceImage": "pond_animated.svg",
+      "variants": [
+        {
+          "slug": "pond-a",
+          "dataFile": "pond-a.json",
+          "suggestedKind": "pond",
+          "sizeTier": "large",
+          "suggestedScale": 0.35,
+          "spriteDims": { "w": 180, "h": 65 },
+          "warnings": [
+            "Replaced (2026-09-22): shore/reed glyphs decoded from pond_animated.svg's static group, quantized to a 30-key single-char palette (scripts/build-pond.mjs) -- fixes the earlier pond-a build's base36 multi-char palette-key bug (ColoredSprite indexes colors[y][x] as exactly one character).",
+            "Water body is a fitted ellipse, not a transcription of the reference's water-a/water-b ripple glyphs -- it's animated at runtime by pondFrame() (src/pondAnim.ts), reusing the waterfall's own pond-cell noise formula standalone (no impact ripple, since no waterfall feeds this pond).",
+            "Collider (`solid`) covers the shore/reed 'sign' glyphs only -- water cells and true empty space are both left open, per request.",
+            "'pond' EntityKind is now fully wired: world.ts EntityKind union, sprites.ts S.POND* exports, App.tsx's PondLayer render path, .ent.pond CSS. Just drag-place via the dev panel."
+          ]
+        }
+      ]
+    }
+  ]
+}

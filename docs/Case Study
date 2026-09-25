@@ -1,0 +1,26 @@
+## Why this project?
+During my internship I worked on an mobile escape game which uses an LLM to bring more variety in a characters text response. 
+
+The two biggest impacts of the project were: 
+-developing six web pages for that game, evoke my interest in UI/UX design
+-taking it further to a visual-heavier UI/UX design of an LLM based mechanic in a game: using a text prompt to craft new things and generate fitting sprites on scratch. 
+
+What made this idea super interesting to me was the need of adjustable UI/UX design for non-deterministic output.
+
+That's where the game design started. 
+
+
+## Research
+
+Games: Animal Crossing, Stardew Valley
+Vision: A cozy island where player can farm simple ressources and CRAFT things.
+
+Next, I built a prototype to test fast the technical side of the project. 
+
+Shortly after experimenting with different color palettes it became clear that the ASCII's edgy sign style on dark bg-color was clashing hard with the cozy feeling. A dystopian Sci-Fi setting on an island made the story and art style more coherent together.
+
+Games: 
+
+Reasearching on games with similar genre I noticed that there weren't many games like that. The idea was still uncontested.
+
+

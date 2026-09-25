@@ -1,0 +1,8 @@
+﻿Re-optimizing dependencies because lockfile has changed
+
+  VITE v5.4.21  ready in 459 ms
+
+  ➜  Local:   http://localhost:5440/
+  ➜  Network: use --host to expose
+15:59:25 [vite] hmr update /src/App.tsx
+15:59:49 [vite] hmr update /src/App.tsx

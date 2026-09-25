@@ -6,22 +6,32 @@
 // Nothing else in the app knows (or may know) which path ran: same async
 // interface either way.
 
-import { llmEnabled, chat, chatJSON, chatStream, MODELS } from './llmClient';
+import { llmEnabled, chat, chatJSON, MODELS } from './llmClient';
 // Build-time-generated static data (produced offline by scripts/build-*.mjs).
 // The shop samples from these; if they're empty, it falls back to ITEM_POOL.
 import catalogData from './data/catalog.json';
 import spritesData from './data/sprites.json';
-// Sprite generation pipeline (text-only → validate → retries → error).
+// Sprite generation pipeline: plan (LLM) -> normalize/validate -> render
+// (local, deterministic) -> retry-once-on-hard-failure.
 import {
   parseSpec,
   resolveStyle,
   instanceFromSpec,
-  makeSprite,
-  screenCraftPrompt,
+  planCraft,
+  planAndRender,
   suggestAlternatives,
+  textureModifierFor,
   type CraftLog,
+  type TextureModifier,
 } from './craft';
-import { generateReferenceImage } from './imageGen';
+import {
+  parseItemFunction,
+  parseGameplayIntent,
+  NEUTRAL_MODIFIERS,
+  MODIFIER_PROMPT,
+  type ItemFunction,
+} from './craft/functions';
+import { checkPolicy } from './craft/policy';
 
 // Structured log, one record per generation. Kept in memory + echoed to the
 // console; read it for playtest analysis.
@@ -41,11 +51,11 @@ const FACTS: Record<string, string[]> = {
     'The oldest known rocks on Earth are over 4 billion years old.',
     'Pumice is the only rock that floats on water.',
   ],
-  apple: [
-    'Apples float because they are about 25% air.',
-    'There are more than 7,500 apple varieties grown around the world.',
-    'An apple tree can take four to five years to produce its first fruit.',
-    'The science of growing apples is called pomology.',
+  date: [
+    'Date palms have been farmed for more than 6,000 years.',
+    'A single date palm can drop over 100kg of fruit in a season.',
+    'Dates are about 70% sugar by weight once they dry on the tree.',
+    'Date palms are either male or female; only the females fruit.',
   ],
   cactus: [
     'Some cacti can survive two years without a single drop of rain.',
@@ -67,7 +77,7 @@ const FACTS: Record<string, string[]> = {
 const BASE_PRICE: Record<string, number> = {
   flower: 3,
   stone: 2,
-  apple: 5,
+  date: 5,
   cactus: 6,
   fern: 4,
   iceflower: 9,
@@ -95,8 +105,26 @@ export interface ShopItem {
   price: number;
   kind: 'item' | 'token';
   tool?: 'water'; // utensils that act as tools (e.g. the watering can)
-  color?: string; // crafted items: player-chosen colour (CSS colour)
+  color?: string; // crafted items: base/default sprite colour (CSS colour)
+  // crafted items: optional per-region colour ("paint by number"). palette maps
+  // single-char keys → hex; colors is a grid the same shape as sprite, each cell
+  // a palette key or '.' (= base colour). Both present or both absent.
+  palette?: Record<string, string>;
+  colors?: string[];
   scale?: number; // crafted items: player-chosen size multiplier
+  // crafted items only: a lightweight "prompt memory" — a few inferred
+  // descriptive traits (material/mood/etc., from craftDescribe) plus one
+  // exact `prompt: <what the player typed>` entry appended in code (not by
+  // the LLM), so what spawned the item is always faithfully preserved even
+  // if the model paraphrases everything else. Shown on the item's tooltip.
+  tags?: string[];
+  // crafted items only: visual finish effect, derived from spec.finish (see
+  // craft/spec.ts's textureModifierFor) — 'matte' or absent means no effect.
+  textureModifier?: TextureModifier;
+  // crafted items only: the player-invented function, translated by the LLM
+  // into bounded numeric modifiers (see craft/functions.ts). Applies only
+  // once the item is PLACED in the world, near the crop beds.
+  fn?: ItemFunction;
   equip: null | {
     mode: 'vehicle' | 'hold' | 'pet';
     speedMult?: number; // vehicles: movement interval multiplier (<1 = faster)
@@ -145,14 +173,29 @@ const ITEM_POOL: Record<Category, Omit<ShopItem, 'id' | 'kind'>[]> = {
   ],
 };
 
-const TOKEN_PRICES: Record<Category, number> = {
-  plant: 12,
-  pets: 30,
-  clothing: 15,
-  vehicle: 35,
-  food: 10,
-  utensils: 14,
-};
+// One universal token, one price. It used to be a token per category at
+// 10-35 each, with the token's category gating what you could craft; now a
+// single token crafts anything and the crafted item's category is inferred
+// from the prompt instead (see craftItem).
+export const TOKEN_PRICE = 20;
+export const TOKENS_PER_DAY = 3;
+
+// Not part of the rotating per-category stock — the shop shows it in its own
+// slot, so it appears once rather than six times. hourSeed only keeps the id
+// stable within a restock window.
+export function universalToken(hourSeed: number): ShopItem {
+  return {
+    id: `token-${hourSeed}`,
+    name: 'Craft Token',
+    category: 'utensils', // nominal only; the crafted item infers its own
+    sprite: TOKEN_SPRITE,
+    desc: 'A blank token, humming with possibility.',
+    funcDesc: 'describe anything you can imagine — and what it should do.',
+    price: TOKEN_PRICE,
+    kind: 'token',
+    equip: null,
+  };
+}
 
 function seededRand(seed: number) {
   let a = seed | 0;
@@ -164,8 +207,10 @@ function seededRand(seed: number) {
   };
 }
 
-// The shop's stock for one category and one real-world hour: a craft token
-// first, then 3 "generated" items. Same hour → same stock (deterministic).
+// The shop's stock for one category and one real-world hour: 3 "generated"
+// items. Same hour → same stock (deterministic). The craft token is no longer
+// part of this — it's universal now, so the shop renders it once on its own
+// (see universalToken).
 export async function getShopStock(category: Category, hourSeed: number): Promise<ShopItem[]> {
   await delay(300);
   const rnd = seededRand(hourSeed * 131 + CATEGORIES.indexOf(category) * 17 + 5);
@@ -179,30 +224,8 @@ export async function getShopStock(category: Category, hourSeed: number): Promis
     const base = pool.splice(idx, 1)[0];
     picked.push({ ...base, id: `${category}-${hourSeed}-${i}`, kind: 'item' });
   }
-  const token: ShopItem = {
-    id: `${category}-token-${hourSeed}`,
-    name: `${category[0].toUpperCase() + category.slice(1)} Token`,
-    category,
-    sprite: TOKEN_SPRITE,
-    desc: `A craft token attuned to everything ${category}.`,
-    funcDesc: `use it to craft any ${category}-ish thing u can describe.`,
-    price: TOKEN_PRICES[category],
-    kind: 'token',
-    equip: null,
-  };
-  return [token, ...picked];
+  return picked;
 }
-
-// keywords that clearly belong to a category — used to reject cross-category
-// craft requests (a plant token can't craft a bicycle)
-const CATEGORY_WORDS: Record<Category, string[]> = {
-  plant: ['flower', 'tree', 'plant', 'rose', 'daisy', 'cactus', 'fern', 'bush', 'herb', 'vine', 'seed'],
-  pets: ['dog', 'puppy', 'cat', 'kitten', 'bird', 'bunny', 'rabbit', 'pet', 'turtle', 'hamster', 'fox'],
-  clothing: ['hat', 'scarf', 'boots', 'shirt', 'cape', 'coat', 'glove', 'sock', 'dress', 'jacket'],
-  vehicle: ['bike', 'bicycle', 'boat', 'ship', 'canoe', 'kayak', 'skateboard', 'cart', 'wagon', 'sled', 'car', 'scooter'],
-  food: ['bread', 'pie', 'cake', 'cheese', 'soup', 'apple', 'berry', 'honey', 'cookie', 'stew', 'sandwich'],
-  utensils: ['can', 'watering', 'trowel', 'basket', 'pot', 'bucket', 'shovel', 'rake', 'hoe', 'spade'],
-};
 
 const WATER_WORDS = ['boat', 'ship', 'canoe', 'kayak', 'raft'];
 const FAST_WORDS = ['bike', 'bicycle', 'scooter'];
@@ -264,11 +287,14 @@ export type CraftResult =
   // or blocked (sensitive) input.
   | { ok: false; reply: string; suggestions?: string[] };
 
-// Live-progress hooks the crafting UI can pass into craftItem.
+// Live-progress hooks the crafting UI can pass into craftItem. Rendering is
+// now local/synchronous (no more image or streaming stages — see the
+// crafting pipeline overhaul), so 'image' is gone and onLine's lines arrive
+// all at once rather than progressively; the hooks are kept (not removed)
+// so CraftModal's existing busy/partial-line UI keeps working unmodified.
 export interface CraftUiHooks {
-  onStage?: (stage: 'image' | 'drawing' | 'retrying') => void;
+  onStage?: (stage: 'drawing' | 'retrying') => void;
   onLine?: (line: string, index: number, level: 0 | 1 | 2) => void;
-  onImage?: (dataUrl: string) => void;
 }
 
 // Pick a sprite + default equip/funcDesc for a freshly crafted item. Sprites
@@ -322,7 +348,7 @@ function buildCraftedItem(
     name,
     category,
     sprite: template.sprite,
-    desc: `Custom-crafted from a ${category} token.`,
+    desc: 'Custom-crafted from a blank token.',
     funcDesc: overrides?.funcDesc?.trim() || funcDesc,
     price: 0,
     kind: 'item',
@@ -339,67 +365,63 @@ const CRAFT_TO_TOKEN: Partial<Record<string, Category>> = {
   gem: 'utensils', potion: 'utensils', instrument: 'utensils', furniture: 'utensils',
 };
 
+// The crafted item still HAS a category (it drives sprite sizing, the equip
+// template, and inventory grouping) — it's just inferred from what the player
+// asked for now, rather than dictated by which token they bought. Falls back
+// to the model's own hint, then to a neutral default.
+function inferCategory(specCategory: string, hint?: Category): Category {
+  return CRAFT_TO_TOKEN[specCategory] ?? hint ?? 'utensils';
+}
+
 // Craft anything the player describes. With an LLM key set, this runs the
 // generate → validate → shared-store → fail pipeline and produces a real
 // per-prompt sprite (plus the player's colour/size). Offline, it falls back to
 // the keyword-based mock below so the game still crafts.
-export async function craftItem(category: Category, prompt: string, ui?: CraftUiHooks): Promise<CraftResult> {
+export async function craftItem(prompt: string, ui?: CraftUiHooks): Promise<CraftResult> {
+  // Local content policy runs FIRST and on every path — before any network
+  // call, and equally in offline/mock mode. The model-side `sensitive` check
+  // below is fail-open by design (a failed request returns "not sensitive"),
+  // so this deterministic pass is the part that always holds.
+  const policy = checkPolicy(prompt);
+  if (!policy.allowed) return { ok: false, reply: policy.reason! };
+
   if (llmEnabled) {
     const spec = parseSpec(prompt);
-    const wanted = CRAFT_TO_TOKEN[spec.category];
-    if (wanted && wanted !== category) {
-      return {
-        ok: false,
-        reply: `hmm... that sounds more like a ${wanted} thing. this token only crafts ${category} stuff. try again?`,
-      };
-    }
     try {
-      // PRE-FLIGHT SCREEN — one cheap call making every judgment needed
-      // before generation (category fit + content safety + size class; the
-      // size classification used to be its own call inside makeSprite, so
-      // this is net-zero extra calls). A mismatch or blocked prompt bails
-      // here for ~$0.00002 instead of a full wasted generation.
-      const screened = await screenCraftPrompt(prompt, category, chatJSON, {
+      // PLAN — one cheap call that now decides content safety, size, AND the
+      // region-by-region visual composition (CraftPlan) in one shot. Its
+      // `fit` field no longer gates anything: a universal token has no
+      // category to mismatch against, so the only rejection left here is a
+      // blocked prompt. `tokenHint` is still useful as a category guess.
+      const plan = await planCraft(prompt, spec.category, chatJSON, {
         model: MODELS.fast,
         fallbackModel: MODELS.fastFallback,
       });
-      if (screened.sensitive) {
+      if (plan.sensitive) {
         // deliberately NO suggestions on blocked input
         return {
           ok: false,
           reply: "let's keep it cozy in my shop... i won't craft that one. try something friendlier?",
         };
       }
-      if (!screened.fit) {
-        // deliberately NO suggestions on a category mismatch
-        return {
-          ok: false,
-          reply: screened.tokenHint
-            ? `hmm... "${prompt}" feels more like a ${screened.tokenHint} thing. this token only crafts ${category} stuff, purr.`
-            : `hmm... "${prompt}" doesn't really feel like a ${category} thing. this token only crafts ${category} stuff. try again?`,
-        };
-      }
+      const category = inferCategory(spec.category, plan.tokenHint as Category | undefined);
 
-      // Text-only → validate → retries. If every attempt fails, sprite is
-      // null and the player gets an honest error message (no template
-      // stand-in, no silent substitution — deliberate).
-      // strategy:'text-only' — dropped the image-mediated step: it was both
-      // expensive (vision tokens) and counterproductive (over-specifying
-      // visual detail from a reference image was hurting sprite quality, not
-      // helping). genImage/onImage/onStage('image') stay wired but go
-      // unused — keeps the A/B capability available if image-mediated
-      // generation is worth revisiting later; just flip strategy back.
-      const { sprite, log, refImage, error } = await makeSprite(prompt, category, {
-        genImage: generateReferenceImage,
-        chatStream, // streaming Stage 2 transport (per-line validation + fail-fast)
-        classify: async () => screened.sizeClass, // already decided by the screen
-        model: MODELS.smart, // ASCII sprite generation — primary
-        modelFallback: MODELS.smartFallback, // used only if the primary fails before any output
-        strategy: 'text-only',
-        onStage: ui?.onStage,
-        onLine: ui?.onLine,
-        onImage: ui?.onImage,
+      // Normalize/validate the plan → render locally (deterministic, no
+      // LLM) → one retry of the PLAN on a hard failure. If both attempts
+      // fail, sprite is null and the player gets an honest error message (no
+      // template stand-in, no silent substitution — deliberate). Rendering
+      // is instant/local now, so there's nothing to parallelize it against —
+      // craftDescribe runs after category is known, same dependency as
+      // before, just no longer racing a Stage-2 call that no longer exists.
+      ui?.onStage?.('drawing');
+      const { sprite, log, error } = await planAndRender(prompt, category, plan, {
+        chat: chatJSON,
+        model: MODELS.fast,
+        fallbackModel: MODELS.fastFallback,
       });
+      if (log.retried) ui?.onStage?.('retrying');
+      if (sprite) sprite.lines.forEach((line, i) => ui?.onLine?.(line, i, log.fallbackLevel as 0 | 1));
+      const description = await craftDescribe(prompt, category);
       craftLog.push(log);
       console.info('[craft]', log);
 
@@ -423,14 +445,35 @@ export async function craftItem(category: Category, prompt: string, ui?: CraftUi
         (sprite.name && sprite.name.trim()) ||
         prompt.trim().slice(0, 18).replace(/^\w/, (c) => c.toUpperCase()) ||
         'Mystery Thing';
-      const item = buildCraftedItem(category, name, prompt);
+      // The player's own stated function becomes the item's funcDesc via the
+      // overrides hook, replacing the per-category boilerplate — this is the
+      // whole point of letting them invent one.
+      const item = buildCraftedItem(category, name, prompt, {
+        funcDesc: description.fn.narrative,
+      });
+      item.fn = description.fn;
       item.sprite = sprite.lines; // the freshly generated sprite
-      // colour still comes from the player's words; size is baked into the
-      // sprite's own dimensions (sizeClass), so no CSS scale needed.
+      // Per-region colour from the generator (rose: red bloom, green stem …),
+      // when it produced a valid palette + grid. Absent → the sprite is mono.
+      if (sprite.palette && sprite.colors) {
+        item.palette = sprite.palette;
+        item.colors = sprite.colors;
+      }
+      // the base colour still comes from the player's words; on-screen SIZE is
+      // baked into the sprite's own dimensions (sizeClass), so resolveStyle's
+      // own size-word scale is intentionally not applied here. The scale that
+      // IS applied compensates for the renderer's higher internal glyph
+      // resolution (see spriteConfig.ts's RESOLUTION_MULTIPLIER) — a
+      // different concern from the player's stated size, so no conflict.
       const style = resolveStyle(instanceFromSpec(spec, item.id));
       if (style.color) item.color = style.color;
-      item.desc = `Freshly crafted from a ${category} token.`;
-      return { ok: true, item, refImage };
+      if (sprite.resolutionScale) item.scale = sprite.resolutionScale;
+      item.desc = description.description;
+      // the exact prompt is appended in CODE, not asked of the model — see
+      // craftDescribe's own comment on why that tag has to be verbatim.
+      item.tags = [...description.tags, `prompt: ${prompt.trim()}`];
+      item.textureModifier = textureModifierFor(spec.finish);
+      return { ok: true, item };
     } catch (err) {
       console.warn('[craft] pipeline error:', err);
       return {
@@ -441,19 +484,24 @@ export async function craftItem(category: Category, prompt: string, ui?: CraftUi
   }
 
   await delay(900);
-  const p = prompt.toLowerCase();
-  const fitsOwn = CATEGORY_WORDS[category].some((w) => p.includes(w));
-  const other = CATEGORIES.find(
-    (c) => c !== category && CATEGORY_WORDS[c].some((w) => p.includes(w)),
-  );
-  if (!fitsOwn && other) {
-    return {
-      ok: false,
-      reply: `hmm... that sounds more like a ${other} thing. this token only crafts ${category} stuff. try again?`,
-    };
-  }
+  // No cross-category rejection any more — one universal token crafts
+  // anything, so the category is simply inferred and the craft proceeds.
+  const offlineSpec = parseSpec(prompt);
+  const category = inferCategory(offlineSpec.category);
   const name = prompt.trim().slice(0, 18).replace(/^\w/, (c) => c.toUpperCase()) || 'Mystery Thing';
-  return { ok: true, item: buildCraftedItem(category, name, prompt) };
+  // Offline mode still gets real (mock) description/tags/texture — parseSpec
+  // and textureModifierFor are pure local keyword-matching (no LLM needed at
+  // all), and craftDescribe degrades to its own mock text when !llmEnabled,
+  // so there's no reason to skip this path just because there's no API key.
+  const description = await craftDescribe(prompt, category);
+  const item = buildCraftedItem(category, name, prompt, {
+    funcDesc: description.fn.narrative,
+  });
+  item.fn = description.fn;
+  item.desc = description.description;
+  item.tags = [...description.tags, `prompt: ${prompt.trim()}`];
+  item.textureModifier = textureModifierFor(offlineSpec.finish);
+  return { ok: true, item };
 }
 
 function mockFunFact(itemName: string): string {
@@ -493,7 +541,7 @@ export async function getFunFact(itemName: string): Promise<string> {
 
 const MITCHY_FALLBACK = [
   'purrr... nice weather today, huh?',
-  'shake the apple tree. trust me.',
+  'shake the date palm. trust me.',
   'i buy almost anything. ALMOST.',
   'being a shopkeeper cat is honest work.',
   'flowers sell well this season.',
@@ -586,5 +634,89 @@ export async function getPrice(itemName: string): Promise<number> {
   } catch (err) {
     console.warn('[llm] getPrice fell back to mock:', err);
     return mockPrice(itemName);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Crafted-item flavor text + inferred tags. A small, separate, cheap call —
+// same reasoning as keeping screenCraftPrompt/getFunFact/getPrice apart from
+// the sprite-drawing prompt: that prompt is already tuned tight for
+// reliability on a small/fast model (see spriteGen.ts's own notes), and
+// bolting more concerns onto it is exactly the kind of thing that's already
+// been found to hurt it. This runs in PARALLEL with makeSprite (see
+// craftItem below), not after, so it costs no extra wall-clock time on the
+// common path.
+//
+// The "prompt: <exact text>" memory tag is NOT requested from the model —
+// it's appended in code by the caller, verbatim, so what actually spawned
+// the item is always faithfully preserved even if the model paraphrases or
+// drops words elsewhere. Only the OTHER, inferred tags come from here.
+// ---------------------------------------------------------------------------
+
+interface CraftDescription {
+  description: string;
+  tags: string[];
+  // The player's invented function, translated into bounded numbers. Folded
+  // into THIS call rather than a fourth round-trip: the extra fields cost
+  // only output tokens, and the model is already looking at the same prompt.
+  fn: ItemFunction;
+}
+
+function mockCraftDescribe(prompt: string, category: Category): CraftDescription {
+  return {
+    description: `A hand-crafted ${category} item, made just the way you described it.`,
+    tags: [category],
+    fn: { narrative: '', modifiers: { ...NEUTRAL_MODIFIERS } },
+  };
+}
+
+export async function craftDescribe(prompt: string, category: Category): Promise<CraftDescription> {
+  if (!llmEnabled) {
+    await delay(300);
+    return mockCraftDescribe(prompt, category);
+  }
+  try {
+    const r = await chatJSON<{
+      description?: unknown;
+      tags?: unknown;
+      narrative_function?: unknown;
+      gameplay_intent?: unknown;
+      modifiers?: unknown;
+      behavior?: unknown;
+    }>(
+      [
+        {
+          role: 'system',
+          content:
+            'You write short flavor text for Asciia Bay, a cozy ASCII island-village game, for an item a ' +
+            'player just described to a crafting station. Reply with JSON only: {"description": "...", ' +
+            '"tags": ["...", "..."], "narrative_function": "...", "gameplay_intent": {...}, "modifiers": {...}, ' +
+            '"behavior": null}. ' +
+            '"description": ONE to TWO short sentences, warm/cozy tone, no preamble, ' +
+            'no quotes around it, under 30 words total — say what the thing IS and maybe one charming detail, ' +
+            'not what it does (that goes in narrative_function). "tags": 2 to 5 short (1-2 word) INFERRED traits — ' +
+            'material, mood, colour, or notable quality (e.g. "artificial", "cozy", "sharp", "ancient") — ' +
+            'not a restatement of the whole prompt, not the item\'s name, and never prefixed with "prompt:" ' +
+            '(that tag is added separately, elsewhere). "narrative_function": ONE short sentence, same cozy ' +
+            'tone, saying what the item DOES for the player — take the function they described seriously, ' +
+            'even a strange one.\n\n' +
+            MODIFIER_PROMPT,
+        },
+        { role: 'user', content: `Category: ${category}. The player asked for: "${prompt}".` },
+      ],
+      { temperature: 0.8, maxTokens: 400, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
+    );
+    const description = typeof r?.description === 'string' ? r.description.trim() : '';
+    const tags = Array.isArray(r?.tags)
+      ? r.tags.filter((t): t is string => typeof t === 'string' && t.trim().length > 0).map((t) => t.trim())
+      : [];
+    if (!description) throw new Error('empty description');
+    // parseItemFunction never throws — worst case the item is cosmetic, which
+    // must not cost the player their whole craft.
+    const intent = parseGameplayIntent(r?.gameplay_intent);
+    return { description, tags: tags.slice(0, 5), fn: parseItemFunction(r ?? {}, intent) };
+  } catch (err) {
+    console.warn('[llm] craftDescribe fell back to mock:', err);
+    return mockCraftDescribe(prompt, category);
   }
 }

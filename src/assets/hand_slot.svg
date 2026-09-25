@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 280">
+  <style>
+    text {
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+      font-size: 15px;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+  </style>
+  <g>
+    <text x="130" y="10" fill="#d19e8d">.</text>
+    <text x="150" y="10" fill="#d3a290">.</text>
+    <text x="70" y="30" fill="#d1a290">.</text>
+    <text x="90" y="30" fill="#d4a08e">.</text>
+    <text x="130" y="30" fill="#dbac98">.</text>
+    <text x="150" y="30" fill="#fff8e4">@</text>
+    <text x="190" y="30" fill="#d09e8e">.</text>
+    <text x="210" y="30" fill="#f6ecea">@</text>
+    <text x="70" y="50" fill="#d09b8b">.</text>
+    <text x="90" y="50" fill="#e9c4b3">.</text>
+    <text x="130" y="50" fill="#dfb09b">.</text>
+    <text x="150" y="50" fill="#fff7e1">@</text>
+    <text x="190" y="50" fill="#f8e0ce">@</text>
+    <text x="210" y="50" fill="#d8afa5">.</text>
+    <text x="230" y="50" fill="#d4a492">.</text>
+    <text x="70" y="70" fill="#d09d8d">.</text>
+    <text x="90" y="70" fill="#fff6df">@</text>
+    <text x="110" y="70" fill="#ddb2a2">.</text>
+    <text x="130" y="70" fill="#deae99">.</text>
+    <text x="150" y="70" fill="#fff7e1">@</text>
+    <text x="190" y="70" fill="#fff3e3">@</text>
+    <text x="210" y="70" fill="#d09c8d">.</text>
+    <text x="230" y="70" fill="#cf9b8b">.</text>
+    <text x="10" y="90" fill="#d09d8d">.</text>
+    <text x="30" y="90" fill="#d2a08f">.</text>
+    <text x="70" y="90" fill="#d1a08e">.</text>
+    <text x="90" y="90" fill="#fff6e0">@</text>
+    <text x="110" y="90" fill="#e9bfab">.</text>
+    <text x="130" y="90" fill="#ddac97">.</text>
+    <text x="150" y="90" fill="#fff8e3">@</text>
+    <text x="170" y="90" fill="#fff4e1">@</text>
+    <text x="190" y="90" fill="#fff3e2">@</text>
+    <text x="210" y="90" fill="#cf9b8c">.</text>
+    <text x="230" y="90" fill="#cf9a89">.</text>
+    <text x="10" y="110" fill="#d19e8e">.</text>
+    <text x="30" y="110" fill="#fff6e0">@</text>
+    <text x="50" y="110" fill="#fff7e1">@</text>
+    <text x="70" y="110" fill="#d19d8c">.</text>
+    <text x="90" y="110" fill="#fff6e0">@</text>
+    <text x="110" y="110" fill="#e6beab">.</text>
+    <text x="130" y="110" fill="#dfb29f">.</text>
+    <text x="150" y="110" fill="#fff6df">@</text>
+    <text x="170" y="110" fill="#fff3d9">@</text>
+    <text x="190" y="110" fill="#fff3db">@</text>
+    <text x="210" y="110" fill="#d39e8f">.</text>
+    <text x="230" y="110" fill="#ce9988">.</text>
+    <text x="10" y="130" fill="#d09d8d">.</text>
+    <text x="30" y="130" fill="#fff8e1">@</text>
+    <text x="50" y="130" fill="#fff7e0">@</text>
+    <text x="70" y="130" fill="#d19e8e">.</text>
+    <text x="90" y="130" fill="#fff8e0">@</text>
+    <text x="110" y="130" fill="#ffe2cd">@</text>
+    <text x="130" y="130" fill="#fcd3bd">@</text>
+    <text x="150" y="130" fill="#fff6df">@</text>
+    <text x="170" y="130" fill="#fff5e0">@</text>
+    <text x="190" y="130" fill="#fff8e3">@</text>
+    <text x="210" y="130" fill="#d09d8e">.</text>
+    <text x="230" y="130" fill="#d09b8a">.</text>
+    <text x="30" y="150" fill="#d3a190">.</text>
+    <text x="50" y="150" fill="#fff7e1">@</text>
+    <text x="70" y="150" fill="#fff5dd">@</text>
+    <text x="90" y="150" fill="#fddcc4">@</text>
+    <text x="110" y="150" fill="#fff7e0">@</text>
+    <text x="130" y="150" fill="#fff7e0">@</text>
+    <text x="150" y="150" fill="#fff7e0">@</text>
+    <text x="170" y="150" fill="#fff8e0">@</text>
+    <text x="190" y="150" fill="#fff5de">@</text>
+    <text x="210" y="150" fill="#d9a28e">.</text>
+    <text x="230" y="150" fill="#d09b89">.</text>
+    <text x="250" y="150" fill="#d29f8e">.</text>
+    <text x="270" y="150" fill="#d2a08e">.</text>
+    <text x="30" y="170" fill="#d3a08e">.</text>
+    <text x="50" y="170" fill="#fff7e1">@</text>
+    <text x="70" y="170" fill="#fff6e0">@</text>
+    <text x="90" y="170" fill="#fff7e0">@</text>
+    <text x="110" y="170" fill="#fff8e2">@</text>
+    <text x="130" y="170" fill="#fff8e0">@</text>
+    <text x="150" y="170" fill="#fff7e0">@</text>
+    <text x="170" y="170" fill="#fff7e0">@</text>
+    <text x="190" y="170" fill="#e5beaa">.</text>
+    <text x="210" y="170" fill="#dfad9b">.</text>
+    <text x="230" y="170" fill="#fff6e0">@</text>
+    <text x="250" y="170" fill="#fff6e0">@</text>
+    <text x="270" y="170" fill="#fff3df">@</text>
+    <text x="50" y="190" fill="#f6cab6">@</text>
+    <text x="70" y="190" fill="#fff8e0">@</text>
+    <text x="90" y="190" fill="#fff6e0">@</text>
+    <text x="110" y="190" fill="#fff7e0">@</text>
+    <text x="130" y="190" fill="#fff8e1">@</text>
+    <text x="150" y="190" fill="#fff7e1">@</text>
+    <text x="170" y="190" fill="#fff4db">@</text>
+    <text x="190" y="190" fill="#d6a390">.</text>
+    <text x="210" y="190" fill="#fff8e0">@</text>
+    <text x="230" y="190" fill="#fff8e1">@</text>
+    <text x="250" y="190" fill="#d6a290">.</text>
+    <text x="270" y="190" fill="#d4a594">.</text>
+    <text x="50" y="210" fill="#d19d8d">.</text>
+    <text x="70" y="210" fill="#fff8e0">@</text>
+    <text x="90" y="210" fill="#fff7e1">@</text>
+    <text x="110" y="210" fill="#fff7e0">@</text>
+    <text x="130" y="210" fill="#fff6e0">@</text>
+    <text x="150" y="210" fill="#fff9e5">@</text>
+    <text x="170" y="210" fill="#f3c5b1">.</text>
+    <text x="190" y="210" fill="#fff6df">@</text>
+    <text x="210" y="210" fill="#fff7e0">@</text>
+    <text x="230" y="210" fill="#d6a190">.</text>
+    <text x="250" y="210" fill="#f7efee">@</text>
+    <text x="50" y="230" fill="#d29f8e">.</text>
+    <text x="70" y="230" fill="#f8ceb8">@</text>
+    <text x="90" y="230" fill="#fff6e0">@</text>
+    <text x="110" y="230" fill="#fff7e1">@</text>
+    <text x="130" y="230" fill="#fff8e1">@</text>
+    <text x="150" y="230" fill="#fff7e1">@</text>
+    <text x="170" y="230" fill="#fff6e0">@</text>
+    <text x="190" y="230" fill="#fff7e0">@</text>
+    <text x="210" y="230" fill="#d29f90">.</text>
+    <text x="230" y="230" fill="#d09d8c">.</text>
+    <text x="70" y="250" fill="#d2a08e">.</text>
+    <text x="90" y="250" fill="#f8cfbb">@</text>
+    <text x="110" y="250" fill="#fff8e1">@</text>
+    <text x="130" y="250" fill="#fff8e2">@</text>
+    <text x="150" y="250" fill="#fff8e1">@</text>
+    <text x="170" y="250" fill="#fff7e0">@</text>
+    <text x="190" y="250" fill="#f9d0b7">@</text>
+    <text x="210" y="250" fill="#d3a391">.</text>
+    <text x="90" y="270" fill="#d2a18f">.</text>
+    <text x="110" y="270" fill="#d19e8e">.</text>
+    <text x="130" y="270" fill="#d29e8e">.</text>
+    <text x="150" y="270" fill="#d09c8b">.</text>
+    <text x="170" y="270" fill="#f6cab6">@</text>
+    <text x="190" y="270" fill="#d4a694">.</text>
+    <text x="210" y="270" fill="#fefafa">@</text>
+  </g>
+</svg>

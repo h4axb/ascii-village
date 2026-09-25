@@ -1,0 +1,35 @@
+## Part C Intro
+
+Last sequence was Mitchy getting out of screen to wait on the east coast.
+
+Next is after exploration, player talks to Mitchy.
+**Option A: “Wait, what was I supposed to do again?”**
+**Option B: “I think I’m done looking around.”**
+
+Option A explains to visit your house in the north side of the island and collect ressources on the way to store them at the house.
+
+Option B moves to next act.
+
+Mitchy: "Okay, on this island it's good to have your own boat. I do sell crafting tokens you can use to craft various stuff like your boat. Since you just moved here I'll make you a special price of 10 gold. Here collecting ressources and giving them to me is gold."
+
+Player gets two options.
+
+Option A: "Okay, I'll give you the money."
+Option B: "I will go collect it."
+
+Clicking A opens the inven UI and player can select items and on right the preview show + and minus button to adjust the amount. If there's no more to increase or decrease grey out the icon to indicate visually as well it's not possible. 
+
+And show how much money is left or needed. So orient on the predefined objects prices. Show visually per UI how much the current selected items already cover for the 10 gold. If player has not enough or wants to wait they should be able to cancel which will leave Mitchy saying "Okay, come back when you got the money."
+
+If 10 gold is filled then show button in green which was greyed out before "Buy the crafting token."
+
+UI Panel closes and Mitchy talks before opening the crafting panel. mitchy explains there "You can now individually craft your own boat however you want it."
+
+Player can insert the prompt. Important here is the prompt has to be a vehicle moving over water and no violent sexual stuff etc. but i think the llm would block that anyway? Its important that its 100% controlled. Also in game it needs to define the size so player and Mitchy fit visually on top of it together securing the width. 
+
+Then after crafting is done, show the button "Place it on the water.". clicking it closes the panel and spawns the crafted object on the water right in front of them. the ship logic has to be universal to move only on the blue ocean water biotome. then cinematic starts with letterbox and mitchy jumps on the object (right side) and then the player (left side). important to make always sure the position where they stand make sense visually tbd. and the object sails over to the shop island and when it reaches shore, mitchy jumps out and then the player. togehter they walk next to the store and mitchy says "This is my shop. If you need stuff or want to sell stuff come here. I'm busy now so I'll give you this list with small quests to do. That will help you to get comfortable at this new place. Ah, important note, when you want to take your ship/boat then left click on it and click return to your inventory. In that way you can always take it with you."
+
+Then the cinematic and letterbox stops and player is off to go again. the quest list will appear in form of a list on left top corner under the clock.
+
+
+the quest design i will implement as part d.

@@ -1,0 +1,275 @@
+Then I’d remove the Virtual Try-On entirely from the narrative. MYLL becomes purely **guilty-pleasure browsing + establishing material wants**, which makes the contrast with crafting in ASCIIA BAY cleaner.
+
+### Intro Part A — narration
+
+**Laptop off — dark room**
+
+> Another long day...
+
+Pause.
+
+> I should probably check my laptop before I call it a night.
+
+Laptop turns on.
+
+---
+
+**Laptop on — 1 new mail**
+
+> Oh, one new email.
+
+Pause.
+
+> Maybe this time it's good news.
+
+Cursor moves to Mail.
+
+---
+
+**Mail inbox**
+
+No narration. Cursor finds the unread Northstar Games email and opens it.
+
+---
+
+**Rejection email**
+
+Let the cursor follow the important parts first:
+
+*Hi...*
+
+↓
+
+*...after careful consideration...*
+
+↓
+
+*...we've decided to move forward with other candidates.*
+
+Pause.
+
+> ...Right.
+
+> That's the twelfth rejection this month.
+
+Longer pause.
+
+> I knew all this AI stuff was changing things, but... I didn't think I'd feel it this much.
+
+Pause.
+
+> Maybe I should figure out what I could actually do with it.
+
+Beat.
+
+> ...Tomorrow.
+
+Cursor moves toward close.
+
+> I'm way too tired to think about this now.
+
+Mail closes.
+
+---
+
+**Desktop**
+
+Pause.
+
+> I should really just go to bed.
+
+Cursor remains still.
+
+> ...But MYLL did just drop their summer collection.
+
+Cursor slowly starts moving toward MYLL.
+
+> Just a quick look.
+
+Click.
+
+---
+
+### MYLL — browsing
+
+MYLL opens.
+
+> Okay... just a few minutes.
+
+Cursor starts browsing.
+
+> Oh, that's cute.
+
+Moves to another item.
+
+> ...That too.
+
+Scroll.
+
+> I could actually use some new shoes...
+
+Another item catches her attention.
+
+> Why do I always find things I want when I'm trying not to spend money?
+
+Brief pause.
+
+> I'll just look.
+
+Continue scrolling through **clothes, accessories, shoes and potentially lifestyle/home objects**. That last category would help broaden the setup beyond clothing if crafting in ASCIIA BAY can create many different kinds of things.
+
+Another appealing item:
+
+> Ugh... I want that too.
+
+Scroll.
+
+> Maybe someday.
+
+---
+
+### Gradually getting tired
+
+Keep browsing, but make the cursor movements progressively slower.
+
+> Let's see what else they have...
+
+Scroll.
+
+First subtle blink.
+
+> Hmm...
+
+Cursor continues.
+
+Another product.
+
+> That's nice too...
+
+Longer blink.
+
+Cursor stops briefly.
+
+> I really should stop scrolling.
+
+Pause.
+
+She scrolls again anyway.
+
+> ...Just one more.
+
+Slow scroll.
+
+Another blink.
+
+No narration for a while.
+
+Cursor makes one last small movement.
+
+> ...
+
+Final eyelid closure.
+
+**Black.**
+
+This version makes the pre-dream situation fairly clear without explicitly explaining the metaphor:
+
+**“Maybe I should figure out what I can do with AI.”**
++
+**“I want these things, but I can only look.”**
++
+**falls asleep**
+
+Then ASCIIA BAY can immediately invert both ideas: **AI isn't merely something affecting her from outside anymore; it's something she can actively use to turn an idea into something in her world.** That first crafting scene will be important for making the connection land.
+
+
+---------------------------
+
+==================================================
+NARRATION ARCHITECTURE — ONE UNIFIED INTRO SYSTEM
+==================================================
+
+IMPORTANT:
+
+Narration will NOT exist only in the current prologue / former "Intro A".
+
+More narration will be added to later intro/onboarding sequences, including
+future sequences that occur after the player wakes in ASCIIA BAY.
+
+Therefore, do NOT build the Intro Editor around:
+
+introANarration.ts
+
+as a permanently separate narration system.
+
+The intro has already been unified into one continuous runtime experience.
+
+Its narration should follow the same principle.
+
+
+==================================================
+ONE AUTHORITATIVE INTRO NARRATION FILE
+==================================================
+
+Refactor the current:
+
+introANarration.ts
+
+into one authoritative intro-wide narration data file.
+
+Use a neutral name appropriate to the existing project, conceptually:
+
+introNarration.ts
+
+This file should contain narration data for the ENTIRE intro/onboarding,
+not only the former Intro A/prologue.
+
+Do NOT later create:
+
+introBNarration.ts
+boatNarration.ts
+shopNarration.ts
+craftingNarration.ts
+
+etc.
+
+There should be one intro narration authoring source.
+
+
+==================================================
+NARRATION CAN BELONG TO ANY INTRO STAGE
+==================================================
+
+Narration entries must be associated with stable intro stage/scene IDs and
+named cinematic slots rather than "Part A" or array positions.
+
+Conceptually:
+
+INTRO
+│
+├── laptop-off
+│     └── narration slots
+│
+├── rejection-email
+│     └── narration slots
+│
+├── myll-browsing
+│     └── narration slots
+│
+├── wake-asciia-bay
+│     └── narration slots if needed
+│
+├── guided-exploration
+│     └── narration slots if needed
+│
+├── mitchy-boat-quest
+│     └── narration slots if needed
+│
+├── crafting-tutorial
+│     └── narration slots if needed
+│
+├── boat-travel
+│     └── narration slots if needed
+│
+└── shop-arrival
+      └── narration slots if needed

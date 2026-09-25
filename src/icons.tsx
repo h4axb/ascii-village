@@ -44,50 +44,17 @@ export function MoonIcon({ className }: P) {
   );
 }
 
-export function GearIcon({ className }: P) {
-  return (
-    <svg {...base} className={className}>
-      <circle cx="12" cy="12" r="3.1" />
-      <circle cx="12" cy="12" r="6.2" />
-      {/* teeth */}
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
-        const a = (deg * Math.PI) / 180;
-        return (
-          <line
-            key={deg}
-            x1={12 + Math.cos(a) * 6.2}
-            y1={12 + Math.sin(a) * 6.2}
-            x2={12 + Math.cos(a) * 8.6}
-            y2={12 + Math.sin(a) * 8.6}
-          />
-        );
-      })}
-    </svg>
-  );
-}
+// The gear / bag / hand line-art icons that used to live here are gone: the
+// HUD orbit menu now uses the glyph-art SVGs in src/assets instead, and
+// nothing else referenced them.
 
-export function BagIcon({ className }: P) {
+export function SaveIcon({ className }: P) {
   return (
     <svg {...base} className={className}>
-      {/* bag body + handle */}
-      <path d="M5.4 8.2h13.2l-1 11.3H6.4z" />
-      <path d="M9 8.2V6.6a3 3 0 0 1 6 0v1.6" />
-      {/* little refresh swirl, as in the sketch */}
-      <path d="M10 13.8a2.3 2.3 0 1 0 .9-1.8" />
-      <path d="M10.7 10.4v1.8h1.8" />
-    </svg>
-  );
-}
-
-export function HandIcon({ className }: P) {
-  return (
-    <svg {...base} className={className}>
-      {/* four fingers + thumb, open palm */}
-      <path d="M9.4 11V5.9a1.2 1.2 0 0 1 2.4 0V11" />
-      <path d="M11.8 10.7V4.9a1.2 1.2 0 0 1 2.4 0v5.8" />
-      <path d="M14.2 11V6.4a1.2 1.2 0 0 1 2.4 0V13" />
-      <path d="M9.4 11.4V9.2a1.2 1.2 0 0 0-2.4 0v5.4" />
-      <path d="M7 14.6c0 3 2.2 5.4 5.2 5.4s4.4-2 4.4-5.2" />
+      {/* floppy-disk body with a clipped corner, a label window, a write-slot */}
+      <path d="M4.5 4.5h12l3 3v12h-15z" />
+      <path d="M7.5 4.5v6h7.5v-6" />
+      <path d="M7.5 20v-6h9v6" />
     </svg>
   );
 }

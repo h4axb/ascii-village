@@ -1,0 +1,1102 @@
+Implement the following save-system, start-screen, and intro-flow changes.
+
+The goal is to simplify persistence so that gameplay progress is ONLY persisted when the player explicitly saves, while Intro Part A and Intro Part B become one complete intro sequence.
+
+Do not redesign unrelated gameplay systems.
+
+==================================================
+1. CORE SAVE-SYSTEM RULE
+==================================================
+
+Change the gameplay save system from automatic saving to explicit manual saving.
+
+The LAST MANUALLY SAVED SaveState must be the single persistent source of truth for gameplay progress.
+
+During normal gameplay, React/runtime state may change freely, but these changes must NOT automatically be written to browser storage.
+
+If the player reloads the page, closes the browser, Vite performs a reload, or the game is reopened:
+
+→ discard unsaved runtime progress
+→ load the last manually saved SaveState
+
+If no manually saved SaveState exists:
+
+→ start as a fresh game
+
+
+==================================================
+2. REMOVE GAMEPLAY AUTOSAVE
+==================================================
+
+Remove the current automatic SaveState persistence.
+
+Remove gameplay writeSave() calls caused by:
+
+- delayed/debounced autosaving after state changes
+- player movement
+- inventory changes
+- money changes
+- player-name changes
+- introPartBDone changes
+- Mitchy position changes
+- visibilitychange
+- beforeunload
+- hiding/changing tabs
+- browser closing
+- ordinary React state changes
+
+There must NOT be a background autosave.
+
+IMPORTANT:
+
+This applies ONLY to gameplay SaveState persistence.
+
+Do NOT modify or remove persistence belonging to development/editor systems such as:
+
+- Scene Markings
+- devWorldAssets
+- worldOverrides
+- editor layout
+- authored world data
+- other development/editor persistence
+
+These systems must remain independent.
+
+
+==================================================
+3. SETTINGS → SAVE GAME
+==================================================
+
+Add a clearly visible:
+
+Save Game
+
+button to the existing Settings UI.
+
+This becomes the normal way to persist gameplay progress.
+
+When pressed:
+
+const snap = snapRef.current();
+writeSave(snap);
+
+This updates the persistent browser SaveState.
+
+It must NOT download a JSON file.
+
+Show the existing brief saving feedback, such as:
+
+Saving…
+
+if that feedback system already exists.
+
+The Settings Save Game button is the ONLY normal gameplay action that updates the persistent browser save.
+
+
+==================================================
+4. CTRL+S = JSON BACKUP ONLY
+==================================================
+
+Separate JSON export from normal game saving.
+
+Ctrl+S should continue to export/download the current runtime SaveState as a JSON backup.
+
+Conceptually:
+
+const snap = snapRef.current();
+downloadSaveFile(snap);
+
+Ctrl+S must NOT call:
+
+writeSave(snap);
+
+Therefore:
+
+Settings → Save Game
+= persist current gameplay state to browser storage
+
+Ctrl+S
+= export current runtime state as JSON
+
+These are intentionally separate actions.
+
+Do not make Ctrl+S establish a new browser save point.
+
+
+==================================================
+5. LOADING A GAME
+==================================================
+
+Keep loadSave() as the source of persistent gameplay state when Game mounts.
+
+If a persistent manually saved SaveState exists:
+
+→ load it
+
+If none exists:
+
+→ create a fresh runtime game
+
+Do NOT automatically create a persistent SaveState simply because a new game was started.
+
+A fresh game remains unsaved until the player explicitly presses:
+
+Settings → Save Game
+
+
+==================================================
+6. START SCREEN STATES
+==================================================
+
+Update the Start Screen to clearly distinguish continuing an existing game from starting over.
+
+If a saved game exists, show:
+
+Continue
+New Game
+
+Continue:
+
+→ load the last manually saved SaveState
+→ enter the game based on that state
+
+New Game:
+
+→ show the confirmation described below
+
+
+If NO saved game exists, show:
+
+Start Game
+
+Start Game:
+
+→ create a fresh runtime game
+→ do NOT create a persistent save yet
+
+
+==================================================
+7. NEW GAME CONFIRMATION
+==================================================
+
+If a saved game exists and the player presses:
+
+New Game
+
+do NOT immediately delete anything.
+
+Show a confirmation dialog:
+
+"Start a new game?"
+
+"Your current saved game will be deleted and you will start again from the beginning."
+
+Buttons:
+
+Cancel
+Start New Game
+
+
+Cancel:
+
+→ close confirmation
+→ change nothing
+
+
+Start New Game:
+
+1. Delete ONLY the persistent gameplay SaveState.
+2. Do NOT use localStorage.clear().
+3. Do NOT delete development/editor persistence.
+4. Reset the runtime gameplay state.
+5. Begin a genuine fresh game.
+6. Start the complete intro sequence described below.
+7. Do NOT automatically create another persistent SaveState.
+
+The new game remains unsaved until:
+
+Settings → Save Game
+
+
+Do NOT delete:
+
+- Scene Markings
+- devWorldAssets
+- worldOverrides
+- editor layout
+- editor settings
+- authored world data
+- other development data
+
+
+==================================================
+8. COMPLETE INTRO FLOW
+==================================================
+
+Treat the existing Intro Part A and Intro Part B as ONE complete intro sequence.
+
+The intended fresh-game flow is:
+
+Start Game / New Game
+        ↓
+Intro Part A
+        ↓
+Intro Part B
+        ↓
+Normal Gameplay
+
+
+INTRO PART A
+
+Play ALL existing Intro Part A clips/scenes in their existing intended order.
+
+This includes the existing Intro A material already implemented.
+
+Do not redesign:
+
+- visuals
+- clip contents
+- scene timing
+- UI
+- animations
+- existing transitions
+
+unless a minimal technical change is necessary to connect Intro A to Intro B.
+
+When the FINAL Intro Part A scene finishes:
+
+→ transition directly into Intro Part B
+
+There must NOT be:
+
+- Start Screen
+- temporary normal gameplay
+- manual interaction with the world
+
+between Intro A and Intro B.
+
+It should feel like one continuous introduction.
+
+
+==================================================
+9. INTRO PART B
+==================================================
+
+After Intro Part A finishes, start the existing Intro Part B sequence.
+
+Preserve the existing Part B implementation and authored Scene Markings.
+
+The sequence remains conceptually:
+
+Intro A ends
+→ transition / blackout
+→ player wakes up in Asciia Bay
+→ Mitchy enters
+→ wake-up dialogue
+→ Mitchy introduces himself
+→ player-name input
+→ orientation/dialogue
+→ Mitchy exits
+→ normal gameplay begins
+
+Do NOT redesign:
+
+- dialogue
+- Mitchy movement
+- player start marker
+- Mitchy start marker
+- Mitchy exit marker
+- camera behavior
+- wake-up animation
+- letterboxing
+- timings
+- map explanation
+- player-name system
+
+unless a change is technically required for the new intro/save architecture.
+
+
+==================================================
+10. INTRO COMPLETION STATE
+==================================================
+
+Use the existing:
+
+SaveState.introPartBDone
+
+as the SINGLE persistent source of truth for whether the COMPLETE intro has already been completed.
+
+From now on, interpret:
+
+introPartBDone
+
+as:
+
+"Has the player completed Intro Part A + Intro Part B?"
+
+
+Rules:
+
+NO saved game:
+→ Intro A runs
+→ Intro B runs
+
+
+Saved game with:
+
+introPartBDone === false
+
+→ complete intro runs from Intro A
+→ then Intro B
+
+
+Saved game with:
+
+introPartBDone === true
+
+→ skip BOTH Intro A and Intro B
+→ enter normal gameplay
+
+
+Do NOT introduce:
+
+- introPartADone
+- another localStorage intro key
+- sessionStorage intro completion
+- cookies
+- IndexedDB intro flags
+- separate browser intro flags
+
+SaveState.introPartBDone must remain the single persistent intro-completion value.
+
+
+==================================================
+11. WHEN INTRO COMPLETION IS SET
+==================================================
+
+Do NOT set introPartBDone = true after Intro Part A.
+
+Only set:
+
+introPartBDone = true
+
+when Intro Part B has fully completed.
+
+This changes the CURRENT RUNTIME STATE only.
+
+Do NOT immediately call writeSave() when Intro B finishes.
+
+The completed intro becomes persistent only when the player later explicitly uses:
+
+Settings → Save Game
+
+
+Example:
+
+Fresh game
+→ Intro A
+→ Intro B
+→ Intro B completes
+→ runtime introPartBDone = true
+→ player plays normally
+→ Settings → Save Game
+→ saved SaveState now contains introPartBDone: true
+
+
+Next launch:
+
+Continue
+→ saved introPartBDone === true
+→ skip Intro A
+→ skip Intro B
+→ normal gameplay
+
+
+==================================================
+12. RELOADING BEFORE SAVING
+==================================================
+
+This behavior is intentional:
+
+Fresh game
+→ Intro A
+→ Intro B
+→ Intro completes
+→ player does NOT manually save
+→ reload
+
+Because no manual save exists:
+
+→ start fresh again
+→ Intro A runs again
+→ Intro B runs again
+
+
+Similarly:
+
+Load an older manual save with introPartBDone === false
+→ play intro
+→ do not save
+→ reload
+
+The previous manual save still has:
+
+introPartBDone === false
+
+Therefore:
+
+→ complete intro runs again
+
+
+Do NOT add automatic intro persistence to prevent this.
+
+This is intentional manual-save behavior.
+
+
+==================================================
+13. SAVING DURING THE INTRO
+==================================================
+
+The player must NOT be able to create a persistent save in the middle of the intro sequence.
+
+During Intro Part A or Intro Part B:
+
+→ disable the Settings "Save Game" button
+
+or prevent access to it if Settings itself is unavailable during cinematics.
+
+Do not persist:
+
+- intermediate Intro A state
+- intermediate Intro B state
+- temporary Mitchy entrance position
+- temporary cinematic player position
+- dialogue progress
+- camera progress
+- letterbox state
+- blackout state
+
+A reload during an unsaved intro should simply restore the previous manual save and restart the intro according to that SaveState.
+
+
+==================================================
+14. DEVELOPMENT-ONLY SKIP INTRO BUTTON
+==================================================
+
+Add a development-only:
+
+Skip Intro
+
+button for testing.
+
+CRITICAL:
+
+This button must exist ONLY in the Vite development environment.
+
+Use Vite's development environment detection:
+
+import.meta.env.DEV
+
+Do NOT determine development mode through hostname checks such as:
+
+localhost
+127.0.0.1
+192.168.x.x
+
+The Skip Intro control must NOT appear as an accessible gameplay control in the production build.
+
+
+==================================================
+15. DEV SKIP DURING INTRO PART A
+==================================================
+
+While Intro Part A is running, show:
+
+Skip Intro
+
+Pressing it should:
+
+1. cleanly stop the currently running Intro A scene
+2. cancel relevant Intro A timers/animations/listeners
+3. skip all remaining Intro A clips
+4. perform any required cleanup
+5. transition directly into the START of Intro Part B
+
+IMPORTANT:
+
+Skipping Intro A does NOT mean the entire intro is complete.
+
+Therefore:
+
+DO NOT set:
+
+introPartBDone = true
+
+when skipping Intro A.
+
+The purpose of this button during Part A is to quickly reach Part B for development/testing.
+
+
+==================================================
+16. DEV SKIP DURING INTRO PART B
+==================================================
+
+While Intro Part B is running, the same development-only:
+
+Skip Intro
+
+button should finish the complete intro.
+
+Pressing it should cleanly put the game into the SAME final state that naturally completing Intro Part B would produce.
+
+It must:
+
+- stop active Intro B timers/tweens
+- clean up cinematic effects
+- close dialogue
+- remove blackout
+- remove letterboxing
+- restore normal camera/gameplay state
+- restore player controls
+- place the player in the correct final gameplay state
+- place Mitchy in the correct final position/state
+- set runtime introPartBDone = true
+- enter normal gameplay
+
+It must NOT automatically call:
+
+writeSave()
+
+Therefore, even after DEV Skip Intro:
+
+→ reload without Save Game
+→ previous manual save is restored
+
+
+==================================================
+17. SHARE INTRO-B FINALIZATION LOGIC
+==================================================
+
+Do NOT create two different implementations of the final Intro B state.
+
+Create/reuse one shared finalization path conceptually similar to:
+
+finishIntroPartB()
+
+Both:
+
+1. natural Intro Part B completion
+2. DEV Skip Intro during Part B
+
+must use the same finalization logic wherever possible.
+
+The result after skipping Part B should be indistinguishable from naturally completing Part B regarding:
+
+- player position/state
+- Mitchy position/state
+- camera
+- controls
+- dialogue
+- blackout
+- letterbox
+- cinematic state
+- introPartBDone
+
+The only difference is that the developer skipped the animation/dialogue.
+
+
+==================================================
+18. INTRO PART B MARKERS
+==================================================
+
+Preserve the existing authored Scene Marker system.
+
+Continue using:
+
+intro.partB.playerStart
+intro.partB.mitchyStart
+intro.partB.mitchyExit
+
+Do NOT replace these with hardcoded fallback coordinates.
+
+Do NOT change Scene Marker persistence.
+
+Do NOT change the editor-authored positions as part of this task.
+
+
+==================================================
+19. PLAYER AND MITCHY STATE
+==================================================
+
+Do not introduce new persisted cinematic positions.
+
+During Intro Part B, player and Mitchy positions can exist as runtime state.
+
+Once Intro B finishes naturally or through DEV Skip:
+
+→ establish the correct final runtime gameplay positions
+
+These positions become persistent only when the player later uses:
+
+Settings → Save Game
+
+Do not autosave Mitchy's position simply because his intro movement completed.
+
+
+==================================================
+20. JSON SAVE IMPORT
+==================================================
+
+Preserve the existing ability to import a SaveState JSON file.
+
+Importing a save is an intentional persistence action.
+
+Therefore, importing a valid SaveState may still call:
+
+writeSave(parsed);
+
+because the user explicitly chose to establish that imported save as the current persistent game.
+
+After import:
+
+→ start/load the game from that SaveState
+
+The imported:
+
+introPartBDone
+
+value determines whether the complete intro runs.
+
+
+==================================================
+21. SAVE SYSTEM RESPONSIBILITIES
+==================================================
+
+After this change, the responsibilities should be clearly separated:
+
+
+START SCREEN → CONTINUE
+
+Loads:
+last manually saved browser SaveState
+
+
+START SCREEN → START GAME
+
+Starts:
+fresh unsaved game
+
+
+START SCREEN → NEW GAME
+
+Deletes:
+gameplay SaveState only
+
+Then starts:
+fresh unsaved game + complete Intro A → B
+
+
+SETTINGS → SAVE GAME
+
+Calls:
+writeSave(current runtime snapshot)
+
+Purpose:
+establish new persistent save point
+
+
+CTRL+S
+
+Calls:
+downloadSaveFile(current runtime snapshot)
+
+Purpose:
+JSON backup/export only
+
+
+UPLOAD/IMPORT SAVE
+
+Calls:
+writeSave(imported SaveState)
+
+Purpose:
+explicitly establish imported save as persistent
+
+
+INTRO COMPLETION
+
+Changes:
+runtime introPartBDone = true
+
+Does NOT:
+write automatically to browser storage
+
+
+DEV SKIP
+
+Changes:
+runtime intro state only
+
+Does NOT:
+automatically save
+
+
+==================================================
+22. IMPORTANT — DO NOT TOUCH
+==================================================
+
+Do NOT unnecessarily modify:
+
+- Scene Marker persistence
+- Scene Marking editor
+- devWorldAssets persistence
+- worldOverrides
+- editor layout persistence
+- authored world assets
+- terrain rendering
+- regionAt()
+- visualTerrainAt()
+- coastline rendering
+- crafting
+- quests unrelated to the intro
+- inventory logic
+- player movement
+- Mitchy's authored markers
+- map system
+- character customization
+- other gameplay systems
+
+Keep this task focused on:
+
+1. gameplay SaveState persistence
+2. Start Screen save/new-game behavior
+3. Intro A → Intro B sequencing
+4. development Skip Intro
+
+
+==================================================
+23. CLEAN UP OLD SAVE LOGIC
+==================================================
+
+After implementation, search the ENTIRE project for:
+
+writeSave(
+
+Do not assume the old autosave logic was the only location.
+
+Inspect every remaining call.
+
+Normal gameplay persistence should ultimately have only intentional paths such as:
+
+Settings → Save Game → writeSave()
+
+and:
+
+Import Save → writeSave()
+
+Remove accidental/background persistence.
+
+Also search for:
+
+- beforeunload
+- visibilitychange
+- autosave timers
+- save-related setTimeout
+- localStorage.setItem
+- introPartBDone persistence
+- __replayIntroB
+- __introBAuto
+
+Do NOT blindly remove unrelated developer persistence.
+
+Determine whether each occurrence belongs to:
+
+A. gameplay SaveState
+or
+B. editor/development persistence
+
+Only change A where required by this specification.
+
+
+==================================================
+24. HMR / DEVELOPMENT BEHAVIOR
+==================================================
+
+Do not create special gameplay persistence just to survive Vite HMR.
+
+The manually saved SaveState is the persistent source of truth.
+
+If a full reload occurs during development:
+
+→ load last manual save
+→ determine intro behavior from that save
+
+Fast Refresh/HMR should not secretly establish a new gameplay save.
+
+The DEV Skip Intro button exists specifically to make repeatedly testing the intro convenient without requiring special persistence hacks.
+
+
+==================================================
+25. EXPECTED TEST CASES
+==================================================
+
+After implementation, verify ALL of these cases.
+
+
+TEST A — Fresh game
+
+No SaveState exists.
+
+Start Game
+→ Intro A
+→ Intro B
+→ Gameplay
+
+Expected:
+No persistent SaveState exists until Save Game is pressed.
+
+
+TEST B — Reload during Intro A
+
+Fresh game
+→ Intro A
+→ reload
+
+Expected:
+Fresh game loads
+→ Intro A starts again
+
+
+TEST C — Reload during Intro B
+
+Fresh game
+→ Intro A
+→ Intro B
+→ reload
+
+Expected:
+Fresh game loads
+→ complete intro begins again from Intro A
+
+
+TEST D — Complete intro without saving
+
+Intro A
+→ Intro B
+→ Gameplay
+→ reload without Save Game
+
+Expected:
+previous manual state is restored
+
+If there was no save:
+→ fresh game
+→ Intro A again
+
+
+TEST E — Complete intro and save
+
+Intro A
+→ Intro B
+→ Gameplay
+→ Settings → Save Game
+→ reload
+
+Expected:
+introPartBDone === true
+→ neither Intro A nor Intro B runs
+→ normal gameplay
+
+
+TEST F — Unsaved gameplay progress
+
+Load save
+→ move player/change inventory/etc.
+→ do NOT save
+→ reload
+
+Expected:
+all unsaved gameplay changes disappear
+→ previous manual save restored
+
+
+TEST G — Saved gameplay progress
+
+Load save
+→ move/change state
+→ Settings → Save Game
+→ reload
+
+Expected:
+new saved state restored
+
+
+TEST H — Ctrl+S
+
+Change runtime state
+→ Ctrl+S
+
+Expected:
+JSON file downloaded
+
+But browser SaveState is NOT updated.
+
+Reload:
+
+Expected:
+previous manual browser save restored
+
+
+TEST I — New Game
+
+Existing save with introPartBDone === true
+
+Start Screen
+→ New Game
+→ confirmation
+→ Start New Game
+
+Expected:
+gameplay SaveState deleted
+editor/dev data untouched
+Intro A starts
+then Intro B
+
+
+TEST J — Cancel New Game
+
+Existing save
+→ New Game
+→ Cancel
+
+Expected:
+nothing changes
+
+
+TEST K — DEV Skip during Intro A
+
+Development build
+→ Intro A
+→ Skip Intro
+
+Expected:
+remaining Intro A skipped
+→ Intro B starts normally
+→ introPartBDone remains false
+
+
+TEST L — DEV Skip during Intro B
+
+Development build
+→ Intro B
+→ Skip Intro
+
+Expected:
+same final runtime state as natural Intro B completion
+→ introPartBDone = true
+→ gameplay
+
+No automatic save.
+
+
+TEST M — Production build
+
+Build production version.
+
+Expected:
+No DEV Skip Intro button/control is available.
+
+
+TEST N — Editor persistence
+
+Create/use Scene Markings or existing dev editor data.
+Start New Game.
+
+Expected:
+gameplay SaveState deleted
+editor/dev data remains intact.
+
+
+==================================================
+26. IMPLEMENTATION PRINCIPLE
+==================================================
+
+Prefer simplifying the existing architecture rather than layering additional flags on top of it.
+
+In particular:
+
+Do NOT solve persistence problems by adding more browser keys.
+
+Do NOT create separate persistence for Intro A and Intro B.
+
+Do NOT create an "intro has played this browser session" flag.
+
+Do NOT create HMR-specific intro persistence.
+
+The architecture should remain:
+
+MANUAL SaveState
+        ↓
+single persistent gameplay source of truth
+
+Runtime React state
+        ↓
+current unsaved gameplay session
+
+Intro Part A → Intro Part B
+        ↓
+runtime introPartBDone = true
+
+Settings → Save Game
+        ↓
+persist current runtime SaveState
+
+
+==================================================
+27. BEFORE CHANGING CODE
+==================================================
+
+Before implementation, inspect the existing relevant code and identify:
+
+1. every gameplay writeSave() call
+2. current Ctrl+S implementation
+3. current Settings component/panel
+4. Start Screen / Landing implementation
+5. SaveState loading
+6. SaveState deletion mechanism/key
+7. Intro Part A entry and completion path
+8. Intro Part B automatic entry point
+9. natural Intro Part B completion path
+10. introPartBDone state initialization
+11. introPartBDone update locations
+12. Mitchy/player intro finalization
+13. existing DEV replay helpers
+14. whether any intro logic currently depends on autosaving
+
+Then make the smallest coherent architectural change required.
+
+Do not guess about existing behavior when the code can be traced.
+
+
+==================================================
+28. AFTER IMPLEMENTATION — REPORT
+==================================================
+
+When finished, give me a concise implementation report containing:
+
+1. Which autosave code was removed.
+2. Every remaining gameplay-related writeSave() call and why it remains.
+3. Where Settings → Save Game was added.
+4. Confirmation that Ctrl+S now exports JSON only.
+5. How New Game deletes ONLY gameplay SaveState.
+6. How Continue determines whether Intro A/B should run.
+7. How Intro A transitions into Intro B.
+8. Where introPartBDone becomes true.
+9. Confirmation that completing Intro B does NOT automatically persist it.
+10. How the DEV Skip Intro button is gated by import.meta.env.DEV.
+11. How DEV Skip works differently during Part A vs Part B.
+12. Confirmation that natural Part B completion and DEV Skip use the same finalization path.
+13. Confirmation that editor/dev persistence was not modified.
+14. Any old intro/autosave logic that became obsolete and was removed.
+
+Do not make unrelated visual/gameplay changes.

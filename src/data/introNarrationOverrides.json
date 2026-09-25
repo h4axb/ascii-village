@@ -1,0 +1,182 @@
+{
+  "laptop-off": [
+    {
+      "id": "laptop-off-1",
+      "text": "Another long day...",
+      "delayMs": 300,
+      "holdMs": 1700
+    },
+    {
+      "id": "laptop-off-2",
+      "text": "I should probably check my laptop before I call it a night.",
+      "delayMs": 500,
+      "holdMs": 2000
+    },
+    {
+      "id": "laptop-off-3",
+      "text": "PLAYWRIGHT TEST BEAT",
+      "delayMs": 300,
+      "holdMs": 1500
+    }
+  ],
+  "laptop-on": [
+    {
+      "id": "laptop-on-1",
+      "text": "Oh, one new email.",
+      "delayMs": 400,
+      "holdMs": 1500
+    },
+    {
+      "id": "laptop-on-2",
+      "text": "Maybe this time it’s good news.",
+      "delayMs": 300,
+      "holdMs": 1700
+    }
+  ],
+  "rejection-email": [
+    {
+      "id": "rejection-1",
+      "text": "...Right.",
+      "delayMs": 500,
+      "holdMs": 1300
+    },
+    {
+      "id": "rejection-2",
+      "text": "That’s the twelfth rejection this month.",
+      "delayMs": 300,
+      "holdMs": 2000
+    },
+    {
+      "id": "rejection-3",
+      "text": "I knew all this AI stuff was changing things, but... I didn’t think I’d feel it this much.",
+      "delayMs": 900,
+      "holdMs": 3000
+    },
+    {
+      "id": "rejection-4",
+      "text": "Maybe I should figure out what I could actually do with it.",
+      "delayMs": 700,
+      "holdMs": 2400
+    },
+    {
+      "id": "rejection-5",
+      "text": "...Tomorrow.",
+      "delayMs": 500,
+      "holdMs": 1300
+    },
+    {
+      "id": "rejection-6",
+      "text": "I’m way too tired to think about this now.",
+      "delayMs": 200,
+      "holdMs": 1800
+    }
+  ],
+  "desktop": [
+    {
+      "id": "desktop-1",
+      "text": "I should really just go to bed.",
+      "delayMs": 700,
+      "holdMs": 1800
+    },
+    {
+      "id": "desktop-2",
+      "text": "...But MYLL did just drop their summer collection.",
+      "delayMs": 500,
+      "holdMs": 2000
+    },
+    {
+      "id": "desktop-3",
+      "text": "Just a quick look.",
+      "delayMs": 300,
+      "holdMs": 1300
+    }
+  ],
+  "myll-browsing": [
+    {
+      "id": "myll-1",
+      "text": "Okay... just a few minutes.",
+      "delayMs": 300,
+      "holdMs": 1500
+    },
+    {
+      "id": "myll-2",
+      "text": "Oh, that’s cute.",
+      "delayMs": 200,
+      "holdMs": 1200
+    },
+    {
+      "id": "myll-3",
+      "text": "...That too.",
+      "delayMs": 200,
+      "holdMs": 1100
+    },
+    {
+      "id": "myll-4",
+      "text": "I could actually use some new shoes...",
+      "delayMs": 300,
+      "holdMs": 1600
+    },
+    {
+      "id": "myll-5",
+      "text": "Why do I always find things I want when I’m trying not to spend money?",
+      "delayMs": 400,
+      "holdMs": 2600
+    },
+    {
+      "id": "myll-6",
+      "text": "I’ll just look.",
+      "delayMs": 500,
+      "holdMs": 1200
+    },
+    {
+      "id": "myll-7",
+      "text": "Ugh... I want that too.",
+      "delayMs": 300,
+      "holdMs": 1300
+    },
+    {
+      "id": "myll-8",
+      "text": "Maybe someday.",
+      "delayMs": 400,
+      "holdMs": 1600
+    }
+  ],
+  "myll-tired": [
+    {
+      "id": "tired-1",
+      "text": "Let’s see what else they have...",
+      "delayMs": 300,
+      "holdMs": 1400
+    },
+    {
+      "id": "tired-2",
+      "text": "Hmm...",
+      "delayMs": 400,
+      "holdMs": 1100
+    },
+    {
+      "id": "tired-3",
+      "text": "That’s nice too...",
+      "delayMs": 400,
+      "holdMs": 1400
+    },
+    {
+      "id": "tired-4",
+      "text": "I really should stop scrolling.",
+      "delayMs": 600,
+      "holdMs": 1800
+    },
+    {
+      "id": "tired-5",
+      "text": "...Just one more.",
+      "delayMs": 500,
+      "holdMs": 1500
+    },
+    {
+      "id": "tired-6",
+      "text": "...",
+      "delayMs": 500,
+      "holdMs": 1400
+    }
+  ]
+}

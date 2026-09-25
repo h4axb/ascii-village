@@ -33,25 +33,24 @@ export const hourSeedOf = (wt: number) => Math.floor(wt / HOUR_MS);
 export const GROWTH_TICK_MS = 6 * HOUR_MS;
 export const growthWindowOf = (wt: number) => Math.floor(wt / GROWTH_TICK_MS);
 
+// Daily allowances (craft tokens, granted coins) reset when this changes.
+// UTC-aligned rather than local-midnight, unlike isNightOf's display clock —
+// a counter only needs a stable boundary, not one that matches the HUD.
+export const DAY_MS = 24 * HOUR_MS;
+export const daySeedOf = (wt: number) => Math.floor(wt / DAY_MS);
+
 // clock display, formatted for the player's locale
 export function formatWorldTime(wt: number): string {
   return new Date(wt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-// day/night cycle — drives a brightness tint on the world layer
-export type DayPhase = 'dawn' | 'day' | 'dusk' | 'night';
+// The day/night PALETTE that used to live here is gone: the world no longer
+// shifts colour with the clock, so every layer is a fixed colour in
+// styles.css. The clock itself stays — shop restock and the palms regrowing
+// their dates both key off it.
 
-// HUD clock icon: night runs 18:00-06:00, daylight the rest. Coarser than
-// dayPhaseOf on purpose — the icon is only ever a sun or a moon.
+// HUD clock icon: night runs 18:00-06:00, daylight the rest.
 export function isNightOf(wt: number): boolean {
   const h = new Date(wt).getHours();
   return h >= 18 || h < 6;
-}
-
-export function dayPhaseOf(wt: number): DayPhase {
-  const h = new Date(wt).getHours();
-  if (h >= 6 && h < 8) return 'dawn';
-  if (h >= 8 && h < 18) return 'day';
-  if (h >= 18 && h < 21) return 'dusk';
-  return 'night';
 }

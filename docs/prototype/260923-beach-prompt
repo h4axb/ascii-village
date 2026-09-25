@@ -1,0 +1,734 @@
+# Full Implementation Prompt — Terrain / Coastline Glyph Transition
+
+Rework **only the visual terrain-transition rendering** to achieve the layered glyph-based coastline look of **Reference Image 1**.
+
+The goal is **not** to redesign the island geometry, biome system, collision, or gameplay terrain. The goal is to change how the existing terrain surfaces visually transition into one another.
+
+The main visual technique should be:
+
+* graphical glyph density,
+* glyph pixel coverage,
+* stacked foreground glyph layers,
+* deterministic spatial variation,
+* and the existing soft background gradients where appropriate.
+
+## Important gradient rule
+
+Soft background gradients are still wanted for:
+
+* **sand**
+* **shallow water**
+* **ocean**
+
+The **dark-green coastal edge is the exception**. It should no longer be represented by its own solid/gradient dark-green background. Its dark-green appearance should come from dense foreground glyphs.
+
+The current code uses `visualTerrainColorAt()` with narrow-seam interpolation and a smoothstep calculation. Do **not** remove or disable that system globally because it also produces the desired soft transitions in the sand/water areas. Only change the background treatment associated with the dark-green `earthRim`. 
+
+---
+
+# 1. CORE VISUAL PRINCIPLE
+
+Reference Image 1 should be treated as the visual target.
+
+Terrain transitions should primarily be created through **graphical glyph signs**, rather than broad new solid-color bands.
+
+At close zoom:
+
+> Individual glyph signs should clearly be visible.
+
+At normal/far zoom:
+
+> Their density and pixel coverage should optically merge into larger perceived color regions.
+
+Control the appearance using:
+
+* glyph density,
+* glyph pixel coverage,
+* glyph foreground color,
+* stacked glyph layers,
+* deterministic noise,
+* spatially coherent width variation,
+* existing background colors,
+* existing sand/ocean interpolation.
+
+Use **graphical signs/shapes**, not text-like ASCII punctuation as the main visual language.
+
+Do not build the transition primarily from signs such as:
+
+`# % @ X x ; : .`
+
+Prefer visually graphical signs supported by the existing renderer/font.
+
+---
+
+# 2. GREEN LAND → MULTI-LAYER INNER COAST TRANSITION
+
+Keep the existing normal green/olive island background.
+
+The normal island interior can continue using its existing environmental glyph signs.
+
+The important change is the area **immediately inside the coastal edge**.
+
+Do **not** introduce new solid light-green or yellow background bands.
+
+Instead, build this area from stacked foreground glyph layers over the **original green/olive land background**.
+
+## Layer A — existing green/olive background
+
+The bottom layer remains the current island background.
+
+Do not replace or recolor it.
+
+Conceptually:
+
+**existing green/olive BG**
+
+This remains visible through gaps between the glyphs above it.
+
+---
+
+## Layer B — very dense light-green glyph transition
+
+Immediately inside the dark-green coastal edge, introduce a region of:
+
+**very dense, high-pixel-coverage light-green graphical glyph signs**
+
+These are foreground glyphs rendered over the existing green/olive background.
+
+The intended local width is approximately:
+
+**4–6 rendered pixels**
+
+However, **4–6 px is NOT a fixed outline thickness.**
+
+The width must vary organically around the island.
+
+Some coastline sections can become slightly thinner, while others extend farther inward.
+
+Do not produce:
+
+```text
+████████████████████
+████████████████████
+--------------------
+same thickness everywhere
+```
+
+Instead, produce an irregular transition whose depth expands and contracts naturally:
+
+```text
+      ███████████
+   ███████████████
+ █████████████
+    ███████████████
+  ████████████
+```
+
+Use deterministic, **spatially coherent noise** to vary the width.
+
+Do not use completely independent random noise per pixel. Nearby coastline areas should tend to have similar widths, with the transition gradually becoming thicker or thinner elsewhere.
+
+The light-green glyph density should also vary slightly.
+
+Near its strongest portions it should have extremely high pixel coverage so that:
+
+* close up → individual light-green glyphs are visible;
+* zoomed out → the region looks almost like a light-green surface;
+* small gaps still expose the original green/olive background.
+
+Therefore:
+
+**original green BG + very dense light-green glyphs**
+
+should create the perceived light-green coastal region.
+
+There should be **no dedicated light-green background band added for this effect.**
+
+---
+
+# 3. SAND-COLORED GLYPHS STACKED OVER THE LIGHT-GREEN GLYPHS
+
+On the coast-facing portion of the light-green glyph region, add another foreground layer:
+
+**dense sand/yellow graphical glyph signs**
+
+These must be rendered **on top of the light-green glyph layer**.
+
+This creates locations containing three simultaneous visual layers:
+
+### Layer 1
+
+existing green/olive land background
+
+### Layer 2
+
+very dense light-green graphical glyphs
+
+### Layer 3
+
+dense sand/yellow graphical glyphs
+
+Therefore, a single visual area can effectively contain:
+
+**green BG + light-green glyph + sand-colored glyph**
+
+The sand-colored layer should occupy approximately:
+
+**2–4 rendered pixels**
+
+but again this is only an approximate local width.
+
+It must **not** become a uniform 2–4 px yellow outline.
+
+Its width should expand, contract, thin, and occasionally partially break around the coastline.
+
+The sand layer should generally remain narrower than the underlying light-green glyph region.
+
+Conceptually:
+
+```text
+                         toward coast →
+
+GREEN BG
+════════════════════════════════════════
+
+LIGHT-GREEN GLYPHS
+                   LLLLLLL
+                   ~4–6 px
+
+SAND GLYPHS
+                      SSS
+                      ~2–4 px
+```
+
+But the real widths should vary:
+
+```text
+GREEN       LLLLLLSSS | EDGE
+GREEN         LLLLSS  | EDGE
+GREEN      LLLLLLLLSSSS | EDGE
+GREEN        LLLLLS   | EDGE
+```
+
+where:
+
+**L = very dense light-green glyph coverage**
+
+**S = dense sand/yellow glyphs rendered over L**
+
+The light-green width and sand-overlay width should **not use exactly the same noise field**.
+
+Otherwise the sand layer will simply look like a smaller copy of the light-green contour.
+
+Use separate but spatially coherent deterministic variation for:
+
+* light-green transition depth,
+* sand overlay depth,
+* light-green glyph density,
+* sand glyph density.
+
+The sand glyphs must also **not completely hide the light-green glyphs**.
+
+Both colors should remain visible in the overlapping area.
+
+At zoom-out, their combined pixel coverage should optically create the rich mixed transition seen in Reference Image 1.
+
+---
+
+# 4. INTERIOR GRASS-LIKE GLYPH SIGNS — `nd < 0.7`
+
+Separately from the coastline transition, introduce the oblique grass-like signs visible across the green interior in Reference Image 1.
+
+Apply these primarily within:
+
+**`nd < 0.7`**
+
+These are environmental texture signs and are **not part of the dense coastline transition**.
+
+Each grass-like mark should be approximately:
+
+**3 rendered pixels long**
+
+The signs should have an oblique/slanted appearance rather than looking like horizontal or vertical bars.
+
+They should resemble small stylized grass marks.
+
+Use **two visible density variations**.
+
+### Density variation 1 — sparse
+
+Occasional isolated grass signs with substantial green background visible between them.
+
+### Density variation 2 — denser patches
+
+Localized areas containing noticeably more grass signs.
+
+These areas should still be much less dense than the coastal glyph transition.
+
+The two variations should form natural-looking patches rather than uniform distributions.
+
+Use deterministic spatial noise to decide where sparse and denser areas occur.
+
+Avoid:
+
+* grids,
+* repeated spacing,
+* checkerboard patterns,
+* perfectly even scatter,
+* contour-following stripes.
+
+The interior should instead have irregular patches similar to natural vegetation distribution.
+
+---
+
+# 5. DARK-GREEN COASTAL EDGE — GLYPHS ONLY
+
+This is the main structural change to the current coastline.
+
+The current visual terrain contains an `earthRim` between the grass edge and sand, with a dark olive background color `#46513B`. 
+
+Remove the **dedicated dark-green background/gradient appearance of this edge**.
+
+Do not remove the normal green land background.
+
+Do not remove the sand background.
+
+Do not remove the ocean background.
+
+Do not globally remove the terrain interpolation system.
+
+Only the dark-green edge should stop reading as a solid/gradient background band.
+
+Reconstruct its visible dark-green color using:
+
+**extremely dense dark-green/olive graphical glyph signs**
+
+The glyph coverage should become sufficiently high that:
+
+* close up → the edge is visibly constructed from individual signs;
+* zoomed out → the signs optically merge into an almost continuous dark-green edge.
+
+The result should look like a **glyph-created surface**, not a dark-green stripe painted behind the glyphs.
+
+Use mixed high-coverage signs instead of filling the entire region with a single full-block glyph.
+
+The dark edge should also vary organically in thickness.
+
+It must not become a perfectly consistent outline around the island.
+
+---
+
+# 6. GLYPH PIXEL COVERAGE
+
+Do not control the transition using glyph count alone.
+
+Different signs occupy very different percentages of their character cells.
+
+Use glyph **pixel coverage** as part of the transition.
+
+Possible high-coverage graphical signs, where supported by the actual font/renderer, include:
+
+**Very dense**
+
+`█ ▓ ▰ ◆ ◼ ■ ▪`
+
+**Dense**
+
+`▒ ▦ ▩ ▥ ▧ ◈ ◇ ♦`
+
+**Medium / dither-like**
+
+`░ ⣿ ⣶ ⣾ ⣷ ⣯`
+
+**Organic**
+
+`♣ ♠ ✿ ❉ ✦ ✣ ✤`
+
+**Angular / terrain-like**
+
+`▲ ▼ ◀ ▶ ◢ ◣ ◤ ◥`
+
+**Water-oriented**
+
+`≋ ≈ ∿ ≀ ≁ ⌇`
+
+**Small sparse fillers**
+
+`• ∙ · ˙ ◦`
+
+These are **visual-density references**, not a requirement to use every Unicode sign.
+
+Only use signs that:
+
+* render reliably,
+* fit the existing graphical language,
+* remain legible at the game's scale.
+
+Avoid widespread use of `█`.
+
+Although it has maximum pixel coverage, filling large regions with it would effectively recreate a solid background.
+
+Prefer mixed dense signs such as:
+
+`▓ ▒ ▦ ◈ ◆`
+
+For example, the dark edge could draw from a mixed pool resembling:
+
+`▓ ▓ ▒ ▒ ▦ ▩ ◆ ◼ ▪ ◈ ▲ ◢ ◣ ✣ ✤`
+
+---
+
+# 7. ACTUAL SAND TERRAIN
+
+Keep the existing soft yellow/cream sand background treatment.
+
+Do **not** flatten the sand into a single hard color.
+
+Do **not** remove its existing smooth background transition.
+
+The sand should consist of:
+
+**existing soft yellow/cream background**
+
+*
+
+**darker sandy graphical glyph texture**
+
+Increase the density and average pixel coverage of the sand glyphs compared with the current implementation.
+
+Especially near transitions, use enough glyph coverage for the sand to feel richly textured rather than sparse.
+
+Potential graphical-density references:
+
+`▒ ░ ▪ ◈ ◇ ◆ ▦ ▧`
+
+The underlying soft sand background should remain visible.
+
+The glyph distribution should remain organic rather than uniformly filled.
+
+---
+
+# 8. COMPLETE LAND → SAND TRANSITION
+
+The intended visual progression is now:
+
+### Interior
+
+**normal green/olive BG + environmental glyphs**
+
+with oblique grass signs for `nd < 0.7`
+
+↓
+
+### Inner coastline
+
+**normal green/olive BG + increasingly dense light-green glyphs**
+
+↓
+
+### Strong inner coastline overlap
+
+**normal green/olive BG + VERY DENSE light-green glyphs + dense sand/yellow glyphs on top**
+
+↓
+
+### Coastal edge
+
+**extremely dense dark-green/olive glyphs with NO dedicated dark-green edge background**
+
+↓
+
+### Actual beach
+
+**existing soft yellow/cream sand background + dense sandy glyph texture**
+
+The transition should therefore come largely from **foreground glyph layering and optical color mixing**, while the actual sand surface retains its softer background treatment.
+
+---
+
+# 9. OCEAN
+
+Keep the existing soft blue ocean background gradient/tonal variation.
+
+Do **not** flatten the ocean.
+
+Do **not** remove its interpolation.
+
+The ocean should consist of:
+
+**soft blue background**
+
+*
+
+**variable-density water glyph texture**
+
+The darker water areas should use graphical signs with greater pixel coverage than very thin punctuation.
+
+Avoid relying primarily on signs such as:
+
+`;`
+
+for dark water texture.
+
+Potential water-oriented signs include:
+
+`≋ ≈ ∿ ≁ ░ ▒ ◦ ·`
+
+The water should progress naturally between:
+
+**calm / sparse**
+
+→
+
+**medium texture**
+
+→
+
+**locally denser, darker texture**
+
+Do not make the entire ocean equally busy.
+
+Large calm areas should remain.
+
+---
+
+# 10. ORGANIC WIDTH AND DENSITY VARIATION
+
+This applies to **all coastline glyph transition layers**.
+
+The coastline must not look like the island has been given several Photoshop-style outlines.
+
+In particular, avoid:
+
+```text
+green
+| 4px light green
+| 3px yellow
+| 2px dark green
+| sand
+```
+
+with identical widths around the entire island.
+
+Instead, every transition should naturally expand and contract.
+
+The approximate width values are **targets, not hard contour widths**:
+
+* light-green glyph region: roughly **4–6 px**
+* sand/yellow overlay: roughly **2–4 px**
+* dark-green glyph edge: organically variable
+
+Use spatially coherent deterministic noise.
+
+Variation should affect:
+
+* transition width,
+* glyph density,
+* glyph choice,
+* glyph coverage,
+* local boundary shape.
+
+Nearby areas should correlate with one another.
+
+Do not use independent random values for every cell, because that produces visual static rather than natural coastline variation.
+
+The result should resemble naturally irregular patches following the general coastline rather than mathematically precise contour bands.
+
+---
+
+# 11. BACKGROUND VS GLYPH LAYERING
+
+The final rendering architecture should conceptually be:
+
+### A. Normal green interior
+
+**existing green/olive BG**
+
+*
+
+normal environmental glyphs
+
+*
+
+oblique grass-like signs in `nd < 0.7`
+
+---
+
+### B. Light-green inner transition
+
+**existing green/olive BG**
+
+*
+
+very dense light-green glyphs
+
+Approximately 4–6 px locally, but organically varying.
+
+---
+
+### C. Sand-over-light-green overlap
+
+**existing green/olive BG**
+
+*
+
+very dense light-green glyphs
+
+*
+
+dense sand/yellow glyphs on top
+
+Sand overlay approximately 2–4 px locally, but organically varying.
+
+---
+
+### D. Dark-green edge
+
+**NO dedicated dark-green edge background/gradient**
+
+*
+
+extremely dense dark-green/olive graphical glyphs
+
+---
+
+### E. Sand
+
+**existing soft yellow/cream background gradient**
+
+*
+
+dense darker sandy glyphs
+
+---
+
+### F. Ocean
+
+**existing soft blue background gradient/tonal variation**
+
+*
+
+variable-density water glyphs
+
+---
+
+# 12. CURRENT CODE — DO NOT BREAK SHARED GRADIENT LOGIC
+
+The current implementation has a separate visual-terrain system from gameplay `regionAt()`. Keep this separation intact. `regionAt()` controls biome/gameplay classification, while the visual terrain system controls coastline appearance. 
+
+The current visual coastline uses:
+
+* `grassEdge`
+* `earthRim`
+* `sand`
+* `outerSand`
+* `shallowWater`
+* `ocean`
+
+with boundaries controlled by `COAST`. 
+
+`visualTerrainColorAt()` currently uses a narrow interpolation window and:
+
+```ts
+t = u * u * (3 - 2 * u);
+```
+
+which is smoothstep interpolation. It then uses `t` to interpolate between neighboring RGB colors. 
+
+**Do not remove this globally.**
+
+It is still useful for the desired:
+
+* sand background transitions,
+* shallow-water transition,
+* ocean tonal transition.
+
+Instead, specifically prevent the dark-green `earthRim` from creating the unwanted dark-green background/gradient band.
+
+Its dark-green visual appearance should be transferred to the foreground glyph system.
+
+If the same gradient function handles all terrain types, **special-case or restructure only the `earthRim` behavior rather than deleting the shared interpolation system.**
+
+---
+
+# 13. CRITICAL CONSTRAINTS
+
+Do **not** modify:
+
+* `regionAt()`
+* biome/gameplay behavior
+* island shapes
+* island dimensions
+* coastline geometry
+* collision
+* water collision
+* structures
+* entities
+* player rendering
+* normal green island background
+* existing sand background gradient
+* existing ocean background gradient
+
+Do not move the coastline merely to achieve the visual effect.
+
+The new irregularity should come from **glyph placement, glyph density and transition-depth variation**, not from changing the actual island geometry.
+
+Do **not**:
+
+* globally disable `smoothstep`;
+* globally disable terrain-color interpolation;
+* flatten sand;
+* flatten ocean;
+* create a new solid light-green background band;
+* create a new solid yellow background band;
+* create a new solid dark-green edge band;
+* create a dark-green edge gradient;
+* make every coastline layer the same thickness;
+* use text-like ASCII noise as the primary visual texture.
+
+---
+
+# 14. TARGET RESULT
+
+At close range, the player should see that the terrain transition is built from many individual graphical signs.
+
+At zoom-out, their density and pixel coverage should optically merge into richer terrain-color transitions.
+
+The final land-to-water sequence should read approximately as:
+
+**green/olive land BG + interior grass signs**
+
+→
+
+**green BG + irregular very-dense light-green glyph region**
+
+→
+
+**green BG + very-dense light-green glyphs + narrower dense sand/yellow glyphs stacked on top**
+
+→
+
+**irregular extremely dense dark-green glyph-only coastal edge**
+
+→
+
+**soft warm sand background gradient + dense sandy glyphs**
+
+→
+
+**soft blue ocean background gradient + variable water glyph texture**
+
+The most important requirements are:
+
+1. **Preserve the original green/olive island background.**
+2. Add **very dense light-green glyphs** immediately inside the coast, roughly 4–6 px deep locally.
+3. Make that width **organically variable**, not a uniform outline.
+4. Add **dense sand/yellow glyphs on top of the light-green glyphs**, roughly 2–4 px deep locally.
+5. Make the sand overlay independently irregular so it is not simply a smaller copy of the light-green contour.
+6. Allow a visual position to contain **three layers: original BG + light-green glyph + sand glyph**.
+7. For `nd < 0.7`, add approximately **3 px long oblique grass-like signs**, with two natural density variations.
+8. Remove **only** the dedicated dark-green `earthRim` background/gradient appearance.
+9. Reconstruct that dark-green edge using **extremely dense, high-pixel-coverage dark-green/olive graphical glyphs**.
+10. Preserve the existing soft **sand background gradient**.
+11. Preserve the existing soft **ocean background gradient/tonal variation**.
+12. Use deterministic, spatially coherent variation so none of these layers look like mechanically uniform outlines.

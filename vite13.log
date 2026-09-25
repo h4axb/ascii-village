@@ -1,0 +1,12 @@
+
+  VITE v5.4.21  ready in 398 ms
+
+  ➜  Local:   http://localhost:5195/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help
+22:09:01 [vite] hmr update /src/App.tsx
+22:09:29 [vite] hmr update /src/App.tsx
+22:09:52 [vite] hmr update /src/App.tsx
+22:11:40 [vite] hmr update /src/App.tsx, /src/CraftModal.tsx
+22:11:58 [vite] hmr update /src/App.tsx, /src/CraftModal.tsx
+22:12:15 [vite] hmr update /src/App.tsx, /src/CraftModal.tsx

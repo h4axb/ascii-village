@@ -1,0 +1,241 @@
+Implement the Scene Markings system required for Intro Part B before implementing the actual cinematic.
+
+The cinematic will depend on manually positioned editor markers. Do NOT implement or guess the cinematic positions yet.
+
+The existing World Asset Editor should be extended rather than replaced. Preserve all current asset placement, image insertion, ghost placement, undo/redo, and other existing editor functionality.
+
+# 1. Expand the Editor
+
+Increase the width of the existing World Asset Editor panel to approximately 2× its current width.
+
+Do not fundamentally redesign the editor. The additional width is needed because more development tools will be added to it.
+
+At the top of the editor, introduce two main bookmark/tab sections:
+
+WORLD ASSETS | SCENE MARKINGS
+
+## WORLD ASSETS
+
+This contains the existing editor functionality.
+
+Preserve the current internal sections/tabs such as:
+
+- Assets
+- Insert Image
+- Existing placed assets
+- Ghost controls
+- Undo / redo
+- Dump/export functionality
+
+Do not break or remove existing behavior.
+
+## SCENE MARKINGS
+
+Create a new editor-only system for defining important world positions used by cinematics, tutorials, NPC movement, quests, and other scripted sequences.
+
+Because many more markers will be needed later, do NOT display them as one flat list.
+
+Use a collapsible hierarchy.
+
+For now:
+
+Scene Markings
+└── Intro
+    └── Part B — Wake Up
+        ├── PLAYER START
+        ├── MITCHY START
+        └── MITCHY EXIT
+
+The hierarchy should be designed so that later I can add structures such as:
+
+Intro
+├── Part A
+├── Part B — Wake Up
+└── Part C
+
+Tutorial
+├── Crafting
+└── Inventory
+
+Quests
+├── Quest 01
+├── Quest 02
+└── ...
+
+Groups should be collapsible so the editor remains manageable as more sequences are added.
+
+
+# 2. Marker Purpose
+
+For Intro Part B create these three markers:
+
+PLAYER START
+The world position where the player will be placed when their eyes open.
+
+MITCHY START
+Mitchy's initial world position when the wake-up conversation begins.
+
+MITCHY EXIT
+The destination Mitchy will walk toward after the conversation in order to leave the visible scene.
+
+These positions MUST NOT be hardcoded into the cinematic.
+
+The cinematic implemented later will reference these markers.
+
+
+# 3. Initial Marker Placement
+
+Markers are initially placed using drag and drop.
+
+Workflow:
+
+1. Open Scene Markings.
+2. Expand:
+   Intro → Part B — Wake Up
+3. Drag a marker such as PLAYER START from the editor.
+4. Drop it directly onto the game world.
+5. Store that world position for the marker.
+6. Display the marker at that position in editor mode.
+
+Do NOT automatically choose positions for these markers.
+
+I will manually place all three markers.
+
+
+# 4. Marker Appearance
+
+Placed scene markers should be visually distinct from normal world assets.
+
+Use a clearly visible RED CIRCULAR MARKER.
+
+Display its name inside or immediately beside it, for example:
+
+[ PLAYER START ]
+
+[ MITCHY START ]
+
+[ MITCHY EXIT ]
+
+They should remain readable over the ASCII world.
+
+These are development/editor overlays and should not visually resemble actual game objects.
+
+
+# 5. Reposition Existing Markers
+
+After a marker has been placed, allow it to be repositioned directly in the world using:
+
+ALT + LEFT CLICK + DRAG
+
+Behavior:
+
+- Hold Alt.
+- Left-click an existing marker.
+- Keep the mouse button held.
+- Drag it to another world position.
+- Release to save its new coordinates.
+
+Normal left-click behavior must remain unchanged.
+
+A marker should therefore NOT move from an ordinary click or drag.
+
+In short:
+
+Drag & Drop from editor → initial placement
+
+Alt + Left Click + Drag → reposition an already placed marker
+
+
+# 6. Marker Persistence
+
+Marker positions must persist so that refreshing/restarting the development session does not require me to place them again.
+
+Store markers separately from normal world assets.
+
+Each marker should have a stable semantic ID rather than relying on its visible label or coordinates.
+
+For example:
+
+intro.partB.playerStart
+intro.partB.mitchyStart
+intro.partB.mitchyExit
+
+Later cinematic logic should be able to request a marker position using this stable ID.
+
+Design this so additional marker IDs can easily be registered for future sequences.
+
+
+# 7. Editor-Only Visibility
+
+Scene markers are metadata, NOT game entities.
+
+They must:
+
+- Be visible while the relevant development/editor mode is active.
+- Be selectable/repositionable while editing.
+- Never participate in collision.
+- Never affect gameplay.
+- Never be collectible or interactable as game objects.
+- Never appear during normal gameplay.
+- Never appear during the actual cinematic.
+- Never appear in production builds.
+
+When the editor is closed, the red marker visualization must disappear.
+
+Their stored coordinates must still remain available to development/cinematic logic.
+
+
+# 8. Missing Marker Handling
+
+Prepare a simple marker lookup API/helper for later cinematic code.
+
+The later cinematic should be able to ask for:
+
+PLAYER START
+MITCHY START
+MITCHY EXIT
+
+or preferably their semantic IDs.
+
+If a required marker does not exist, return an explicit missing state rather than inventing a position.
+
+Do NOT create fallback coordinates.
+
+
+# 9. Important Implementation Boundary
+
+STOP after implementing the editor and marker system.
+
+Do NOT implement Intro Part B yet.
+
+Do NOT:
+
+- start the wake-up cinematic
+- create Mitchy's dialogue
+- create the eye-opening sequence
+- move the player
+- move Mitchy
+- create letterboxing
+- guess temporary positions
+- add fallback world coordinates
+
+The purpose of this first implementation pass is ONLY to give me the editor tools necessary to manually stage the cinematic.
+
+After implementation, I will manually place:
+
+PLAYER START
+MITCHY START
+MITCHY EXIT
+
+Only after I have positioned these markers will Intro Part B be implemented.
+
+When finished, tell me:
+
+1. Where the new Scene Markings tab is.
+2. How marker data is stored.
+3. How I can add future marker definitions/categories.
+4. How the cinematic code can retrieve a marker position.
+5. Which files were created or changed.
+6. Whether all three required Intro Part B markers are ready for me to place.
+
+Then run/show the editor in the existing local development environment so I can position the three markers.

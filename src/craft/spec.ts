@@ -37,22 +37,6 @@ export interface CraftSpec {
   unknown: string[]; // tokens we couldn't classify (log these to grow the vocab)
 }
 
-// A shared, generated-once sprite. Colour/size are NOT baked in.
-export interface BaseAsset {
-  id: string;
-  key: string; // shape-only cache key
-  category: string;
-  base: string;
-  hybrid?: string;
-  shape: string[];
-  sprite: string[]; // uncoloured ASCII
-  createdAt: number;
-  // The level the ORIGINAL generation succeeded at (0 image, 1 retry, 2
-  // text-only). Never 3 — hand-made template fallbacks are never cached, so a
-  // generic template can't poison future lookups for a specific prompt.
-  fallbackLevel?: 0 | 1 | 2;
-}
-
 // One player's owned thing: a reference to a shared base + their cosmetics.
 export interface ItemInstance {
   baseId: string;
@@ -150,15 +134,6 @@ export function parseSpec(prompt: string): CraftSpec {
   return spec;
 }
 
-// The shared cache key: SHAPE only (category + sorted nouns + sorted features).
-// Order-independent, so "robot dog" and "dog robot" collide, as do "big red dog"
-// and "small blue dog" (size/colour are cosmetics, not in the key).
-export function baseKey(spec: CraftSpec): string {
-  const nouns = [spec.base, spec.hybrid].filter(Boolean).sort();
-  const shape = [...spec.shape].sort();
-  return `${spec.category}:${nouns.join('+')}${shape.length ? '|' + shape.join(',') : ''}`;
-}
-
 // material → a sensible default colour when the player didn't name one
 const MATERIAL_COLOR: Record<string, string> = {
   wood: 'brown', stone: 'gray', metal: 'silver', gold: 'gold', silver: 'silver',
@@ -177,6 +152,30 @@ export function resolveStyle(inst: ItemInstance): { colorKey?: string; color?: s
     color: colorKey ? PALETTE[colorKey] : undefined,
     scale: SIZE_SCALE[inst.size] ?? 1,
   };
+}
+
+// The four crafting "finish" effects the frontend can render (see
+// ColoredSprite.tsx's `texture` prop / styles.css's .tex-* rules). Derived
+// from `spec.finish` — vocab.ts's FINISH_GROUPS already classifies the
+// player's words into this exact register (shiny/glowing/metallic/matte/
+// transparent/wet/furry) via deterministic keyword lookup, so this reuses
+// that existing, already-tested extraction rather than asking the sprite-
+// generation LLM to separately re-infer the same thing (a second source of
+// truth for one concept, and one more thing riding on that already-tuned,
+// reliability-sensitive prompt — see spriteGen.ts's own notes on keeping
+// that prompt narrow).
+export type TextureModifier = 'shiny' | 'neon' | 'metallic' | 'matte';
+const FINISH_TO_TEXTURE: Partial<Record<string, TextureModifier>> = {
+  shiny: 'shiny',
+  glowing: 'neon', // "an ambient light radius" reads as neon glow, not literal shine
+  metallic: 'metallic',
+  matte: 'matte',
+  // transparent/wet/furry have no dedicated CSS effect (out of scope per the
+  // spec's own 4-bucket list) — they fall through to the 'matte' default,
+  // same as no finish at all.
+};
+export function textureModifierFor(finish?: string): TextureModifier {
+  return (finish && FINISH_TO_TEXTURE[finish]) || 'matte';
 }
 
 // Pull the per-player cosmetics off a spec into an ItemInstance.

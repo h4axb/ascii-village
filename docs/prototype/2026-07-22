@@ -1,0 +1,42 @@
+## A) fixed player movement
+The player's movement was jittering because it was running on CSS animation. This is now fixed to render on the GPU.
+
+Additionally, when the player collides with an object, they glide at a slower pace to either the left or right side instead of stopping movement completely.
+=> movement never gets stuck or frustrating
+
+## B) Crafting modal UI/UX design
+The web game has a core mechanic, the crafting of an item, which is based on an LLM. Inside the shop of a friendly resident called "Mitchy", the player can buy a crafting token from these six categories: plant, pet, clothing, vehicle, food and utensil. The different categories define what kind of item the player can craft i.e., with the plant token the player can't craft a cat. That would require a pet token. For the modal where the crafting takes place, I have mandatory and optional features to consider for the final UI/UX design.
+
+
+
+Mandatory:
+
+1. A chat with Mitchy serves as the interface for the player to input their crafting prompt.
+
+2. Inside the crafting modal Mitchy offers three alternatives (which come closest to the player's original input) IF the crafting fails. The "how" isn't decided yet.
+
+3. After a successful crafting attempt, give the player the option to either equip the item or put it inside their inventory.
+
+
+
+
+Optional: 
+
+1. Store the crafting history? That would allow the player to review their crafted items with all the details of time and context. How does that record help players for the future gameplay? What is the relevance for the game?
+=> YES, that gives the player the opportunity to teach them the prompting. The player can reflect on what works well and doesn't.
+
+2. Should three additional rerolls be offered to the player when an item was crafted for optimization or redoing the outcome? Is that freedom increasing the player's satisfaction with the gameplay?
+=> NO, misguides the player to generate all three versions and pick the best. Further, giving the option before generating, teaches the player consequences.
+
+3. Add an additional chit-chat window with Mitchy while the crafted item is being generated? From a game design perspective, the player is left with an option to continue the gameplay. The same concern was regarding the stuck movement after hitting a collision.
+=> YES, if the crafting takes longer than 3 seconds let Mitchy ask a random question to initiate a chat.
+
+4. Show the drawn line by line during crafting + add a loading bar to visually depict the duration of crafting. That information gives the player predictableness.
+
+Final features
+Mandatory: All
+Optional: 1,3,4
+
+I made in Figma Lofi sketches of the different states (Chat default, Craft loading, Craft successful, Craft failure, Craft outcome folded and unfolded in chat, history log) to define the layout. 
+
+Next: day/night time & weather cycle

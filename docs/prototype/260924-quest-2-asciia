@@ -1,0 +1,872 @@
+Implement Intro Part B of ASCIIA BAY as an interactive onboarding sequence immediately following the existing Intro Part A.
+
+The Scene Markings system has already been implemented and I have manually positioned the required Intro Part B markers.
+
+Use those marker positions.
+
+Do NOT hardcode, replace, approximate, or invent the authored world positions.
+
+
+# 0. Required Scene Markers
+
+Intro Part B requires:
+
+PLAYER START
+→ Player position when Part B begins and the world is revealed.
+
+MITCHY START
+→ The exact position Mitchy runs TO and stands on for the wake-up conversation.
+→ Mitchy must NOT initially spawn here.
+
+MITCHY EXIT
+→ Mitchy's final post-cinematic world position after he leaves the camera.
+
+Use the stable marker IDs created by the Scene Markings system.
+
+Before starting Part B, verify that all required markers exist.
+
+If any marker is missing:
+
+- Do not start Part B.
+- Do not use fallback coordinates.
+- In development mode, clearly report exactly which marker is missing.
+
+
+IMPORTANT:
+
+MITCHY START is a destination, NOT Mitchy's initial spawn position.
+
+Mitchy begins outside the visible camera, runs into the scene during the eye-opening sequence, reaches MITCHY START, performs a short jump/hop, and then begins the conversation.
+
+
+The intended complete sequence is:
+
+Intro Part A
+→ black screen
+→ “Hey! Wake up!”
+→ eyes begin opening
+→ Mitchy is already running into view
+→ Mitchy reaches MITCHY START
+→ Mitchy performs a quick jump/hop
+→ Mitchy introduction
+→ player name
+→ map introduction
+→ onboarding dialogue choice
+→ Mitchy runs away
+→ Mitchy leaves camera view
+→ Mitchy is silently repositioned to MITCHY EXIT
+→ Mitchy's world/map position updates
+→ wait 1 second
+→ letterbox opens
+→ player control
+→ normal gameplay
+
+
+# 1. Transition from Existing Intro Part A
+
+Currently the existing intro ends on an in-game frame.
+
+Change this ending so that it flows directly into Intro Part B.
+
+There must be:
+
+- no reload
+- no separate start button
+- no manual action between Part A and Part B
+
+When Part A finishes:
+
+1. Transition to a completely black screen.
+2. Keep the screen black for approximately 2–3 seconds.
+3. Begin the Part B wake-up sequence.
+
+
+# 2. Initial World State
+
+Before revealing the world:
+
+- Position the player at PLAYER START.
+- Keep the player stationary.
+- Disable player movement.
+- Disable gameplay interactions.
+- Disable map access.
+- Prepare cinematic letterboxing.
+- Keep the screen visually black until the eye-opening sequence begins.
+
+Do NOT place Mitchy directly at MITCHY START.
+
+Instead, determine a temporary OFF-CAMERA entrance position from which Mitchy can run toward MITCHY START.
+
+This temporary position:
+
+- should be outside the visible camera
+- is only used for Mitchy's cinematic entrance
+- should not replace MITCHY START
+- should not become a persistent gameplay position
+- does not require another manually placed scene marker unless technically necessary
+
+Prefer deriving the temporary position from:
+
+- current camera bounds
+- MITCHY START
+- the direction Mitchy needs to approach from
+
+Mitchy should already be running toward MITCHY START when the player's vision begins opening.
+
+
+# 3. Urgent Wake-Up
+
+While the screen is still completely black, show the narrative dialogue box at the bottom-center of the screen.
+
+Use the supplied reference design for the narrative box and reuse the existing game's UI design system wherever applicable.
+
+Speaker:
+
+???
+
+Dialogue:
+
+“Hey! Wake up!”
+
+The text animation/timing should communicate urgency.
+
+The call should feel abrupt, as though Mitchy has just arrived in a hurry and is trying to wake the player.
+
+Keep this moment short.
+
+Immediately transition into the eye-opening sequence.
+
+
+# 4. Eye-Opening + Mitchy's Entrance
+
+Perform a short, fast eye-opening animation.
+
+Behavior:
+
+- Begin completely black.
+- Quickly reveal the world as though the player's eyes are opening.
+- Keep the animation subtle and fast.
+- Player movement remains disabled.
+
+During the eye-opening animation:
+
+- Player remains at PLAYER START.
+- Mitchy is already RUNNING toward MITCHY START.
+- Mitchy enters the visible camera while the player's eyes are opening.
+- The player should first see Mitchy in motion rather than already standing in place.
+
+The timing should feel like one continuous event:
+
+Black
+→ “Hey! Wake up!”
+→ eyes begin opening
+→ Mitchy is already running into view
+→ Mitchy approaches the player
+→ Mitchy reaches MITCHY START
+→ Mitchy stops
+→ Mitchy performs a quick jump/hop
+→ conversation continues
+
+
+# 5. Cinematic Letterboxing — Start
+
+From the FIRST VISIBLE FRAME of the eye-opening animation, black cinematic letterbox bars must already be visible at the top and bottom of the screen.
+
+The letterboxing communicates that the player currently does not have control.
+
+Keep the bars visible throughout:
+
+- eye opening
+- Mitchy's entrance
+- Mitchy's arrival jump
+- Mitchy's introduction
+- player name entry
+- tutorial dialogue
+- dialogue choices
+- Mitchy's final dialogue
+- Mitchy running away
+- Mitchy's off-screen repositioning
+
+Player movement remains disabled for this entire period.
+
+
+# 6. Mitchy Reaches MITCHY START
+
+MITCHY START is the exact position where Mitchy stops for the conversation.
+
+When Mitchy reaches MITCHY START:
+
+1. Stop his running movement precisely at the marker.
+2. Transition out of the running state.
+3. Immediately perform a short energetic JUMP/HOP animation.
+4. Return Mitchy to his normal standing/idle state.
+5. Continue the conversation.
+
+The jump is important.
+
+It should visually communicate:
+
+- Mitchy arrived in a hurry
+- he is energetic/slightly frantic
+- he urgently tried to wake the player
+- the wake-up was intentionally abrupt
+
+Keep the jump cute, fast, and subtle rather than exaggerated.
+
+The rhythm should feel like:
+
+RUN
+→ STOP
+→ HOP!
+→ TALK
+
+If the current character animation system does not contain a dedicated jump animation, implement a small reusable hop using the existing character rendering/movement system.
+
+Do not introduce an unnecessarily large new animation framework just for this.
+
+Mitchy remains standing at MITCHY START throughout the following conversation.
+
+
+# 7. Mitchy Introduction
+
+After Mitchy's arrival/hop animation has completed:
+
+Speaker:
+
+???
+
+“Hi! You must be the new villager.”
+
+“Sorry I'm late. I had a little trouble getting here.”
+
+Then reveal the NPC's identity by changing the speaker label:
+
+???
+
+→
+
+Mitchy
+
+Mitchy:
+
+“I’m Mitchy, the owner of [SHOP_NAME].”
+
+“What’s your name?”
+
+Do not repeat the explanation about Mitchy being late after revealing his name.
+
+
+# 8. Player Name Entry
+
+Open a small player-name entry UI.
+
+IMPORTANT:
+
+Use the existing game's UI design system and shared CSS/design variables.
+
+Do not create an isolated visual style specifically for this panel.
+
+If I later modify global UI colors/design variables, this panel should update automatically with the rest of the interface.
+
+The player:
+
+1. Enters their name.
+2. Confirms it.
+3. The name is persisted as part of the current save.
+
+Expose the value to the dialogue system as something equivalent to:
+
+{PLAYER_NAME}
+
+Mitchy and future NPCs must be able to dynamically reference it.
+
+Examples:
+
+“Morning, {PLAYER_NAME}!”
+
+“Hey {PLAYER_NAME}, found anything interesting?”
+
+Do NOT automatically insert the player's name into every conversation.
+
+It should only appear where dialogue explicitly references it.
+
+
+# 9. Continue Mitchy's Dialogue
+
+After name confirmation:
+
+Mitchy:
+
+“Nice to meet you, {PLAYER_NAME}.”
+
+“Why don’t you look around for a bit? You’ll find your house on the north side of the island.”
+
+“If you get lost, press M to open your map.”
+
+Render:
+
+M
+
+using the existing YELLOW control-highlight styling.
+
+All explicit keyboard/control terminology introduced through dialogue should use this same styling.
+
+Then:
+
+Mitchy:
+
+“Anything else before you head out?”
+
+
+# 10. Map System
+
+Add a world map that can be opened and closed using:
+
+M
+
+The map should use the existing game's UI design system and shared CSS/design variables.
+
+Do not create an unrelated visual style.
+
+
+## Map Purpose
+
+The map is the player's primary way of getting a larger spatial overview of ASCIIA BAY.
+
+The normal gameplay camera remains at the fixed close view.
+
+The map replaces the need for the player to zoom far out for navigation.
+
+
+## Map Content
+
+Show an overview of the entire currently playable island/world area.
+
+Show:
+
+- all main islands
+- actual terrain/coastline shapes
+- major placed world structures/assets useful for orientation
+- player location
+- relevant NPC locations
+
+The map is for orientation.
+
+It should not become a second fully detailed gameplay viewport.
+
+
+## Derive the Map from Current World Data
+
+Where technically practical, derive the map from the SAME source-of-truth world data used by the game.
+
+Relevant data may include:
+
+- terrain/world geometry
+- coastline/island geometry
+- terrain regions
+- persistent placed world assets
+- important structures
+- current character positions
+
+The purpose is to prevent the map and game world from becoming out of sync.
+
+For example:
+
+If I later move:
+
+- a house
+- a bridge
+- a shop
+- another important structure
+- another relevant world asset
+
+the map should reflect its updated position automatically.
+
+Do NOT require me to manually maintain a separate static map image.
+
+
+## Map Performance
+
+Do NOT continuously run a second full-resolution instance of the entire game renderer in the background.
+
+Prefer an architecture such as:
+
+SEMI-STATIC WORLD MAP LAYER
+
+Derived from:
+
+- terrain
+- coastline
+- island shapes
+- persistent relevant world assets
+
+This can be:
+
+- generated when the map opens
+- cached
+- invalidated/rebuilt when relevant world data changes
+
+PLUS:
+
+DYNAMIC CHARACTER OVERLAY
+
+Derived from:
+
+- current player position
+- current NPC positions
+- future moving markers
+
+Choose the exact implementation based on the current architecture.
+
+The important goals are:
+
+- one source of truth
+- automatic synchronization
+- good performance
+- no manually duplicated map layout
+
+
+## Map Visual Simplification
+
+The map does NOT need to reproduce every individual ASCII glyph at gameplay resolution.
+
+Prioritize:
+
+- recognizable island silhouettes
+- coastline
+- major terrain regions
+- major landmarks
+- important structures
+- character locations
+
+Do not clutter it with every:
+
+- flower
+- grass glyph
+- tiny decoration
+- collectible
+- particle
+- temporary effect
+
+unless doing so is effectively free and remains readable.
+
+
+# 11. Character Location Markers
+
+Represent characters on the map using small markers based on their character HEADS rather than generic dots where practical.
+
+Examples:
+
+Player
+→ player's head
+
+Mitchy
+→ Mitchy's head
+
+Future NPC
+→ that NPC's head
+
+Character marker positions must be derived from their actual current world positions.
+
+Do NOT manually maintain separate map-space positions for dynamic characters.
+
+
+## Player Marker
+
+Use a recognizable head representation of the current player.
+
+Where practical, derive this from the existing character appearance/rendering data rather than maintaining a separate duplicate portrait.
+
+The player should immediately understand:
+
+“This is me.”
+
+
+## NPC Markers
+
+Use each NPC's head/portrait representation.
+
+Mitchy's marker must correspond to Mitchy's actual current world position.
+
+If Mitchy moves, his map marker must update.
+
+
+## Reusable Character Marker Architecture
+
+Do not hardcode the map around only Player + Mitchy.
+
+Design character markers around reusable data such as:
+
+- character ID
+- display name
+- current world position
+- head/portrait representation
+- map visibility
+
+Future NPCs should be addable without rewriting the core map system.
+
+
+# 12. Map Interaction
+
+Press:
+
+M
+
+to open the map.
+
+Press:
+
+M
+
+again to close it.
+
+Also provide a visible close control consistent with the existing UI system.
+
+While the map is open:
+
+- disable player movement
+- disable world interaction underneath it
+- prevent accidental gameplay input from passing through
+- keep M available for closing the map
+
+Closing the map restores the appropriate gameplay input state.
+
+
+## Map During Cinematics
+
+Do NOT allow the player to open the map while player control is disabled during Intro Part B.
+
+Mitchy's line:
+
+“If you get lost, press M to open your map.”
+
+only teaches the control.
+
+The player can actually use M once the cinematic ends and normal gameplay control has been restored.
+
+
+# 13. Tutorial Dialogue Choices
+
+Show exactly two choices:
+
+1. So, where should I start?
+
+2. I think I’m good!
+
+
+## Choice 1 — So, where should I start?
+
+Mitchy:
+
+“Why don't you explore a little? Collect whatever catches your eye and bring it back to your new house.”
+
+“Make the place feel like your own!”
+
+“Oh, and if you ever forget how something works, you'll find all the controls under Settings → Controls.”
+
+Render:
+
+Settings → Controls
+
+using the same yellow control-highlight styling.
+
+Do NOT make Mitchy verbally explain every individual control such as:
+
+- left-click
+- F
+- I
+- Esc
+
+These controls should later be introduced through contextual UI hints when they actually become relevant.
+
+After this answer, continue to Mitchy's departure.
+
+
+## Choice 2 — I think I’m good!
+
+Do not show the Choice 1 explanation.
+
+Continue directly to Mitchy's departure.
+
+
+# 14. Mitchy's Departure
+
+Regardless of which option the player selected:
+
+Mitchy:
+
+“Alright! I’ll be waiting by the bridge on the east side.”
+
+“Come find me if you still have questions or when you’re done looking around.”
+
+After the final dialogue box closes, Mitchy begins RUNNING away from MITCHY START in the direction of:
+
+MITCHY EXIT
+
+Use MITCHY EXIT to determine the appropriate direction/destination.
+
+Player movement remains disabled while Mitchy is leaving.
+
+
+# 15. Mitchy Leaving the Camera
+
+Mitchy should visibly run away rather than immediately teleporting.
+
+However, Mitchy does NOT need to visibly travel the entire world-space distance to MITCHY EXIT.
+
+The important cinematic requirement is:
+
+The player sees Mitchy run completely outside the current camera view.
+
+Once Mitchy has completely crossed outside the visible camera bounds:
+
+1. Immediately set Mitchy's actual world position to MITCHY EXIT.
+2. Update Mitchy's persistent/current NPC position accordingly.
+3. Ensure every system using Mitchy's current position now resolves to MITCHY EXIT.
+4. Update Mitchy's map marker to MITCHY EXIT.
+5. Keep player movement disabled.
+6. Continue the cinematic ending.
+
+Because Mitchy is already off-screen when this happens, the player must never see him teleport.
+
+By the time normal gameplay begins, Mitchy must already physically exist at MITCHY EXIT.
+
+
+## Complete Mitchy Position Flow
+
+The complete position flow must be:
+
+TEMPORARY OFF-CAMERA ENTRANCE
+→ Mitchy runs into view
+→ Mitchy reaches MITCHY START
+→ Mitchy hops
+→ Mitchy stands at MITCHY START
+→ conversation
+→ Mitchy runs away toward MITCHY EXIT
+→ Mitchy completely leaves camera bounds
+→ Mitchy is silently repositioned to MITCHY EXIT
+→ world/NPC position updates
+→ map position updates
+→ cinematic ends
+→ gameplay
+
+
+# 16. Cinematic Letterboxing — End
+
+Keep the cinematic letterbox bars visible while Mitchy runs away and while his off-screen position is updated.
+
+Once Mitchy has completely exited the visible camera:
+
+1. Reposition Mitchy to MITCHY EXIT.
+2. Confirm his current world/NPC position has updated.
+3. Confirm his map position now resolves to MITCHY EXIT.
+4. Keep player movement disabled.
+5. Wait 1 second.
+6. Smoothly animate the TOP letterbox bar upward/off-screen.
+7. Smoothly animate the BOTTOM letterbox bar downward/off-screen.
+8. Expand the visible game area back to the normal gameplay view.
+9. Restore player movement as the letterbox transition finishes.
+
+Do NOT instantly hide the bars.
+
+Do NOT restore player control before Mitchy has been repositioned.
+
+Exact sequence:
+
+Mitchy runs away
+→ Mitchy leaves camera
+→ Mitchy silently moves to MITCHY EXIT
+→ Mitchy's world/map position updates
+→ wait 1 second
+→ letterbox smoothly opens
+→ player control restored
+
+The transition should feel like the cinematic frame itself is opening into gameplay.
+
+
+# 17. Gameplay Begins
+
+Once the letterbox transition finishes:
+
+- restore normal player movement
+- restore normal gameplay input
+- enable M to open the map
+- Mitchy must already be at MITCHY EXIT
+- Mitchy's map marker must already show MITCHY EXIT
+- player can freely explore
+- player can find their house
+- player can collect resources
+
+Do not automatically start another cinematic immediately afterward.
+
+
+# 18. Contextual Controls
+
+After player control has been restored, briefly show only the contextual controls that are immediately relevant.
+
+Include:
+
+M — Map
+
+using the existing yellow control-highlight presentation.
+
+Do not dump the complete control scheme onto the player.
+
+Detailed controls remain available through:
+
+Settings → Controls
+
+
+# 19. Integration with Current Intro
+
+Replace the current final in-game ending/frame of Intro Part A with this Part B sequence.
+
+The entire intro should execute continuously:
+
+PART A
+→ black
+→ “Hey! Wake up!”
+→ eyes opening
+→ Mitchy runs into scene
+→ Mitchy reaches MITCHY START
+→ Mitchy hops
+→ introduction
+→ name entry
+→ map explanation
+→ tutorial choice
+→ Mitchy runs away
+→ Mitchy leaves camera
+→ Mitchy silently moves to MITCHY EXIT
+→ 1-second pause
+→ letterbox opens
+→ gameplay
+
+Do not create Part B as an unrelated standalone demo if it can be integrated directly into the existing intro flow.
+
+Preserve any existing development chapter/sequence skipping functionality so Part B can be tested without replaying the entire intro every time.
+
+
+# 20. Configurable Values
+
+Do not scatter narrative-specific configuration throughout unrelated components.
+
+Keep new configurable narrative/cinematic values centralized or clearly identifiable.
+
+After implementation, give me the location of every relevant value, including at minimum:
+
+- Mitchy's display name
+- Shop name
+- PLAYER_NAME storage key
+- Player-name placeholder/default
+- All Mitchy dialogue
+- Dialogue choices
+- Initial black-screen duration
+- Eye-opening duration
+- Mitchy's entrance running speed
+- Mitchy's jump height
+- Mitchy's jump duration
+- Mitchy's exit running speed
+- Letterbox size
+- Letterbox transition duration
+- 1-second post-exit delay
+- Required scene-marker IDs
+- Map key binding
+- Map character marker size
+- Map overview scale/padding
+- Map-visible world asset categories
+- Any additional values introduced by this implementation
+
+
+# 21. Scope
+
+This implementation is specifically:
+
+- Intro Part B wake-up
+- Mitchy's entrance
+- Mitchy's arrival jump
+- onboarding dialogue
+- player naming
+- map introduction/map system
+- Mitchy's departure
+- Mitchy's off-screen repositioning
+- transition into normal gameplay
+
+Do NOT expand this implementation into:
+
+- AI crafting tutorial
+- crafting quest
+- quest-list system
+- later Mitchy quests
+
+Those will be implemented afterward.
+
+
+# 22. Final Verification
+
+After implementation, run the project in the existing local development environment and verify:
+
+1. Intro Part A automatically enters Part B.
+2. Black screen remains for approximately 2–3 seconds.
+3. PLAYER START controls the player's actual wake-up position.
+4. Mitchy is NOT already standing at MITCHY START when the eyes open.
+5. Mitchy begins from outside the visible camera.
+6. “Hey! Wake up!” appears while the screen is black.
+7. The eye-opening animation begins immediately afterward.
+8. Letterboxing is already present from the first visible world frame.
+9. Mitchy is already running as the world becomes visible.
+10. Mitchy visibly enters the camera.
+11. Mitchy runs accurately to MITCHY START.
+12. Mitchy stops at MITCHY START.
+13. Mitchy performs the short jump/hop.
+14. Mitchy returns to idle at MITCHY START.
+15. Conversation continues only after his entrance/hop finishes.
+16. Player movement remains disabled throughout the cinematic.
+17. Map access remains disabled throughout the cinematic.
+18. Name entry persists correctly.
+19. {PLAYER_NAME} resolves correctly.
+20. Both dialogue choices work.
+21. Mitchy runs away after the final dialogue.
+22. Mitchy completely leaves the visible camera.
+23. Mitchy is silently repositioned to MITCHY EXIT only after he is off-screen.
+24. The player never sees Mitchy teleport.
+25. Mitchy's actual world/NPC position becomes MITCHY EXIT.
+26. Mitchy's map marker becomes MITCHY EXIT.
+27. This repositioning happens BEFORE player control is restored.
+28. Letterboxing remains visible throughout Mitchy's departure.
+29. The 1-second delay occurs after Mitchy's repositioning.
+30. Letterbox bars smoothly animate outward.
+31. Player control is restored only as the letterbox transition finishes.
+32. Scene-marker overlays are not visible during cinematic/gameplay.
+33. M cannot open the map during the cinematic.
+34. M opens the map after gameplay begins.
+35. M closes the map.
+36. The map represents the complete playable island/world area.
+37. The map corresponds to the current world layout.
+38. Player head marker corresponds to the player's actual position.
+39. Mitchy head marker corresponds to Mitchy's actual position.
+40. Character markers update when characters move.
+41. Map input does not cause gameplay movement/interactions underneath it.
+42. The complete Part A → Part B → gameplay sequence works in localhost.
+
+
+# 23. Report Back
+
+When finished, report:
+
+1. Files created/changed.
+2. Configurable names/dialogue/timing values and where each is located.
+3. How player-name persistence works.
+4. How the cinematic retrieves PLAYER START, MITCHY START, and MITCHY EXIT.
+5. How Mitchy's temporary off-camera entrance position is calculated.
+6. How Mitchy's entrance movement works.
+7. How the arrival jump/hop is implemented.
+8. How Mitchy's off-screen detection works when leaving.
+9. How Mitchy is repositioned to MITCHY EXIT.
+10. How Mitchy's persistent/current world position is updated.
+11. How the map derives its world representation.
+12. Whether the map is generated, cached, or live-updated and why.
+13. How world coordinates are converted to map coordinates.
+14. How character head markers are rendered.
+15. How future NPCs can be registered on the map.
+16. Any remaining technical issues or assumptions.
+17. The localhost route/URL I should use to test the complete intro.

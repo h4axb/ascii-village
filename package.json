@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "build:catalog": "node --env-file=.env scripts/build-catalog.mjs",
-    "build:sprites": "node --env-file=.env scripts/build-sprites.mjs"
+    "build:sprites": "node --env-file=.env scripts/build-sprites.mjs",
+    "build:palm": "node scripts/build-palm.mjs",
+    "place:palms": "node scripts/place-palms.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

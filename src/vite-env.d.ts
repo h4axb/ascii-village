@@ -1,13 +1,6 @@
 /// <reference types="vite/client" />
-
-interface ImportMetaEnv {
-  readonly VITE_LLM_API_KEY?: string;
-  readonly VITE_LLM_BASE_URL?: string;
-  readonly VITE_LLM_MODEL?: string; // legacy single-model fallback
-  readonly VITE_LLM_MODEL_FAST?: string; // runtime default (Haiku)
-  readonly VITE_LLM_MODEL_SMART?: string; // runtime escape hatch (Sonnet)
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
+// Gives TS the ambient module declarations for Vite's asset imports (`.svg`,
+// `.png`, `?raw`, `?url`, …) and for `import.meta.env`. The project imported
+// assets fine before this only because everything was JSON (covered by
+// tsconfig's resolveJsonModule); the HUD's icon SVGs are the first real asset
+// imports.

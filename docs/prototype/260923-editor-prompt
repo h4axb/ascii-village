@@ -1,0 +1,325 @@
+Yes. I’d change the editor specification more substantially now. Based on the screenshot, doubling the panel width also gives enough room to turn the top into proper **editor-mode bookmarks/tabs** rather than squeezing everything into the current asset view.
+
+Use this as the next implementation prompt:
+
+## Overwork the World Editor
+
+Update the existing dev World Editor UI.
+
+### 1. Double the editor width
+
+The current editor panel on the right is much too narrow.
+
+Make the entire editor approximately **2× its current width**.
+
+It should still:
+
+* remain anchored to the right side of the screen,
+* remain vertically scrollable when necessary,
+* not affect the actual game-world layout,
+* overlay the game rather than resize the game viewport.
+
+Use the additional horizontal space to display more assets per row and make labels/controls easier to read.
+
+Do NOT make the individual asset thumbnails twice as large. Primarily use the extra width to fit more content horizontally.
+
+---
+
+## 2. Remove long technical asset text
+
+Some assets currently display very long technical/descriptive text underneath their thumbnail, especially assets such as the **pond and bridge**.
+
+Do not display these long descriptions in the asset browser.
+
+Asset cards should only display a short human-readable name.
+
+For example:
+
+**Bridge**
+
+instead of:
+
+“Large mechanically decoded from a pre-rendered glyph SVG…”
+
+Likewise, the pond should simply display:
+
+**Pond**
+
+Keep technical metadata internally if it is needed by the system, but do not render it as the visible asset name.
+
+Asset cards should remain compact and visually scannable.
+
+---
+
+## 3. Top-level editor bookmarks
+
+Change the top of the editor into top-level bookmarks/tabs.
+
+Initially provide:
+
+**World Assets** | **Intro Locations**
+
+These are different editor modes.
+
+### World Assets
+
+Contains the functionality currently available in the editor:
+
+* Assets
+* Insert Image
+* placed assets
+* ghost placement
+* scale/rotation
+* masks
+* undo/redo
+* etc.
+
+The existing **Assets / Insert Image** controls can remain as secondary tabs inside `World Assets`.
+
+### Intro Locations
+
+This is the new scripted-sequence marker editor.
+
+---
+
+# 4. Intro Locations
+
+The purpose of `Intro Locations` is to let me visually define the exact positions used by the intro script instead of describing coordinates or positions to the implementation AI.
+
+The available location markers must be generated from the actual loaded intro script.
+
+**Do not hardcode the marker list into the editor UI.**
+
+When the intro script/configuration is loaded, inspect its declared location markers and generate an editor entry for every required position.
+
+For example, if the intro sequence declares:
+
+`INTRO_PLAYER_START`
+
+`INTRO_MITCHY_START`
+
+`INTRO_MITCHY_TALK_POSITION`
+
+`INTRO_MITCHY_EXIT`
+
+the **Intro Locations** editor automatically shows those four entries.
+
+If another marker is later added to the intro script, it should automatically appear in this editor without requiring a separate UI implementation.
+
+---
+
+## 5. Marker list
+
+Inside `Intro Locations`, show something like:
+
+**Intro — Wake Up**
+
+○ Player Start
+○ Mitchy Start
+○ Mitchy Talk Position
+○ Mitchy Exit
+
+**Intro — Bridge**
+
+○ Player Position
+○ Mitchy Position
+○ Boat Position
+
+**Intro — Shop**
+
+○ Player Landing Position
+○ Mitchy Landing Position
+○ Mitchy Exit
+
+Group markers according to their sequence/scene when this information exists in the script.
+
+The human-readable label can be separate from the internal ID.
+
+Example:
+
+**Mitchy Talk Position**
+
+Internal:
+
+`INTRO_MITCHY_TALK_POSITION`
+
+---
+
+## 6. Placing a marker
+
+Clicking a location in the list activates that marker for placement.
+
+Then clicking on the game world places the marker at that exact world/tile position.
+
+Example:
+
+Select:
+
+**Player Start**
+
+Then click underneath the tree.
+
+The editor stores:
+
+`INTRO_PLAYER_START → selected world position`
+
+Selecting:
+
+**Mitchy Start**
+
+and clicking elsewhere stores:
+
+`INTRO_MITCHY_START → selected world position`
+
+A marker can be repositioned simply by selecting it again and placing it somewhere else.
+
+---
+
+## 7. Marker visualization
+
+While `Intro Locations` is open, display placed markers directly over the game world.
+
+Keep them simple and highly readable.
+
+For example:
+
+**① Player Start**
+
+**② Mitchy Start**
+
+**③ Mitchy Talk**
+
+Use a small point/cross underneath the label to show the exact position.
+
+The exact point is more important than the label because this position will later be used by the script.
+
+Placed and unplaced markers should be visually distinguishable in the editor list:
+
+`● Player Start` — placed
+
+`○ Mitchy Start` — not placed
+
+Selecting a marker should highlight both its list entry and its corresponding world marker.
+
+---
+
+## 8. Optional facing direction
+
+After placing a character marker, allow an optional:
+
+**Facing**
+
+`↑ Up`
+`↓ Down`
+`← Left`
+`→ Right`
+`None`
+
+Visualize this with a small arrow at the marker.
+
+This allows the script to know both:
+
+**where the character should stand**
+
+and
+
+**which direction the character should face.**
+
+---
+
+## 9. Intro script consumes these positions
+
+The intro sequence must reference these named marker positions rather than hardcoded coordinates.
+
+Example:
+
+`INTRO_MITCHY_START`
+→ Mitchy begins here
+
+then:
+
+move Mitchy to
+`INTRO_MITCHY_TALK_POSITION`
+
+then:
+
+face the player
+→ whole-sprite hop twice
+→ show `!`
+→ begin dialogue
+
+This means I can completely change the staging of the intro through the editor without changing the intro's behavior code.
+
+---
+
+## 10. Editor-only visualization
+
+**Location markers must NEVER be rendered during normal gameplay.**
+
+They are developer/editor information only.
+
+Rules:
+
+Editor closed:
+→ no markers visible.
+
+`World Assets` selected:
+→ intro markers do not need to be visible.
+
+`Intro Locations` selected:
+→ intro markers become visible and editable.
+
+Production/non-dev build:
+→ no marker visualization UI.
+
+The underlying stored coordinates can still be used by gameplay scripts, but the visual marker itself must not exist in the player's game.
+
+---
+
+## 11. Architecture for future scripted sequences
+
+Do not design this specifically so that only the intro can use it.
+
+Create a reusable concept of:
+
+**Script Location Sets**
+
+The editor can currently expose:
+
+**World Assets | Intro Locations**
+
+but later we should be able to add location sets such as:
+
+**Quest Locations**
+
+**NPC Events**
+
+**Cinematics**
+
+without rebuilding the marker-placement system.
+
+A script should declare which named locations it needs.
+
+The editor visualizes those declarations and lets me assign world positions to them.
+
+In other words:
+
+**Script defines WHAT positions are required.**
+
+**Editor lets me decide WHERE those positions are.**
+
+**Sequence logic defines WHAT happens between those positions.**
+
+Keep these three responsibilities separate.
+
+The key architectural change here is the **script-driven marker list**. That is better than us manually defining `INTRO_PLAYER_START`, etc. in the editor itself. When you later change the intro sequence, the editor stays synchronized automatically.
+
+And visually I'd make the hierarchy at the top roughly:
+
+**`WORLD ASSETS` | `INTRO LOCATIONS`**
+
+then, only under World Assets:
+
+**`assets` | `insert image`**
+
+That prevents “Intro Locations” from looking like just another kind of asset.

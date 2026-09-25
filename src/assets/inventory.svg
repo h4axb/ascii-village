@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 340">
+  <style>
+    text {
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+      font-size: 15px;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+  </style>
+  <g>
+    <text x="190" y="10" fill="#7d5452">Ø</text>
+    <text x="210" y="10" fill="#a4685e">&amp;</text>
+    <text x="170" y="30" fill="#6e4d4d">Ø</text>
+    <text x="190" y="30" fill="#704d4f">Ø</text>
+    <text x="210" y="30" fill="#a66a5e">&amp;</text>
+    <text x="150" y="50" fill="#6d4a4b">@</text>
+    <text x="170" y="50" fill="#7e5351">Ø</text>
+    <text x="210" y="50" fill="#6e4750">@</text>
+    <text x="230" y="50" fill="#a3685d">&amp;</text>
+    <text x="130" y="70" fill="#885755">¥</text>
+    <text x="150" y="70" fill="#714d4e">Ø</text>
+    <text x="210" y="70" fill="#b69893">*</text>
+    <text x="230" y="70" fill="#ffe0b8">·</text>
+    <text x="110" y="90" fill="#734e4e">Ø</text>
+    <text x="130" y="90" fill="#765050">Ø</text>
+    <text x="210" y="90" fill="#ffe2b9">·</text>
+    <text x="230" y="90" fill="#7e5351">Ø</text>
+    <text x="250" y="90" fill="#ffe1b8">·</text>
+    <text x="90" y="110" fill="#9a6359">&amp;</text>
+    <text x="110" y="110" fill="#845753">¥</text>
+    <text x="210" y="110" fill="#ffe1ba">·</text>
+    <text x="230" y="110" fill="#65434a">@</text>
+    <text x="250" y="110" fill="#d6a98b">†</text>
+    <text x="70" y="130" fill="#714d4d">Ø</text>
+    <text x="90" y="130" fill="#815552">Ø</text>
+    <text x="230" y="130" fill="#ffe3bd">·</text>
+    <text x="250" y="130" fill="#67454b">@</text>
+    <text x="50" y="150" fill="#754f4e">Ø</text>
+    <text x="70" y="150" fill="#835552">¥</text>
+    <text x="230" y="150" fill="#66454a">@</text>
+    <text x="250" y="150" fill="#68464b">@</text>
+    <text x="30" y="170" fill="#975f57">¥</text>
+    <text x="50" y="170" fill="#895955">¥</text>
+    <text x="230" y="170" fill="#9a6259">&amp;</text>
+    <text x="250" y="170" fill="#69464f">@</text>
+    <text x="30" y="190" fill="#915f59">¥</text>
+    <text x="50" y="190" fill="#ffdeb5">·</text>
+    <text x="70" y="190" fill="#976159">&amp;</text>
+    <text x="90" y="190" fill="#99625a">&amp;</text>
+    <text x="110" y="190" fill="#98605a">&amp;</text>
+    <text x="130" y="190" fill="#98615a">&amp;</text>
+    <text x="150" y="190" fill="#98625a">&amp;</text>
+    <text x="170" y="190" fill="#966059">&amp;</text>
+    <text x="190" y="190" fill="#7b5351">Ø</text>
+    <text x="230" y="190" fill="#986159">&amp;</text>
+    <text x="250" y="190" fill="#694650">@</text>
+    <text x="10" y="210" fill="#704d4e">Ø</text>
+    <text x="30" y="210" fill="#805453">Ø</text>
+    <text x="50" y="210" fill="#b27163">%</text>
+    <text x="70" y="210" fill="#ffe2b9">·</text>
+    <text x="90" y="210" fill="#986059">&amp;</text>
+    <text x="110" y="210" fill="#98615a">&amp;</text>
+    <text x="130" y="210" fill="#97615a">&amp;</text>
+    <text x="150" y="210" fill="#98625b">&amp;</text>
+    <text x="170" y="210" fill="#98615a">&amp;</text>
+    <text x="190" y="210" fill="#97615a">&amp;</text>
+    <text x="210" y="210" fill="#61454b">@</text>
+    <text x="230" y="210" fill="#986159">&amp;</text>
+    <text x="10" y="230" fill="#734e50">Ø</text>
+    <text x="30" y="230" fill="#825553">¥</text>
+    <text x="50" y="230" fill="#966059">&amp;</text>
+    <text x="70" y="230" fill="#98615a">&amp;</text>
+    <text x="90" y="230" fill="#966057">&amp;</text>
+    <text x="110" y="230" fill="#966057">&amp;</text>
+    <text x="130" y="230" fill="#976159">&amp;</text>
+    <text x="150" y="230" fill="#97615a">&amp;</text>
+    <text x="170" y="230" fill="#976059">&amp;</text>
+    <text x="190" y="230" fill="#95605a">&amp;</text>
+    <text x="210" y="230" fill="#754e4f">Ø</text>
+    <text x="230" y="230" fill="#68464f">@</text>
+    <text x="30" y="250" fill="#d2a486">‡</text>
+    <text x="50" y="250" fill="#66464d">@</text>
+    <text x="70" y="250" fill="#986159">&amp;</text>
+    <text x="90" y="250" fill="#986059">&amp;</text>
+    <text x="110" y="250" fill="#fff0d7">·</text>
+    <text x="130" y="250" fill="#ffddb0">:</text>
+    <text x="150" y="250" fill="#966059">&amp;</text>
+    <text x="170" y="250" fill="#976057">&amp;</text>
+    <text x="190" y="250" fill="#68464d">@</text>
+    <text x="210" y="250" fill="#825552">¥</text>
+    <text x="230" y="250" fill="#68454e">@</text>
+    <text x="30" y="270" fill="#d1a387">‡</text>
+    <text x="50" y="270" fill="#976057">&amp;</text>
+    <text x="70" y="270" fill="#63434b">@</text>
+    <text x="90" y="270" fill="#64464d">@</text>
+    <text x="110" y="270" fill="#dbaf90">†</text>
+    <text x="130" y="270" fill="#c68c76">¤</text>
+    <text x="150" y="270" fill="#65454b">@</text>
+    <text x="170" y="270" fill="#67464d">@</text>
+    <text x="190" y="270" fill="#b77363">%</text>
+    <text x="210" y="270" fill="#845552">¥</text>
+    <text x="230" y="270" fill="#6a474f">@</text>
+    <text x="30" y="290" fill="#69484e">@</text>
+    <text x="50" y="290" fill="#97625a">&amp;</text>
+    <text x="70" y="290" fill="#945f57">¥</text>
+    <text x="90" y="290" fill="#966059">&amp;</text>
+    <text x="110" y="290" fill="#ffefd2">·</text>
+    <text x="130" y="290" fill="#fed8ac">:</text>
+    <text x="150" y="290" fill="#674549">@</text>
+    <text x="170" y="290" fill="#b87262">%</text>
+    <text x="190" y="290" fill="#b97363">%</text>
+    <text x="210" y="290" fill="#865754">¥</text>
+    <text x="230" y="290" fill="#6a4750">@</text>
+    <text x="50" y="310" fill="#96605a">&amp;</text>
+    <text x="70" y="310" fill="#96605a">&amp;</text>
+    <text x="90" y="310" fill="#945e57">¥</text>
+    <text x="110" y="310" fill="#64454b">@</text>
+    <text x="130" y="310" fill="#67474e">@</text>
+    <text x="150" y="310" fill="#955f59">¥</text>
+    <text x="170" y="310" fill="#935e57">¥</text>
+    <text x="190" y="310" fill="#925f57">¥</text>
+    <text x="210" y="310" fill="#69464f">@</text>
+    <text x="50" y="330" fill="#68464e">@</text>
+    <text x="70" y="330" fill="#68464e">@</text>
+    <text x="90" y="330" fill="#68454d">@</text>
+    <text x="110" y="330" fill="#69464e">@</text>
+    <text x="130" y="330" fill="#67454e">@</text>
+    <text x="150" y="330" fill="#69474f">@</text>
+    <text x="170" y="330" fill="#69464e">@</text>
+    <text x="190" y="330" fill="#b0635b">&amp;</text>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+## Day/night cycle
+Add the visualization of the day and night cycle. In addition of the icon next to the clock to indicate the day or night time, I want to include a color gradient that transitions smoothly.
+
+midnight: deep cool blue, heaviest atmosphere/vignette
+6:30 (dawn): warm peach glow
+noon: fully clear (natural daylight — the neutral baseline)
+18:00 (sunset):	golden orange
+20:00 (dusk): purple
+
+The color implementation is filling the background color as a gradient. I need the objects to be colored individually.
+=> Put the objects in the environment into variable groups and color them manually.

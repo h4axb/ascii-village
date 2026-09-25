@@ -1,23 +1,29 @@
 // ---------------------------------------------------------------------------
-// STAGE 2 — Claude vision transcribes the reference image into an ASCII sprite.
-// One vision call (image + text), anatomy-first. Pure prompt building + parsing;
-// the vision chat function is injected (llm.ts owns the client), so this file
-// never imports an API client.
+// STAGE 0 — the pre-flight screen, now expanded into the full visual planner.
+// ONE cheap JSON call decides everything needed before rendering: content
+// safety, size, AND the region-by-region visual composition (CraftPlan).
+// There is no separate Stage 2 any more — a local, deterministic renderer
+// (glyphRender.ts) turns the plan into glyphs; the LLM never picks a literal
+// character or reasons about luminance/shading.
 // ---------------------------------------------------------------------------
 
 import {
+  adjustSizeTier,
+  CATEGORY_SIZE_DEFAULT,
   FACE_SET,
-  MAX_SPRITE_WIDTH,
-  SIZE_BANDS,
-  SIZE_GUIDELINE,
-  STYLE_EXAMPLES,
-  type GeneratedSprite,
+  type CraftCategory,
+  type CraftPlan,
+  type FaceMark,
+  type RegionSpec,
+  type ShapeRelation,
   type SizeClass,
+  type SpatialRelation,
 } from './spriteConfig';
+import { MATERIALS_HINT } from './materials';
+import { checkPolicy } from './policy';
 
-import { checkLine } from './spriteValidate';
-
-// Local vision message types (kept out of the client to respect the boundary).
+// Local vision/JSON message types (kept out of the client to respect the
+// craft/ <-> llm.ts import boundary — llm.ts owns the actual client).
 type ContentPart =
   | { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }
   | { type: 'image_url'; image_url: { url: string } };
@@ -36,233 +42,297 @@ export type VisionJSON = <T>(
   },
 ) => Promise<T>;
 
-// Streaming transport (llmClient.chatStream matches this shape). Yields raw
-// text deltas; a delta may contain several newlines at once.
-export type ChatStreamFn = (
-  messages: VMessage[],
-  opts?: {
-    model?: string;
-    maxTokens?: number;
-    thinking?: { type: 'disabled' | 'enabled' | 'adaptive' };
-    signal?: AbortSignal;
-    fallbackModel?: string;
-  },
-) => AsyncGenerator<string, void, void>;
-
-const FACE_LIST = FACE_SET.join(' ');
-const BODY_LIST = "@ # * o O . , ' \" ` ~ - _ = + | / \\ ( ) < > ^ v ; : ! % & and space";
-
-function styleBlock(): string {
-  return STYLE_EXAMPLES.map((e) => `${e.name}:\n${e.art.join('\n')}`).join('\n\n');
-}
-
-// The full system prompt. `hasImage` branches the handful of sections that
-// actually mention a reference image — kept parameterized (rather than
-// hard-coding the text-only framing) so the image-mediated path stays
-// available for a future A/B without rewriting this function again.
-export function systemPrompt(hasImage: boolean): string {
-  return [
-    // 1) ROLE
-    hasImage
-      ? 'You are an ASCII sprite artist. You transcribe a reference image into a symbolic ' +
-        'character sprite. Symbols carry meaning — you NEVER shade silhouettes with density characters. ' +
-        'You NEVER write words, names, or letters as labels inside the sprite: every part is drawn as a ' +
-        'shape out of the allowed symbols (a body is an outlined shape, never the word "body").'
-      : 'You are an ASCII sprite artist. You turn a short text description into a symbolic ' +
-        'character sprite. Symbols carry meaning — you NEVER shade silhouettes with density characters. ' +
-        'You NEVER write words, names, or letters as labels inside the sprite: every part is drawn as a ' +
-        'shape out of the allowed symbols (a body is an outlined shape, never the word "body").',
-
-    // 2) STRUCTURAL ANALYSIS — break the subject down first, then draw
-    'First analyse the subject into its essential visual components (these become "parts"):\n' +
-      '- Core anatomy: head shape, body posture, ears, limbs, tail — with COUNTS (e.g. 3 heads, 4 legs)\n' +
-      '- Key features / expression: eye style, mouth, snout, and the cute-face mood\n' +
-      '- Accessories & details: glasses, hats, collars, loading rings, clothing, markings\n' +
-      '(For plants: bloom/crown, stem/trunk, leaves, pot. For objects/structures: the main silhouette ' +
-      'plus functional parts like wheels, roof, handle.)\n' +
-      'Note the spatial arrangement — what sits on top / left / right. THEN draw the sprite part by part, ' +
-      'preserving that arrangement and the proportions. ' +
-      (hasImage
-        ? 'Reproduce the anatomy you actually SEE in the image — every part that is there, in the same ' +
-          'layout — do not add, drop, or "improve" parts based on assumptions. '
-        : 'Derive the anatomy from the words in the description — infer reasonable, typical anatomy for ' +
-          'the subject described; do not invent extra parts the description never implied. ') +
-      'Prioritize a recognizable silhouette over dense texture, with clean outlines. When you are ' +
-      'uncertain about a detail, simplify rather than elaborate — a clean simple silhouette that reads ' +
-      'clearly beats an over-detailed one that loses coherence; every extra stroke is a chance to bend ' +
-      'the grid or blur the shape.',
-
-    // 3) CONCEPT SUBSTITUTION — reason about motifs that don't translate
-    // literally, the way a from-scratch creative pass would, rather than a
-    // blind pixel transcription. Scoped: motifs/details only, never core
-    // anatomy, never text.
-    (hasImage
-      ? 'When the reference contains a theme or motif with no literal symbol in the allowed set '
-      : 'When the description names a theme or motif with no literal symbol in the allowed set ') +
-      '(a loading spinner, a sparkle effect, a specific small accessory), do not omit it and do not ' +
-      'trace it pixel-for-pixel — reason about what it REPRESENTS and choose a fitting symbolic ' +
-      'stand-in from the allowed glyphs (e.g. a loading ring above a head could become a * spark or a ' +
-      'cocked ear; a "thinking" mood could become the face expression itself). Apply this to motifs ' +
-      'and small details only — heads, limbs, and body structure are still drawn structurally from the ' +
-      'anatomy analysis. Never substitute in text, letters, or a caption: the sprite is symbols only.',
-
-    // 4) FACES — cute dot faces, single-width so the grid never bends
-    'For eyes and mouths of creatures/characters, draw a CUTE Japanese-style dot face, chosen by mood: ' +
-      'neutral (·ω·), happy (^ω^), sleepy (-_-) or (_ _), grumpy (>_<), surprised (°o°), plain ( o.o ). ' +
-      'The dots (· ° o) are the eyes and ω is a small animal mouth when used. Always wrap the face in ( ). ' +
-      'A mood does NOT need a special glyph — sleepy, grumpy and other expressions can be built entirely ' +
-      'from plain punctuation (as in the examples) when that reads better than a dot-face. ' +
-      'Use ONLY single-width glyphs — never the fullwidth kaomoji dot (・) or any other wide glyph.\n' +
-      `FACE SET (the only non-ASCII glyphs allowed): ${FACE_LIST}. ` +
-      `Everything else must come from: ${BODY_LIST}. No words, no other letters, no digits.`,
-
-    // 5) STYLE EXAMPLES
-    'Your output must look stylistically related to these existing sprites:\n\n' + styleBlock(),
-
-    // 6) SIZE — bands derive from SIZE_BANDS (anchored to the hand-made world
-    // sprites), never hardcoded here, so retuning the bands retunes the prompt.
-    `Sprites are ${SIZE_BANDS.small.minW} to ${MAX_SPRITE_WIDTH} characters wide — ` +
-      `${SIZE_BANDS.small.minW} is a HARD FLOOR, never narrower. Size classes: ` +
-      `small ${SIZE_BANDS.small.minW}-${SIZE_BANDS.small.maxW} wide (max ${SIZE_BANDS.small.maxH} tall), ` +
-      `medium ${SIZE_BANDS.medium.minW}-${SIZE_BANDS.medium.maxW} wide (max ${SIZE_BANDS.medium.maxH} tall), ` +
-      `large ${SIZE_BANDS.large.minW}-${Math.min(SIZE_BANDS.large.maxW, MAX_SPRITE_WIDTH)} wide (max ${SIZE_BANDS.large.maxH} tall). ` +
-      SIZE_GUIDELINE +
-      ' Your sprite stands NEXT TO those world sprites — a creature wider than ~8 characters reads as ' +
-      'bigger than a person, so most animals and items belong in the small band (the style-example cat ' +
-      'is 7 wide — that is the right scale for a pet). ' +
-      'Choose the smallest class that lets every anatomical part stay recognizable. A standing or ' +
-      'dynamic pose (a raised limb, a wave, an outstretched part) needs LATERAL room, not just height — ' +
-      'use the full width of the chosen band rather than compressing narrow and stacking tall; a sprite ' +
-      'narrower than its band\'s minimum width fails validation outright.',
-
-    // 7) OUTPUT — a plain-text grammar designed for incremental streaming.
-    // ANALYSIS COMES FIRST, deliberately: PARTS + LAYOUT are written before a
-    // single sprite row, forcing the structural analysis to actually happen
-    // before drawing (thinking is disabled, so these two lines ARE the
-    // model's working space — worth the ~1s before the first sprite line).
-    // SYMMETRY comes after LAYOUT (judging symmetry needs the anatomy already
-    // reasoned out) and before NAME/LINES (it governs how rows are drawn).
-    // Control keywords use letters that don't exist in the sprite charset
-    // (only o/O/v are allowed), so a sprite row can never be mistaken for a
-    // control line. No sizeClass field: it's decided upstream and re-derived
-    // from actual width anyway.
-    // NOTE: a SYMMETRY: mirror|none field (model draws only a left half, we
-    // mirror it) was tried and is fully implemented/unit-tested downstream
-    // (mirrorHalfLine, SpriteLineStream) — but live-tested against
-    // google/gemini-2.5-flash-lite it was NOT reliable: the model repeatedly
-    // wrote a COMPLETE symmetric-looking pattern (e.g. a whole "( ^ω^ )" face)
-    // instead of a true half, even with an explicit strengthened warning
-    // against exactly that failure, so mirroring doubled it into garbage.
-    // Confirmed twice, not a fluke. Not asking for it here — the field is
-    // absent from the grammar below, so the parser's default ('none') always
-    // applies and every line passes through unmodified. Re-add the SYMMETRY
-    // line + a worked example (git history has the exact prompt text) if this
-    // is ever retried against a more capable model.
-    'Reply in EXACTLY this plain-text format — no JSON, no code fences, no commentary outside the fields. ' +
-      'Start immediately with PARTS:. PARTS and LAYOUT are your structural analysis — be precise ' +
-      '(exact COUNTS, which parts touch, what is biggest) and then draw following that plan exactly. ' +
-      'Do not write anything between LINES: and the sprite rows:\n' +
-      'PARTS: part one | part two | part three\n' +
-      'LAYOUT: one short sentence on the spatial arrangement (top/left/right, sizes)\n' +
-      'NAME: short cute name\n' +
-      'LINES:\n' +
-      '<one sprite row per line, exactly as drawn, padded with trailing spaces to the sprite width>\n' +
-      'END\n\n' +
-      'Example (format only — draw whatever fits the subject; this is a valid SMALL sprite, 8 wide x 4 tall):\n' +
-      'PARTS: pointed ears x2 | dot face | round body | four paws | tail\n' +
-      'LAYOUT: ears on top of head, face centered, a rounded body below it, paws under the body, tail at right\n' +
-      'NAME: Village Cat\n' +
-      'LINES:\n' +
-      ' /\\_/\\  \n' +
-      '( o.o ) \n' +
-      ' (___)~ \n' +
-      ' ^   ^  \n' +
-      'END\n\n' +
-      'Keep PARTS to at most 6 short phrases (2-5 words each) with counts, covering anatomy + accessories.',
-  ].join('\n\n');
-}
-
-function userText(
-  prompt: string,
-  category: string,
-  hasImage: boolean,
-  retryHint?: string,
-  sizeClass?: SizeClass,
-): string {
-  let base = hasImage
-    ? `Token category: ${category}. The player asked for: "${prompt}". Transcribe the reference image.`
-    : `Token category: ${category}. The player asked for: "${prompt}". No reference image — derive the ` +
-      `anatomy from the words, then draw the sprite.`;
-  if (sizeClass) {
-    const band = SIZE_BANDS[sizeClass];
-    base += ` Draw within the ${sizeClass} size band: ${band.minW}-${Math.min(band.maxW, MAX_SPRITE_WIDTH)} characters wide, max ${band.maxH} lines tall.`;
-  }
-  return retryHint ? `${base}\n\nYour previous attempt failed validation: ${retryHint}. Fix exactly that.` : base;
-}
-
-// ---------------------------------------------------------------------------
-// STAGE 0 — pre-flight screen. ONE cheap JSON call that makes every judgment
-// needed before generation starts (absorbs what used to be classifySize):
-//   fit        does the request belong to the token's category?
-//   tokenHint  which token WOULD fit, for Mitchy's feedback line
-//   sensitive  violent/gory/sexual/hateful content (cozy family game)
-//   sizeClass  the size band the sprite generator draws inside
-// A mismatch or blocked prompt now costs one tiny call instead of a full
-// wasted generation. On ANY failure the default is PERMISSIVE (fit, not
-// sensitive, medium) — a broken screen must never block crafting.
-// ---------------------------------------------------------------------------
-
-export interface CraftScreen {
-  fit: boolean;
-  tokenHint?: string; // a real category name, when fit is false
-  sensitive: boolean;
-  sizeClass: SizeClass;
-}
-
 const TOKEN_CATEGORIES =
   'plant (flowers, trees, flora), pets (animals, creatures, companions), ' +
   'clothing (wearables, accessories), vehicle (things you ride), ' +
   'food (edible things), utensils (tools, weapons, furniture, misc objects)';
 
-export function screenPrompt(): string {
-  return (
-    'You screen craft requests for Asciia Bay, a cozy, family-friendly ASCII island-village game. ' +
-    `The token categories are: ${TOKEN_CATEGORIES}. ` +
-    'Judge: (1) "fit" — does the requested thing belong to the GIVEN token category? Be LENIENT: a ' +
-    'hybrid like "a dog with a witch hat" fits pets because the core subject is a pet; only mark ' +
-    'fit=false when the core subject clearly belongs elsewhere. (2) "tokenHint" — when fit is false, ' +
-    'the category it WOULD belong to (or "none"). (3) "sensitive" — true only for violent, gory, ' +
-    'sexual, hateful, or otherwise family-unfriendly content. (4) "sizeClass" — ' +
-    SIZE_GUIDELINE +
-    ' Reply with JSON only: {"fit": true|false, "tokenHint": "plant|pets|clothing|vehicle|food|utensils|none", ' +
-    '"sensitive": true|false, "sizeClass": "small"|"medium"|"large"}.'
-  );
+const CATEGORY_SIZE_DEFAULTS_TEXT = (
+  Object.entries(CATEGORY_SIZE_DEFAULT) as [string, SizeClass][]
+)
+  .map(([cat, size]) => `${cat} defaults to ${size}`)
+  .join(', ');
+
+// ---------------------------------------------------------------------------
+// planPrompt() — the system prompt for the expanded Stage 0 call. Confirmed
+// live against ~20 diverse prompts (Phase A prototype, scripts/craft-plan-
+// prototype.mjs) before this was ported into production, including the
+// adversarial "magical strawberry" case (a physical body + separate small
+// accent regions for a trait with no physical shape).
+// ---------------------------------------------------------------------------
+
+export function planPrompt(): string {
+  return [
+    'You plan crafted items for Asciia Bay, a cozy, family-friendly ASCII island-village game. ' +
+      `The token categories are: ${TOKEN_CATEGORIES}.`,
+
+    'First, screen the request: (1) "fit" — does it belong to the GIVEN token category? Be LENIENT: a ' +
+      'hybrid like "a dog with a witch hat" fits pets because the core subject is a pet; only mark ' +
+      'fit=false when the core subject clearly belongs elsewhere. (2) "tokenHint" — when fit is false, ' +
+      'the category it WOULD belong to (or "none"). (3) "sensitive" — true only for violent, gory, ' +
+      'sexual, hateful, or otherwise family-unfriendly content.',
+
+    '(4) "sizeAdjust" — every category already has a default drawn size ' +
+      `(${CATEGORY_SIZE_DEFAULTS_TEXT}). Judge ONLY relative to what\'s typical for the request\'s OWN ` +
+      'category: "default" for a typical example (this covers most requests, even ones that sound big ' +
+      'in real life, like a plain "a car" for vehicle); "smaller" only when the request\'s own words name ' +
+      'something distinctly smaller than typical (a "tiny"/"miniature" adjective, or a toy/mouse-scale ' +
+      'subject); "bigger" only when distinctly larger than typical ("giant"/"huge", or an unusually large ' +
+      'example like a bus among vehicles).',
+
+    'Then decide "width" and "height" as an ASPECT-RATIO HINT ONLY — any two positive numbers describing ' +
+      'the object\'s proportions (e.g. 3 and 1 for a long thin snake, 1 and 1 for something roughly as ' +
+      'wide as tall). These are NOT literal cell counts — code picks the actual canvas size afterward, ' +
+      'using your numbers only as a shape hint, so do not worry about hitting an exact number. Character ' +
+      'CELLS are taller than wide (about 1.667x) — a round or wide subject (ball, coin, wheel) needs a ' +
+      'bigger width number than height to read as round, not equal width/height.',
+
+    'SILHOUETTE FIRST. Before anything else, identify the 3-6 largest recognizable masses of the object — ' +
+      'write these as a short "parts" list (short phrases, e.g. ["hull", "mast", "sail"]). These masses, ' +
+      'built from a handful of base regions, must make the object recognizable by SHAPE ALONE, with no ' +
+      'texture, colour, or small decoration to lean on. Base shapes must create a recognizable silhouette ' +
+      'before details are added — do not compensate for a weak silhouette with texture or decorative ' +
+      'regions; those cannot fix a composition whose outline doesn\'t already read as the object.',
+
+    'Now plan the VISUAL COMPOSITION as a list of "regions" and, optionally, a "face". You are choosing ' +
+      'WHERE things go and WHAT they represent geometrically — you never choose a character, a colour ' +
+      'shading value, or reason about brightness; that is rendered automatically from your plan. Build the ' +
+      'base/major masses from your "parts" list FIRST (role "body"/"attachment"), then, only once that base ' +
+      'silhouette alone would be recognizable, add "detail"/"accent" regions for anything the player ' +
+      'explicitly asked for, or — if the request left room to invent — 1-2 small inferred details. Do not ' +
+      'add details to compensate for a base shape that isn\'t working; fix the base shapes instead.',
+
+    'Each region has:\n' +
+      '- "id": a short unique lowercase identifier ("body", "flame_core") used only to reference this ' +
+      'region from "relations" below — never shown to the player.\n' +
+      '- "primitive": one of 12 genuinely mathematical shapes: "rectangle" (solid/blocky forms), ' +
+      '"rounded_rectangle" (a rectangle with softened corners), "circle" (perfectly round — set BOTH ' +
+      '"width" AND "height" to the SAME number, the diameter — never omit or null "height"), "ellipse" ' +
+      '(an oval, width and height may differ), "triangle" ' +
+      '(one pointed apex, wide base — use "rotation" to change which way it points), "trapezoid" ' +
+      '(four-sided, wider at one end than the other), "diamond" (a rotated-square rhombus), "semicircle" ' +
+      '(half a circle, flat edge down by default — use "rotation" to change facing), "arc" (a curved RING ' +
+      'SEGMENT, NOT a full ring — a smile, a crescent rim, a halo arc), "line" (a thin stroke — a stem, a ' +
+      'crack, a whisker), "point" (a tiny isolated mark — a single sparkle, a bead, an eye dot), "blob" ' +
+      '(an ORGANIC/irregular rounded form — berries, clouds, rocks — should NOT look like a precise ' +
+      'geometric oval). Use the SAME 12 shapes for base masses and for small details — there is no ' +
+      'separate "detail" vocabulary.\n' +
+      '- "bounds": {"cx","cy","width","height","rotation"} — "cx"/"cy" are the shape\'s CENTRE (not its ' +
+      'top-left corner), as a fraction 0..1 of the eventual canvas; "width"/"height" are also fractions ' +
+      '0..1 of the eventual canvas. "rotation" is OPTIONAL, in degrees (0 = unrotated), and works for ' +
+      'every primitive except circle/point.\n' +
+      '- A few primitives take EXTRA fields alongside "bounds": "rounded_rectangle" may add "cornerRadius" ' +
+      '(0-0.5, default ~0.2); "trapezoid" may add "topWidth" and "bottomWidth" (each 0-1, fraction of its ' +
+      'own width — omit either to default to 1, a plain rectangle); "arc" needs "startAngle" and ' +
+      '"endAngle" (degrees, 0 = east/right, counter-clockwise — e.g. 0 to 180 for a top half-ring). Every ' +
+      'other primitive needs no extra fields.\n' +
+      '- "material": EITHER one of these named presets — ' + MATERIALS_HINT + ' — OR, for anything that ' +
+      'isn\'t a real physical material (magic, moonlight, jelly, holographic, ghostly, a candy colour, ' +
+      'an aura, anything abstract), a literal "#rrggbb" hex that reads as the right colour instead. The ' +
+      'named presets are surface/colour shortcuts, not a category system — most concepts will NOT match ' +
+      'one, and that is expected; pick a hex.\n' +
+      '- "role": "body" or "attachment" for major anatomy/structure, "detail" or "accent" for small marks ' +
+      '(seeds, sparkles, tiny features) that should NOT compete with major anatomy for space — these are ' +
+      'tracked against a SEPARATE, more generous budget.\n' +
+      '- "importance": 1-5, where 5 is a defining, unmistakable feature and 1 is a minor flourish that ' +
+      'could be dropped without losing the concept.',
+
+    'Regions are painted in the ORDER you list them — a later region painted over an earlier one\'s cells ' +
+      'wins. Paint base/major shapes first, details and highlights last. Worked example, "wooden torch": ' +
+      'first a "rectangle" wood handle (id "handle", role body) around cx=0.5, cy=0.75, width=0.2, ' +
+      'height=0.4, then a "blob" fire (id "flame", role attachment) painted OVER the top of the handle ' +
+      'around cx=0.5, cy=0.35, width=0.35, height=0.35, then a smaller brighter "blob" fire core (id ' +
+      '"flame_core", role detail) painted over the middle of the flame.',
+
+    'Optionally, "relations": a list of {"subject":id,"relation":"attached_to"|"extends_from"|' +
+      '"centered_on","object":id} linking two region ids by EXACTLY one of these three verbs: ' +
+      '"attached_to" (subject is fixed onto object, e.g. a flame head attached_to a torch handle), ' +
+      '"extends_from" (subject grows/extends out of object, e.g. a stem extends_from a flower base), ' +
+      '"centered_on" (subject should be centered over object, e.g. a face centered_on a head). Add a ' +
+      'relation whenever one part should be attached to, extending from, or centered on another — this ' +
+      'keeps them touching even after your composition is rescaled to fit its size band. Omit ' +
+      '"relations" entirely for a simple item where nothing needs to connect. Do not invent other ' +
+      'relation verbs — only these three are understood. Worked example, the torch above: ' +
+      '{"subject":"flame","relation":"attached_to","object":"handle"}.',
+
+    'Use "line"/"point"/"arc" regions for DETAILS a filled shape cannot express — this matters most for ' +
+      'abstract or non-physical traits, and only once the base silhouette already reads. A request like ' +
+      '"magical strawberry" needs a recognizable berry body (blob) and leaf crown (a few small triangular ' +
+      '"triangle" shapes or an "arc") as its BASE, PLUS — as a detail added after that base is solid — ' +
+      'several small separate "point" regions (role accent, small width/height like 0.03-0.06) scattered ' +
+      'near — not on top of — the berry to read as magical sparkle, since "magical" has no physical shape ' +
+      'or material of its own.',
+
+    'Give the whole thing a "name" (short, cute).',
+
+    'Optionally, "face": a short list of {"x","y","glyph"} placing literal cute dot-face glyphs on top of ' +
+      `everything else, glyph one of: ${FACE_SET.join(' ')} — use this for a creature/pet\'s expression, ` +
+      'omit entirely for non-creature items.',
+
+    'Reply with JSON only, this exact shape:\n' +
+      '{"fit": true|false, "tokenHint": "plant|pets|clothing|vehicle|food|utensils|none", ' +
+      '"sensitive": true|false, "sizeAdjust": "smaller"|"default"|"bigger", ' +
+      '"width": number, "height": number, "name": string, "parts": [string, ...], ' +
+      '"regions": [{"id": string, "primitive": string, "bounds": {"cx":n,"cy":n,"width":n,"height":n,' +
+      '"rotation":n}, "cornerRadius":n, "topWidth":n, "bottomWidth":n, "startAngle":n, "endAngle":n, ' +
+      '"material": string, "role": string, "importance": 1-5}, ...] (rotation and the extra fields after ' +
+      'bounds are optional and primitive-specific — omit any that do not apply), ' +
+      '"relations": [{"subject":id,"relation":"attached_to"|"extends_from"|"centered_on","object":id}, ...] ' +
+      '(optional, omit if nothing needs to connect), ' +
+      '"face": [{"x":n,"y":n,"glyph":string}, ...] (optional, omit if not a creature)}',
+  ].join('\n\n');
 }
 
-export async function screenCraftPrompt(
+function isFaceMark(v: unknown): v is FaceMark {
+  if (!v || typeof v !== 'object') return false;
+  const f = v as Partial<FaceMark>;
+  return typeof f.x === 'number' && typeof f.y === 'number' && typeof f.glyph === 'string' && FACE_SET.includes(f.glyph);
+}
+
+function coerceRegions(v: unknown): RegionSpec[] {
+  if (!Array.isArray(v)) return [];
+  const out: RegionSpec[] = [];
+  const seenIds = new Map<string, number>();
+  for (let i = 0; i < v.length; i++) {
+    const r = v[i];
+    if (!r || typeof r !== 'object') continue;
+    const region = r as Record<string, unknown>;
+    const bounds = region.bounds as Record<string, unknown> | undefined;
+    if (!bounds) continue;
+    // id: default to a positional fallback when missing/empty, then
+    // de-duplicate repeated ids by suffixing — relation lookups need every
+    // id to be unambiguous, without requiring the model to guarantee
+    // uniqueness itself (same fail-open posture as the rest of this
+    // coercion function).
+    const baseId = typeof region.id === 'string' && region.id.trim() ? region.id.trim() : `region_${i}`;
+    const seenCount = seenIds.get(baseId) ?? 0;
+    const id = seenCount > 0 ? `${baseId}_${seenCount + 1}` : baseId;
+    seenIds.set(baseId, seenCount + 1);
+    // permissive coercion here — validateRegionPlan (spriteValidate.ts) does
+    // the real structural rejection; this just avoids throwing on obviously
+    // present-but-loosely-typed model output (e.g. a stringified number).
+    const width = Number(bounds.width);
+    // circle: CODE keeps width/height equal, never the model — confirmed
+    // live necessary, not just a nice-to-have: the model reliably omits or
+    // nulls "height" for circle (told to "set width only"), which coerced
+    // to 0 and failed validation every time. Force-mirroring here also
+    // makes true circularity an actual guarantee, not just a hope — before
+    // this, a circle with a model-supplied height!=width would silently
+    // render as an ellipse (toLocal scales u/v independently by width and
+    // height, so nothing upstream of this was actually enforcing it).
+    const height = region.primitive === 'circle' ? width : Number(bounds.height);
+    const spec: RegionSpec = {
+      id,
+      primitive: region.primitive as RegionSpec['primitive'],
+      bounds: {
+        cx: Number(bounds.cx), cy: Number(bounds.cy),
+        width, height,
+        ...(bounds.rotation !== undefined ? { rotation: Number(bounds.rotation) } : {}),
+      },
+      material: String(region.material ?? 'stone'),
+      role: (region.role as RegionSpec['role']) ?? 'detail',
+      importance: (Number(region.importance) || 3) as RegionSpec['importance'],
+    };
+    // primitive-specific optional params — only carried through when present
+    // and numeric, otherwise left absent so the renderer's own defaults
+    // apply (see PrimitiveParams / inPrimitive's ?? fallbacks).
+    if (region.cornerRadius !== undefined) spec.cornerRadius = Number(region.cornerRadius);
+    if (region.topWidth !== undefined) spec.topWidth = Number(region.topWidth);
+    if (region.bottomWidth !== undefined) spec.bottomWidth = Number(region.bottomWidth);
+    if (region.startAngle !== undefined) spec.startAngle = Number(region.startAngle);
+    if (region.endAngle !== undefined) spec.endAngle = Number(region.endAngle);
+    out.push(spec);
+  }
+  return out;
+}
+
+const VALID_RELATIONS: ReadonlySet<SpatialRelation> = new Set(['attached_to', 'extends_from', 'centered_on']);
+
+// Structural coercion only — valid verb, non-empty distinct subject/object.
+// Referential integrity (do these ids still exist after budget trimming?)
+// is checked later in validateRegionPlan (spriteValidate.ts), not here.
+function coerceRelations(v: unknown): ShapeRelation[] {
+  if (!Array.isArray(v)) return [];
+  const out: ShapeRelation[] = [];
+  for (const r of v) {
+    if (!r || typeof r !== 'object') continue;
+    const rel = r as Record<string, unknown>;
+    const subject = typeof rel.subject === 'string' ? rel.subject.trim() : '';
+    const object = typeof rel.object === 'string' ? rel.object.trim() : '';
+    const relation = rel.relation as SpatialRelation;
+    if (!subject || !object || subject === object) continue;
+    if (!VALID_RELATIONS.has(relation)) continue;
+    out.push({ subject, relation, object });
+  }
+  return out;
+}
+
+export async function planCraft(
   prompt: string,
   category: string,
   chat: VisionJSON,
   opts: { model?: string; fallbackModel?: string } = {},
-): Promise<CraftScreen> {
+): Promise<CraftPlan> {
+  const base = CATEGORY_SIZE_DEFAULT[category as CraftCategory] ?? 'medium';
+  const empty: CraftPlan = {
+    fit: true, sensitive: false, sizeAdjust: 'default', sizeClass: base,
+    name: '', width: 0, height: 0, parts: [], regions: [],
+  };
   try {
-    const r = await chat<{ fit?: unknown; tokenHint?: unknown; sensitive?: unknown; sizeClass?: unknown }>(
+    const r = await chat<Record<string, unknown>>(
       [
-        { role: 'system', content: screenPrompt() },
+        { role: 'system', content: planPrompt() },
         { role: 'user', content: `Token category: ${category}. Request: "${prompt}".` },
       ],
-      { model: opts.model, maxTokens: 60, thinking: { type: 'disabled' }, fallbackModel: opts.fallbackModel },
+      // 1000 -> 1500 (Stage 2): confirmed live-necessary, not precautionary —
+      // the richer per-region schema (bounds gained rotation, some
+      // primitives gained cornerRadius/topWidth/bottomWidth/startAngle/
+      // endAngle) pushes a genuinely detail-heavy plan (e.g. "acoustic
+      // guitar" with 6 individually-authored string regions) over the old
+      // budget, truncating mid-JSON and surviving neither attempt of the
+      // retry (both truncate the same way) — same failure shape and same
+      // fix as the original 700->1000 raise during Phase A. 1300 alone
+      // still occasionally clipped the trailing "relations" array on the
+      // same worst-case prompt; 1500 gave it comfortable headroom live.
+      { model: opts.model, temperature: 0.7, maxTokens: 1500, thinking: { type: 'disabled' }, fallbackModel: opts.fallbackModel },
     );
-    const s = r?.sizeClass;
+    const adj = r?.sizeAdjust;
+    const sizeClass = adjustSizeTier(base, adj === 'smaller' || adj === 'bigger' ? adj : 'default');
     return {
-      fit: r?.fit !== false, // anything unclear → permissive
+      fit: r?.fit !== false,
       tokenHint: typeof r?.tokenHint === 'string' && r.tokenHint !== 'none' ? r.tokenHint : undefined,
       sensitive: r?.sensitive === true,
-      sizeClass: s === 'small' || s === 'medium' || s === 'large' ? s : 'medium',
+      sizeAdjust: (adj === 'smaller' || adj === 'bigger' ? adj : 'default') as CraftPlan['sizeAdjust'],
+      sizeClass,
+      name: typeof r?.name === 'string' ? r.name.trim().slice(0, 24) : '',
+      width: Number(r?.width) || 0,
+      height: Number(r?.height) || 0,
+      parts: Array.isArray(r?.parts) ? (r.parts as unknown[]).filter((p): p is string => typeof p === 'string').slice(0, 8) : [],
+      regions: coerceRegions(r?.regions),
+      relations: coerceRelations(r?.relations),
+      face: Array.isArray(r?.face) ? (r.face as unknown[]).filter(isFaceMark) : undefined,
     };
   } catch {
-    return { fit: true, sensitive: false, sizeClass: 'medium' };
+    return empty; // fail-open on parse/network failure: caller sees regions:[] and routes into the retry/failure path, never crafts silently
   }
+}
+
+// ---------------------------------------------------------------------------
+// A small, narrow retry-guidance mapper for a failed plan — the failure
+// surface here (validateRegionPlan's errors) is small: canvas-size
+// mismatches can't happen any more (Stage 2's normalized bounds have
+// nothing to be "out of band"), so only genuinely broken region data or an
+// empty plan reach this.
+// ---------------------------------------------------------------------------
+export function planRetryGuidance(error: string): string {
+  if (/no regions/.test(error)) return ' You must include at least one region.';
+  if (/structurally invalid region/.test(error))
+    return ' Every region needs a valid "primitive" (rectangle|rounded_rectangle|circle|ellipse|triangle|' +
+      'trapezoid|diamond|semicircle|arc|line|point|blob), a valid "role" (body|attachment|detail|accent), ' +
+      'an integer "importance" 1-5, a valid "material" (a named preset or a #rrggbb hex), numeric ' +
+      '"bounds" with cx/cy/width/height all in 0..1, and — for trapezoid/arc — their required extra fields.';
+  if (/no regions survived/.test(error)) return ' Provide more than one region so the plan is not empty after trimming.';
+  return '';
 }
 
 // ---------------------------------------------------------------------------
@@ -272,6 +342,14 @@ export async function screenCraftPrompt(
 // distinct creative directions of equal quality — not one real fix plus two
 // downgraded echoes of it, which is what a naive "give 3 alternatives" prompt
 // produces. The caller shuffles the result so no option reads as "first".
+//
+// Every option has to actually be CRAFTABLE, because clicking one runs the
+// full pipeline again (CraftModal's onPickAlt → startCraft) — an option that
+// fails a second time is worse than no option at all. Two things enforce
+// that: the prompt spells out what this generator can actually draw, and the
+// returned options are filtered through the same local content policy the
+// craft path uses, so a suggestion can never lead to a refusal. Five are
+// requested and three kept, leaving headroom for that filter.
 // ---------------------------------------------------------------------------
 
 export interface CraftSuggestions {
@@ -293,236 +371,48 @@ export async function suggestAlternatives(
           role: 'system',
           content:
             'You are Mitchy, a cozy, witty shopkeeper CAT in Asciia Bay, a cozy ASCII island-village game. A craft attempt ' +
-            'just failed and you propose three alternatives the player can pick instead. Ground your ' +
+            'just failed and you propose alternatives the player can pick instead. Ground your ' +
             'intro in the TECHNICAL REASON given (e.g. "too tall" means the motif did not fit the ' +
             'sprite size): one playful lowercase line naming what was too much, under 18 words, no ' +
-            'emoji. Then exactly 3 options, each 3-8 words, each a craftable description staying ' +
-            'CLOSE to the player\'s idea and fitting the token category. Each option MUST use a ' +
-            'different repair strategy: ' +
+            'emoji. Then exactly 5 options, each 3-8 words, each staying CLOSE to the player\'s idea. ' +
+            'The first 3 MUST each use a different repair strategy: ' +
             '(A) REDUCE — keep the subject, shrink the overloaded element (e.g. one hat instead of three); ' +
             '(B) REARRANGE — keep ALL the elements, change the composition so it fits (e.g. hats lined up beside, not stacked); ' +
             '(C) REFOCUS — keep the theme, shift the subject or perspective (e.g. the stack of hats itself as the item). ' +
+            'The last 2 are spares in the same spirit. ' +
             'Each must be independently appealing — if any reads like a plain downgrade of another, ' +
-            'rewrite it before answering. Do not number or rank them. ' +
-            'Reply with JSON only: {"intro": "...", "options": ["...", "...", "..."]}.',
+            'rewrite it before answering. Do not number or rank them.\n\n' +
+            'CRAFTABLE is a hard requirement — each option is drawn as a SMALL ASCII sprite on a ' +
+            'character grid, so every one must be: a SINGLE concrete physical object (not a scene, ' +
+            'not two things, not a stack); compact in silhouette, roughly as wide as it is tall; ' +
+            'recognisable from its outline alone; and family-friendly. Never suggest text, letters, ' +
+            'numbers, logos, an abstract concept, an emotion, a place, an action, or anything gory, ' +
+            'sexual or weapon-like — none of those can be drawn or would be allowed. ' +
+            'Reply with JSON only: {"intro": "...", "options": ["...", "...", "...", "...", "..."]}.',
         },
         {
           role: 'user',
-          content: `Token category: ${category}. The player asked for: "${prompt}". Technical failure reason: ${failReason}.`,
+          // A hint, not a constraint — the universal token crafts anything, so
+          // this only says what the player seemed to be reaching for.
+          content: `The player seemed to want something in the "${category}" vein. They asked for: "${prompt}". Technical failure reason: ${failReason}.`,
         },
       ],
-      { model: opts.model, temperature: 0.8, maxTokens: 180, thinking: { type: 'disabled' }, fallbackModel: opts.fallbackModel },
+      { model: opts.model, temperature: 0.8, maxTokens: 260, thinking: { type: 'disabled' }, fallbackModel: opts.fallbackModel },
     );
     const intro = typeof r?.intro === 'string' ? r.intro.trim() : '';
-    const options = Array.isArray(r?.options)
-      ? r.options.filter((o): o is string => typeof o === 'string' && o.trim().length > 0).map((o) => o.trim()).slice(0, 3)
-      : [];
-    if (!intro || options.length < 3) return null;
-    // shuffle so the model's own left-to-right ordering bias can't make one
-    // option look like "the real fix" and the others like consolation prizes
+    const options = (Array.isArray(r?.options) ? r.options : [])
+      .filter((o): o is string => typeof o === 'string' && o.trim().length > 0)
+      .map((o) => o.trim())
+      .filter((o) => checkPolicy(o).allowed)
+      .filter((o) => o.length <= 60)
+      .slice(0, 3);
+    if (!intro || options.length < 1) return null;
     for (let i = options.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [options[i], options[j]] = [options[j], options[i]];
     }
     return { intro, options };
   } catch {
-    return null; // caller degrades to a plain error reply, no buttons
-  }
-}
-
-// ---------------------------------------------------------------------------
-// "Generate half, mirror the rest" — for bilaterally-symmetric subjects, the
-// model draws only the LEFT HALF of each row (last char = the shared center
-// column, never duplicated); we mirror+join it here. Halves typical sprite-
-// body output tokens and guarantees perfect symmetry (a common LLM ASCII
-// failure mode). Flip pairs are direction-sensitive glyphs; everything else
-// (including FACE_SET) self-maps.
-// ---------------------------------------------------------------------------
-
-const MIRROR_PAIRS: Record<string, string> = { '/': '\\', '\\': '/', '(': ')', ')': '(', '<': '>', '>': '<' };
-
-export function mirrorHalfLine(half: string): string {
-  if (half.length === 0) return half; // malformed empty half — width check catches it downstream
-  const center = half[half.length - 1];
-  const left = half.slice(0, -1);
-  const flipped = [...left].reverse().map((ch) => MIRROR_PAIRS[ch] ?? ch).join('');
-  return left + center + flipped;
-}
-
-// ---------------------------------------------------------------------------
-// Incremental wire-format parser. Consumes raw stream deltas and emits events
-// the moment each line is complete, so a sprite row can be validated (and
-// rendered) without waiting for the full response.
-//   state machine: header (NAME:) → lines (until END) → done (PARTS:)
-// Anything before NAME:/LINES: (stray prose, code fences) is ignored.
-// ---------------------------------------------------------------------------
-
-export type ParsedEvent =
-  | { type: 'name'; name: string }
-  | { type: 'line'; text: string; index: number }
-  | { type: 'end' }
-  | { type: 'parts'; parts: string[] }
-  | { type: 'layout'; layout: string }
-  | { type: 'symmetry'; mode: 'mirror' | 'none' };
-
-export class SpriteLineStream {
-  private state: 'header' | 'lines' | 'done' = 'header';
-  private buf = '';
-  private index = 0;
-  private symmetry: 'mirror' | 'none' = 'none';
-
-  feed(delta: string): ParsedEvent[] {
-    this.buf += delta;
-    const out: ParsedEvent[] = [];
-    let nl;
-    while ((nl = this.buf.indexOf('\n')) >= 0) {
-      const line = this.buf.slice(0, nl).replace(/\r$/, '');
-      this.buf = this.buf.slice(nl + 1);
-      this.dispatch(line, out);
-    }
-    return out;
-  }
-
-  // flush a trailing unterminated line at EOF (typically the PARTS: footer)
-  finish(): ParsedEvent[] {
-    const out: ParsedEvent[] = [];
-    if (this.buf.length > 0) {
-      this.dispatch(this.buf.replace(/\r$/, ''), out);
-      this.buf = '';
-    }
-    return out;
-  }
-
-  private dispatch(line: string, out: ParsedEvent[]) {
-    if (this.state === 'header') {
-      const t = line.trim();
-      if (t.startsWith('PARTS:')) {
-        out.push({
-          type: 'parts',
-          parts: t.slice(6).split('|').map((s) => s.trim()).filter(Boolean).slice(0, 6),
-        });
-      } else if (t.startsWith('LAYOUT:')) out.push({ type: 'layout', layout: t.slice(7).trim().slice(0, 160) });
-      else if (t.startsWith('SYMMETRY:')) {
-        const mode = t.slice(9).trim().toLowerCase() === 'mirror' ? 'mirror' : 'none';
-        this.symmetry = mode; // remembered for the 'lines' state below
-        out.push({ type: 'symmetry', mode });
-      } else if (t.startsWith('NAME:')) out.push({ type: 'name', name: t.slice(5).trim().slice(0, 24) });
-      else if (t === 'LINES:') this.state = 'lines';
-      // anything else before LINES: is ignored
-    } else if (this.state === 'lines') {
-      if (line.trim() === 'END') {
-        this.state = 'done';
-        out.push({ type: 'end' });
-      } else {
-        // do NOT trim — trailing spaces are part of the sprite grid. Mirror
-        // happens HERE, before the line is ever emitted, so every downstream
-        // consumer (checkLine, onLine, fail-fast abort) only ever sees the
-        // full, already-mirrored row — no changes needed anywhere else.
-        const text = this.symmetry === 'mirror' ? mirrorHalfLine(line) : line;
-        out.push({ type: 'line', text, index: this.index++ });
-      }
-    } else {
-      // tolerate a trailing PARTS: after END (old-format compatibility)
-      const t = line.trim();
-      if (t.startsWith('PARTS:')) {
-        out.push({
-          type: 'parts',
-          parts: t.slice(6).split('|').map((s) => s.trim()).filter(Boolean).slice(0, 6),
-        });
-      }
-    }
-  }
-}
-
-// One STREAMING generation attempt. Sprite lines are validated the moment they
-// arrive; the first bad line aborts the in-flight request (fail fast — no
-// tokens wasted finishing a doomed response). Returns either the sprite or an
-// error string that feeds the retry-hint mechanism.
-export async function generateSprite(
-  prompt: string,
-  category: string,
-  referenceImage: string | null,
-  chatStream: ChatStreamFn,
-  opts: {
-    model?: string;
-    fallbackModel?: string;
-    retryHint?: string;
-    sizeClass?: SizeClass;
-    onLine?: (line: string, index: number) => void; // progressive rendering hook
-  } = {},
-): Promise<{ sprite: GeneratedSprite } | { error: string }> {
-  const hasImage = !!referenceImage;
-  // The system prompt is pure/static — a perfect prompt-cache prefix. The
-  // cache_control breakpoint makes every craft after the first read the
-  // system prompt from cache (~11x cheaper on that span; verified live).
-  const messages: VMessage[] = [
-    {
-      role: 'system',
-      content: [{ type: 'text', text: systemPrompt(hasImage), cache_control: { type: 'ephemeral' } }],
-    },
-  ];
-  if (hasImage) {
-    messages.push({
-      role: 'user',
-      content: [
-        { type: 'text', text: userText(prompt, category, true, opts.retryHint, opts.sizeClass) },
-        { type: 'image_url', image_url: { url: referenceImage as string } },
-      ],
-    });
-  } else {
-    messages.push({ role: 'user', content: userText(prompt, category, false, opts.retryHint, opts.sizeClass) });
-  }
-
-  const controller = new AbortController();
-  const parser = new SpriteLineStream();
-  let name = 'Crafted Thing';
-  let parts: string[] = [];
-  let layout: string | undefined;
-  let symmetry: 'mirror' | 'none' = 'none';
-  const lines: string[] = [];
-  let ended = false;
-
-  const handle = (events: ParsedEvent[]): string | null => {
-    for (const ev of events) {
-      if (ev.type === 'name') name = ev.name || name;
-      else if (ev.type === 'end') ended = true;
-      else if (ev.type === 'parts') parts = ev.parts;
-      else if (ev.type === 'layout') layout = ev.layout;
-      else if (ev.type === 'symmetry') symmetry = ev.mode;
-      else if (ev.type === 'line' && !ended) {
-        const check = checkLine(ev.text);
-        if (!check.ok) return check.error ?? 'bad line';
-        lines.push(ev.text);
-        opts.onLine?.(ev.text, ev.index);
-      }
-    }
     return null;
-  };
-
-  try {
-    // thinking disabled: this is direct transcription, not a reasoning task.
-    // Generous budget as headroom — with streaming + fail-fast the real cost
-    // is bounded by aborting early, not by the ceiling.
-    const stream = chatStream(messages, {
-      model: opts.model,
-      maxTokens: 6000,
-      thinking: { type: 'disabled' },
-      signal: controller.signal,
-      fallbackModel: opts.fallbackModel,
-    });
-    for await (const delta of stream) {
-      const bad = handle(parser.feed(delta));
-      if (bad) {
-        controller.abort(); // fail fast — stop the model mid-generation
-        return { error: bad };
-      }
-    }
-    const bad = handle(parser.finish());
-    if (bad) return { error: bad };
-  } catch (e) {
-    return { error: `stream failed: ${(e as Error)?.message ?? e}` };
   }
-
-  if (lines.length === 0) return { error: 'no sprite lines received' };
-  return { sprite: { name, sizeClass: 'medium', parts, layout, symmetry, lines } };
 }

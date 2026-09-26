@@ -22,7 +22,39 @@ entry: Cloudflare's build image runs pnpm 10, which rejects the file without
 it ("packages field missing or empty"), while pnpm 11 locally needs the file
 for the esbuild build permission (`allowBuilds`).
 
-## One-time setup (~15 min)
+## Workers or Pages?
+
+The repo works with both:
+
+- **Workers** (Cloudflare's recommended option, used now): `wrangler.jsonc`
+  serves `dist/` and routes `/api/chat/completions` to `worker/index.ts`.
+- **Pages**: uses `functions/` automatically and ignores the Worker files.
+
+Both run the same proxy code (`functions/api/chat/completions.ts`).
+
+## Setup as a Worker
+
+1. **Workers & Pages → Create application → Import a repository** →
+   `h4axb/ascii-village`.
+2. **Settings:**
+   | Field | Value |
+   |---|---|
+   | Project / Worker name | `asciia-bay-2` (must match `name` in `wrangler.jsonc`) |
+   | Build command | `pnpm run build` |
+   | Deploy command | `npx wrangler deploy` |
+   | Root directory | *(leave empty)* |
+3. **Deploy.** The log should end with a `…workers.dev` URL.
+4. **Add the key:** Worker → **Settings → Variables and Secrets → Add** →
+   type **Secret**, name `LLM_API_KEY`. Secrets apply immediately; no
+   redeploy needed.
+5. **Set a spending limit** in the Requesty dashboard.
+
+To rename the Worker, change `name` in `wrangler.jsonc` to the same value.
+
+Test locally: create `.dev.vars` with `LLM_API_KEY=...` (git-ignored), run
+`pnpm run build`, then `npx wrangler dev`.
+
+## Setup as Pages (alternative, ~15 min)
 
 1. **Create a Cloudflare account** at <https://dash.cloudflare.com/sign-up> (free plan).
 2. **Workers & Pages → Create → Pages → Connect to Git.** Authorize GitHub and

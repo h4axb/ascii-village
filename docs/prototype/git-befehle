@@ -1,0 +1,2 @@
+# check latest commit
+git show --stat HEAD

@@ -5,3 +5,7 @@ dist
 .env
 .env.local
 .env.*.local
+
+# Cloudflare Wrangler: local secrets and cache
+.dev.vars
+.wrangler

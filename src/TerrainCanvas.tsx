@@ -37,6 +37,16 @@ const bucket = (r: number) => RES_STEPS.find((s) => s >= r * 0.92) ?? 2;
 // just never report it.
 const isLost = (ctx: CanvasRenderingContext2D | null) =>
   !ctx || !!(ctx as unknown as { isContextLost?: () => boolean }).isContextLost?.();
+
+// Detach a tile AND hand its pixel memory back now. A removed canvas keeps
+// its backing store until garbage collection; Safari (and Chrome under GPU
+// pressure) counts that against a total canvas budget and, once over it,
+// renders new canvases blank — glyphs "vanish" after a minute of walking.
+const freeCanvas = (el: HTMLCanvasElement) => {
+  el.remove();
+  el.width = 0;
+  el.height = 0;
+};
 const FOAM_TICKS = 2; // foam advances one phase every 2 caustic ticks
 const MAX_CAUSTIC_CELLS = 90_000; // zoomed far out the shimmer is invisible anyway
 
@@ -104,7 +114,7 @@ export default function TerrainCanvas(props: Props) {
   useEffect(() => {
     const s = st.current;
     s.keep = grassKeepOut(props.growthWindow);
-    for (const t of s.tiles.values()) t.el.remove();
+    for (const t of s.tiles.values()) freeCanvas(t.el);
     s.tiles.clear();
     schedule();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,7 +135,10 @@ export default function TerrainCanvas(props: Props) {
     el.height = Math.ceil((y1 - y0) * lineH * res);
     el.style.cssText = `position:absolute;left:${x0}ch;top:${y0}em;width:${x1 - x0}ch;height:${y1 - y0}em;pointer-events:none`;
     const ctx = el.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      el.width = el.height = 0;
+      return;
+    }
     ctx.scale(res, res);
     ctx.font = `${lineH}px ${s.font}`;
     ctx.textAlign = 'center';
@@ -160,8 +173,11 @@ export default function TerrainCanvas(props: Props) {
       schedule();
     });
     const old = s.tiles.get(ti);
-    if (old) old.el.replaceWith(el);
-    else tilesRef.current?.appendChild(el);
+    if (old) {
+      old.el.replaceWith(el);
+      old.el.width = 0;
+      old.el.height = 0;
+    } else tilesRef.current?.appendChild(el);
     s.tiles.set(ti, { el, ctx, res });
   }
 
@@ -201,7 +217,7 @@ export default function TerrainCanvas(props: Props) {
       const ty = (ti / TILES_X) | 0;
       // one ring of slack only: kept tiles are what fills GPU memory
       if (tx < tx0 - 1 || tx > tx1 + 1 || ty < ty0 - 1 || ty > ty1 + 1) {
-        t.el.remove();
+        freeCanvas(t.el);
         s.tiles.delete(ti);
       }
     }

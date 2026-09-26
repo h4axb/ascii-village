@@ -10,12 +10,28 @@
 // out from the user's page. Most providers (Groq, OpenRouter, Together) send
 // CORS headers and work directly. OpenAI's api.openai.com does NOT allow
 // direct browser calls — for GPT you'd need a tiny server/proxy in front.
-// Also note: any key shipped to the browser is visible to users. Fine for a
-// local/personal project; use a backend proxy for anything public.
+// Any key shipped to the browser is visible to users, so production builds
+// don't ship one: they go through the /api proxy (see below and
+// docs/Deploy-Cloudflare.md).
 // ---------------------------------------------------------------------------
 
-const API_KEY = import.meta.env.VITE_LLM_API_KEY?.trim() ?? '';
-const BASE_URL = (import.meta.env.VITE_LLM_BASE_URL?.trim() || 'https://router.requesty.ai/v1').replace(/\/$/, '');
+// Two modes:
+//   dev  (`npm run dev`)  — calls the provider directly with VITE_LLM_API_KEY
+//                           from .env, same as always. Local only.
+//   prod (`npm run build`) — calls this site's own /api proxy (a Cloudflare
+//                           Pages Function, see functions/api/), which adds
+//                           the key server-side. The key is NEVER read in a
+//                           production build: `import.meta.env.DEV` is replaced
+//                           with `false` at build time and the dead branch is
+//                           dropped, so even a stray .env can't leak it into
+//                           the public bundle.
+// VITE_LLM_DISABLED=1 at build time ships a build with the mock/offline
+// behavior instead (no proxy calls at all).
+const API_KEY = import.meta.env.DEV ? (import.meta.env.VITE_LLM_API_KEY?.trim() ?? '') : '';
+const BASE_URL = import.meta.env.DEV
+  ? (import.meta.env.VITE_LLM_BASE_URL?.trim() || 'https://router.requesty.ai/v1').replace(/\/$/, '')
+  : '/api';
+const authHeader = (): Record<string, string> => (API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {});
 
 // ONE model for everything (user directive): sprite generation, fun facts,
 // Mitchy's dialogue/chat, size classification — all google/gemini-2.5-flash-lite
@@ -40,9 +56,12 @@ export const MODELS = {
   smartFallback: MODEL_SMART_FALLBACK,
 } as const;
 
-// True only when a key is present. Callers use this to decide whether to hit
-// the API or fall back to their built-in mock behavior.
-export const llmEnabled = API_KEY.length > 0;
+// Callers use this to decide whether to hit the API or fall back to their
+// built-in mock behavior. Dev: only when a key is present. Prod: on (the
+// proxy holds the key) unless the build opted out with VITE_LLM_DISABLED=1.
+export const llmEnabled = import.meta.env.DEV
+  ? API_KEY.length > 0
+  : import.meta.env.VITE_LLM_DISABLED !== '1';
 
 // A message part — text, or an image (data URL or https URL). Vision-capable
 // models (Claude via the gateway) accept an array of parts as `content`.
@@ -85,7 +104,7 @@ async function chatOnce(messages: ChatMessage[], opts: ChatOptions, model: strin
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${API_KEY}`,
+        ...authHeader(),
       },
       signal: controller.signal,
       body: JSON.stringify({
@@ -124,7 +143,7 @@ async function chatOnce(messages: ChatMessage[], opts: ChatOptions, model: strin
 // callers can catch and fall back to a mock. Retries once with
 // `opts.fallbackModel`, if set, before throwing.
 export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<string> {
-  if (!llmEnabled) throw new Error('LLM not configured (no VITE_LLM_API_KEY).');
+  if (!llmEnabled) throw new Error('LLM not configured (no VITE_LLM_API_KEY / VITE_LLM_DISABLED=1).');
   const primary = opts.model ?? MODELS.fast;
   try {
     return await chatOnce(messages, opts, primary);
@@ -166,7 +185,7 @@ async function* chatStreamOnce(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${API_KEY}`,
+        ...authHeader(),
       },
       signal: controller.signal,
       body: JSON.stringify({
@@ -227,7 +246,7 @@ export async function* chatStream(
   messages: ChatMessage[],
   opts: StreamChatOptions = {},
 ): AsyncGenerator<string, void, void> {
-  if (!llmEnabled) throw new Error('LLM not configured (no VITE_LLM_API_KEY).');
+  if (!llmEnabled) throw new Error('LLM not configured (no VITE_LLM_API_KEY / VITE_LLM_DISABLED=1).');
   const primary = opts.model ?? MODELS.fast;
   let yieldedAny = false;
   try {

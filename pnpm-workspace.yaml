@@ -1,2 +1,11 @@
+# Single-package repo. `packages` is required by pnpm 10 (Cloudflare's build
+# image) whenever this file exists; pnpm 11 reads build permissions from here.
+packages:
+  - .
+
+# Allow esbuild's install script. pnpm 11 reads `allowBuilds`,
+# pnpm 10 reads `onlyBuiltDependencies`.
 allowBuilds:
   esbuild: true
+onlyBuiltDependencies:
+  - esbuild

@@ -27,8 +27,16 @@ const TW = 64; // tile width, chars
 const TH = 32; // tile height, lines
 const TILES_X = Math.ceil(GROUND_W / TW);
 const TILES_Y = Math.ceil(GROUND_H / TH);
-const RES_STEPS = [0.5, 0.75, 1, 1.5, 2, 3];
-const bucket = (r: number) => RES_STEPS.find((s) => s >= r * 0.92) ?? 3;
+// Capped at 2x: a 3x tile is ~2.3x the memory for no visible gain on ground
+// texture, and GPU memory pressure is what makes browsers drop canvases.
+const RES_STEPS = [0.5, 0.75, 1, 1.5, 2];
+const bucket = (r: number) => RES_STEPS.find((s) => s >= r * 0.92) ?? 2;
+
+// Browsers may silently wipe a canvas's pixels under GPU memory pressure
+// ("context lost"). Chrome 99+ exposes it on the 2D context; older engines
+// just never report it.
+const isLost = (ctx: CanvasRenderingContext2D | null) =>
+  !ctx || !!(ctx as unknown as { isContextLost?: () => boolean }).isContextLost?.();
 const FOAM_TICKS = 2; // foam advances one phase every 2 caustic ticks
 const MAX_CAUSTIC_CELLS = 90_000; // zoomed far out the shimmer is invisible anyway
 
@@ -58,7 +66,7 @@ export default function TerrainCanvas(props: Props) {
   const ovRef = useRef<HTMLCanvasElement>(null);
   const st = useRef({
     props,
-    tiles: new Map<number, { el: HTMLCanvasElement; res: number }>(),
+    tiles: new Map<number, { el: HTMLCanvasElement; ctx: CanvasRenderingContext2D; res: number }>(),
     queue: [] as number[],
     raf: 0,
     keep: null as Uint8Array | null,
@@ -67,8 +75,8 @@ export default function TerrainCanvas(props: Props) {
   });
   st.current.props = props;
 
-  // 1. colour layer — painted once
-  useEffect(() => {
+  // 1. colour layer — painted once, and again if the browser ever wipes it
+  function paintBg() {
     const c = bgRef.current;
     const ctx = c?.getContext('2d');
     if (!c || !ctx) return;
@@ -78,6 +86,13 @@ export default function TerrainCanvas(props: Props) {
     const img = ctx.createImageData(f.bgW, f.bgH);
     img.data.set(f.bg);
     ctx.putImageData(img, 0, 0);
+  }
+  useEffect(() => {
+    paintBg();
+    const c = bgRef.current;
+    c?.addEventListener('contextrestored', paintBg);
+    return () => c?.removeEventListener('contextrestored', paintBg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // font of the world text, so canvas glyphs match the DOM sprites
@@ -134,10 +149,20 @@ export default function TerrainCanvas(props: Props) {
         ctx.fillText(GLYPHS[g], (x - x0 + 0.5) * charW, (y - y0 + 0.5) * lineH);
       }
     }
+    // a wiped tile gets redrawn (res -1 forces it back into the queue)
+    const onLost = () => {
+      const t = st.current.tiles.get(ti);
+      if (t && t.el === el) t.res = -1;
+    };
+    el.addEventListener('contextlost', onLost);
+    el.addEventListener('contextrestored', () => {
+      onLost();
+      schedule();
+    });
     const old = s.tiles.get(ti);
     if (old) old.el.replaceWith(el);
     else tilesRef.current?.appendChild(el);
-    s.tiles.set(ti, { el, res });
+    s.tiles.set(ti, { el, ctx, res });
   }
 
   function currentRes() {
@@ -160,7 +185,7 @@ export default function TerrainCanvas(props: Props) {
       for (let tx = tx0; tx <= tx1; tx++) {
         const ti = ty * TILES_X + tx;
         const t = s.tiles.get(ti);
-        if (!t || t.res !== res) want.push(ti);
+        if (!t || t.res !== res || isLost(t.ctx)) want.push(ti);
       }
     }
     // nearest to the screen centre first
@@ -174,7 +199,8 @@ export default function TerrainCanvas(props: Props) {
     for (const [ti, t] of s.tiles) {
       const tx = ti % TILES_X;
       const ty = (ti / TILES_X) | 0;
-      if (tx < tx0 - 2 || tx > tx1 + 2 || ty < ty0 - 2 || ty > ty1 + 2) {
+      // one ring of slack only: kept tiles are what fills GPU memory
+      if (tx < tx0 - 1 || tx > tx1 + 1 || ty < ty0 - 1 || ty > ty1 + 1) {
         t.el.remove();
         s.tiles.delete(ti);
       }
@@ -197,12 +223,19 @@ export default function TerrainCanvas(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.camX, props.camY, props.viewW, props.viewH, props.zoom, props.scale, props.charW, props.lineH]);
 
-  useEffect(
-    () => () => {
+  // Watchdog: not every engine fires 'contextlost', so every 2s re-check
+  // that the colour layer and the visible tiles still have their pixels.
+  useEffect(() => {
+    const iv = window.setInterval(() => {
+      if (isLost(bgRef.current?.getContext('2d') ?? null)) paintBg();
+      schedule();
+    }, 2000);
+    return () => {
+      window.clearInterval(iv);
       if (st.current.raf) cancelAnimationFrame(st.current.raf);
-    },
-    [],
-  );
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 3. motion overlay
   useEffect(() => {

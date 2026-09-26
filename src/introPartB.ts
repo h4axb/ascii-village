@@ -85,17 +85,7 @@ export const DEPARTURE_LINES: { speaker: string; text: string }[] = [
 ];
 
 export const MAP_KEY = 'm';
-export const MAP_CHAR_MARKER_SIZE_PX = 14;
-// World TILE units (same grid as player.x/y, Ent.x/y and every scene marker)
-// -> map overview px. NOTE: originally authored as a ch/em multiplier
-// (0.14); re-derived against actual world TILE units instead, since every
-// coordinate GameMap.tsx actually has on hand (player/Mitchy positions,
-// STRUCT_ENTS positions, scene markers) is already in tiles, not ch/em — see
-// GameMap.tsx's worldToMapPx(). Value picked so the full MAP_W×MAP_H (130×145
-// tile) map renders at a comfortably screen-filling ~550×610px.
-export const MAP_OVERVIEW_SCALE = 4.2;
-export const MAP_OVERVIEW_PADDING_PX = 24;
-export const MAP_CHAR_MARKER_SIZE_PX_MITCHY = 14;
+// (Map sizing/zoom lives in GameMap.tsx.)
 
 // World asset categories drawn on the semi-static map layer. Anything not
 // listed here is skipped for map-readability reasons (flowers, grass

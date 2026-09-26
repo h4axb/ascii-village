@@ -4227,7 +4227,7 @@ function Game() {
       )}
 
       {/* ---- the M map overlay ---- */}
-      <GameMap open={mapOpen} onClose={() => setMapOpen(false)} characters={mapCharacters} />
+      <GameMap open={mapOpen} onClose={() => setMapOpen(false)} characters={mapCharacters} ents={ents} />
 
       {modal && (
         <div

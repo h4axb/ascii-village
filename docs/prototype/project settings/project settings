@@ -6,15 +6,16 @@
 ## Project structure
 + rendering: vite, water as canvas
 + libraries: vite, react 
-+ assets: 
++ assets: uploaded svg (assets), rendered in json (src/data)
+First the text signs in json are translated to letters and each letter has a predefined color (ColoredSprite.tsx). 
 
 ## Deployment
-+ hosting provider: cloudflare
++ hosting provider: cloudflare (https://dash.cloudflare.com/c09514d3d422733cfb67e78b94475238/workers/services/view/asciia-bay-2/production)
 + platform: workers (more flexible setup), config file: wrangler.jsonc
 + package manager: pnpm (takes less storage)
 
 
 ## LLM
-+ llm provider: requesty
++ llm provider: requesty (https://app.requesty.ai/api-keys/32d9d7d5-566f-4fae-92d0-3aeedbf540d8)
 + model: model google/gemini-2.5-flash-lite
 + Cost: Cloudflare free plan (100k requests/day); LLM billed by Requesty

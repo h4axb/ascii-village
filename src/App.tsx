@@ -7,13 +7,6 @@ import {
   MAP_H,
   GROUND_W,
   GROUND_H,
-  genLandLayers,
-  OCEAN_BASE,
-  OCEAN_SHALLOW,
-  oceanCaustics,
-  OCEAN_CFG,
-  SHORE_FRAMES,
-  SHORE_CFG,
   isWater,
   STRUCT_ENTS,
   wildSpawns,
@@ -26,11 +19,11 @@ import {
   tileBoxesOverlap,
   near,
   nearestIsland,
-  visualTerrainColorAt,
   spriteTiles,
   PALM_SCALE,
   GARDEN_BED_SCALE,
 } from './world';
+import TerrainCanvas from './TerrainCanvas';
 import type { Ent, ItemType, EntityKind } from './world';
 import {
   getFunFact,
@@ -83,7 +76,7 @@ import { SunIcon, MoonIcon, CoinIcon, SaveIcon } from './icons';
 import gearIcon from './assets/gear.svg';
 import inventoryIcon from './assets/inventory.svg';
 import handSlotIcon from './assets/hand_slot.svg';
-import { ColoredSprite } from './ColoredSprite';
+import { ColoredSprite, darken } from './ColoredSprite';
 import { useLayoutTool } from './devLayout';
 import { useWorldAssetTool } from './devWorldAssets';
 import { useSceneMarkerTool } from './devSceneMarkers';
@@ -985,10 +978,6 @@ function Game() {
 
   // ---- derived world: structures + windowed wild spawns − exceptions ----
   const growthWindow = growthWindowOf(wt);
-  // The ground's grass is masked against the wild flora, which moves each
-  // growth window — so the layers are rebuilt when the window turns over
-  // (every 6 in-game hours), not every render.
-  const landLayers = useMemo(() => genLandLayers(growthWindow), [growthWindow]);
   const ents = useMemo(
     () => [
       // `place`/`devScale` are empty except while the dev layout tool is being
@@ -3588,14 +3577,17 @@ function Game() {
                   transition: worldTransition, // matches the rig, keeps lockstep
                 }}
               >
-              <CoastBackgroundLayer />
-              <OceanLayer camX={camX} camY={camY} viewW={viewW} viewH={viewH} />
-              {landLayers.map((l) => (
-                <pre key={l.region} className={'ground region-' + l.region}>
-                  {l.text}
-                </pre>
-              ))}
-              <ShoreLayer />
+              <TerrainCanvas
+                camX={camX}
+                camY={camY}
+                viewW={viewW}
+                viewH={viewH}
+                zoom={zoom}
+                scale={dims.scale}
+                charW={dims.charW}
+                lineH={dims.lineH}
+                growthWindow={growthWindow}
+              />
 
 
               {/* garden: the baked bed (picket fence + soil), then a sprite per
@@ -3718,7 +3710,13 @@ function Game() {
               {ents
                 .filter((e) => e.kind === 'pond' && !(import.meta.env.DEV && worldAssetTool.removedStructIds.has(e.id)))
                 .map((e) => (
-                  <PondLayer key={e.id} ent={e} />
+                  <PondLayer
+                    key={e.id}
+                    ent={e}
+                    charW={dims.charW}
+                    lineH={dims.lineH}
+                    res={dims.scale * zoom * (window.devicePixelRatio || 1)}
+                  />
                 ))}
 
               {ents.map((e) => {
@@ -5047,131 +5045,6 @@ function StoragePanel({
   );
 }
 
-// The open ocean: a STATIC base lattice with caustic light drifting over it.
-//
-// `t` only ever counts up — it is never wrapped or passed through a sine — so
-// the water always moves forward. There is no frame list to cycle: each tick
-// builds the caustic layers for the current offset. The base lattice has no
-// drift term, so it is rendered once and never rebuilt.
-//
-// Self-contained, so the animation re-renders only this layer and not the whole
-// game. prefers-reduced-motion leaves it on frame 0.
-//
-// camX/camY/viewW/viewH are the CURRENT camera rect (ground chars/lines, same
-// units as GROUND_W/GROUND_H — see clampCam in the parent), read fresh every
-// render but only USED every OCEAN_CFG.driftMs tick (via boundsRef, not a
-// useMemo dependency) — otherwise recomputing on every pixel of camera motion
-// would defeat the whole point of throttling this to an interval. Restricting
-// oceanCaustics to roughly what's on screen is what keeps its cost flat as
-// the map grows — see that function's own comment for the measured cost
-// without this (worse than its own redraw interval on the current map size).
-// A REAL background per visual-terrain band (world.ts's
-// visualTerrainColorAt/VISUAL_TERRAIN_BG), painted underneath every other
-// ground/ocean layer — not just another glyph `color:`, an actual filled
-// canvas, so the band shows through wherever the sparse ASCII texture above
-// it doesn't cover.
-//
-// Painted at CHARACTER resolution (GROUND_W x GROUND_H, one canvas pixel per
-// character cell) using visualTerrainColorAt's CONTINUOUS nd->colour blend
-// (same VISUAL_TERRAIN_BG stop colours as before, just interpolated between
-// them instead of stepped) — a flat step-per-band fill visually dominated
-// the coastline transition no matter how much glyph texture sat on top of
-// it, because the whole ring shared just two or three solid colours. A
-// smooth per-character gradient, closer to how a real reference photo/SVG
-// transect reads, gives the transition its own colour movement independent
-// of the glyph layers, instead of competing with them. Built via ImageData
-// (one bulk pixel-buffer write + a single putImageData) rather than a
-// fillRect-per-pixel loop — cheap enough to still be a one-time paint on
-// mount, same as OCEAN_BASE/SHORE_FRAMES. `image-rendering` is left at the
-// browser default (not `pixelated`) so the CSS upscale to GROUND_W ch x
-// GROUND_H em blends the samples smoothly instead of keeping them blocky.
-function CoastBackgroundLayer() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const c = canvasRef.current;
-    const ctx = c?.getContext('2d');
-    if (!ctx) return;
-    const img = ctx.createImageData(GROUND_W, GROUND_H);
-    const data = img.data;
-    for (let y = 0; y < GROUND_H; y++) {
-      const fy = y / TILE_LN;
-      let rowOff = y * GROUND_W * 4;
-      for (let x = 0; x < GROUND_W; x++) {
-        const fx = x / TILE_CH;
-        const [r, g, b] = visualTerrainColorAt(fx, fy);
-        data[rowOff] = r;
-        data[rowOff + 1] = g;
-        data[rowOff + 2] = b;
-        data[rowOff + 3] = 255;
-        rowOff += 4;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-  }, []);
-  return (
-    <canvas
-      ref={canvasRef}
-      width={GROUND_W}
-      height={GROUND_H}
-      style={{
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        width: `${GROUND_W}ch`,
-        height: `${GROUND_H}em`,
-      }}
-    />
-  );
-}
-
-function OceanLayer({
-  camX,
-  camY,
-  viewW,
-  viewH,
-}: {
-  camX: number;
-  camY: number;
-  viewW: number;
-  viewH: number;
-}) {
-  const [t, setT] = useState(0);
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const iv = window.setInterval(() => setT((v) => v + 1), OCEAN_CFG.driftMs);
-    return () => window.clearInterval(iv);
-  }, []);
-  // Margin beyond the strictly-visible rect: the camera can drift between two
-  // ~90ms caustic recomputes (walking, zooming, panning), and without slack
-  // the shimmer would visibly "pop in" at the edge the instant it scrolls into
-  // view instead of already being there. 0.15 (15% of the viewport on each
-  // side) comfortably covers a walking step or two — measured ~25ms for a
-  // typical window at that margin, vs ~90ms unbounded (see oceanCaustics'
-  // comment) and ~40ms at a 0.5 margin, which was generous enough to erase
-  // most of the win. Widen it only if panning/zooming visibly outruns it.
-  const CAUSTIC_MARGIN = 0.15;
-  const boundsRef = useRef({ x0: 0, y0: 0, x1: 0, y1: 0 });
-  boundsRef.current = {
-    x0: camX - viewW * CAUSTIC_MARGIN,
-    y0: camY - viewH * CAUSTIC_MARGIN,
-    x1: camX + viewW * (1 + CAUSTIC_MARGIN),
-    y1: camY + viewH * (1 + CAUSTIC_MARGIN),
-  };
-  const tones = useMemo(() => oceanCaustics(t, boundsRef.current), [t]);
-  return (
-    <>
-      <pre className="ocean ocean-base">{OCEAN_BASE.base}</pre>
-      <pre className="ocean ocean-base-lit">{OCEAN_BASE.lit}</pre>
-      <pre className="ocean ocean-shallow">{OCEAN_SHALLOW}</pre>
-      {tones.map((s, i) => (
-        <pre key={i} className={`ocean ocean-c${i}`}>
-          {s}
-        </pre>
-      ))}
-    </>
-  );
-}
-
 // A player-placed decoration/furniture item — real (in `placedItems`) or a
 // ghost preview while placement mode is active. Same scale-shrink offset
 // every other entity uses, PLUS a rotation-aware shift: the DOM sprite text
@@ -5258,59 +5131,73 @@ function PlacedItemView({
 
 // Its own component with its own redraw interval, so a continuously-animating
 // pond doesn't re-render every other entity on the map.
-function PondLayer({ ent }: { ent: Ent }) {
+// Drawn on a canvas: the pond re-colours most of its cells every frame, and
+// as one <span> per cell (each with its own opaque background) that forced
+// the browser to re-layout and repaint hundreds of elements 9x a second —
+// measured as the single biggest frame cost in the game. Same frames, same
+// colours as ColoredSprite's solidCells path: each occupied cell gets its
+// palette colour on a background darkened by 55%.
+function PondLayer({ ent, charW, lineH, res }: { ent: Ent; charW: number; lineH: number; res: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
   const [t, setT] = useState(0);
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const iv = window.setInterval(() => setT((v) => v + 1), POND_FRAME_MS);
     return () => window.clearInterval(iv);
   }, []);
-  const frame = useMemo(
-    () => pondFrame(S.POND, S.POND_COLORS, S.POND_ANIM, t),
-    [t],
-  );
   const k = ent.scale ?? 1;
   const cw = Math.max(...ent.sprite.map((l) => l.length));
+  const rows = ent.sprite.length;
+  // backing store at the resolution the pond is actually shown at
+  const r = Math.min(3, Math.max(0.5, Math.ceil(res * k * 4) / 4));
+  useEffect(() => {
+    const c = ref.current;
+    const ctx = c?.getContext('2d');
+    if (!c || !ctx) return;
+    const { sprite, colors } = pondFrame(S.POND, S.POND_COLORS, S.POND_ANIM, t);
+    const w = Math.ceil(cw * charW * r);
+    const h = Math.ceil(rows * lineH * r);
+    if (c.width !== w || c.height !== h) {
+      c.width = w;
+      c.height = h;
+    } else ctx.clearRect(0, 0, w, h);
+    const palette = ent.palette ?? {};
+    const font = getComputedStyle(c).fontFamily || 'monospace';
+    ctx.font = `${lineH * r}px ${font}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let y = 0; y < sprite.length; y++) {
+      const line = sprite[y];
+      const crow = colors[y] ?? '';
+      // whole device pixels, so neighbouring cell backgrounds never leave a hairline gap
+      const y0 = Math.floor(y * lineH * r);
+      const y1 = Math.floor((y + 1) * lineH * r);
+      for (let x = 0; x < line.length; x++) {
+        const ch = line[x];
+        if (ch === ' ') continue;
+        const hex = palette[crow[x]] ?? '#6a7078';
+        const x0 = Math.floor(x * charW * r);
+        const x1 = Math.floor((x + 1) * charW * r);
+        ctx.fillStyle = darken(hex, 0.55);
+        ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+        ctx.fillStyle = hex;
+        ctx.fillText(ch, (x0 + x1) / 2, (y0 + y1) / 2);
+      }
+    }
+  }, [t, r, cw, rows, charW, lineH, ent.palette]);
   return (
-    <ColoredSprite
+    <canvas
+      ref={ref}
       className="ent pond"
       style={{
         left: `${ent.x * TILE_CH - ((1 - k) * cw) / 2}ch`,
-        top: `${ent.y * TILE_LN - (1 - k) * ent.sprite.length}em`,
+        top: `${ent.y * TILE_LN - (1 - k) * rows}em`,
+        width: `${cw}ch`,
+        height: `${rows}em`,
         zIndex: footprint(ent).row,
         ...(k !== 1 ? { scale: `${k}` } : {}),
       }}
-      sprite={frame.sprite}
-      colors={frame.colors}
-      palette={ent.palette}
-      perCell
-      // same per-cell occlusion as the house/garden-bed — shore/reed and
-      // water-dot cells all get an opaque background derived from their own
-      // (possibly animated) colour, so ground/terrain can't show through
-      solidCells
     />
-  );
-}
-
-// The shoreline — now ONLY the white foam crest. The surge's other two layers
-// (the glowing sheet that climbed the sand, and the dark wet-sand glaze it left
-// behind) are no longer drawn: the ocean's own drift carries the water, and the
-// foam is the one part of the old wave behaviour kept. Its frames still run on
-// their own slower loop, independent of the ocean drift.
-function ShoreLayer() {
-  const [phase, setPhase] = useState(0);
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const iv = window.setInterval(() => setPhase((p) => (p + 1) % SHORE_FRAMES.length), SHORE_CFG.surgeMs);
-    return () => window.clearInterval(iv);
-  }, []);
-  const f = SHORE_FRAMES[phase];
-  return (
-    <>
-      {/* the trailing band first, so the bright crest paints over it */}
-      <pre className="ocean shore-foam2">{f.foam2}</pre>
-      <pre className="ocean shore-foam">{f.foam}</pre>
-    </>
   );
 }
 

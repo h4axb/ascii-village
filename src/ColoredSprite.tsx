@@ -27,7 +27,7 @@ function hexToRgb(hex: string): [number, number, number] {
 // belong to its own region (hair backing is dark hair-red, shirt backing is
 // dark shirt-white, etc.) without this component having to know what body
 // part any given cell is.
-function darken(hex: string, factor: number): string {
+export function darken(hex: string, factor: number): string {
   const [r, g, b] = hexToRgb(hex);
   const d = (v: number) => Math.max(0, Math.round(v * (1 - factor)));
   return `#${d(r).toString(16).padStart(2, '0')}${d(g).toString(16).padStart(2, '0')}${d(b).toString(16).padStart(2, '0')}`;

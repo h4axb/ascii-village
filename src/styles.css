@@ -650,158 +650,9 @@ pre {
   background-size: 4ch 2em;
 }
 
-.ground {
-  position: absolute;
-  inset: 0;
-  color: #454545;
-  white-space: pre;
-  line-height: 1;
-}
-
-/* per-region ground colours — one layer per region, each a fixed colour.
-   Deliberately separated bands (water → shallow → sand → wet-shoreline →
-   grass), each a clearly distinct hue/value rather than a gradient of
-   close-together tones — that separation is what makes the coastline read
-   from a distance instead of dissolving into one blob. */
-.region-beach {
-  color: #E6D39B; /* warm pale cream-beige sand */
-}
-.region-sandgrain {
-  color: #F0DDA7; /* BRIGHT sand highlight, calm mid-beach texture only (see world.ts) */
-}
-/* the land terrain layers are the grass-highlight flecks over the island */
-.region-meadow,
-.region-jungle,
-.region-desert,
-.region-rocky,
-.region-tundra {
-  color: #6E7A4E;
-}
-/* sparse lighter "sign" glyphs scattered across the TRUE island interior
-   (world.ts's ISLAND_SIGNS, nd <= 0.85 — well clear of the coastline bands
-   below) — a lighter tone than the base grass flecks. */
-.region-islandsigns {
-  color: #8CA06B;
-}
-/* Oblique interior "grass blade" signs (world.ts's GRASS_SIGN_CHARS,
-   nd < 0.7, two density tiers forming natural patches) — a cooler, slightly
-   darker tone than islandsigns above so the two layers stay visually
-   distinct where they're both eligible (both land, both clear of the
-   coastline bands). */
-.region-grasssigns {
-  color: #5C6B3E;
-}
-
-/* STAGE 2 COASTLINE TRANSITION BANDS — see world.ts's EDGE_BANDS/
-   genLandLayers for the density curves. Each is a narrow, dense glyph band
-   peaking exactly on one VisualTerrain background boundary (world.ts's
-   COAST/visualTerrainAt), so the hard seam between two solid background
-   colours reads as an organic ASCII transition instead. */
-/* Terrain-glyph rework Layer B: the dense LIGHT-green inner coastline. Kept
-   distinctly lighter than both the base land fleck (#6E7A4E) and the old
-   "concentrated grass-edge" tone this replaced, so the coastal ring reads
-   as genuinely light green rather than just a slightly richer green. */
-.region-edgegrass {
-  color: #A9C17A;
-}
-/* Terrain-glyph rework Layer C: dense sand/yellow glyphs stacked ON TOP of
-   the light-green band above (see genLandLayers' paint-order comment) —
-   warm gold, distinct from both the light green underneath and the actual
-   beach's own cream tone further out. */
-.region-edgesandoverlay {
-  color: #E0B865;
-}
-/* Terrain-glyph rework Layer D: the dark coastal edge now has NO dedicated
-   background band (see world.ts's GRADIENT_STOPS) — this glyph colour is
-   the ONLY thing that makes the edge read as dark green. Kept the same
-   dark desaturated olive tone as before; only world.ts's density/coverage
-   and the background removal changed, not this colour. */
-.region-edgerim {
-  color: #333C2C; /* dark desaturated olive-green glyph tone — a shade of LAND, not brown soil */
-}
-.region-edgesandinner {
-  color: #D9B87E; /* rim-adjacent warm gold, sampled from shore3.svg's sand-core zone — connects rim to beach */
-}
-.region-edgesandouter {
-  color: #D8DBB8; /* pale sage-cream, sampled from shore3.svg's wet-sand/transition zone — the sand cools toward the water here, not staying one flat tone */
-}
-.region-seamwarm {
-  color: #C9D3B4; /* sand-facing half of the seam — sampled from shore3.svg's late transition zone, bridging outer sand into shallow water */
-}
-.region-seamcool {
-  color: #7EA6A8; /* water-facing half of the seam — matches shore3.svg's stable open-ocean tone (~#78a2ab) */
-}
-
-/* The ocean sits behind every land layer: a dense two-tone base lattice, a
-   shallow-water ring near the coast, and four tiers of caustic light
-   drifting across it (see OCEAN_CFG in world.ts). One <pre> per tone, so the
-   whole sea costs a handful of elements instead of a span per character.
-   Fixed colours — nothing here shifts with the clock any more, and nothing
-   here blends with --sky-bg: the water is meant to read as a completely
-   separate, vividly blue palette from the land, not tinted by it. */
-.ocean {
-  position: absolute;
-  inset: 0;
-  white-space: pre;
-  line-height: 1;
-}
-
-/* The base lattice — the body of the water, out past the shallow ring.
-   Saturated rather than dark: the sea should read as alive edge to edge,
-   not as gloom with bright spots on it. */
-.ocean-base {
-  color: #5592A0; /* deep water */
-}
-.ocean-base-lit {
-  color: #67A5AE; /* normal water — the lighter half of the base lattice split */
-}
-
-/* Shallow water: a ring hugging the coastline, spanning COAST.outerSandEnd
-   to COAST.shallowWaterEnd (world.ts's genOceanShallow) — starting OUTSIDE
-   the (now-wider) beach rather than underneath it, giving the water its own
-   visible water → shallow → sand banding the way the land side already has
-   one. Density lowered in Stage 3 so it reads calmer than the dense
-   sand/water seam just inland of it. */
-.ocean-shallow {
-  color: #8FC4C1;
-}
-
-/* Caustics, dark to bright. The tiers are separated by HARD cutoffs (see `cuts`
-   in OCEAN_CFG), so each is a solid region with a crisp edge rather than a step
-   in a gradient — that separation is what makes them pop. Kept inside the
-   same deep→shallow hue family as the base/shallow tones above.
-   STAGE 3: c0/c1 are LOW-CONTRAST micro/soft-field tiers (close to the base
-   lattice on purpose — most of the caustic layer should read this way); c2
-   is the "soft texture field" tier; c3 is now gated in world.ts's
-   oceanCaustics() to a small number of irregular highlight clusters rather
-   than showing everywhere, so it can stay this pale without the whole sea
-   looking bright. */
-.ocean-c0 {
-  color: #5A96A2;
-}
-.ocean-c1 {
-  color: #6FA8AF;
-}
-.ocean-c2 {
-  color: #8FC4C1;
-}
-/* rare highlight-cluster tier only (see world.ts's cluster gate) */
-.ocean-c3 {
-  color: #C7E8E2;
-}
-
-/* The shoreline foam. Two bands on the same waterline and the same loop: the
-   bright leading crest, and a wider trailing wash behind it — what separates
-   them is glyph density, not colour, so the surf reads as one band of foam
-   with depth rather than two differently-tinted stripes. STAGE 3: shifted
-   from a pure pale-turquoise (matching .ocean-c3 exactly) toward a warmer
-   cream-turquoise blend, so the foam visually bridges cream sand -> pale
-   turquoise -> dusty blue water instead of reading as a harsh white/cyan
-   outline around the island. */
-.shore-foam,
-.shore-foam2 {
-  color: #D9E4CE;
-}
+/* Ground and water are drawn on canvas now (src/terrain.ts +
+   src/TerrainCanvas.tsx) — the old per-region <pre> colour classes
+   (.ground, .region-*, .ocean-*, .shore-foam) are gone with them. */
 
 /* dev-only tile readout for the alt+drag layout tool (see devLayout.ts).
    pointer-events: none so it can never swallow a drag. */
@@ -1432,12 +1283,11 @@ pre {
    building occludes the ground along its actual silhouette rather than a
    box, and correctly matches whatever VisualTerrain band it's standing on
    instead of only ever matching the single hardcoded --sky-bg tone.
-   .ent.shop is NOT converted in this pass (see the task this came from) —
-   it keeps the old rectangular occlusion, on its own selector now that the
-   shared rule above no longer carries a background at all. */
-.ent.shop {
-  background: var(--sky-bg);
-}
+   .ent.shop needs no occlusion either — see below. */
+/* .ent.shop used to paint a rectangular background here to hide the ground
+   glyphs behind it. The canvas terrain (terrain.ts) no longer draws glyphs
+   under structures, so the box — which never matched the patchy grass
+   colour anyway — is gone. */
 
 /* stone stays its own natural colour (not in the themed categories) */
 .ent.stone {

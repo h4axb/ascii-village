@@ -1,3 +1,9 @@
+
+
+19-26: crafting water vehicle
+28: retry once
+
+
 TASK: IMPLEMENT INTRO PART C
 EXPLORATION RETURN → RESOURCE PAYMENT → CRAFTING TOKEN → WATER VEHICLE
 → TRAVEL CINEMATIC → SHOP ARRIVAL
@@ -519,7 +525,7 @@ Do not require the player to manually open it.
 
 
 ==================================================
-19. CRAFTING EXPLANATION
+### 19. CRAFTING EXPLANATION
 ==================================================
 
 When the Crafting panel opens, Mitchy explains:
@@ -679,7 +685,7 @@ Do not expose internal moderation/classifier terminology.
 
 
 ==================================================
-26. LOW CONFIDENCE
+### 26. LOW CONFIDENCE
 ==================================================
 
 If semantic classification is uncertain, prefer asking the player to clarify
@@ -723,7 +729,7 @@ Do NOT trust arbitrary generated values for:
 
 
 ==================================================
-28. RETRY / STRUCTURED OUTPUT RELIABILITY
+### 28. RETRY / STRUCTURED OUTPUT RELIABILITY
 ==================================================
 
 Reuse the existing structured JSON/retry infrastructure.
@@ -1059,7 +1065,7 @@ Characters must remain visually on top of the vehicle where appropriate.
 
 
 ==================================================
-43. SHOP ISLAND ARRIVAL
+### 43. SHOP ISLAND ARRIVAL
 ==================================================
 
 When the vehicle reaches:

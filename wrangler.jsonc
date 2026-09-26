@@ -15,5 +15,6 @@
   // Keep text variables set in the dashboard (e.g. LLM_ALLOWED_MODELS) instead
   // of wiping them on every deploy. Secrets are always kept.
   "keep_vars": true,
+  "workers_dev": true,
   "observability": { "enabled": true }
 }

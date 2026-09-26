@@ -1,35 +1,1743 @@
-## Part C Intro
+TASK: IMPLEMENT INTRO PART C
+EXPLORATION RETURN → RESOURCE PAYMENT → CRAFTING TOKEN → WATER VEHICLE
+→ TRAVEL CINEMATIC → SHOP ARRIVAL
 
-Last sequence was Mitchy getting out of screen to wait on the east coast.
+Part A / the prologue, the wake-up sequence, Mitchy's initial onboarding,
+guided exploration, the unified intro narration architecture, the Intro
+Editor, and the manual-save architecture already exist.
 
-Next is after exploration, player talks to Mitchy.
-**Option A: “Wait, what was I supposed to do again?”**
-**Option B: “I think I’m done looking around.”**
+This task implements the NEXT section of the existing unified intro.
 
-Option A explains to visit your house in the north side of the island and collect ressources on the way to store them at the house.
+Do NOT create a separate intro system.
 
-Option B moves to next act.
+Part C must continue through the existing unified intro/onboarding controller.
 
-Mitchy: "Okay, on this island it's good to have your own boat. I do sell crafting tokens you can use to craft various stuff like your boat. Since you just moved here I'll make you a special price of 10 gold. Here collecting ressources and giving them to me is gold."
+IMPORTANT:
 
-Player gets two options.
+Part D will implement the actual quest-list system.
 
-Option A: "Okay, I'll give you the money."
-Option B: "I will go collect it."
-
-Clicking A opens the inven UI and player can select items and on right the preview show + and minus button to adjust the amount. If there's no more to increase or decrease grey out the icon to indicate visually as well it's not possible. 
-
-And show how much money is left or needed. So orient on the predefined objects prices. Show visually per UI how much the current selected items already cover for the 10 gold. If player has not enough or wants to wait they should be able to cancel which will leave Mitchy saying "Okay, come back when you got the money."
-
-If 10 gold is filled then show button in green which was greyed out before "Buy the crafting token."
-
-UI Panel closes and Mitchy talks before opening the crafting panel. mitchy explains there "You can now individually craft your own boat however you want it."
-
-Player can insert the prompt. Important here is the prompt has to be a vehicle moving over water and no violent sexual stuff etc. but i think the llm would block that anyway? Its important that its 100% controlled. Also in game it needs to define the size so player and Mitchy fit visually on top of it together securing the width. 
-
-Then after crafting is done, show the button "Place it on the water.". clicking it closes the panel and spawns the crafted object on the water right in front of them. the ship logic has to be universal to move only on the blue ocean water biotome. then cinematic starts with letterbox and mitchy jumps on the object (right side) and then the player (left side). important to make always sure the position where they stand make sense visually tbd. and the object sails over to the shop island and when it reaches shore, mitchy jumps out and then the player. togehter they walk next to the store and mitchy says "This is my shop. If you need stuff or want to sell stuff come here. I'm busy now so I'll give you this list with small quests to do. That will help you to get comfortable at this new place. Ah, important note, when you want to take your ship/boat then left click on it and click return to your inventory. In that way you can always take it with you."
-
-Then the cinematic and letterbox stops and player is off to go again. the quest list will appear in form of a list on left top corner under the clock.
+Do NOT implement the Part D quests in this task.
 
 
-the quest design i will implement as part d.
+==================================================
+1. INSPECT FIRST — DO NOT MODIFY YET
+==================================================
+
+Before implementing anything, inspect the actual current project.
+
+Trace:
+
+1. The unified intro/onboarding controller.
+2. The current stage immediately before Part C.
+3. How guided exploration currently starts/ends.
+4. Mitchy's current position after leaving the previous cinematic.
+5. How player ↔ NPC interaction currently works.
+6. How DialogueBox and dialogue choices work.
+7. How player movement/interactions are locked during cinematics.
+8. The current Inventory UI and inventory state.
+9. Existing resource/item data.
+10. Existing item gold/value/pricing data.
+11. Existing coin icon/component/asset.
+12. How inventory quantities are stored.
+13. How items are removed from inventory.
+14. Existing crafting-token implementation.
+15. Existing crafting panel.
+16. Existing crafting pipeline:
+    - policy filtering
+    - semantic parsing
+    - preflight
+    - generation
+    - plan validation
+    - GameplayIntent
+    - renderer
+17. Existing generated-object/world-object architecture.
+18. Existing placement system.
+19. Existing terrain gameplay classification such as regionAt().
+20. Existing Scene Markings/editor architecture.
+21. Existing Mitchy movement/jump animation.
+22. Existing letterbox/cinematic system.
+23. Existing unified narration system and Intro Editor.
+24. Existing introDone lifecycle.
+25. Existing manual-save architecture.
+
+Then report:
+
+- what can be reused directly
+- what needs extending
+- what new Part C stages are required
+- what new Scene Markings are required
+- how resource payment should integrate into the existing Inventory
+- how the tutorial water-vehicle constraint should integrate into the existing
+  crafting pipeline
+- how passenger positioning should work with generated objects
+- how travel should use gameplay terrain rather than visual colors
+- any architectural issue that needs resolving
+
+Then implement the smallest clean solution.
+
+Do NOT redesign already-working systems unnecessarily.
+
+
+==================================================
+2. PART C START CONDITION
+==================================================
+
+The previous sequence ends with Mitchy leaving the camera and moving to/waiting
+at the authored east-coast location.
+
+The player then receives free movement and explores.
+
+Part C begins when the player returns and interacts with Mitchy.
+
+Free movement does NOT mean the intro is complete.
+
+introDone must remain false throughout Part C.
+
+
+==================================================
+3. INITIAL MITCHY INTERACTION
+==================================================
+
+When the player talks to Mitchy during guided exploration, present two choices:
+
+OPTION A:
+
+“Wait, what was I supposed to do again?”
+
+OPTION B:
+
+“I think I’m done looking around.”
+
+
+==================================================
+4. OPTION A — OBJECTIVE REMINDER
+==================================================
+
+If the player chooses:
+
+“Wait, what was I supposed to do again?”
+
+Mitchy replies:
+
+“Go check out your house on the north side of the island. And pick up some
+resources along the way!”
+
+“You can store whatever you collect at your house.”
+
+Then return to the appropriate interaction state.
+
+Do NOT advance Part C.
+
+The player can continue exploring and later talk to Mitchy again.
+
+
+==================================================
+5. OPTION B — CONTINUE INTRO
+==================================================
+
+If the player chooses:
+
+“I think I’m done looking around.”
+
+continue Part C.
+
+Lock player movement/world interaction while the dialogue sequence is active.
+
+Mitchy says:
+
+“Alright! There’s one more thing you’ll need around here. A way to get across
+the water.”
+
+“It’s always good to have your own boat around here.”
+
+“I sell crafting tokens. You can use them to make all kinds of things,
+including a boat of your own.”
+
+“They usually cost 20 gold, but since you just moved here, I’ll give you one
+for 10.”
+
+“And you don’t need actual coins. The resources you collect have value too,
+so you can trade those with me instead.”
+
+IMPORTANT WRITING RULE:
+
+Do not use em dashes in Mitchy's dialogue.
+
+Use normal punctuation such as periods and commas instead.
+
+
+==================================================
+6. PAYMENT CHOICE
+==================================================
+
+After Mitchy's explanation, present:
+
+OPTION A:
+
+“Okay, I’ll pay the 10 gold.”
+
+OPTION B:
+
+“I’ll go collect some more.”
+
+
+==================================================
+7. OPTION B — COLLECT MORE
+==================================================
+
+If the player chooses:
+
+“I’ll go collect some more.”
+
+Mitchy says:
+
+“Okay, come back when you’ve got enough.”
+
+End the dialogue.
+
+Restore player movement and normal guided-exploration interaction.
+
+Do NOT reset Part C.
+
+Do NOT restart the entire onboarding conversation when the player returns.
+
+The intro controller must remember that the player has already received
+Mitchy's crafting-token explanation.
+
+When the player later talks to Mitchy again, resume from the payment stage
+rather than replaying unrelated earlier onboarding.
+
+
+==================================================
+8. OPTION A — OPEN PAYMENT INVENTORY
+==================================================
+
+If the player chooses:
+
+“Okay, I’ll pay the 10 gold.”
+
+immediately open the EXISTING Inventory UI in resource-payment mode.
+
+Do NOT add another Mitchy explanation between the choice and opening the
+Inventory.
+
+Do NOT create a separate shop UI.
+
+Do NOT create a separate payment panel.
+
+This transaction should use the player's normal Inventory interface, with
+temporary payment controls integrated into its existing right-hand detail
+area.
+
+The player is effectively selecting which owned resources they want to trade
+to Mitchy for the crafting token.
+
+Keep player movement and unrelated world interaction disabled while the
+payment Inventory is open.
+
+
+==================================================
+9. DEFAULT INVENTORY ITEM VALUE DISPLAY
+==================================================
+
+This change should also improve the normal Inventory UI.
+
+Each item's detail view should show its existing predefined gold/coin value
+next to the item title.
+
+Reuse the coin icon that already exists in the game.
+
+Conceptually:
+
+Wildflower    [coin icon] 2
+
+Do NOT create a duplicate coin icon if an existing implementation can be
+reused.
+
+The value must come from the authoritative existing item/object price data.
+
+Do not duplicate prices inside the Inventory component.
+
+
+==================================================
+10. PAYMENT MODE LAYOUT
+==================================================
+
+Use the existing Inventory panel shown in the current game.
+
+LEFT SIDE:
+
+Keep the normal inventory item grid.
+
+RIGHT SIDE:
+
+Keep the selected item's existing preview integrated into the panel.
+
+Below/around the selected item information, add the payment controls.
+
+Conceptually:
+
+--------------------------------------------------
+
+Wildflower                         [coin] 2
+
+[ EXISTING ITEM PREVIEW ]
+
+Owned                                  5
+
+Amount to give
+
+                [ − ]   2   [ + ]
+
+Value from this item                   4
+
+--------------------------------------------------
+
+Current offer                     8 / 10
+
+2 gold still needed
+
+[ Cancel ]
+
+[ Buy Crafting Token ]
+
+--------------------------------------------------
+
+Do not build a visually unrelated transaction screen.
+
+
+==================================================
+11. PLUS / MINUS CONTROLS
+==================================================
+
+For the currently selected inventory resource:
+
+[ − ]
+
+decreases the amount offered.
+
+[ + ]
+
+increases the amount offered.
+
+The amount may never exceed the quantity the player actually owns.
+
+If offered amount = owned quantity:
+
+grey out / disable [+].
+
+If offered amount = 0:
+
+grey out / disable [−].
+
+Disabled controls must be visibly disabled, not merely non-functional.
+
+
+==================================================
+12. MULTIPLE RESOURCE TYPES
+==================================================
+
+The payment selection must persist while the player moves between inventory
+items.
+
+Example:
+
+Wood x2
+Stone x1
+Flower x3
+
+may all contribute simultaneously.
+
+Selecting another inventory slot must NOT clear previously selected resource
+amounts.
+
+The UI should always calculate the combined value of ALL currently offered
+resources.
+
+
+==================================================
+13. RESOURCE VALUE CALCULATION
+==================================================
+
+Use the existing predefined item prices.
+
+Conceptually:
+
+offeredValue =
+SUM(
+    selectedQuantity[item] * itemGoldValue[item]
+)
+
+Do NOT ask an LLM to determine resource value.
+
+Do NOT create separate tutorial prices.
+
+The existing item price/value system is authoritative.
+
+
+==================================================
+14. PAYMENT PROGRESS
+==================================================
+
+Clearly display the current combined value relative to the required 10 gold.
+
+Examples:
+
+Current offer: 6 / 10
+4 gold still needed
+
+or:
+
+Current offer: 10 / 10
+
+If the player exceeds the value:
+
+Current offer: 11 / 10
+1 gold over
+
+The player does NOT need to reach exactly 10.
+
+Any value:
+
+>= 10
+
+is sufficient.
+
+No change needs to be returned for excess value.
+
+
+==================================================
+15. BUY CRAFTING TOKEN BUTTON
+==================================================
+
+Reuse the existing large pink Inventory action-button visual language.
+
+For this tutorial purchase:
+
+BELOW 10 GOLD:
+
+button is disabled / grey.
+
+AT OR ABOVE 10 GOLD:
+
+button becomes GREEN and clickable.
+
+Text:
+
+Buy Crafting Token
+
+Do not create a completely new button style.
+
+The green state should clearly communicate that the transaction is ready.
+
+
+==================================================
+16. CANCEL PAYMENT
+==================================================
+
+The player must always be able to cancel the transaction.
+
+If Cancel is selected:
+
+- discard the temporary offered-resource selection
+- do NOT remove any resources
+- close the Inventory
+- return to Mitchy's dialogue
+
+Mitchy says:
+
+“Okay, come back when you’ve got enough.”
+
+Then:
+
+- end dialogue
+- restore player movement
+- return to guided exploration
+- preserve the correct Part C progression stage
+
+
+==================================================
+17. CONFIRM PURCHASE
+==================================================
+
+When:
+
+offeredValue >= 10
+
+and the player presses:
+
+Buy Crafting Token
+
+perform the transaction atomically.
+
+Only then:
+
+1. remove the selected resource quantities from inventory
+2. grant/prepare the crafting token
+3. close the Inventory
+4. clear temporary payment-selection state
+
+Do not remove resources incrementally while the player is adjusting the
+offer.
+
+If something fails during the transaction, do not partially remove items.
+
+
+==================================================
+18. AFTER PURCHASE — CONTROLLED SEQUENCE
+==================================================
+
+After pressing Buy Crafting Token:
+
+the Inventory closes.
+
+The player may NOT move or interact with the world during the following
+sequence.
+
+Keep cinematic/tutorial control locked.
+
+Mitchy says:
+
+“Perfect!”
+
+Then animate Mitchy giving the crafting token to the player.
+
+Use/reuse existing item-acquisition or transfer presentation where
+appropriate.
+
+The token should visibly/readably transfer to the player.
+
+After the transfer:
+
+Mitchy says:
+
+“Now for the fun part.”
+
+Then open the existing Crafting panel automatically.
+
+Do not require the player to manually open it.
+
+
+==================================================
+19. CRAFTING EXPLANATION
+==================================================
+
+When the Crafting panel opens, Mitchy explains:
+
+“Use the token to make something we can travel across the water with. What it
+looks like is up to you.”
+
+The player can then enter their crafting prompt.
+
+This tutorial does NOT require the player to make a conventional boat.
+
+Valid creative concepts may include things such as:
+
+- boat
+- raft
+- floating leaf
+- giant teacup boat
+- strawberry boat
+- small ferry
+- other clearly usable non-violent water vehicles/platforms
+
+The important requirement is:
+
+it must function as a vehicle/platform capable of carrying the player and
+Mitchy over water.
+
+
+==================================================
+20. SPECIAL TUTORIAL CRAFTING CONTEXT
+==================================================
+
+Do NOT globally restrict the normal crafting system to water vehicles.
+
+This restriction applies only to this Part C tutorial craft.
+
+Introduce/reuse an explicit crafting context appropriate to the existing
+architecture.
+
+Conceptually:
+
+INTRO_WATER_VEHICLE
+
+or equivalent.
+
+Do not force this exact enum/string if the existing architecture has a better
+pattern.
+
+The general crafting system must remain capable of crafting its normal
+objects outside this tutorial.
+
+
+==================================================
+21. DO NOT RELY ON THE LLM AS THE SOLE AUTHORITY
+==================================================
+
+It is impossible to guarantee that an LLM will classify every arbitrary
+prompt correctly.
+
+Therefore the system must use layered validation.
+
+The LLM may assist with semantic interpretation.
+
+The GAME CODE remains authoritative for gameplay permissions.
+
+
+==================================================
+22. WATER VEHICLE VALIDATION PIPELINE
+==================================================
+
+Integrate this into the EXISTING crafting pipeline rather than creating an
+unrelated second generator.
+
+Conceptually:
+
+PLAYER PROMPT
+    ↓
+existing policy/safety validation
+    ↓
+structured semantic intent classification
+    ↓
+water-vehicle requirement
+    ↓
+existing generation pipeline
+    ↓
+generated-plan validation
+    ↓
+game-controlled WATER VEHICLE gameplay properties
+    ↓
+render
+
+
+==================================================
+23. SAFETY VALIDATION
+==================================================
+
+Reuse the project's existing crafting safety/policy layer.
+
+The tutorial craft must reject inappropriate prompts according to the
+existing game policy, including relevant violent/sexual/disallowed content.
+
+Do NOT rely only on the model provider refusing the generation.
+
+Do NOT assume:
+
+“the LLM will probably block it.”
+
+The game should explicitly validate before accepting the craft.
+
+
+==================================================
+24. SEMANTIC WATER-VEHICLE VALIDATION
+==================================================
+
+The preflight/classification step should determine whether the player's
+requested object is reasonably usable as a non-violent water
+vehicle/platform.
+
+Use a strict structured response rather than vague prose.
+
+Conceptually only:
+
+{
+  "safe": true,
+  "isWaterVehicle": true,
+  "canCarryPassengers": true,
+  "confidence": 0.96
+}
+
+Adapt this to the current structured-response architecture.
+
+Do NOT trust free-form LLM prose.
+
+
+==================================================
+25. AMBIGUOUS OR INVALID PROMPTS
+==================================================
+
+If the prompt clearly does not describe something usable for water travel,
+do not consume the crafting token and do not generate the final craft.
+
+Examples:
+
+sword
+chair
+house
+normal bicycle
+random flower
+
+Show a player-friendly response such as:
+
+“That doesn’t sound like something we can travel across the water with. Try
+describing a boat, raft, or another kind of water vehicle.”
+
+Use the game's existing error/prompt-feedback visual language where possible.
+
+Do not expose internal moderation/classifier terminology.
+
+
+==================================================
+26. LOW CONFIDENCE
+==================================================
+
+If semantic classification is uncertain, prefer asking the player to clarify
+their prompt rather than guessing.
+
+Do not silently turn unrelated objects into water vehicles.
+
+The player can revise and resubmit without losing the token.
+
+
+==================================================
+27. CODE CONTROLS GAMEPLAY PROPERTIES
+==================================================
+
+Even after the LLM approves the concept, do NOT allow generated LLM output to
+freely determine gameplay permissions.
+
+After successful validation, GAME CODE assigns the appropriate constrained
+gameplay behavior.
+
+Conceptually:
+
+GameplayIntent = WATER_VEHICLE
+
+allowedTraversal = OCEAN
+
+passengerCapacity = 2
+
+tutorialVehicle = true
+
+Use the actual project's types and architecture.
+
+Do NOT trust arbitrary generated values for:
+
+- traversal surfaces
+- passenger capacity
+- collision behavior
+- gameplay radius
+- movement permissions
+- progression flags
+
+
+==================================================
+28. RETRY / STRUCTURED OUTPUT RELIABILITY
+==================================================
+
+Reuse the existing structured JSON/retry infrastructure.
+
+Malformed classification/generation output should use the existing retry
+strategy.
+
+Do not create an unlimited retry loop.
+
+If validation still fails after the normal retry policy:
+
+- fail safely
+- preserve the crafting token
+- allow the player to try again
+
+
+==================================================
+29. GENERATED VEHICLE SIZE
+==================================================
+
+The LLM controls the vehicle's APPEARANCE.
+
+The GAME controls the gameplay-safe size envelope.
+
+Do NOT ask the LLM to freely determine physical size.
+
+The generated vehicle must always be large enough for:
+
+- player
+- Mitchy
+- reasonable spacing between them
+
+while remaining within a maximum size that works with:
+
+- the camera
+- coastline
+- travel cinematic
+- shop docking area
+
+
+==================================================
+30. MAIN BODY / PASSENGER SURFACE
+==================================================
+
+The player and Mitchy must visually stand ON TOP OF THE MAIN BODY of the
+generated vehicle.
+
+They must not stand:
+
+- at arbitrary bounding-box edges
+- on a sail
+- on a mast
+- on a flag
+- on a chimney
+- on decorative appendages
+- floating beside the vehicle
+
+Determine/reuse a reliable main-body concept from the generated plan.
+
+If necessary, extend the plan metadata with a deterministic primary
+body/passenger surface designation.
+
+Do not let decorative primitives determine passenger positioning.
+
+
+==================================================
+31. PASSENGER ANCHORS
+==================================================
+
+Derive two stable passenger anchors on top of the main body.
+
+Conceptually:
+
+              PLAYER          MITCHY
+                 ↓               ↓
+                 ●               ●
+             ┌──────────────────────┐
+             │      MAIN BODY       │
+        ~~~~~└──────────────────────┘~~~~~
+
+Player:
+
+slightly LEFT of center.
+
+Mitchy:
+
+slightly RIGHT of center.
+
+Both must visibly stand on the top surface.
+
+The spacing must account for the actual rendered character widths.
+
+If the generated visual is too small, normalize/scale it into the required
+vehicle envelope rather than moving the passengers outside the body.
+
+
+==================================================
+32. SUCCESSFUL CRAFT
+==================================================
+
+After successful generation:
+
+show the existing crafted-object preview as normal.
+
+Add/replace the appropriate final tutorial action with:
+
+Place it on the water
+
+Do NOT immediately begin travel just because generation completed.
+
+The player explicitly presses:
+
+Place it on the water
+
+
+==================================================
+33. PLACING THE VEHICLE
+==================================================
+
+When the player presses:
+
+Place it on the water
+
+close the Crafting panel.
+
+For this controlled tutorial sequence, do NOT require arbitrary manual
+placement.
+
+Spawn/place the crafted vehicle at an authored Part C water marker directly
+in front of Mitchy/player on the east coast.
+
+This guarantees a reliable cinematic starting position.
+
+The generated object remains the player's actual crafted object.
+
+It is not replaced with a generic boat.
+
+
+==================================================
+34. NEW PART C SCENE MARKINGS
+==================================================
+
+Extend the existing Scene Markings editor/system.
+
+Use names consistent with the project's existing marker naming convention.
+
+Conceptually Part C needs at least:
+
+intro.partC.vehicleSpawn
+
+intro.partC.shopDock
+
+intro.partC.mitchyDisembark
+
+intro.partC.playerDisembark
+
+intro.partC.mitchyShopEnd
+
+intro.partC.playerShopEnd
+
+If the east-coast Mitchy waiting position already has an authoritative
+existing marker, reuse it.
+
+Do not create duplicate markers for the same semantic location.
+
+
+==================================================
+35. MARKER SEMANTICS
+==================================================
+
+vehicleSpawn
+
+= exact water location where the newly crafted vehicle appears before the
+travel cinematic.
+
+shopDock
+
+= exact location where the vehicle stops beside the shop island.
+
+mitchyDisembark
+
+= exact valid land position Mitchy jumps onto after docking.
+
+playerDisembark
+
+= exact valid land position the player jumps onto after docking.
+
+mitchyShopEnd
+
+= Mitchy's final position next to the shop for dialogue.
+
+playerShopEnd
+
+= player's corresponding final position during the shop conversation.
+
+
+==================================================
+36. MARKERS MUST BE AUTHORABLE
+==================================================
+
+These Part C markers must appear in the existing Scene Markings editor.
+
+They should:
+
+- be editable/movable like existing intro markers
+- persist using the existing editor persistence architecture
+- remain invisible during normal gameplay
+- not affect world gameplay outside the scripted sequence
+
+
+==================================================
+37. START TRAVEL CINEMATIC
+==================================================
+
+Immediately after the crafted vehicle is placed at vehicleSpawn:
+
+begin the controlled travel cinematic.
+
+Enable the existing cinematic letterbox.
+
+Keep player movement/world interaction locked.
+
+Do not mark the intro complete.
+
+
+==================================================
+38. BOARDING
+==================================================
+
+Boarding order:
+
+1. Mitchy
+2. Player
+
+Mitchy jumps onto:
+
+the RIGHT passenger anchor.
+
+Player jumps onto:
+
+the LEFT passenger anchor.
+
+Use the existing Mitchy/player jump/movement animation architecture where
+possible.
+
+Both must visibly land on top of the vehicle's main body.
+
+
+==================================================
+39. VEHICLE MOVEMENT
+==================================================
+
+The generated water vehicle must have universal water-vehicle movement
+behavior.
+
+It may travel only through the authoritative gameplay water/ocean biome.
+
+IMPORTANT:
+
+Do NOT detect water using:
+
+- blue pixel color
+- rendered background color
+- visualTerrainAt color
+- CSS color
+- generated appearance
+
+Use the authoritative gameplay terrain/region system.
+
+For example, if the current architecture uses:
+
+regionAt()
+
+for biome/gameplay behavior, integrate with that system.
+
+Changing the visual ocean color later must NOT break vehicle movement.
+
+
+==================================================
+40. SHORE / DOCK EXCEPTION
+==================================================
+
+Normal vehicle movement should remain restricted to gameplay water.
+
+The scripted docking sequence may use the authored shopDock endpoint to
+position the vehicle correctly against the coast.
+
+Do not loosen global traversal rules merely so the cinematic can reach shore.
+
+Use a controlled cinematic docking behavior/exception if required.
+
+
+==================================================
+41. TRAVEL ROUTE
+==================================================
+
+Travel from:
+
+vehicleSpawn
+
+to:
+
+shopDock.
+
+If a direct path is valid and visually appropriate, use it.
+
+If the current world geometry requires a route, extend Scene Markings with
+the smallest appropriate route/waypoint mechanism.
+
+Do NOT ask the LLM to decide the travel route.
+
+The generated object controls appearance.
+
+Authored game data controls destination/path.
+
+
+==================================================
+42. PASSENGERS DURING TRAVEL
+==================================================
+
+While the vehicle moves:
+
+- player remains attached to the left passenger anchor
+- Mitchy remains attached to the right passenger anchor
+
+Their world positions should derive from the moving vehicle anchors.
+
+Do not independently pathfind the characters across the ocean.
+
+Do not allow terrain/entity rendering to visually cover them incorrectly.
+
+Characters must remain visually on top of the vehicle where appropriate.
+
+
+==================================================
+43. SHOP ISLAND ARRIVAL
+==================================================
+
+When the vehicle reaches:
+
+shopDock
+
+stop the vehicle.
+
+Then:
+
+1. Mitchy jumps from the vehicle to mitchyDisembark.
+2. Player jumps from the vehicle to playerDisembark.
+
+These are explicit authored land markers.
+
+Do NOT infer arbitrary landing positions from coastline colors.
+
+
+==================================================
+44. WALK TO SHOP
+==================================================
+
+After disembarking:
+
+Mitchy walks to:
+
+mitchyShopEnd
+
+Player walks to:
+
+playerShopEnd
+
+They should move together naturally toward the shop.
+
+Keep the cinematic letterbox active.
+
+Keep normal player control locked.
+
+When both reach their final shop positions, begin Mitchy's shop dialogue.
+
+
+==================================================
+45. VEHICLE AFTER DISEMBARKING
+==================================================
+
+The crafted vehicle remains physically docked at:
+
+shopDock
+
+after the cinematic.
+
+It becomes a normal interactable player-owned world object.
+
+Do NOT despawn it automatically.
+
+Do NOT replace it with a generic boat.
+
+The exact generated vehicle the player crafted remains there.
+
+
+==================================================
+46. SHOP DIALOGUE
+==================================================
+
+Mitchy says:
+
+“And here we are! This is my shop.”
+
+“If you ever need something or have something you want to sell, come find me
+here.”
+
+Pause.
+
+“I’ve got some things to take care of, but I made you a little list.”
+
+At this point trigger the Part D handoff described below.
+
+Then:
+
+“It should help you get settled in.”
+
+Pause.
+
+“Oh! One more thing.”
+
+“If you want to take your boat with you, click on it and choose Return to
+Inventory.”
+
+“That way you don’t have to leave it behind.”
+
+Finally:
+
+“Alright, I’ll let you get to it!”
+
+IMPORTANT:
+
+Do not use em dashes in Mitchy's dialogue.
+
+
+==================================================
+47. RETURN TO INVENTORY
+==================================================
+
+The crafted water vehicle must support the normal player-owned object
+interaction:
+
+Return to Inventory
+
+When the player later left-clicks/interacts with the docked vehicle and
+chooses:
+
+Return to Inventory
+
+the vehicle should:
+
+- leave the world
+- return to the player's inventory
+- preserve its generated identity/data
+- be placeable again according to its normal water-vehicle placement rules
+
+Do not implement this as a tutorial-only fake button if the existing object
+architecture supports a reusable world-object return mechanic.
+
+If an existing Return to Inventory system already exists, reuse it.
+
+
+==================================================
+48. NORMAL WATER-VEHICLE PLACEMENT AFTER TUTORIAL
+==================================================
+
+The authored vehicleSpawn marker is ONLY for the scripted tutorial placement.
+
+After the tutorial, when the player takes the vehicle from inventory and
+places it normally:
+
+it must follow normal water-vehicle placement validation.
+
+It may only be placed on valid gameplay water/ocean positions.
+
+Do not permanently snap it back to the tutorial marker.
+
+
+==================================================
+49. PART D HANDOFF — DO NOT IMPLEMENT QUESTS YET
+==================================================
+
+Part D will implement the actual quest design/system.
+
+Therefore Part C must NOT invent or hardcode the final quest list.
+
+At the point where Mitchy says:
+
+“I’ve got some things to take care of, but I made you a little list.”
+
+create/use the cleanest explicit handoff point for Part D.
+
+Conceptually:
+
+partCShopIntroComplete
+
+or an equivalent intro stage/event.
+
+Do not force this exact name if the current intro architecture has a better
+pattern.
+
+The purpose is that Part D can later attach the quest-list creation/display
+without Part C needing to be rewritten.
+
+
+==================================================
+50. QUEST LIST UI PLACEHOLDER / BOUNDARY
+==================================================
+
+The future quest list will appear:
+
+top-left of the game screen
+under the clock.
+
+Do NOT implement the actual quest content or quest progression in Part C.
+
+If a placeholder is technically necessary for the handoff, keep it minimal
+and clearly separated from the future Part D implementation.
+
+Prefer an explicit progression event/state over fake quest data.
+
+
+==================================================
+51. END OF PART C
+==================================================
+
+After Mitchy's final line:
+
+“Alright, I’ll let you get to it!”
+
+end the cinematic.
+
+Remove the letterbox.
+
+Restore normal player movement and world interaction.
+
+The player is now free to move around the shop island/world again.
+
+IMPORTANT:
+
+Follow the CURRENT unified intro lifecycle.
+
+Do not independently change introDone semantics unless the current
+architecture already defines this exact shop-arrival point as intro
+completion.
+
+If introDone is currently intended to complete here, use the existing
+authoritative finishIntro() path.
+
+If later Part D onboarding is still considered part of the intro in the
+current implementation, preserve that lifecycle instead.
+
+Inspect first rather than inventing a second completion rule.
+
+
+==================================================
+52. UNIFIED INTRO NARRATION ARCHITECTURE
+==================================================
+
+The unified intro-wide narration architecture and Intro Editor already exist.
+
+Do NOT create:
+
+partCNarration.ts
+
+or another narration system.
+
+If Part C requires protagonist internal narration now or later, expose its
+stable intro stages/narration slots through the SAME existing unified
+narration system and Intro Editor.
+
+Mitchy's spoken dialogue remains DialogueBox dialogue.
+
+Do not confuse:
+
+Mitchy dialogue
+
+with:
+
+protagonist internal narration.
+
+
+==================================================
+53. INTRO EDITOR / STAGE COMPATIBILITY
+==================================================
+
+Part C is another section of the existing unified intro.
+
+Give its meaningful stages stable IDs consistent with the current intro
+architecture.
+
+The existing Intro Editor should remain capable of representing the relevant
+Part C stages where appropriate.
+
+Do not build a second Part C editor.
+
+Do not duplicate authoring systems.
+
+
+==================================================
+54. MANUAL SAVE ARCHITECTURE
+==================================================
+
+Do NOT reintroduce autosave.
+
+The existing manual-save architecture is already correct.
+
+Part C progression may exist in runtime state while the intro is active, but
+must not cause automatic persistent gameplay saves.
+
+Only the existing explicit Save Game behavior may write the normal browser
+save.
+
+Ctrl+S remains JSON backup behavior according to the existing architecture.
+
+Do not modify this unless strictly required and approved.
+
+
+==================================================
+55. RELOAD / UNSAVED INTRO BEHAVIOR
+==================================================
+
+Respect the existing manual-save semantics.
+
+Do not add special Part C persistence that conflicts with them.
+
+If the player has not explicitly saved, reload should follow the project's
+existing authoritative behavior for unsaved intro/runtime progress.
+
+Do not introduce hidden localStorage keys to preserve Part C.
+
+
+==================================================
+56. CONTROL LOCKING
+==================================================
+
+During controlled sequences, prevent unrelated interaction.
+
+This includes at least:
+
+- purchase confirmation transition
+- token handoff
+- crafting-panel transition where required
+- vehicle placement transition
+- boarding
+- sailing
+- disembarking
+- walk to shop
+- final shop dialogue
+
+During free exploration/resource collection:
+
+restore normal player control.
+
+Use the existing centralized cinematic/input-lock architecture.
+
+Do not scatter unrelated boolean locks throughout components if an existing
+system already handles this.
+
+
+==================================================
+57. FAILURE SAFETY
+==================================================
+
+The sequence must fail safely.
+
+Examples:
+
+If player lacks sufficient resources:
+- Buy button stays disabled
+- Cancel remains available
+
+If LLM preflight rejects prompt:
+- token is preserved
+- player may edit prompt
+
+If generation fails:
+- token is preserved unless the existing crafting system already has a safe
+  transaction model that guarantees recovery
+
+If required Part C marker is missing in DEV:
+- report clearly
+- do not silently teleport to arbitrary coordinates
+
+If passenger anchors cannot be generated:
+- use deterministic game-side normalization/fallback
+- do not place characters randomly
+
+If transaction fails:
+- do not partially remove resources
+
+
+==================================================
+58. DO NOT TRUST GENERATED GAMEPLAY METADATA
+==================================================
+
+Treat generated content as untrusted input.
+
+Clamp/validate all gameplay-relevant generated values using the existing
+crafting validation architecture.
+
+The LLM may influence:
+
+- shape
+- primitives
+- decorative details
+- appearance
+- semantic description
+
+Game code controls:
+
+- water-vehicle status
+- movement surface
+- passenger capacity
+- passenger anchors
+- minimum/maximum vehicle footprint
+- collision behavior
+- placement validity
+- tutorial progression
+- travel route
+- docking position
+
+
+==================================================
+59. DO NOT OVERENGINEER
+==================================================
+
+Do not create a generic vehicle framework, cinematic graph editor, quest
+engine, or visual scripting system unless the existing project already has
+such abstractions.
+
+This task needs:
+
+- one reusable water-vehicle gameplay intent/type
+- reliable two-passenger positioning
+- payment integration
+- Part C progression
+- authored travel markers
+- scripted travel
+- normal post-tutorial vehicle ownership
+
+Keep the solution explicit and understandable.
+
+
+==================================================
+60. TESTING — RETURN TO MITCHY
+==================================================
+
+Test:
+
+1. Complete previous intro section.
+2. Mitchy waits at the east coast.
+3. Player explores freely.
+4. Player returns to Mitchy.
+5. Interaction shows:
+   - “Wait, what was I supposed to do again?”
+   - “I think I’m done looking around.”
+6. Reminder option repeats correct objective.
+7. Reminder does not advance Part C.
+8. Continue option advances correctly.
+9. Mitchy explains:
+   - the need for water travel
+   - his crafting tokens
+   - normal 20-gold price
+   - newcomer 10-gold price
+   - resources can be traded as value
+10. Payment choices appear:
+   - “Okay, I’ll pay the 10 gold.”
+   - “I’ll go collect some more.”
+
+
+==================================================
+61. TESTING — PAYMENT
+==================================================
+
+11. Choosing collect more restores free movement.
+12. Returning later resumes the correct payment stage.
+13. Choosing “Okay, I’ll pay the 10 gold.” opens the existing Inventory
+    directly in payment mode.
+14. Item title shows existing coin icon + item value.
+15. Existing preview remains visible.
+16. [+] increases offered quantity.
+17. [−] decreases offered quantity.
+18. [+] disables at owned maximum.
+19. [−] disables at zero.
+20. Offered quantities persist while switching inventory items.
+21. Combined value uses authoritative item prices.
+22. Below 10, purchase button is grey/disabled.
+23. At 10, purchase button becomes green.
+24. Above 10 also remains valid.
+25. Cancel removes no resources.
+26. Cancel closes Inventory and returns correctly.
+27. Successful purchase removes exactly selected resources.
+28. Transaction cannot partially complete.
+
+
+==================================================
+62. TESTING — TOKEN HANDOFF
+==================================================
+
+29. Successful purchase closes Inventory.
+30. Player cannot move/interact.
+31. Mitchy says “Perfect!”
+32. Token handoff animation occurs.
+33. Player receives token correctly.
+34. Mitchy says “Now for the fun part.”
+35. Crafting panel opens automatically.
+36. Mitchy explains the water-vehicle requirement.
+
+
+==================================================
+63. TESTING — CRAFTING VALIDATION
+==================================================
+
+Test prompts such as:
+
+VALID:
+- wooden boat
+- raft
+- strawberry boat
+- floating leaf raft
+- little ferry
+- teacup boat
+
+INVALID FOR THIS TUTORIAL:
+- sword
+- chair
+- house
+- bicycle
+- flower
+
+Also test:
+
+- ambiguous water-vehicle prompt
+- malformed structured LLM response
+- model timeout
+- safety-policy rejection
+- generation failure
+
+Verify:
+
+37. Valid creative water vehicles proceed.
+38. Invalid objects are rejected before final craft.
+39. Ambiguous prompts ask for clarification.
+40. Rejected prompt does not consume token.
+41. Generation failure does not strand progression.
+42. Game code assigns gameplay permissions.
+43. Generated data cannot override traversal/passenger rules.
+
+
+==================================================
+64. TESTING — VEHICLE GEOMETRY
+==================================================
+
+Test visually different generated vehicles:
+
+- wide raft
+- narrow boat
+- tall sailboat
+- object with large decoration
+- asymmetrical vehicle
+
+Verify:
+
+44. Vehicle fits required gameplay envelope.
+45. Player fits on main body.
+46. Mitchy fits on main body.
+47. Player is left of center.
+48. Mitchy is right of center.
+49. Decorative elements do not move passenger anchors incorrectly.
+50. Characters do not float beside vehicle.
+51. Characters do not stand on sails/masts/decorations.
+
+
+==================================================
+65. TESTING — PLACEMENT / TRAVEL
+==================================================
+
+52. Successful craft shows Place it on the water.
+53. Clicking it closes Crafting.
+54. Vehicle appears at vehicleSpawn.
+55. Letterbox begins.
+56. Mitchy boards first.
+57. Mitchy lands on right main-body anchor.
+58. Player boards second.
+59. Player lands on left main-body anchor.
+60. Vehicle travels toward shopDock.
+61. Vehicle movement uses gameplay water classification.
+62. Changing visual ocean color would not affect movement.
+63. Vehicle cannot normally traverse land.
+64. Scripted docking reaches shopDock correctly.
+
+
+==================================================
+66. TESTING — DISEMBARK / SHOP
+==================================================
+
+65. Vehicle stops at shopDock.
+66. Mitchy jumps to mitchyDisembark.
+67. Player jumps to playerDisembark.
+68. Both landing positions are valid land.
+69. Mitchy walks to mitchyShopEnd.
+70. Player walks to playerShopEnd.
+71. Shop dialogue starts after arrival.
+72. Vehicle remains docked.
+73. Vehicle remains the exact generated craft.
+74. Return to Inventory interaction exists.
+75. Returning vehicle preserves generated data.
+76. Re-placing it later follows normal water placement rules.
+
+
+==================================================
+67. TESTING — END / REGRESSION
+==================================================
+
+77. Final dialogue ends cleanly.
+78. Letterbox disappears.
+79. Player regains control.
+80. Part D handoff point exists.
+81. No fake quest progression was implemented.
+82. Existing intro sections still work.
+83. Existing unified narration still works.
+84. Intro Editor still works.
+85. Existing DEV Skip Intro still works.
+86. No autosave was introduced.
+87. Manual Save Game still works normally.
+88. Ctrl+S behavior remains unchanged.
+89. Existing crafting outside Part C remains unrestricted by the tutorial
+    water-vehicle rule.
+90. Existing Inventory outside payment mode still works normally.
+91. Existing Scene Markings still work.
+
+
+==================================================
+68. BUILD / VERIFICATION
+==================================================
+
+Run the project's normal checks, including at minimum:
+
+- TypeScript/typecheck
+- production build
+- relevant existing regression tests
+
+Also inspect for:
+
+- duplicate Part C state systems
+- obsolete temporary test data
+- test narration
+- placeholder resources
+- debug strings
+- test markers accidentally saved into production-consumed authoring data
+
+IMPORTANT:
+
+Testing must never leave test fixtures, temporary narration beats,
+placeholder assets, modified overrides, test markers, or other test data in
+production-consumed project files.
+
+Any test that mutates authoring data must:
+
+1. preserve the exact pre-test state
+2. restore it after the test
+3. verify restoration before completion
+
+
+==================================================
+69. FINAL REPORT
+==================================================
+
+After implementation report:
+
+1. Files added.
+2. Files modified.
+3. Part C stage progression implemented.
+4. Existing systems reused.
+5. New Scene Markings added.
+6. Payment-mode architecture.
+7. How authoritative item prices are read.
+8. How offered resources are calculated/removed.
+9. How token handoff works.
+10. How tutorial crafting context works.
+11. Safety + semantic validation pipeline.
+12. What remains LLM-controlled.
+13. What is deterministically game-controlled.
+14. How generated vehicle size is normalized.
+15. How main-body passenger anchors work.
+16. How water traversal is validated.
+17. How vehicleSpawn/shopDock/disembark markers work.
+18. How scripted travel works.
+19. How vehicle becomes a normal owned world object afterward.
+20. Exact Part D handoff created.
+21. Any remaining limitation/TBD.
+22. Typecheck/build/test results.
+23. Confirmation that temporary test data was restored/removed.
+
+
+==================================================
+DO NOT TOUCH UNRELATED SYSTEMS
+==================================================
+
+Do not modify unrelated:
+
+- terrain visuals
+- coastline appearance
+- MYLL/prologue content
+- save architecture
+- unrelated NPCs
+- unrelated quests
+- world generation
+- normal crafting semantics outside necessary reusable water-vehicle support
+- World Assets behavior
+- existing narration content
+- Intro Editor behavior except where necessary to expose legitimate new Part C
+  intro stages/slots
+
+If a broader architectural change appears necessary, report it before
+silently refactoring unrelated systems.

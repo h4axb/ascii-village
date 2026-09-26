@@ -11,12 +11,6 @@
       "text": "I should probably check my laptop before I call it a night.",
       "delayMs": 500,
       "holdMs": 2000
-    },
-    {
-      "id": "laptop-off-3",
-      "text": "PLAYWRIGHT TEST BEAT",
-      "delayMs": 300,
-      "holdMs": 1500
     }
   ],
   "laptop-on": [

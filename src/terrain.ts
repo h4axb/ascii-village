@@ -87,12 +87,13 @@ export const TERRAIN_PALETTE = {
   grassDark: hex('#4c5935'),
   rimGrass: hex('#46542f'), // ground darkening toward the bushes
   bushDark: hex('#2f3c24'),
-  bushMid: hex('#44542f'),
+  bushMid: hex('#55663a'),
   bushLight: hex('#5d6b39'),
-  foliageGlyph: hex('#b2a24f'), // the yellow-olive x o * ¤ texture on bushes
-  foliageGlyphDark: hex('#76803f'),
-  fringeGlyph: hex('#d2bd6c'), // yellow toward the sand edge of the rim
-  sand: hex('#e8c994'),
+  foliageGlyph: hex('#c4b058'), // the yellow-olive x o * ¤ texture on bushes
+  foliageGlyphDark: hex('#8a8f44'),
+  fringeGlyph: hex('#dcc26c'), // yellow toward the sand edge of the rim
+  sandGlyph: hex('#c49a52'), // warm grain on the sand
+  sand: hex('#eac48c'),
   sandOuter: hex('#efd8a8'),
   wetSand: hex('#e9e0c0'),
   shallow1: hex('#a7d2cb'),
@@ -125,10 +126,10 @@ const LAND_STOPS: { nd: number; c: RGB }[] = [
 ];
 const SEA_STOPS: { nd: number; c: RGB }[] = [
   { nd: 0, c: P.sand },
-  { nd: 1.03, c: P.sand },
-  { nd: 1.05, c: P.sandOuter },
-  { nd: 1.064, c: P.wetSand },
-  { nd: 1.08, c: P.shallow1 },
+  { nd: 1.04, c: P.sand },
+  { nd: 1.062, c: P.sandOuter },
+  { nd: 1.076, c: P.wetSand },
+  { nd: 1.092, c: P.shallow1 },
   { nd: 1.15, c: P.shallow2 },
   { nd: 1.3, c: P.water },
   { nd: 1.55, c: P.deep },
@@ -144,7 +145,7 @@ function stopsAt(stops: { nd: number; c: RGB }[], n: number) {
   out.g = a.c[1] + (b.c[1] - a.c[1]) * t;
   out.b = a.c[2] + (b.c[2] - a.c[2]) * t;
 }
-export const WATERLINE_ND = 1.07; // where the visible water starts (foam rides here)
+export const WATERLINE_ND = 1.082; // where the visible water starts (foam rides here)
 export const SAND_START_ND = 1.01;
 
 // Tile units are near-square on screen (4 chars x 8.4px = 33.6px wide, 2 lines
@@ -307,7 +308,7 @@ function sample(fx: number, fy: number, jit: number) {
   if (ndv > 0.82 && ndv < 1.06) {
     if (bushAt(fx, fy * ISO_Y) > 0) {
       const tone = 0.94 + 0.12 * hit.tone;
-      const t = 0.45;
+      const t = 0.8;
       out.r = (P.bushDark[0] + (P.bushMid[0] - P.bushDark[0]) * t) * tone;
       out.g = (P.bushDark[1] + (P.bushMid[1] - P.bushDark[1]) * t) * tone;
       out.b = (P.bushDark[2] + (P.bushMid[2] - P.bushDark[2]) * t) * tone;
@@ -340,16 +341,17 @@ function sample(fx: number, fy: number, jit: number) {
 // (craft/materials.ts RAMP_DEFAULT, from glyphify.py), light → heavy, so the
 // ground reads as one art style with the house, player and items on top.
 const RAMP = [...RAMP_DEFAULT.slice(1)]; // drop the leading space
-export const GLYPHS = ['', ...RAMP, '∘', 'o', 'O', '"', "'", ',', 'v', '0'];
+export const GLYPHS = ['', ...RAMP, '∘', 'o', 'O', '"', "'", ',', 'v', '0', '8', 'x'];
 const G_RING = RAMP.length + 1; // ∘
 const G_O = RAMP.length + 2; // o
 const G_BIG_O = RAMP.length + 3; // O
 const G_TUFT = [RAMP.length + 4, RAMP.length + 7, RAMP.length + 4, RAMP.length + 7, 9, 5]; // " v " v * +
+const G_EIGHT = RAMP.length + 9; // 8
+const G_X = RAMP.length + 10; // x
+// Leafy marks: mostly round shapes (like the reference foliage and the
+// house art's o 0 @ & % runs), a few heavier ramp marks for weight.
+const G_LEAF = [G_O, 15, G_EIGHT, 12, 11, G_O, 9, 10, G_X, 13, RAMP.length + 8];
 const G_ROCK = [RAMP.length + 2, RAMP.length + 3, RAMP.length + 8, RAMP.length - 1, 12]; // o O 0 Ø &
-// v in 0..1 → a ramp glyph index (1-based into GLYPHS); lo/hi clamp the
-// weight range a surface may use
-const ramp = (v: number, lo: number, hi: number) =>
-  1 + Math.round(lo + clamp01(v) * (hi - lo));
 
 // ---- the field ---------------------------------------------------------------
 
@@ -418,14 +420,14 @@ export function terrainField(): TerrainField {
         const lit = h2 * h2;
         const fringe = smooth(0.975, 1.01, out.ndv);
         // mostly heavy ramp marks, some round o / ¤ for the leafy mix
-        g = h < 0.18 ? G_O : ramp(0.3 + 0.7 * (0.5 * tex + 0.5 * h2), 3, RAMP.length - 1);
+        g = G_LEAF[Math.floor((0.55 * tex + 0.45 * h2) * G_LEAF.length) % G_LEAF.length];
         const fr = P.foliageGlyphDark[0] + (P.foliageGlyph[0] - P.foliageGlyphDark[0]) * lit;
         const fg = P.foliageGlyphDark[1] + (P.foliageGlyph[1] - P.foliageGlyphDark[1]) * lit;
         const fb = P.foliageGlyphDark[2] + (P.foliageGlyph[2] - P.foliageGlyphDark[2]) * lit;
         tr = fr + (P.fringeGlyph[0] - fr) * fringe;
         tg = fg + (P.fringeGlyph[1] - fg) * fringe;
         tb = fb + (P.fringeGlyph[2] - fb) * fringe;
-        m = 0.62 + 0.3 * Math.max(lit, fringe);
+        m = 0.8 + 0.18 * Math.max(lit, fringe);
       } else if (out.kind === KIND_GRASS) {
         // The rim band: glyphs thicken toward the coast (the fade starts
         // well inland: bushes cover the last stretch before the shore).
@@ -437,12 +439,12 @@ export function terrainField(): TerrainField {
         const inland = 1 - smooth(0.8, 0.9, out.ndv);
         const tuftP = 0.7 * (1 - smooth(0.25, 0.6, out.patch)) * tuftCluster * inland;
         if (h < 0.012 + 0.8 * rim * rim) {
-          g = ramp(0.25 + 0.6 * rim * (0.6 + 0.4 * tex), 0, RAMP.length - 1);
+          g = G_LEAF[Math.floor(h2 * G_LEAF.length)];
           const fringe = smooth(0.965, 1.005, out.ndv);
           tr = P.foliageGlyph[0] + (P.fringeGlyph[0] - P.foliageGlyph[0]) * fringe;
           tg = P.foliageGlyph[1] + (P.fringeGlyph[1] - P.foliageGlyph[1]) * fringe;
           tb = P.foliageGlyph[2] + (P.fringeGlyph[2] - P.foliageGlyph[2]) * fringe;
-          m = rim > 0.2 ? 0.35 + 0.5 * rim : 0.22;
+          m = rim > 0.2 ? 0.4 + 0.5 * rim : 0.25;
         } else if (h2 < tuftP) {
           g = G_TUFT[Math.floor(h * 97) % G_TUFT.length];
           tr = P.grassGlyph[0];
@@ -467,21 +469,26 @@ export function terrainField(): TerrainField {
           tg = st[1];
           tb = st[2];
           m = 1;
-        } else if (h < 0.45) {
-          // sparse, faint grain so the sand stays a calm band next to the rim
-          // (no ¬ / =: on a light, flat surface they line up into dashes)
-          g = tex < 0.55 ? ramp(0, 0, 0) : tex < 0.85 ? ramp(0, 1, 1) : ramp(0, 4, 4);
-          k = -(0.1 + 0.06 * tex);
+        } else if (h < 0.8) {
+          // warm glyph grain over the whole band, yellow-olive right next to
+          // the rim so sand and foliage knit together like the reference
+          const nearRim = 1 - smooth(1.015, 1.045, out.ndv);
+          g = h2 < 0.35 ? G_O : h2 < 0.55 ? G_RING : h2 < 0.7 ? G_X : h2 < 0.85 ? 2 : 1;
+          tr = P.sandGlyph[0] + (P.fringeGlyph[0] - P.sandGlyph[0]) * nearRim;
+          tg = P.sandGlyph[1] + (P.fringeGlyph[1] - P.sandGlyph[1]) * nearRim;
+          tb = P.sandGlyph[2] + (P.fringeGlyph[2] - P.sandGlyph[2]) * nearRim;
+          m = 0.32 + 0.25 * tex + 0.25 * nearRim;
         }
       } else {
-        // water: a dense lattice of dots and rings, brighter in the shallows
+        // water: a dot on EVERY cell (the reference's fine lattice), rings
+        // and a few x marks mixed in, brighter in the shallows and patches
         const shallow = out.ndv < 1.25;
         const bright = vnoise(fx * 0.18, fy * 0.18, 5);
-        g = tex > 0.72 ? G_RING : tex > 0.55 && shallow ? ramp(0.1, 0, 2) : 1;
+        g = h2 < 0.62 ? 1 : h2 < 0.82 ? G_RING : shallow && h2 < 0.9 ? G_X : 2;
         tr = P.waterGlyph[0];
         tg = P.waterGlyph[1];
         tb = P.waterGlyph[2];
-        m = (shallow ? 0.32 : 0.18) + 0.18 * smooth(0.5, 0.8, bright);
+        m = (shallow ? 0.3 : 0.2) + 0.22 * smooth(0.5, 0.8, bright);
       }
       if (tr < 0 && g) {
         tr = k >= 0 ? 255 : 0;

@@ -76,7 +76,7 @@ import { SunIcon, MoonIcon, CoinIcon, SaveIcon } from './icons';
 import gearIcon from './assets/gear.svg';
 import inventoryIcon from './assets/inventory.svg';
 import handSlotIcon from './assets/hand_slot.svg';
-import { ColoredSprite, darken } from './ColoredSprite';
+import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
 import { useLayoutTool } from './devLayout';
 import { useWorldAssetTool } from './devWorldAssets';
 import { useSceneMarkerTool } from './devSceneMarkers';
@@ -1772,6 +1772,24 @@ function Game() {
     });
   }
 
+  // A timed line (no waiting for the player) that the next arrow / Enter can
+  // still cut short.
+  function sleepOrAdvance(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      if (skipCinematicRef.current) {
+        resolve();
+        return;
+      }
+      const done = () => {
+        window.clearTimeout(id);
+        if (dialogueAdvanceRef.current === done) dialogueAdvanceRef.current = null;
+        resolve();
+      };
+      const id = window.setTimeout(done, ms);
+      dialogueAdvanceRef.current = done;
+    });
+  }
+
   function waitForDialogueAdvance(): Promise<void> {
     return new Promise((resolve) => {
       if (skipCinematicRef.current) {
@@ -1948,7 +1966,7 @@ function Game() {
     setMitchyPos(entranceStart);
 
     setDialogue({ speaker: UNKNOWN_SPEAKER, text: WAKE_LINE });
-    await sleep(BLACK_SCREEN_MS);
+    await sleepOrAdvance(BLACK_SCREEN_MS);
 
     // Eyes open: letterbox bars appear, the black cover starts fading (CSS
     // transition, EYE_OPEN_MS — see the .cinematic-blackout style), and
@@ -4039,7 +4057,15 @@ function Game() {
                   transition: worldTransition,
                 }}
               >
-                <ColoredSprite
+                {/* One canvas, not ~400 styled spans: every walk frame swaps
+                    the whole sprite, and as spans each swap restyled
+                    thousands of nodes and repainted the screen. Occupied
+                    cells still get an opaque backing (terrain never shows
+                    through the character) and the 1px outline. eyeRow is
+                    only set for the idle portrait (character.face's row 14,
+                    verified against docs/character-sprite-parts's eye
+                    colour predicate) — the walk frames' crop differs. */}
+                <SolidSpriteCanvas
                   className="player-sprite"
                   style={{
                     left: `${-playerOffX}ch`,
@@ -4049,17 +4075,10 @@ function Game() {
                   sprite={displaySprite}
                   colors={displayColors}
                   palette={displayPalette}
-                  // Occupied cells get an opaque per-cell background (see
-                  // ColoredSprite's solidCells) so terrain/ground texture can
-                  // never show through the character — only genuine gaps stay
-                  // transparent. eyeRow is only set for the idle/static
-                  // portrait (character.face's own row 14, verified against
-                  // docs/character-sprite-parts's eye colour predicate) —
-                  // the walk-cycle frames have different crop/padding per
-                  // direction that hasn't been verified against the same row
-                  // number, so they get solid cells but not the eye override.
-                  solidCells
                   eyeRow={walkAnim ? undefined : 14}
+                  charW={dims.charW}
+                  lineH={dims.lineH}
+                  res={dims.scale * zoom * playerK * (window.devicePixelRatio || 1)}
                 />
 
                 {equipped?.equip?.mode === 'vehicle' && (

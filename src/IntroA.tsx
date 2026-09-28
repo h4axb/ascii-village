@@ -64,6 +64,7 @@ import {
 } from './introAConfig';
 import { INTRO_NARRATION, INTRO_STAGE_ORDER, type IntroStageId } from './introNarrationData';
 import IntroNarration from './IntroNarration';
+import { AUTO_NEXT_MS } from './introPartB';
 
 export type IntroAHandle = { skip: () => void };
 
@@ -107,6 +108,19 @@ export default forwardRef<
   // ordinary React state instead of a ref, same as stage 15+'s DialogueBox
   // line. See introNarrationData.ts for the data this reads.
   const [narrationText, setNarrationText] = useState<string | null>(null);
+  // Set while a narration beat is up: ends its wait early (arrow / Enter).
+  const nextRef = useRef<(() => void) | null>(null);
+  const onNext = () => nextRef.current?.();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && nextRef.current) {
+        e.preventDefault();
+        nextRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   useImperativeHandle(ref, () => ({
     skip() {
@@ -193,7 +207,19 @@ export default forwardRef<
       if (beat.delayMs) await sleep(beat.delayMs);
       if (skipRef.current || ffRef.current || cancelled) return;
       setNarrationText(beat.text);
-      await sleep(beat.holdMs);
+      // stays up until the arrow / Enter, or AUTO_NEXT_MS (a beat scripted
+      // to stay longer keeps its own hold)
+      await new Promise<void>((resolve) => {
+        const done = () => {
+          window.clearTimeout(id);
+          timers.current.delete(id);
+          if (nextRef.current === done) nextRef.current = null;
+          resolve();
+        };
+        const id = window.setTimeout(done, Math.max(beat.holdMs, AUTO_NEXT_MS));
+        timers.current.add(id);
+        nextRef.current = done;
+      });
       if (cancelled) return;
       setNarrationText(null);
     }
@@ -703,7 +729,7 @@ export default forwardRef<
           position:fixed + z-index 10002, now meaningfully compared
           against Letterbox/dialogue/skip-button since it's no longer
           trapped inside this component's own stacking context). */}
-      {createPortal(<IntroNarration text={narrationText} />, document.body)}
+      {createPortal(<IntroNarration text={narrationText} onNext={onNext} />, document.body)}
       <style>{`
         div[data-introa-cursor].clicking { transform: translate(0,0) scale(0.72) !important; }
       `}</style>

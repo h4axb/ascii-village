@@ -336,3 +336,100 @@ function propsAreEqual(prev: Props, next: Props): boolean {
 }
 
 export const ColoredSprite = React.memo(ColoredSpriteImpl, propsAreEqual);
+
+// The `solidCells` look drawn on ONE canvas instead of one <span> per cell.
+// Used for the player: its walk cycle swaps the whole sprite several times a
+// second, and as ~400 styled spans (each with a background and a 4-way text
+// shadow) every swap rewrote thousands of DOM styles and repainted the
+// screen — measured as the biggest cost of walking. Same colours, same eye
+// cells, same 1px outline as the span version.
+interface SolidCanvasProps {
+  sprite: string[];
+  colors: string[];
+  palette: Record<string, string>;
+  eyeRow?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  charW: number; // px per cell at the sprite's own font size
+  lineH: number;
+  res: number; // backing pixels per CSS px (screen scale x devicePixelRatio)
+  outline?: string; // CSS var holding the outline colour
+}
+
+export function SolidSpriteCanvas({
+  sprite,
+  colors,
+  palette,
+  eyeRow,
+  className,
+  style,
+  charW,
+  lineH,
+  res,
+  outline = '--player-outline',
+}: SolidCanvasProps) {
+  const ref = React.useRef<HTMLCanvasElement>(null);
+  const cols = Math.max(0, ...sprite.map((l) => l.length));
+  const rows = sprite.length;
+  const r = Math.min(3, Math.max(0.5, Math.ceil(res * 4) / 4));
+  React.useLayoutEffect(() => {
+    const c = ref.current;
+    const ctx = c?.getContext('2d');
+    if (!c || !ctx) return;
+    const w = Math.max(1, Math.ceil(cols * charW * r));
+    const h = Math.max(1, Math.ceil(rows * lineH * r));
+    if (c.width !== w || c.height !== h) {
+      c.width = w;
+      c.height = h;
+    } else ctx.clearRect(0, 0, w, h);
+    const cs = getComputedStyle(c);
+    const base = cs.color || '#fff';
+    const ring = cs.getPropertyValue(outline).trim() || '#000';
+    ctx.font = `${lineH * r}px ${cs.fontFamily || 'monospace'}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // cells in paint order: every background first, then every glyph's
+    // outline, then the glyphs — the order the browser paints the spans in
+    const glyphs: [string, number, number, string][] = [];
+    for (let y = 0; y < rows; y++) {
+      const line = sprite[y];
+      const crow = colors[y] ?? '';
+      const y0 = Math.floor(y * lineH * r);
+      const y1 = Math.floor((y + 1) * lineH * r);
+      for (let x = 0; x < line.length; x++) {
+        const ch = line[x];
+        const key = crow[x];
+        const hex = key ? palette[key] : undefined;
+        const eye = eyeRow === y && !!hex && isWarmBrown(hex);
+        if (ch === ' ' && !eye) continue;
+        const x0 = Math.floor(x * charW * r);
+        const x1 = Math.floor((x + 1) * charW * r);
+        if (eye || hex) {
+          ctx.fillStyle = eye ? EYE_BG : darken(hex!, 0.55);
+          ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+        }
+        if (!eye && ch !== ' ') glyphs.push([ch, (x0 + x1) / 2, (y0 + y1) / 2, hex ?? base]);
+      }
+    }
+    const o = r; // the CSS ring is 1px at the sprite's own scale
+    ctx.fillStyle = ring;
+    for (const [ch, x, y] of glyphs) {
+      ctx.fillText(ch, x + o, y);
+      ctx.fillText(ch, x - o, y);
+      ctx.fillText(ch, x, y + o);
+      ctx.fillText(ch, x, y - o);
+    }
+    let last = '';
+    for (const [ch, x, y, hex] of glyphs) {
+      if (hex !== last) ctx.fillStyle = last = hex;
+      ctx.fillText(ch, x, y);
+    }
+  }, [sprite, colors, palette, eyeRow, cols, rows, charW, lineH, r, outline]);
+  return (
+    <canvas
+      ref={ref}
+      className={className}
+      style={{ position: 'absolute', width: `${cols}ch`, height: `${rows}em`, ...style }}
+    />
+  );
+}

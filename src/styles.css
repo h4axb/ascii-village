@@ -3133,11 +3133,50 @@ pre {
   margin: 0;
 }
 
-.introb-dialogue-next {
-  margin-top: 12px;
-  color: var(--ui-muted);
-  font-size: 11px;
-  text-align: right;
+.introb-dialogue {
+  /* room under the text for the next arrow */
+  padding-bottom: 30px;
+}
+
+/* "Next" arrow: bottom centre of the dialogue / narration box, bobbing so
+   it reads as "click to continue". A button of its own, so it is clickable
+   even inside the narration box (whose wrapper ignores the pointer). */
+.next-arrow {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ui-body, #fff);
+  cursor: pointer;
+  pointer-events: auto;
+  animation: next-arrow-bob 0.9s ease-in-out infinite;
+}
+
+.next-arrow:hover {
+  color: var(--ui-petal-core, #ffd166);
+}
+
+@keyframes next-arrow-bob {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+  }
+  50% {
+    transform: translate(-50%, 3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .next-arrow {
+    animation: none;
+  }
 }
 
 /* Yellow keyword-highlight span — {KEY:...}/{SETTINGS_CONTROLS} tokens in
@@ -3177,8 +3216,8 @@ pre {
    laptop/MYLL prologue's cinematic beats (src/introNarrationData.ts, the ONE
    authoritative narration source for the whole unified intro, not just
    Stage A; IntroA.tsx). Deliberately NOT styled like
-   .introb-dialogue/DialogueBox: no speaker-name label, no "click to
-   continue" affordance, no choices — it must read as the protagonist's
+   .introb-dialogue/DialogueBox: no speaker-name label, no choices (it only
+   shares the bottom-centre "next" arrow) — it must read as the protagonist's
    own thoughts, not as another character talking to the player. A
    bottom-center black chat box, fixed against the viewport (this is
    portaled to document.body from IntroA.tsx, escaping its own root's
@@ -3209,8 +3248,10 @@ pre {
    Editor) introduces a longer line, re-measure and bump this height —
    anything that still wraps to <=2 lines needs no change. */
 .introa-narration-box {
+  position: relative;
   width: min(640px, 84vw);
-  height: 96px;
+  /* +8px over the measured 2-line fit so the next arrow clears the text */
+  height: 104px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3225,6 +3266,11 @@ pre {
 
 .introa-narration-box.visible {
   opacity: 1;
+}
+
+.introa-narration-box .next-arrow {
+  color: #fff;
+  bottom: 2px;
 }
 
 .introa-narration-text {

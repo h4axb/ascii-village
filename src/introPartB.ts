@@ -117,6 +117,10 @@ export const MITCHY_OFFCAM_START_MARGIN = 0;
 // this on a normal gameplay session, so it never activates on its own.
 export const AUTO_ADVANCE_MS = 2000;
 
+// Normal play: a dialogue line / narration beat moves on by itself after
+// this long if the player hasn't clicked the arrow or pressed Enter.
+export const AUTO_NEXT_MS = 3000;
+
 export function substitutePlayerName(text: string, playerName: string): string {
   return text.replace(/\{PLAYER_NAME\}/g, playerName);
 }

@@ -1,11 +1,12 @@
 // The "M" map overlay: a still, zoomed-out picture of the ACTUAL world.
 //
-//   1. TERRAIN (cached once per session): the same colour mosaic + glyphs the
-//      game draws (terrain.ts), rendered at a fixed small cell size — no
-//      caustics, foam or other animation.
-//   2. ENTITIES (redrawn each time the map opens): every world sprite — house,
-//      shop, palms, pond, garden, flora, placed items — painted as its own
-//      coloured cells at map scale, so the map shows the island as it is now.
+//   1. TERRAIN: the same colour mosaic + glyphs the game draws (terrain.ts)
+//      — no caustics, foam or other animation.
+//   2. ENTITIES: every world sprite — house, shop, palms, pond, garden, flora,
+//      placed items — drawn with its own glyphs and colours, exactly as in
+//      game, so the map shows the island as it is now.
+//   Both are painted each time the map opens, at the resolution the screen
+//   shows them, and freed again when it closes.
 //   3. MARKERS: head portraits for the player and Mitchy (the HUD avatar
 //      technique: a circular crop of the character sprite), icons for the
 //      house and the shop, and a legend in the bottom-left corner.
@@ -14,8 +15,8 @@
 // wide; WASD / arrow keys pan the map camera (App.tsx already blocks world
 // movement while the map is open).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ColoredSprite } from './ColoredSprite';
-import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, MAP_W, STRUCT_ENTS, PLAYER_T, grassKeepOut } from './world';
+import { ColoredSprite, darken } from './ColoredSprite';
+import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, MAP_W, STRUCT_ENTS, PLAYER_T, grassKeepOut, footprint } from './world';
 import type { Ent } from './world';
 import { terrainField, GLYPHS, KIND_WATER } from './terrain';
 
@@ -30,42 +31,51 @@ export interface MapCharacterEntry {
   ringColor?: string; // border accent so the player/Mitchy read as distinct
 }
 
-// Internal map resolution: px per character cell (a cell is 8.4 x 14 in game)
-const CELL_W = 4;
-const CELL_H = (CELL_W * 14) / 8.4;
-const IMG_W = Math.round(GROUND_W * CELL_W);
-const IMG_H = Math.round(GROUND_H * CELL_H);
+// Map drawing resolution: px per character cell, picked to match what the
+// screen shows (see pickCell) so glyphs stay crisp. A cell is 8.4 x 14 in
+// game, so the height follows the width.
+const cellH = (cw: number) => (cw * 14) / 8.4;
+const pickCell = (pxPerCell: number) =>
+  Math.max(4, Math.min(6, Math.ceil(pxPerCell * (window.devicePixelRatio || 1))));
 const ZOOM = 1.6; // how far past "whole width fits" the map is zoomed in
 const PAN_SPEED = 900; // map px per second while a key is held
 const HEAD_PX = 34;
 const ICON_PX = 26;
 
-// Base colours for sprite cells without their own palette colour — the same
-// values the .ent.<kind> CSS rules use in the game.
-const KIND_COLOR: Record<string, string> = {
-  cat: '#e9dcc1',
-  palm: '#9BB86B',
-  flower: '#9BB86B',
-  cactus: '#9BB86B',
-  fern: '#9BB86B',
-  iceflower: '#9BB86B',
-  grasshalm: '#9BB86B',
-  flowerplus: '#9BB86B',
-  pond: '#6a7078',
-  cliff: '#6f7a52',
-  house: '#E4D6B5',
-  shop: '#E4D6B5',
-  stone: '#8a8a8a',
-  date: '#f5b731',
-};
+// Sprites the game draws with an opaque darkened backing behind each cell
+// (ColoredSprite's solidCells, and the pond canvas).
+const SOLID_KINDS = new Set(['house', 'bridge', 'pond']);
+const SKIP_KINDS = new Set(['hotspot', 'blocker', 'cat', 'ghost']);
 
 const hexOf = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
-let terrainCache: HTMLCanvasElement | null = null;
+// Each kind's base colour straight from its .ent.<kind> CSS rule, so the map
+// can't drift from the game's own styling.
+const kindColor = new Map<string, string>();
+function colorOf(kind: string): string {
+  let c = kindColor.get(kind);
+  if (!c) {
+    const probe = document.createElement('pre');
+    probe.className = `ent ${kind}`;
+    probe.style.cssText = 'position:absolute;visibility:hidden;left:-9999px';
+    document.body.appendChild(probe);
+    c = getComputedStyle(probe).color || '#d6d6d6';
+    probe.remove();
+    kindColor.set(kind, c);
+  }
+  return c;
+}
 
-function terrainImage(font: string): HTMLCanvasElement {
-  if (terrainCache) return terrainCache;
+// The still world: colour mosaic + ground glyphs (terrain.ts, no caustics or
+// foam), then every entity drawn as its own glyphs and colours, in the same
+// back-to-front order the game stacks them.
+function paintMap(c: HTMLCanvasElement, cw: number, font: string, ents: Ent[]) {
+  const ch = cellH(cw);
   const f = terrainField();
+  c.width = Math.round(GROUND_W * cw);
+  c.height = Math.round(GROUND_H * ch);
+  const ctx = c.getContext('2d');
+  if (!ctx) return;
   // colour mosaic: one pixel per cell, scaled up without smoothing
   const small = document.createElement('canvas');
   small.width = f.bgW;
@@ -74,18 +84,15 @@ function terrainImage(font: string): HTMLCanvasElement {
   const img = sctx.createImageData(f.bgW, f.bgH);
   img.data.set(f.bg);
   sctx.putImageData(img, 0, 0);
-  const c = document.createElement('canvas');
-  c.width = IMG_W;
-  c.height = IMG_H;
-  const ctx = c.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(small, 0, 0, IMG_W, IMG_H);
-  // glyph texture, same glyphs and colours as the game (window 0's keep-out
-  // mask is close enough for a still overview)
-  const keep = grassKeepOut(0);
-  ctx.font = `${CELL_H}px ${font}`;
+  ctx.drawImage(small, 0, 0, c.width, c.height);
+  small.width = small.height = 0;
+
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  // ground glyphs (window 0's keep-out mask is close enough for a still map)
+  const keep = grassKeepOut(0);
+  ctx.font = `${ch}px ${font}`;
   let last = -1;
   for (let y = 0; y < GROUND_H; y++) {
     const kt = Math.floor(y / TILE_LN) * MAP_W;
@@ -98,34 +105,51 @@ function terrainImage(font: string): HTMLCanvasElement {
         last = f.color[i];
         ctx.fillStyle = hexOf(last);
       }
-      ctx.fillText(GLYPHS[g], (x + 0.5) * CELL_W, (y + 0.5) * CELL_H);
+      ctx.fillText(GLYPHS[g], (x + 0.5) * cw, (y + 0.5) * ch);
     }
   }
-  return (terrainCache = c);
-}
 
-// Entity sprites as coloured cells. A sprite drawn with `scale` k covers
-// (cols*k x rows*k) cells starting at its tile's top-left — the same visual
-// box App.tsx gives it (scaled about its bottom-centre, offsets cancelling).
-function drawEntities(ctx: CanvasRenderingContext2D, ents: Ent[]) {
-  for (const e of ents) {
-    if (e.kind === 'hotspot' || e.kind === 'blocker' || e.kind === 'cat') continue;
+  // entities, back to front like the game's z-index
+  const z = (e: Ent) => (e.kind === 'cliff' ? -1 : e.kind === 'bridge' ? 1e6 : footprint(e).row);
+  const list = ents.filter((e) => !SKIP_KINDS.has(e.kind)).sort((a, b) => z(a) - z(b));
+  for (const e of list) {
+    // a sprite drawn at scale k covers (cols*k x rows*k) cells from its
+    // tile's top-left — the visual box App.tsx gives it
     const k = e.scale ?? 1;
-    const w = Math.max(1, k * CELL_W);
-    const h = Math.max(1, k * CELL_H);
-    const ox = e.x * TILE_CH * CELL_W;
-    const oy = e.y * TILE_LN * CELL_H;
-    const base = KIND_COLOR[e.kind] ?? '#d6d6d6';
+    const w = k * cw;
+    const h = k * ch;
+    const ox = e.x * TILE_CH * cw;
+    const oy = e.y * TILE_LN * ch;
+    const base = colorOf(e.kind);
+    const solid = SOLID_KINDS.has(e.kind);
+    ctx.font = `${h}px ${font}`;
     for (let r = 0; r < e.sprite.length; r++) {
       const line = e.sprite[r];
       const crow = e.colors?.[r] ?? '';
+      const y0 = Math.floor(oy + r * h);
+      const y1 = Math.floor(oy + (r + 1) * h);
       for (let col = 0; col < line.length; col++) {
-        if (line[col] === ' ') continue;
-        ctx.fillStyle = (e.palette && e.palette[crow[col]]) || base;
-        ctx.fillRect(ox + col * w, oy + r * h, Math.ceil(w), Math.ceil(h));
+        const g = line[col];
+        if (g === ' ') continue;
+        const hex = e.palette?.[crow[col]];
+        const x0 = Math.floor(ox + col * w);
+        const x1 = Math.floor(ox + (col + 1) * w);
+        if (solid) {
+          ctx.fillStyle = darken(hex ?? rgbHex(base), 0.55);
+          ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+        }
+        ctx.fillStyle = hex ?? base;
+        ctx.fillText(g, (x0 + x1) / 2, (y0 + y1) / 2);
       }
     }
   }
+}
+
+// computed styles come back as rgb(); darken() wants #rrggbb
+function rgbHex(c: string): string {
+  const m = c.match(/\d+/g);
+  if (!c.startsWith('rgb') || !m) return c;
+  return '#' + m.slice(0, 3).map((v) => (+v).toString(16).padStart(2, '0')).join('');
 }
 
 // centre of an entity's visual box, in character cells
@@ -205,16 +229,20 @@ export default function GameMap({
   const mapW = GROUND_W * pxPerCell;
   const mapH = GROUND_H * pxPerLine;
 
-  // draw terrain + entities whenever the map opens
+  // draw the world whenever the map opens; hand the (large) bitmap's memory
+  // back as soon as it closes
+  const cell = pxPerCell ? pickCell(pxPerCell) : 0;
   useEffect(() => {
-    if (!open) return;
+    if (!open || !cell) return;
     const c = canvasRef.current;
-    const ctx = c?.getContext('2d');
-    if (!c || !ctx) return;
+    if (!c) return;
     const font = getComputedStyle(c).fontFamily || 'monospace';
-    ctx.drawImage(terrainImage(font), 0, 0);
-    drawEntities(ctx, [...ents, ...STRUCT_ENTS.filter((e) => e.kind === 'gardenbed')]);
-  }, [open, ents]);
+    paintMap(c, cell, font, [...ents, ...STRUCT_ENTS.filter((e) => e.kind === 'gardenbed')]);
+    return () => {
+      c.width = 0;
+      c.height = 0;
+    };
+  }, [open, ents, cell]);
 
   const player = characters.find((c) => c.id === 'player');
   const playerPos = open && player ? player.getPos() : null;
@@ -315,7 +343,7 @@ export default function GameMap({
         </button>
         <div className="game-map-viewport" ref={vpRef}>
           <div className="game-map-world" ref={worldRef} style={{ width: mapW, height: mapH }}>
-            <canvas ref={canvasRef} width={IMG_W} height={IMG_H} className="game-map-canvas" />
+            <canvas ref={canvasRef} className="game-map-canvas" />
             {landmarks.house && (
               <div
                 className="map-icon house"

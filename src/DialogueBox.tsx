@@ -7,12 +7,33 @@
 //   - a speaker label that changes mid-conversation ('???' -> 'Mitchy')
 //   - inline {KEY:xxx} / {SETTINGS_CONTROLS} highlight tokens (see
 //     introPartB.ts's DIALOGUE_HIGHLIGHT_LABELS) rendered as yellow spans
-//   - a simple "next" affordance (click anywhere on the box, or
-//     Enter/Space/click) when there are no choices
+//   - a "next" arrow at the bottom centre of the box (click it, anywhere on
+//     the box, or press Enter/Space) when there are no choices; the line
+//     also moves on by itself after AUTO_NEXT_MS
 //   - a two-option choice prompt (reusing OptList's up/down + enter pattern)
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import { AUTO_ADVANCE_MS, DIALOGUE_HIGHLIGHT_LABELS } from './introPartB';
+import { AUTO_ADVANCE_MS, AUTO_NEXT_MS, DIALOGUE_HIGHLIGHT_LABELS } from './introPartB';
+
+// The bouncing "next" arrow on the bottom edge of a dialogue/narration box.
+// A real button, so it stays clickable even where the box itself isn't.
+export function NextArrow({ onClick, label = 'next' }: { onClick?: () => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      className="next-arrow"
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+    >
+      <svg viewBox="0 0 12 8" width="14" height="9" aria-hidden>
+        <path d="M0 0h12L6 8z" fill="currentColor" />
+      </svg>
+    </button>
+  );
+}
 
 export interface DialogueLine {
   speaker: string;
@@ -89,6 +110,15 @@ export default function DialogueBox({
     return () => window.removeEventListener('keydown', onKey);
   }, [locked, hasChoices, line, sel, onAdvance, onChoice]);
 
+  // Normal play: a plain line (no choices) moves on by itself after
+  // AUTO_NEXT_MS unless the player advanced it first. Re-armed per line.
+  useEffect(() => {
+    if (locked || hasChoices) return;
+    const t = window.setTimeout(onAdvance, AUTO_NEXT_MS);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locked, hasChoices, line]);
+
   // Locked/test mode: no click or keyboard, just a timer. Re-armed every
   // time `line` changes (a fresh dialogue beat), same as the sel-reset
   // effect above.
@@ -129,9 +159,7 @@ export default function DialogueBox({
             ))}
           </div>
         ) : (
-          <div className="introb-dialogue-next">
-            {locked ? 'continuing automatically…' : 'click or [Enter] to continue'}
-          </div>
+          <NextArrow onClick={locked ? undefined : onAdvance} />
         )}
       </div>
     </div>

@@ -942,26 +942,60 @@ function mulberry32(a: number) {
 // the gameplay-side mask of where ground glyphs must not be drawn.
 // ---------------------------------------------------------------------------
 
-// Tiles the grass must stay off: every entity's full sprite box AND its solid
-// collision box, plus a one-tile margin, plus the whole garden plot. Without
-// this, tufts sprout through sprites and — worse — inside collision boxes,
-// which paints walkable-looking grass on ground you can't actually stand on.
-const GRASS_CLEAR_MARGIN = 1;
-export function grassKeepOut(window: number): Uint8Array {
-  const mask = new Uint8Array(MAP_W * MAP_H);
-  const block = (b: TileBox) => {
-    for (let ty = b.y0 - GRASS_CLEAR_MARGIN; ty <= b.y1 + GRASS_CLEAR_MARGIN; ty++) {
-      for (let tx = b.x0 - GRASS_CLEAR_MARGIN; tx <= b.x1 + GRASS_CLEAR_MARGIN; tx++) {
-        if (tx >= 0 && tx < MAP_W && ty >= 0 && ty < MAP_H) mask[ty * MAP_W + tx] = 1;
-      }
+// Character cells covered by these entities' glyph silhouettes, one byte
+// per cell of the GROUND_W x GROUND_H ground grid: every sprite row from its
+// first to its last glyph (so nothing shines through the gaps inside a
+// canopy or trunk) plus `margin` cells around it. Replaces the entity's
+// whole rectangular tile box, which left a bare square around every palm.
+export function silhouetteMask(
+  ents: Iterable<Pick<Ent, 'x' | 'y' | 'sprite' | 'scale' | 'rotation'>>,
+  margin = 1,
+  mask = new Uint8Array(GROUND_W * GROUND_H),
+): Uint8Array {
+  const fill = (x0: number, y0: number, x1: number, y1: number) => {
+    const ax = Math.max(0, x0);
+    const bx = Math.min(GROUND_W - 1, x1);
+    if (bx < ax) return;
+    for (let y = Math.max(0, y0); y <= Math.min(GROUND_H - 1, y1); y++) {
+      mask.fill(1, y * GROUND_W + ax, y * GROUND_W + bx + 1);
     }
   };
-  // the hand-placed structures, and the wild flora for THIS growth window
-  for (const e of [...STRUCT_ENTS, ...wildSpawns(window)]) {
-    block(bbox(e));
-    block(collisionBox(e));
+  const m = margin;
+  for (const e of ents) {
+    if (e.rotation) {
+      // rotated sprites no longer map row-for-row: use their box
+      const b = bbox(e);
+      fill(b.x0 * TILE_CH - m, b.y0 * TILE_LN - m, (b.x1 + 1) * TILE_CH - 1 + m, (b.y1 + 1) * TILE_LN - 1 + m);
+      continue;
+    }
+    // a sprite drawn at scale k covers cols*k x rows*k cells from its tile's
+    // top-left (App.tsx pivots the shrink so this corner stays put)
+    const k = e.scale ?? 1;
+    const ox = e.x * TILE_CH;
+    const oy = e.y * TILE_LN;
+    e.sprite.forEach((line, r) => {
+      const first = line.search(/\S/);
+      if (first < 0) return;
+      const last = line.trimEnd().length - 1;
+      fill(
+        Math.floor(ox + first * k) - m,
+        Math.floor(oy + r * k) - m,
+        Math.ceil(ox + (last + 1) * k) - 1 + m,
+        Math.ceil(oy + (r + 1) * k) - 1 + m,
+      );
+    });
   }
-  block({ x0: GARDEN.x0, y0: GARDEN.y0, x1: GARDEN.x1, y1: GARDEN.y1 });
+  return mask;
+}
+
+// Cells the ground glyphs must stay off: the structures' and this growth
+// window's wild flora's silhouettes (1-cell margin), plus the garden plot.
+export function grassKeepOut(window: number): Uint8Array {
+  const mask = silhouetteMask([...STRUCT_ENTS, ...wildSpawns(window)], 1);
+  const g = GARDEN;
+  for (let y = g.y0 * TILE_LN; y < (g.y1 + 1) * TILE_LN; y++) {
+    mask.fill(1, y * GROUND_W + g.x0 * TILE_CH, y * GROUND_W + (g.x1 + 1) * TILE_CH);
+  }
   return mask;
 }
 

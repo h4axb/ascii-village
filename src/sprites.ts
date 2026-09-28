@@ -376,13 +376,16 @@ export const GRASS_HALM_COLORS = [
   '.....rs..tu...v..',
 ];
 
+// Light, slightly yellow greens from the ground's own grass-glyph family
+// (terrain.ts grassGlyph #a6ba68), tips brightest, so the tufts stand out
+// on the olive ground instead of fading into it.
 export const GRASS_HALM_PALETTE: Record<string, string> = {
-  a: '#a6ba95', b: '#9eaf8e', c: '#a6ba95', d: '#9eaf8e',
-  e: '#95a885', f: '#9eaf8e', g: '#95a885', h: '#8b9d7b',
-  i: '#95a885', j: '#8b9d7b', k: '#8b9d7b', l: '#809171',
-  m: '#8b9d7b', n: '#809171', o: '#809171', p: '#768568',
-  q: '#809171', r: '#768568', s: '#768568', t: '#6b7a5f',
-  u: '#768568', v: '#6b7a5f',
+  a: '#f0f8b4', b: '#e6f2a2', c: '#f0f8b4', d: '#e6f2a2',
+  e: '#dbeb92', f: '#e6f2a2', g: '#dbeb92', h: '#cfe182',
+  i: '#dbeb92', j: '#cfe182', k: '#cfe182', l: '#c3d874',
+  m: '#cfe182', n: '#c3d874', o: '#c3d874', p: '#b6cd66',
+  q: '#c3d874', r: '#b6cd66', s: '#b6cd66', t: '#a9c25a',
+  u: '#b6cd66', v: '#a9c25a',
 };
 
 // ---------------------------------------------------------------------------
@@ -561,7 +564,23 @@ export const CLIFF_SOLID: string[] = cliffData.solid;
 // for how. Replaces the old procedurally drawn `+=|.` fence from farm.ts.
 export const GARDEN_BED: string[] = gardenBedData.sprite;
 export const GARDEN_BED_COLORS: string[] = gardenBedData.colors;
-export const GARDEN_BED_PALETTE: Record<string, string> = gardenBedData.palette;
+// Brightened: the baked colours read too dark on the island, especially
+// behind solidCells' own darkened per-cell backing. Scaling the channels
+// (rather than mixing toward white) keeps the wood and soil saturated.
+const GARDEN_BED_LIFT = 1.3;
+const lift = (hex: string, t: number) =>
+  '#' +
+  [1, 3, 5]
+    .map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16);
+      return Math.min(255, Math.round(c * t + 6))
+        .toString(16)
+        .padStart(2, '0');
+    })
+    .join('');
+export const GARDEN_BED_PALETTE: Record<string, string> = Object.fromEntries(
+  Object.entries(gardenBedData.palette as Record<string, string>).map(([k, v]) => [k, lift(v, GARDEN_BED_LIFT)]),
+);
 
 // The reference draws the gate OPEN — a hole in the near fence — so the shut
 // state has to be synthesised.

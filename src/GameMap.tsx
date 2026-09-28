@@ -16,7 +16,7 @@
 // movement while the map is open).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ColoredSprite, darken } from './ColoredSprite';
-import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, MAP_W, STRUCT_ENTS, PLAYER_T, grassKeepOut, footprint } from './world';
+import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, STRUCT_ENTS, PLAYER_T, grassKeepOut, footprint } from './world';
 import type { Ent } from './world';
 import { terrainField, GLYPHS, KIND_WATER } from './terrain';
 
@@ -95,12 +95,11 @@ function paintMap(c: HTMLCanvasElement, cw: number, font: string, ents: Ent[]) {
   ctx.font = `${ch}px ${font}`;
   let last = -1;
   for (let y = 0; y < GROUND_H; y++) {
-    const kt = Math.floor(y / TILE_LN) * MAP_W;
     for (let x = 0; x < GROUND_W; x++) {
       const i = y * GROUND_W + x;
       const g = f.glyph[i];
       if (!g) continue;
-      if (f.kind[i] !== KIND_WATER && keep[kt + Math.floor(x / TILE_CH)]) continue;
+      if (f.kind[i] !== KIND_WATER && keep[i]) continue;
       if (f.color[i] !== last) {
         last = f.color[i];
         ctx.fillStyle = hexOf(last);

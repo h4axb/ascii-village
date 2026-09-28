@@ -1113,6 +1113,12 @@ pre {
   color: #9BB86B;
 }
 
+/* The grass tufts are drawn at GRASS_SCALE (1/5 size), where thin 'o'
+   strokes blur into the ground; bold strokes keep them readable. */
+.ent.grasshalm {
+  font-weight: 700;
+}
+
 /* The pond paints every cell from its own decoded palette (shore, reeds,
    water), so this base colour only shows through on cells left uncoloured. */
 .ent.pond {

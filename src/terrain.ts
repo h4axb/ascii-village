@@ -30,6 +30,7 @@ import {
   STRUCT_ENTS,
   bbox,
   collisionBox,
+  silhouetteMask,
   OCEAN_CFG,
 } from './world';
 import { RAMP_DEFAULT } from './craft/materials';
@@ -174,7 +175,7 @@ const BUSH_GH = Math.ceil((MAP_H * ISO_Y) / BUSH_S) + 2;
 let BUSHES: Float32Array | null = null;
 
 // Tiles covered by a structure (sprite box + collider + 1-tile margin): no
-// bushes or ground glyphs are drawn under the house, bridge, cliff, etc.
+// bush clumps are rooted under the house, bridge, cliff, palms, etc.
 let STRUCT_MASK: Uint8Array | null = null;
 function structMask(): Uint8Array {
   if (STRUCT_MASK) return STRUCT_MASK;
@@ -196,6 +197,16 @@ const masked = (fx: number, fy: number) => {
   const ty = Math.floor(fy);
   return tx >= 0 && tx < MAP_W && ty >= 0 && ty < MAP_H && structMask()[ty * MAP_W + tx] === 1;
 };
+
+// Character cells no ground glyph is drawn on: each structure's glyph
+// silhouette plus one cell (world.ts silhouetteMask), not its whole box.
+let GLYPH_MASK: Uint8Array | null = null;
+function glyphMask(): Uint8Array {
+  return (GLYPH_MASK ??= silhouetteMask(
+    STRUCT_ENTS.filter((e) => e.kind !== 'hotspot' && e.kind !== 'blocker'),
+    1,
+  ));
+}
 
 function bushes(): Float32Array {
   if (BUSHES) return BUSHES;
@@ -412,7 +423,7 @@ export function terrainField(): TerrainField {
       const land = out.kind !== KIND_WATER;
       // fine surface texture shared by every surface (0..1)
       const tex = vnoise(fx * 1.7, fy * 1.7, 201) * 0.6 + h * 0.4;
-      if (land && masked(fx, fy)) {
+      if (land && glyphMask()[idx]) {
         g = 0;
       } else if (out.kind === KIND_BUSH) {
         // foliage texture: every cell a heavy mark, randomly brighter or

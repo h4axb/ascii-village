@@ -12,7 +12,7 @@
 //   3. MOTION: one overlay canvas covering just the visible area, redrawn
 //      every OCEAN_CFG.driftMs with the caustics and shore foam in view.
 import { useEffect, useRef } from 'react';
-import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, MAP_W, grassKeepOut, OCEAN_CFG } from './world';
+import { GROUND_W, GROUND_H, grassKeepOut, OCEAN_CFG } from './world';
 import {
   terrainField,
   GLYPHS,
@@ -148,12 +148,11 @@ export default function TerrainCanvas(props: Props) {
     let last = -1;
     for (let y = y0; y < y1; y++) {
       const row = y * GROUND_W;
-      const kt = Math.floor(y / TILE_LN) * MAP_W;
       for (let x = x0; x < x1; x++) {
         const i = row + x;
         const g = f.glyph[i];
         if (!g) continue;
-        if (keep && f.kind[i] !== KIND_WATER && keep[kt + Math.floor(x / TILE_CH)]) continue;
+        if (keep && f.kind[i] !== KIND_WATER && keep[i]) continue;
         const c = f.color[i];
         if (c !== last) {
           ctx.fillStyle = css(c);

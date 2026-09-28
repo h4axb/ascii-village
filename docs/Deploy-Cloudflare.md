@@ -22,6 +22,18 @@ entry: Cloudflare's build image runs pnpm 10, which rejects the file without
 it ("packages field missing or empty"), while pnpm 11 locally needs the file
 for the esbuild build permission (`allowBuilds`).
 
+## Live links
+
+| Link | What it opens |
+|---|---|
+| <https://asciia-bay-2.app-testing.workers.dev/> | The game as a new player gets it: **with the intro** for a new save, straight into the island for a finished one. |
+| <https://asciia-bay-2.app-testing.workers.dev/0> | **Skips the intro** and starts straight on the island, whatever the save says. |
+| <https://asciia-bay-2.app-testing.workers.dev/intro> | **Always plays the intro**, even over a finished save (for testing it again). |
+
+These paths work because `wrangler.jsonc` sets `not_found_handling:
+"single-page-application"`, so the Worker serves the game for any path;
+`src/App.tsx` (`INTRO_LINK`) reads the path to decide.
+
 ## Workers or Pages?
 
 The repo works with both:

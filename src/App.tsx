@@ -574,6 +574,14 @@ function readIntroBMarkers(): {
   };
 }
 
+// Which link opened the game: …/0 skips the intro, …/intro forces it,
+// anything else (the plain link) uses the save to decide.
+const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/0\/?$/.test(window.location.pathname)
+  ? 'skip'
+  : /^\/intro\/?$/.test(window.location.pathname)
+    ? 'force'
+    : 'default';
+
 function Game() {
   // load once; all initial state comes from the save blob when present
   const [saved] = useState<SaveState | null>(loadSave);
@@ -602,7 +610,15 @@ function Game() {
   // exactly the "flash of the wrong scene, then black again" glitch. This
   // logic is kept intact (just gated off) so re-enabling later is a
   // one-line change, not a rewrite.
-  const introPending = INTRO_AUTO_TRIGGER && (saved ? saved.introDone === false : true);
+  // The link that was opened can override that (the Worker serves the game
+  // for any path, see not_found_handling in wrangler.jsonc):
+  //   /0      never plays the intro, straight onto the island
+  //   /intro  always plays it, even over a finished save (for testers)
+  //   /       the default above
+  const introPending =
+    INTRO_AUTO_TRIGGER &&
+    INTRO_LINK !== 'skip' &&
+    (INTRO_LINK === 'force' || (saved ? saved.introDone === false : true));
   // Computed once, synchronously, at mount — every marker present, given
   // the above. Read again (fresh) inside the mount effect below, since a
   // DEV replay re-triggers it later in the session when this initial value
@@ -769,6 +785,8 @@ function Game() {
   // ever flips it — see the runIntro() function below.
   const [introDone, setIntroDone] = useState<boolean>(() => {
     if (introBMarkersAtMount) return false;
+    // /0: a save interrupted mid-intro must not restart the cinematic either
+    if (INTRO_LINK === 'skip') return true;
     if (saved) return saved.introDone ?? true;
     return true; // no save, and a marker's missing: skip, never soft-lock
   });

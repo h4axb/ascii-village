@@ -353,7 +353,84 @@ interface SolidCanvasProps {
   charW: number; // px per cell at the sprite's own font size
   lineH: number;
   res: number; // backing pixels per CSS px (screen scale x devicePixelRatio)
-  outline?: string; // CSS var holding the outline colour
+  outline?: string | null; // CSS var holding the outline colour; null = none
+  solid?: boolean; // opaque darkened backing per cell (ColoredSprite's solidCells)
+  onClick?: (e: React.MouseEvent) => void;
+  onMouseEnter?: (e: React.MouseEvent) => void;
+  onMouseLeave?: (e: React.MouseEvent) => void;
+}
+
+// Rendering a sprite costs ~2,000 fillText calls (every glyph plus its 4-way
+// outline), so each look is rendered once and kept: a walk frame the player
+// has already shown is one drawImage the next time round. Keyed by the
+// sprite/colours/palette objects themselves (applyOutfit hands back new ones
+// when the outfit changes, which retires the old entries) and then by
+// resolution + style; only the current resolution is kept per look.
+type SolidLook = { key: string; img: HTMLCanvasElement };
+const solidCache = new WeakMap<string[], WeakMap<string[], WeakMap<object, SolidLook>>>();
+
+function renderSolid(
+  sprite: string[],
+  colors: string[],
+  palette: Record<string, string>,
+  eyeRow: number | undefined,
+  charW: number,
+  lineH: number,
+  r: number,
+  font: string,
+  base: string,
+  ring: string | null,
+  solid: boolean,
+): HTMLCanvasElement {
+  const cols = Math.max(0, ...sprite.map((l) => l.length));
+  const rows = sprite.length;
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.ceil(cols * charW * r));
+  c.height = Math.max(1, Math.ceil(rows * lineH * r));
+  const ctx = c.getContext('2d');
+  if (!ctx) return c;
+  ctx.font = `${lineH * r}px ${font}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // cells in paint order: every background first, then every glyph's
+  // outline, then the glyphs — the order the browser paints the spans in
+  const glyphs: [string, number, number, string][] = [];
+  for (let y = 0; y < rows; y++) {
+    const line = sprite[y];
+    const crow = colors[y] ?? '';
+    const y0 = Math.floor(y * lineH * r);
+    const y1 = Math.floor((y + 1) * lineH * r);
+    for (let x = 0; x < line.length; x++) {
+      const ch = line[x];
+      const key = crow[x];
+      const hex = key ? palette[key] : undefined;
+      const eye = eyeRow === y && !!hex && isWarmBrown(hex);
+      if (ch === ' ' && !eye) continue;
+      const x0 = Math.floor(x * charW * r);
+      const x1 = Math.floor((x + 1) * charW * r);
+      if (solid && (eye || hex)) {
+        ctx.fillStyle = eye ? EYE_BG : darken(hex!, 0.55);
+        ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      }
+      if (!eye && ch !== ' ') glyphs.push([ch, (x0 + x1) / 2, (y0 + y1) / 2, hex ?? base]);
+    }
+  }
+  if (ring) {
+    const o = r; // the CSS ring is 1px at the sprite's own scale
+    ctx.fillStyle = ring;
+    for (const [ch, x, y] of glyphs) {
+      ctx.fillText(ch, x + o, y);
+      ctx.fillText(ch, x - o, y);
+      ctx.fillText(ch, x, y + o);
+      ctx.fillText(ch, x, y - o);
+    }
+  }
+  let last = '';
+  for (const [ch, x, y, hex] of glyphs) {
+    if (hex !== last) ctx.fillStyle = last = hex;
+    ctx.fillText(ch, x, y);
+  }
+  return c;
 }
 
 export function SolidSpriteCanvas({
@@ -367,6 +444,10 @@ export function SolidSpriteCanvas({
   lineH,
   res,
   outline = '--player-outline',
+  solid = true,
+  onClick,
+  onMouseEnter,
+  onMouseLeave,
 }: SolidCanvasProps) {
   const ref = React.useRef<HTMLCanvasElement>(null);
   const cols = Math.max(0, ...sprite.map((l) => l.length));
@@ -376,60 +457,36 @@ export function SolidSpriteCanvas({
     const c = ref.current;
     const ctx = c?.getContext('2d');
     if (!c || !ctx) return;
-    const w = Math.max(1, Math.ceil(cols * charW * r));
-    const h = Math.max(1, Math.ceil(rows * lineH * r));
-    if (c.width !== w || c.height !== h) {
-      c.width = w;
-      c.height = h;
-    } else ctx.clearRect(0, 0, w, h);
     const cs = getComputedStyle(c);
     const base = cs.color || '#fff';
-    const ring = cs.getPropertyValue(outline).trim() || '#000';
-    ctx.font = `${lineH * r}px ${cs.fontFamily || 'monospace'}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    // cells in paint order: every background first, then every glyph's
-    // outline, then the glyphs — the order the browser paints the spans in
-    const glyphs: [string, number, number, string][] = [];
-    for (let y = 0; y < rows; y++) {
-      const line = sprite[y];
-      const crow = colors[y] ?? '';
-      const y0 = Math.floor(y * lineH * r);
-      const y1 = Math.floor((y + 1) * lineH * r);
-      for (let x = 0; x < line.length; x++) {
-        const ch = line[x];
-        const key = crow[x];
-        const hex = key ? palette[key] : undefined;
-        const eye = eyeRow === y && !!hex && isWarmBrown(hex);
-        if (ch === ' ' && !eye) continue;
-        const x0 = Math.floor(x * charW * r);
-        const x1 = Math.floor((x + 1) * charW * r);
-        if (eye || hex) {
-          ctx.fillStyle = eye ? EYE_BG : darken(hex!, 0.55);
-          ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-        }
-        if (!eye && ch !== ' ') glyphs.push([ch, (x0 + x1) / 2, (y0 + y1) / 2, hex ?? base]);
-      }
+    const ring = outline ? cs.getPropertyValue(outline).trim() || '#000' : null;
+    const font = cs.fontFamily || 'monospace';
+    const key = `${r}|${charW}|${lineH}|${eyeRow}|${font}|${base}|${ring}|${solid}`;
+    let byColors = solidCache.get(sprite);
+    if (!byColors) solidCache.set(sprite, (byColors = new WeakMap()));
+    let byPalette = byColors.get(colors);
+    if (!byPalette) byColors.set(colors, (byPalette = new WeakMap()));
+    let look = byPalette.get(palette);
+    if (!look || look.key !== key) {
+      if (look) look.img.width = look.img.height = 0; // old resolution: free it now
+      look = { key, img: renderSolid(sprite, colors, palette, eyeRow, charW, lineH, r, font, base, ring, solid) };
+      byPalette.set(palette, look);
     }
-    const o = r; // the CSS ring is 1px at the sprite's own scale
-    ctx.fillStyle = ring;
-    for (const [ch, x, y] of glyphs) {
-      ctx.fillText(ch, x + o, y);
-      ctx.fillText(ch, x - o, y);
-      ctx.fillText(ch, x, y + o);
-      ctx.fillText(ch, x, y - o);
-    }
-    let last = '';
-    for (const [ch, x, y, hex] of glyphs) {
-      if (hex !== last) ctx.fillStyle = last = hex;
-      ctx.fillText(ch, x, y);
-    }
-  }, [sprite, colors, palette, eyeRow, cols, rows, charW, lineH, r, outline]);
+    const { img } = look;
+    if (c.width !== img.width || c.height !== img.height) {
+      c.width = img.width;
+      c.height = img.height;
+    } else ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0);
+  }, [sprite, colors, palette, eyeRow, charW, lineH, r, outline, solid]);
   return (
     <canvas
       ref={ref}
       className={className}
       style={{ position: 'absolute', width: `${cols}ch`, height: `${rows}em`, ...style }}
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     />
   );
 }

@@ -3439,3 +3439,515 @@ pre {
   gap: 8px;
 }
 
+
+/* =========================================================================
+   Mitchy's Workshop (CraftModal.tsx), redesigned: one translucent, blurred
+   sheet over the world, thin 1px lines, no ornaments. Same palette as the
+   rest of the UI (--ui-*), just see-through. Scoped to .cw2 so the other
+   panels keep their current look.
+   ========================================================================= */
+.overlay:has(> .cw2) {
+  background: rgba(5, 5, 5, 0.28); /* the world shows through, blurred below */
+  align-items: center;
+}
+
+.cw2 {
+  --cw2-line: rgba(222, 221, 182, 0.28);
+  --cw2-line-soft: rgba(222, 221, 182, 0.14);
+  --cw2-fill: rgba(38, 43, 28, 0.42);
+  --cw2-fill-hi: rgba(222, 221, 182, 0.1);
+  --accent: var(--ui-accent);
+  --cw2-slot: clamp(58px, 7vw, 84px);
+  --cw2-gap: 10px;
+  --cw2-grid-w: calc(var(--cw2-slot) * 5 + var(--cw2-gap) * 4);
+  --cw2-grid-h: calc(var(--cw2-slot) * 4 + var(--cw2-gap) * 3);
+  --cw2-info-w: clamp(260px, 30vw, 380px);
+  position: relative;
+  width: min(1040px, 96vw);
+  /* room above the slots for ← on the left and ✕ + money on the right */
+  padding: 94px 28px 22px;
+  box-sizing: border-box;
+  background: rgba(20, 24, 14, 0.46);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  border: 1px solid var(--cw2-line-soft);
+  border-radius: 14px;
+  color: var(--ui-body);
+  font-size: 13px;
+}
+
+.cw2 button {
+  border: none;
+  background: none;
+}
+
+.cw2-muted {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+/* thin-line corner controls */
+.cw2-back,
+.cw2-x {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--ui-heading);
+  opacity: 0.8;
+}
+.cw2-back:hover,
+.cw2-x:hover {
+  opacity: 1;
+  background: var(--cw2-fill-hi);
+}
+.cw2-back {
+  position: absolute;
+  left: 14px;
+  top: 12px;
+}
+.cw2-corner {
+  position: absolute;
+  right: 14px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.cw2-money {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px 4px 10px;
+  border: 1px solid var(--cw2-line-soft);
+  border-radius: 999px;
+  background: var(--cw2-fill);
+  color: var(--ui-heading);
+  font-size: 15px;
+}
+.cw2-coin {
+  color: var(--ui-petal-core);
+}
+
+/* slots + info, side by side */
+.cw2-main {
+  position: relative;
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+}
+.cw2-grid {
+  display: grid;
+  grid-template-columns: repeat(5, var(--cw2-slot));
+  grid-auto-rows: var(--cw2-slot);
+  gap: var(--cw2-gap);
+}
+.cw2-slot {
+  position: relative;
+  width: var(--cw2-slot);
+  height: var(--cw2-slot);
+  padding: 0;
+  border: 1px solid var(--cw2-line-soft) !important;
+  border-radius: 8px;
+  background: var(--cw2-fill) !important;
+  overflow: hidden;
+  cursor: default;
+}
+.cw2-slot.filled {
+  cursor: pointer;
+}
+.cw2-slot.filled:hover {
+  border-color: var(--cw2-line) !important;
+  background: var(--cw2-fill-hi) !important;
+}
+.cw2-slot.sel {
+  border-color: var(--ui-heading) !important;
+  box-shadow: 0 0 0 1px var(--ui-heading) inset;
+}
+.cw2-count {
+  position: absolute;
+  left: 6px;
+  bottom: 3px;
+  color: var(--ui-heading);
+  font-size: 12px;
+}
+.cw2-tag {
+  position: absolute;
+  right: 5px;
+  top: 3px;
+  color: var(--ui-accent-hi);
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+
+/* a sprite shrunk to fit its box (see FitSprite) */
+.cw2-fit {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.cw2-fit > pre {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: 0;
+  line-height: 1;
+  font-size: 9px;
+  white-space: pre;
+  transform-origin: center;
+}
+
+/* right info panel */
+.cw2-info {
+  width: var(--cw2-info-w);
+  height: var(--cw2-grid-h);
+  box-sizing: border-box;
+  padding: 18px 20px;
+  border: 1px solid var(--cw2-line-soft);
+  border-radius: 10px;
+  background: var(--cw2-fill);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+.cw2-info-top {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.cw2-info-top .cw2-info-art {
+  flex: 0 0 45%;
+}
+.cw2-info-art {
+  width: 100%;
+  height: 120px;
+  flex: none;
+}
+.cw2-info-art > pre {
+  font-size: 11px;
+}
+.cw2-info-stats {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cw2-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--cw2-line-soft);
+  color: var(--ui-heading);
+  font-size: 15px;
+}
+.cw2-info-name {
+  margin-top: 4px;
+  color: var(--ui-heading);
+  font-size: 18px;
+}
+.cw2-info-rule {
+  height: 1px;
+  background: var(--cw2-line-soft);
+}
+.cw2-info-desc {
+  line-height: 1.5;
+}
+.cw2-center {
+  margin: auto;
+}
+.cw2-drawing {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--ui-heading);
+  white-space: pre;
+  overflow: hidden;
+}
+.cw2 .cw-progress-bar {
+  background: var(--cw2-line-soft);
+}
+
+/* bottom row: dialogue + prompt under the slots, options on the right */
+.cw2-bottom {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-top: 20px;
+}
+.cw2-talk {
+  width: var(--cw2-grid-w);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cw2-options {
+  width: var(--cw2-info-w);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cw2-dialog {
+  position: relative;
+  padding: 16px 22px 18px;
+  border: 1px solid var(--cw2-line-soft);
+  border-radius: 999px;
+  background: var(--cw2-fill);
+  min-height: 34px;
+}
+.cw2-speaker {
+  position: absolute;
+  left: 22px;
+  top: -12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  color: var(--ui-heading);
+  font-size: 13px;
+}
+.cw2-face {
+  margin: 0;
+  font-size: 7px;
+  line-height: 1;
+  color: #e9dcc1;
+}
+.cw2-line {
+  color: var(--ui-heading);
+  text-align: center;
+  line-height: 1.45;
+  font-size: 14px;
+}
+.cw2-prompt {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--cw2-line);
+  border-radius: 999px;
+  background: var(--cw2-fill);
+  padding: 0 6px 0 18px;
+}
+.cw2-prompt:focus-within {
+  border-color: var(--ui-heading);
+}
+.cw2-input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--ui-heading);
+  font: inherit;
+  font-size: 13px;
+}
+.cw2-input::placeholder {
+  color: var(--ui-muted);
+}
+.cw2-send {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--ui-heading);
+}
+.cw2-send:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.cw2-history-link {
+  align-self: center;
+  padding: 2px 4px;
+  color: var(--ui-body);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 12px;
+}
+.cw2-history-link:hover {
+  color: var(--ui-heading);
+  background: none;
+}
+
+/* options: pill buttons, a ▷ marker on the active one */
+.cw2-opt {
+  position: relative;
+  padding: 9px 20px 9px 28px;
+  border: 1px solid var(--cw2-line-soft) !important;
+  border-radius: 999px;
+  background: var(--cw2-fill) !important;
+  color: var(--ui-heading);
+  text-align: left;
+}
+.cw2-opt.sel,
+.cw2-opt:hover {
+  border-color: var(--ui-heading) !important;
+}
+.cw2-opt.sel::before {
+  content: '▷';
+  position: absolute;
+  left: 9px;
+  font-size: 11px;
+}
+
+/* history window over the slots + info area */
+.cw2-history {
+  position: absolute;
+  inset: 0;
+  margin: 0 auto;
+  width: calc(var(--cw2-grid-w) + 24px + var(--cw2-info-w));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--cw2-line);
+  border-radius: 10px;
+  background: rgba(20, 24, 14, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 2;
+}
+.cw2-history-head,
+.cw2-chatview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--cw2-line-soft);
+  color: var(--ui-heading);
+}
+.cw2-history-list,
+.cw2-chatview-list {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 12px 12px;
+}
+.cw2-day {
+  margin: 10px 4px 4px;
+  color: var(--ui-muted);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.cw2-hrow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-align: left;
+  color: inherit;
+}
+.cw2-hrow:hover {
+  background: var(--cw2-fill-hi) !important;
+}
+.cw2-hthumb {
+  flex: none;
+  width: 48px;
+  height: 40px;
+  border: 1px solid var(--cw2-line-soft);
+  border-radius: 6px;
+}
+.cw2-hrow-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cw2-hrow-name {
+  color: var(--ui-heading);
+}
+
+/* a past craft's chat, in place of the slots */
+.cw2-chatview {
+  width: var(--cw2-grid-w);
+  height: var(--cw2-grid-h);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--cw2-line-soft);
+  border-radius: 10px;
+  background: var(--cw2-fill);
+}
+.cw2-msg {
+  margin: 8px 0;
+  max-width: 85%;
+}
+.cw2-msg.me {
+  margin-left: auto;
+  text-align: right;
+}
+.cw2-msg-who {
+  color: var(--ui-muted);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.cw2-msg-text {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid var(--cw2-line-soft);
+  border-radius: 10px;
+  color: var(--ui-heading);
+  line-height: 1.45;
+}
+.cw2-result {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--cw2-line-soft);
+  border-radius: 10px;
+}
+.cw2-result-sprite {
+  flex: none;
+  width: 110px;
+  height: 80px;
+}
+.cw2-result-name {
+  color: var(--ui-heading);
+  font-size: 15px;
+}
+
+/* leave confirm */
+.cw2-scrim {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(5, 5, 5, 0.35);
+  z-index: 5;
+}
+.cw2-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 28px;
+  border: 1px solid var(--cw2-line);
+  border-radius: 14px;
+  background: rgba(20, 24, 14, 0.86);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.cw2-confirm-text {
+  color: var(--ui-heading);
+  font-size: 15px;
+}
+.cw2-confirm-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+@media (max-width: 760px) {
+  .cw2-main,
+  .cw2-bottom {
+    flex-direction: column;
+    align-items: center;
+  }
+  .cw2-info,
+  .cw2-options {
+    width: var(--cw2-grid-w);
+  }
+}

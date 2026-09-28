@@ -604,6 +604,11 @@ export async function getMitchyLine(context = 'a casual idle'): Promise<string> 
   }
 }
 
+// The value a material's sale price is negotiated around (see getPrice).
+export function basePrice(itemName: string): number {
+  return BASE_PRICE[itemName] ?? 1;
+}
+
 function mockPrice(itemName: string): number {
   const base = BASE_PRICE[itemName] ?? 1;
   // slight random variance: -1, 0, or +1

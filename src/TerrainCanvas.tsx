@@ -272,10 +272,16 @@ export default function TerrainCanvas(props: Props) {
         c.width = w;
         c.height = h;
       } else ctx.clearRect(0, 0, w, h);
-      c.style.left = `${x0}ch`;
-      c.style.top = `${y0}em`;
-      c.style.width = `${x1 - x0}ch`;
-      c.style.height = `${y1 - y0}em`;
+      // positioned by transform on its own layer, and only restyled when
+      // the box actually moves: left/top changes re-ran layout and repainted
+      // the world around it on every redraw
+      const box = `${x0},${y0},${x1},${y1}`;
+      if (c.dataset.box !== box) {
+        c.dataset.box = box;
+        c.style.transform = `translate(${x0}ch, ${y0}em)`;
+        c.style.width = `${x1 - x0}ch`;
+        c.style.height = `${y1 - y0}em`;
+      }
       ctx.setTransform(res, 0, 0, res, -x0 * charW * res, -y0 * lineH * res);
       ctx.font = `${lineH}px ${s.font}`;
       ctx.textAlign = 'center';
@@ -326,7 +332,7 @@ export default function TerrainCanvas(props: Props) {
         }}
       />
       <div ref={tilesRef} style={{ position: 'absolute', inset: 0 }} />
-      <canvas ref={ovRef} style={{ position: 'absolute', pointerEvents: 'none' }} />
+      <canvas ref={ovRef} style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none', willChange: 'transform' }} />
     </div>
   );
 }

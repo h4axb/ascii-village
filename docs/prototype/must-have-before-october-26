@@ -36,19 +36,24 @@ Three equally sized white circular dots arranged horizontally. Each dot smoothly
 [x] PART 2: Mitchy welcomes player and waits at boat 
 => bug fix of intro b loop caused by autosave
 [] Explore the map and evantually get back to Mitchy
-[] Ship drifts away, pay Mitchy to use a craft token for a boat
+[] Buy and use a craft token for a boat
 [] Sail to the shop isle
 [] Introducing the shop
 [] Quest list (plant, craft something to help crafting); a total of 4 craftings
 
-3a) [] Visual color adjustment, player rendering with bg, shore 
+3a) [x] Visual color adjustment, player rendering with bg, shore 
 
+[] 3 Crafting Panels (2 alternatives, post-reflection, pre-warning (if too complex))
+=>implement a system to give the llm feedback to adjust results?
+[] User Feedback Form & Evaluation
 
-4. User Feedback Form & Evaluation
-
-5. Start screen
-6. Settings - AI use
-7. Deploy (26.09.)
+[x] Deploy (26.09.)
+ 
+[] Intro details
+[] Start screen
+[] Settings - AI use
+[] Map UI fix 
+[] Camera fix
 
 
 ## Bachelor:

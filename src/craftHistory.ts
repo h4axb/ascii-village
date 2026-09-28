@@ -10,6 +10,13 @@ import { parseItemFunction, type ItemFunction } from './craft/functions';
 // this just needs to preserve it rather than deciding it again.
 const ALREADY_GATED = { requested: true } as const;
 
+// One line of the conversation that led to a craft (saved from now on, so
+// the history can show the whole chat; older records only have `prompt`).
+export interface ChatLine {
+  who: 'me' | 'mitchy';
+  text: string;
+}
+
 export interface CraftRecord {
   id: string;
   name: string;
@@ -23,6 +30,7 @@ export interface CraftRecord {
   punchline: string; // the item's funcDesc, shown in quotes
   fn?: ItemFunction; // the translated function — re-clamped on load, see below
   at: number; // Date.now()
+  chat?: ChatLine[];
 }
 
 const KEY = 'asciia-craft-history';

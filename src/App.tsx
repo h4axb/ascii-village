@@ -28,6 +28,7 @@ import type { Ent, ItemType, EntityKind } from './world';
 import {
   getFunFact,
   getPrice,
+  basePrice,
   getShopStock,
   getMitchyLine,
   CATEGORIES,
@@ -121,7 +122,7 @@ import { ownedToPlaced, placedToOwned, placedToEnt, placementFits } from './plac
 import type { PlacedItem } from './placement';
 import { palmFrame, bundleLandingX, SHAKE_FRAMES, SHAKE_FRAME_MS, SHAKE_MS } from './palmAnim';
 import { pondFrame, POND_FRAME_MS } from './pondAnim';
-import CraftModal from './CraftModal';
+import CraftModal, { CRAFT_SLOTS, type CraftSlot } from './CraftModal';
 
 const INTRO_TEXT =
   "Hey, are u the new villager here? I'm Mitchy and own this shop. in this world u can go around and collect materials and if u give them back to me ill pay u fair.";
@@ -241,6 +242,9 @@ const PLAYER_Z_INDEX = 100000;
 
 // Held-key movement: one tile step per interval while a direction is held.
 // Walking is deliberately unhurried; holding Shift dashes at the fast pace.
+// last transform the walk loop wrote to .world / .player-rig (see setMotion)
+const lastMotion = new WeakMap<HTMLElement, string>();
+
 const WALK_MS = 170;
 const DASH_MS = 100;
 // How long you need to hold a direction into a placed item before it slides.
@@ -1434,12 +1438,22 @@ function Game() {
         mult *
         (n.glide ? GLIDE_SLOW : 1) *
         speedScale(n.x - p.x, n.y - p.y);
+      // Start from where the player is DRAWN right now, not from the last
+      // tile: each glide runs 25ms past the step cadence, so when the next
+      // step lands the previous one is still ~80% done (running) — starting
+      // from p.x snapped the camera forward by the missing 20% every step,
+      // the running judder. (A position set some other way, e.g. a
+      // cinematic teleport, isn't continuous: that starts from p.)
+      const now = performance.now();
+      const prev = stepAnimRef.current;
+      const cont = prev.toX === p.x && prev.toY === p.y;
+      const pr = prev.durMs > 0 ? Math.min(1, (now - prev.t0) / prev.durMs) : 1;
       stepAnimRef.current = {
-        fromX: p.x,
-        fromY: p.y,
+        fromX: cont ? prev.fromX + (prev.toX - prev.fromX) * pr : p.x,
+        fromY: cont ? prev.fromY + (prev.toY - prev.fromY) * pr : p.y,
         toX: n.x,
         toY: n.y,
-        t0: performance.now(),
+        t0: now,
         // Same +25ms the old CSS glideDur used, for the same reason: stay
         // slightly "in flight" past the nominal cadence so a slow tick
         // doesn't read as an early finish-and-pause.
@@ -1595,7 +1609,7 @@ function Game() {
   // and the rig and camera must stay on that SAME curve (see
   // worldTransition's comment) — this only ever drives the plain walking
   // glide, never fights the tween for ownership of the transform.
-  function applyWalkTransform(now: number) {
+  function applyWalkTransform(now: number, force = false) {
     if (camTweenRef.current) return;
     const anim = stepAnimRef.current;
     const progress = anim.durMs > 0 ? Math.min(1, (now - anim.t0) / anim.durMs) : 1;
@@ -1606,16 +1620,33 @@ function Game() {
     const pcyVis = (visY + PLAYER_T.hT / 2) * TILE_LN;
     const camXVis = clampCam(pcxVis + c.panX, c.dims.viewW / c.zoom, GROUND_W);
     const camYVis = clampCam(pcyVis + c.panY, c.dims.viewH / c.zoom, GROUND_H);
-    if (worldRef.current) {
-      worldRef.current.style.transition = 'none';
-      worldRef.current.style.transform =
-        `translate3d(${-camXVis * c.zoom}ch, ${-camYVis * c.zoom}em, 0) scale(${c.zoom})`;
-    }
-    if (rigRef.current) {
-      rigRef.current.style.transition = 'none';
-      rigRef.current.style.transform = `translate3d(${visX * TILE_CH}ch, ${visY * TILE_LN}em, 0)`;
+    setMotion(worldRef.current, `translate3d(${-camXVis * c.zoom}ch, ${-camYVis * c.zoom}em, 0) scale(${c.zoom})`, force);
+    setMotion(rigRef.current, `translate3d(${visX * TILE_CH}ch, ${visY * TILE_LN}em, 0)`, force);
+  }
+
+  // Writes only what changed. Re-writing `transition` (or an identical
+  // transform) every frame still marks the element's style dirty, so the
+  // browser re-ran style + layer building for the whole world every frame,
+  // even standing still. The last value written is remembered (reading
+  // style.transform back gives a normalised string); `force` is for right
+  // after a React commit, which may have overwritten both properties.
+  function setMotion(el: HTMLElement | null, transform: string, force: boolean) {
+    if (!el) return;
+    if (force || lastMotion.get(el) !== transform) {
+      el.style.transition = 'none';
+      el.style.transform = transform;
+      lastMotion.set(el, transform);
     }
   }
+
+  // Every React commit rewrites .world/.player-rig's style prop with the
+  // DISCRETE step target plus a CSS transition. Re-apply the interpolated
+  // position straight after the commit (before the browser paints) so that
+  // value never reaches the screen — otherwise it fought the rAF loop on
+  // every step, showing as the camera stalling one frame, then jumping.
+  useLayoutEffect(() => {
+    applyWalkTransform(performance.now(), true);
+  });
 
   useEffect(() => {
     let raf = requestAnimationFrame(function tick() {
@@ -2736,9 +2767,8 @@ function Game() {
         return m.menuOpen ? { ...m, menuOpen: false } : { t: 'houseMenu', sel: m.slot };
       }
       if (m.t === 'craft') {
-        if (m.confirmClose) return { ...m, confirmClose: false }; // Esc on the confirm = keep crafting
-        if (craftDoneRef.current) return null; // finished → exit is free
-        return { ...m, confirmClose: true }; // otherwise confirm (token safe in inventory)
+        // Leaving the workshop always asks ([F] leave, Esc again = stay)
+        return { ...m, confirmClose: !m.confirmClose };
       }
       return null;
     });
@@ -2748,10 +2778,7 @@ function Game() {
     setModal((m) => {
       if (!m) return m;
       if (m.t === 'detail' || m.t === 'detailOwned') return { t: 'inventory' };
-      if (m.t === 'craft') {
-        if (craftDoneRef.current) return null;
-        return { ...m, confirmClose: true };
-      }
+      if (m.t === 'craft') return { ...m, confirmClose: true };
       return null;
     });
   }
@@ -3130,6 +3157,33 @@ function Game() {
       </pre>
     );
   }
+
+  // The workshop's 20 fixed slots: the same entries, in the same order, as
+  // the inventory grid (materials, then owned items).
+  const craftSlots: CraftSlot[] = [
+    ...ITEM_TYPES.filter((t) => inv[t] > 0).map((t) => ({
+      key: t,
+      name: ITEM_INFO[t].name,
+      sprite: ITEM_SPRITES[t],
+      count: inv[t],
+      price: basePrice(t),
+      priceLabel: 'Base price', // sale prices are negotiated around this
+      desc: ITEM_INFO[t].desc,
+    })),
+    ...bag.map((o) => ({
+      key: o.ownedId,
+      name: o.name,
+      sprite: o.sprite,
+      colors: o.colors,
+      palette: o.palette,
+      color: o.color,
+      texture: o.textureModifier,
+      price: o.price,
+      desc: o.desc,
+      note: o.funcDesc ? `* ${o.funcDesc}` : undefined,
+      tag: o.kind === 'token' ? 'TOKEN' : equipped?.ownedId === o.ownedId ? 'EQ' : undefined,
+    })),
+  ].slice(0, CRAFT_SLOTS);
 
   const nothingEnt = nothingId ? ents.find((e) => e.id === nothingId) : null;
 
@@ -3625,7 +3679,11 @@ function Game() {
                 const offX = ((1 - k) * cw) / 2;
                 const offY = (1 - k) * bed.length;
                 return (
-                  <ColoredSprite
+                  <EntSprite
+                    kind="gardenbed"
+                    charW={dims.charW}
+                    lineH={dims.lineH}
+                    res={dims.scale * zoom * k * (window.devicePixelRatio || 1)}
                     className="garden-bed"
                     style={{
                       left: `${plot.rect.x0 * TILE_CH - offX}ch`,
@@ -3771,8 +3829,12 @@ function Game() {
                 const bare =
                   !anim && e.kind === 'palm' && shaken.has(`${e.id}@${growthWindow}`);
                 return (
-                  <ColoredSprite
+                  <EntSprite
                     key={e.id}
+                    kind={e.kind}
+                    charW={dims.charW}
+                    lineH={dims.lineH}
+                    res={dims.scale * zoom * k * (window.devicePixelRatio || 1)}
                     className={
                       'ent ' +
                       e.kind +
@@ -4590,9 +4652,8 @@ function Game() {
             <CraftModal
               key={modal.token.ownedId}
               token={modal.token}
-              playerFace={character.face}
-              playerFaceColors={character.faceColors}
-              playerPalette={character.palette}
+              slots={craftSlots}
+              money={money}
               onConsume={(equip, item) => consumeCraft(modal.token.ownedId, item, equip)}
               onClose={() => setModal(null)}
               confirmClose={!!modal.confirmClose}
@@ -5146,6 +5207,43 @@ function PlacedItemView({
       )}
     </>
   );
+}
+
+// The big static sprites — house (~3,400 DOM nodes as spans), garden bed
+// (~2,500), bridge (~1,200), palms (~160 each) — drawn on one canvas each.
+// As spans they were ~8,000 of the world's ~8,300 nodes, and every camera
+// move made the browser rebuild its layer list over all of them (measured:
+// ~12ms of every frame while moving; ~1.5ms with these four on canvas).
+// Same props as ColoredSprite, so the entity map needs no other change;
+// anything else (or a sprite without colour data) stays a ColoredSprite.
+const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed']);
+function EntSprite({
+  kind,
+  charW,
+  lineH,
+  res,
+  ...p
+}: React.ComponentProps<typeof ColoredSprite> & { kind: string; charW: number; lineH: number; res: number }) {
+  if (CANVAS_KINDS.has(kind) && p.colors && p.palette && !p.texture) {
+    return (
+      <SolidSpriteCanvas
+        className={p.className}
+        style={p.style}
+        sprite={p.sprite}
+        colors={p.colors}
+        palette={p.palette}
+        solid={!!p.solidCells}
+        outline={null}
+        charW={charW}
+        lineH={lineH}
+        res={res}
+        onClick={p.onClick}
+        onMouseEnter={p.onMouseEnter}
+        onMouseLeave={p.onMouseLeave}
+      />
+    );
+  }
+  return <ColoredSprite {...p} />;
 }
 
 // Its own component with its own redraw interval, so a continuously-animating

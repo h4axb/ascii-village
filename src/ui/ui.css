@@ -24,6 +24,10 @@
   --ds-coin: #f2b53c;
   --ds-coin-dark: #b07a1c;
   --ds-select: #f3e7c4;
+  --ds-name: #efc862; /* a speaker's name: the coin's warm gold, lighter */
+  /* dialogue boxes sit over busy scenery and must stay readable, so they
+     are much less see-through than the sheets */
+  --ds-dialogue: rgba(28, 32, 20, 0.88);
   /* shape + rhythm */
   --ds-radius: 10px;
   --ds-radius-sm: 7px;
@@ -44,8 +48,9 @@
   position: relative;
   width: min(1180px, 96vw);
   box-sizing: border-box;
-  /* room above the content for ← on the left and ✕ + currency on the right */
-  padding: 128px 56px 48px;
+  padding: 26px 40px 44px;
+  display: flex;
+  justify-content: center;
   background: var(--ds-sheet);
   backdrop-filter: var(--ds-blur);
   -webkit-backdrop-filter: var(--ds-blur);
@@ -58,15 +63,19 @@
   font: inherit;
   color: inherit;
 }
-.ds-sheet-back {
-  position: absolute;
-  left: 22px;
-  top: 22px;
+/* shrink-wraps the content, so the top bar's edges ARE the content's edges */
+.ds-sheet-inner {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+}
+.ds-sheet-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 22px;
 }
 .ds-sheet-corner {
-  position: absolute;
-  right: 22px;
-  top: 22px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -125,7 +134,8 @@
   /* 4 rows visible (+ the padding), more scroll */
   max-height: calc(var(--ds-slot) * 0.82 * 4 + var(--ds-gap) * 3 + 6px);
   overflow-y: auto;
-  padding: 3px; /* room for the selection ring */
+  padding: 3px; /* room for the selection ring… */
+  margin: -3px; /* …without moving the slots off the column's edges */
 }
 .ds-slot {
   position: relative;
@@ -292,6 +302,132 @@
   display: grid;
   width: 26px;
   place-items: center;
+}
+
+/* ---- Dialogue --------------------------------------------------------- */
+.ds-dialogue-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 6vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 44px;
+  padding: 0 24px;
+  pointer-events: none;
+  /* above the intro's letterbox bars (10001), below the DEV Skip button */
+  z-index: 10005;
+  color: var(--ds-text);
+  font-size: 15px;
+}
+.ds-dialogue-wrap > * {
+  pointer-events: auto;
+}
+.ds-dialogue {
+  position: relative;
+  width: min(820px, 58vw);
+  min-height: 150px;
+  box-sizing: border-box;
+  padding: 44px 64px 46px;
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.ds-dialogue.clickable {
+  cursor: pointer;
+}
+.introb-locked .ds-dialogue {
+  cursor: default;
+}
+/* the speaker's name: a small tab sitting on the box's top-left edge */
+.ds-dialogue-name {
+  position: absolute;
+  left: 18px;
+  top: 0;
+  transform: translateY(-58%);
+  padding: 3px 12px;
+  background: var(--ds-dialogue);
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-sm);
+  color: var(--ds-name);
+  font-size: 17px;
+  letter-spacing: 0.5px;
+}
+/* dashed corner brackets just inside the frame */
+.ds-bracket {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 0 dashed var(--ds-line);
+  pointer-events: none;
+}
+.ds-bracket.tl { left: 10px; top: 10px; border-left-width: 2px; border-top-width: 2px; border-top-left-radius: 4px; }
+.ds-bracket.tr { right: 10px; top: 10px; border-right-width: 2px; border-top-width: 2px; border-top-right-radius: 4px; }
+.ds-bracket.bl { left: 10px; bottom: 10px; border-left-width: 2px; border-bottom-width: 2px; border-bottom-left-radius: 4px; }
+.ds-bracket.br { right: 10px; bottom: 10px; border-right-width: 2px; border-bottom-width: 2px; border-bottom-right-radius: 4px; }
+.ds-dialogue-text {
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.ds-dialogue .next-arrow {
+  bottom: 12px;
+  color: var(--ds-text);
+}
+/* options: a column right of the box, the active one marked ▶ outside it */
+.ds-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, 30vw);
+}
+.ds-option {
+  position: relative;
+  padding: 11px 30px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  color: var(--ds-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ds-option.sel {
+  border-color: var(--ds-line-strong);
+  box-shadow: 0 0 0 1px var(--ds-line-strong) inset;
+}
+.ds-option.sel::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: 11px solid var(--ds-select);
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+}
+.introb-locked .ds-option {
+  cursor: default;
+}
+
+@media (max-width: 900px) {
+  .ds-dialogue-wrap {
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .ds-dialogue {
+    width: min(820px, 92vw);
+    padding: 36px 28px 40px;
+  }
+  .ds-options {
+    width: min(420px, 92vw);
+  }
 }
 
 /* small chips (e.g. a crafted item's prompt tags) */

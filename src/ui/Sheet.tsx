@@ -22,19 +22,28 @@ export function Sheet({
 }) {
   return (
     <div className="ds-sheet" role="dialog" aria-label={label} aria-modal="true">
-      {onBack && (
-        <button className="ds-iconbtn ds-sheet-back" onClick={onBack} aria-label="back">
-          <IconBack />
-        </button>
-      )}
-      <div className="ds-sheet-corner">
-        <button className="ds-iconbtn" onClick={onClose} aria-label="close">
-          <IconClose />
-        </button>
-        {money !== undefined && <Currency amount={money} />}
+      {/* One centred column: the top bar spans exactly the content's width,
+          so ← lines up with the content's left edge and ✕ + currency with
+          its right edge. */}
+      <div className="ds-sheet-inner">
+        <div className="ds-sheet-top">
+          {onBack ? (
+            <button className="ds-iconbtn" onClick={onBack} aria-label="back">
+              <IconBack />
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="ds-sheet-corner">
+            <button className="ds-iconbtn" onClick={onClose} aria-label="close">
+              <IconClose />
+            </button>
+            {money !== undefined && <Currency amount={money} />}
+          </div>
+        </div>
+        <div className="ds-sheet-body">{children}</div>
+        {footer && <div className="ds-sheet-footer">{footer}</div>}
       </div>
-      <div className="ds-sheet-body">{children}</div>
-      {footer && <div className="ds-sheet-footer">{footer}</div>}
     </div>
   );
 }

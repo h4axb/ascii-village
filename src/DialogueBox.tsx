@@ -14,26 +14,10 @@
 import type React from 'react';
 import { useEffect, useState } from 'react';
 import { AUTO_ADVANCE_MS, AUTO_NEXT_MS, DIALOGUE_HIGHLIGHT_LABELS } from './introPartB';
+import { Dialogue } from './ui';
 
-// The bouncing "next" arrow on the bottom edge of a dialogue/narration box.
-// A real button, so it stays clickable even where the box itself isn't.
-export function NextArrow({ onClick, label = 'next' }: { onClick?: () => void; label?: string }) {
-  return (
-    <button
-      type="button"
-      className="next-arrow"
-      aria-label={label}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.();
-      }}
-    >
-      <svg viewBox="0 0 12 8" width="14" height="9" aria-hidden>
-        <path d="M0 0h12L6 8z" fill="currentColor" />
-      </svg>
-    </button>
-  );
-}
+// The ▼ lives in the design system now; re-exported for IntroNarration.
+export { NextArrow } from './ui';
 
 export interface DialogueLine {
   speaker: string;
@@ -133,35 +117,16 @@ export default function DialogueBox({
   }, [locked, line]);
 
   return (
-    <div className="introb-dialogue-wrap">
-      <div
-        className={'panel dialog-panel introb-dialogue' + (locked ? ' introb-locked' : '')}
-        onClick={() => {
-          if (!locked && !hasChoices) onAdvance();
-        }}
-      >
-        <div className="dialog-name">{line.speaker}</div>
-        <p className="introb-dialogue-text">{renderHighlighted(line.text)}</p>
-        {hasChoices ? (
-          <div className="opts">
-            {line.choices!.map((opt, i) => (
-              <div
-                key={opt}
-                className={'opt' + (sel === i ? ' sel' : '')}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!locked) onChoice(i);
-                }}
-                onMouseEnter={() => !locked && setSel(i)}
-              >
-                {(sel === i ? '> ' : '  ') + opt}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <NextArrow onClick={locked ? undefined : onAdvance} />
-        )}
-      </div>
-    </div>
+    <Dialogue
+      className={locked ? 'introb-locked' : undefined}
+      speaker={line.speaker}
+      options={hasChoices ? line.choices : undefined}
+      sel={sel}
+      onSel={locked ? undefined : setSel}
+      onPick={locked ? undefined : onChoice}
+      onNext={locked ? undefined : onAdvance}
+    >
+      {renderHighlighted(line.text)}
+    </Dialogue>
   );
 }

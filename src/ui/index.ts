@@ -6,6 +6,7 @@
 //   <SlotGrid>     equal item slots, sprite fitted, count bottom-right
 //   <DetailPanel>  picture + name + stat rows / description / actions
 //   <FitSprite>    an ASCII sprite fitted into a fixed box
+//   <Dialogue>     a character's line: name tab, framed box, ▼, options
 //   icons          thin-line icons (currentColor)
 //
 // The inventory is the first user; crafting, dialogue, settings and confirm
@@ -16,4 +17,5 @@ export { Sheet, Split, Currency } from './Sheet';
 export { SlotGrid, type Slot } from './SlotGrid';
 export { DetailPanel, type Stat, type Action } from './DetailPanel';
 export { FitSprite, type SpriteLook } from './FitSprite';
+export { Dialogue, NextArrow } from './Dialogue';
 export * from './icons';

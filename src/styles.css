@@ -3951,3 +3951,16 @@ pre {
     width: var(--cw2-grid-w);
   }
 }
+
+/* Intro Part C: the crafting token Mitchy hands over, flying to the player */
+.token-fx {
+  position: absolute;
+  margin: 0;
+  z-index: 100000;
+  line-height: 1;
+  white-space: pre;
+  color: #f2b53c;
+  font-weight: 700;
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px rgba(242, 181, 60, 0.7));
+}

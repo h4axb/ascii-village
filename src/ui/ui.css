@@ -24,6 +24,9 @@
   --ds-coin: #f2b53c;
   --ds-coin-dark: #b07a1c;
   --ds-select: #f3e7c4;
+  /* the one "go" action of a screen (e.g. Buy): green once it's possible */
+  --ds-go: #7fb069;
+  --ds-go-fill: rgba(127, 176, 105, 0.22);
   --ds-name: #efc862; /* a speaker's name: the coin's warm gold, lighter */
   /* dialogue boxes sit over busy scenery and must stay readable, so they
      are much less see-through than the sheets */
@@ -231,6 +234,10 @@
   flex-direction: column;
 }
 .ds-detail-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   font-size: 22px;
   padding: 6px 0 12px;
   border-bottom: 1px solid var(--ds-line-soft);
@@ -428,6 +435,121 @@
   .ds-options {
     width: min(420px, 92vw);
   }
+}
+
+/* the item's value, right of its title */
+.ds-detail-title-aside {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+/* ---- Controls: label/value rows, − n + stepper ----------------------- */
+.ds-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+}
+.ds-row-label {
+  color: var(--ds-text-soft);
+}
+.ds-row-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ds-row.strong .ds-row-label,
+.ds-row.strong .ds-row-value {
+  color: var(--ds-text);
+  font-size: 16px;
+}
+.ds-stepper {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ds-stepper button {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+  color: var(--ds-text);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ds-stepper button:hover:not(:disabled) {
+  border-color: var(--ds-line-strong);
+}
+.ds-stepper button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.ds-stepper-value {
+  min-width: 2ch;
+  text-align: center;
+  font-size: 16px;
+}
+
+/* ---- payment block (Intro Part C's trade with Mitchy) ----------------- */
+.ds-pay {
+  margin-top: 8px;
+}
+.ds-pay-total {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ds-line);
+}
+.ds-pay-status {
+  color: var(--ds-text-soft);
+  font-size: 13px;
+}
+.ds-pay-status.ok {
+  color: var(--ds-go);
+}
+.ds-reminder {
+  padding: 4px 0 6px;
+  line-height: 1.55;
+}
+.ds-reminder p {
+  margin: 8px 0 0;
+}
+.ds-reminder-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ds-name, #efc862);
+}
+
+/* primary "go" action: grey while impossible, green once it isn't */
+.ds-action.go:not(:disabled) {
+  border-color: var(--ds-go);
+  background: var(--ds-go-fill);
+  color: #e6f4dc;
+}
+.ds-action.go:hover:not(:disabled) {
+  background: rgba(127, 176, 105, 0.34);
+}
+/* help action: small and underlined, never competing with the buttons */
+.ds-link {
+  align-self: center;
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  color: var(--ds-text-soft);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ds-link:hover {
+  color: var(--ds-text);
 }
 
 /* small chips (e.g. a crafted item's prompt tags) */

@@ -1,3 +1,4 @@
+import type { IntroStage } from './introPartC';
 // One save blob for everything — time anchor, player, world exceptions.
 // World state and player state live in the same versioned object so they can
 // never desync. Derived state (wild spawns, shop stock, weather) is NOT
@@ -52,6 +53,10 @@ export interface SaveState {
   // "Part A"/"Part B" were unified into one continuous intro controller —
   // see migrate()'s introPartBDoneToIntroDone().
   introDone?: boolean;
+  // Where in the unified intro the player is, once past Part B (see
+  // introPartC.ts's IntroStage). Absent = 'partB'. Only matters while
+  // introDone is false; only ever written by the manual Save Game action.
+  introStage?: IntroStage;
   // Mitchy's live world position once Intro Part B has moved him off his
   // STRUCT_ENTS static spot (he ends the cinematic waiting by MITCHY EXIT,
   // not his original x:35,y:33). Absent = still at the static position —

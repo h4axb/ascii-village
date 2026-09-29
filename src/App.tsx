@@ -78,7 +78,7 @@ import gearIcon from './assets/gear.svg';
 import inventoryIcon from './assets/inventory.svg';
 import handSlotIcon from './assets/hand_slot.svg';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
-import { Sheet, Split, SlotGrid, DetailPanel, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, type Slot } from './ui';
+import { Sheet, Split, SlotGrid, DetailPanel, Row, Stepper, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, type Slot, type Action } from './ui';
 import { useLayoutTool } from './devLayout';
 import { useWorldAssetTool } from './devWorldAssets';
 import { useSceneMarkerTool } from './devSceneMarkers';
@@ -118,6 +118,24 @@ import {
   DEFAULT_PLAYER_NAME,
   substitutePlayerName,
 } from './introPartB';
+import {
+  type IntroStage,
+  isPartC,
+  type PartCLine,
+  PART_C_SPEAKER,
+  PART_C_PAUSE_MS,
+  RETURN_GREETING,
+  RETURN_CHOICES,
+  OBJECTIVE_REMINDER,
+  TOKEN_EXPLANATION,
+  PAYMENT_RESUME,
+  PAYMENT_CHOICES,
+  COLLECT_MORE,
+  TOKEN_PRICE_PART_C,
+  PAYMENT_REMINDER,
+  HANDOFF_BEFORE,
+  HANDOFF_AFTER,
+} from './introPartC';
 import { screenToTile } from './coords';
 import { ownedToPlaced, placedToOwned, placedToEnt, placementFits } from './placement';
 import type { PlacedItem } from './placement';
@@ -245,6 +263,9 @@ const PLAYER_Z_INDEX = 100000;
 // Walking is deliberately unhurried; holding Shift dashes at the fast pace.
 // last transform the walk loop wrote to .world / .player-rig (see setMotion)
 const lastMotion = new WeakMap<HTMLElement, string>();
+
+// Intro Part C: how long the crafting token takes to fly to the player
+const TOKEN_FX_MS = 900;
 
 const WALK_MS = 170;
 const DASH_MS = 100;
@@ -432,6 +453,11 @@ type Modal =
   // proximity `[F]` dispatch for every collectible/palm/cat/shop/house/
   // laundry/crop/garden-door interaction.
   | { t: 'interact'; ref: InteractRef; sel: number }
+  // Intro Part C: the Inventory in resource-payment mode (Mitchy's crafting
+  // token). `offer` is the temporary selection: nothing leaves the
+  // inventory until the purchase is confirmed. `help` shows the "What am I
+  // buying again?" reminder without touching the offer.
+  | { t: 'pay'; sel: ItemType | null; offer: Partial<Record<ItemType, number>>; help: boolean }
   | null;
 
 const FRESH_SHOP: Modal = {
@@ -619,7 +645,8 @@ function Game() {
   const introPending =
     INTRO_AUTO_TRIGGER &&
     INTRO_LINK !== 'skip' &&
-    (INTRO_LINK === 'force' || (saved ? saved.introDone === false : true));
+    (INTRO_LINK === 'force' ||
+      (saved ? saved.introDone === false && !isPartC(saved.introStage) : true));
   // Computed once, synchronously, at mount — every marker present, given
   // the above. Read again (fresh) inside the mount effect below, since a
   // DEV replay re-triggers it later in the session when this initial value
@@ -685,6 +712,8 @@ function Game() {
     ...emptyInv(),
     ...(saved?.inv ?? {}),
   }));
+  const invRef = useRef(inv); // read by async flows (Intro Part C's trade)
+  invRef.current = inv;
   const [storages, setStorages] = useState<Record<ItemType, number>[]>(() =>
     Array.from({ length: STORAGE_SLOTS }, (_, i) => ({
       ...emptyInv(),
@@ -791,13 +820,24 @@ function Game() {
     if (saved) return saved.introDone ?? true;
     return true; // no save, and a marker's missing: skip, never soft-lock
   });
+  // Where in the unified intro we are once past Part B (introPartC.ts).
+  // State for rendering, plus a ref the async Part C controller reads so a
+  // long-running conversation never acts on a stale value.
+  const [introStage, setIntroStageState] = useState<IntroStage>(() =>
+    introBMarkersAtMount ? 'partB' : (saved?.introStage ?? 'partB'),
+  );
+  const introStageRef = useRef(introStage);
+  function setIntroStage(s: IntroStage) {
+    introStageRef.current = s;
+    setIntroStageState(s);
+  }
   // Non-null while the cinematic owns the world — gates held-key movement
   // (holdStart), the walk rAF loop, world click/hover interaction
   // (canInteract) and the map (M can't open early just because Mitchy's
   // dialogue mentions it). Starts already 'introB' (not null-then-flipped-
   // by-an-effect) when Part B is about to run, so there's no frame of
   // normal, ungated gameplay before the mount effect below catches up.
-  const [cinematic, setCinematic] = useState<'introB' | null>(() =>
+  const [cinematic, setCinematic] = useState<'introB' | 'introC' | null>(() =>
     introBMarkersAtMount ? 'introB' : null,
   );
   const cinematicRef = useRef(cinematic);
@@ -841,6 +881,13 @@ function Game() {
   const mitchyPosRef = useRef(mitchyPos);
   mitchyPosRef.current = mitchyPos;
   const [mitchyHopEm, setMitchyHopEm] = useState(0); // live jump/hop translateY offset
+  // Intro Part C: the crafting token flying from Mitchy to the player
+  const [tokenFx, setTokenFx] = useState<{
+    sprite: string[];
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    go: boolean;
+  } | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const mapOpenRef = useRef(mapOpen);
   mapOpenRef.current = mapOpen;
@@ -1131,6 +1178,7 @@ function Game() {
     lineColors,
     playerName,
     introDone,
+    introStage,
     mitchyPos: mitchyPos ?? undefined,
   });
 
@@ -1779,7 +1827,8 @@ function Game() {
     // Intro Part B's own dialogue box owns Mitchy's introduction on a
     // brand-new session — this proximity greeting is for every OTHER time
     // the player walks up to him (including right after Part B finishes).
-    if (cinematic === 'introB') return;
+    // Part C's own conversation replaces the old one-line greeting
+    if (cinematic || isPartC(introStageRef.current)) return;
     const d = near(catDef, player);
     if (!introShownRef.current && d <= 4) {
       introShownRef.current = true;
@@ -2081,10 +2130,137 @@ function Game() {
     await sleep(LETTERBOX_TRANSITION_MS);
     setLetterboxVisible(false);
     setCinematic(null); // movement/interaction/map restored as this lands
-    finishIntro();
+    // The intro is NOT over: guided exploration begins, and Part C picks up
+    // when the player comes back to Mitchy (introDone stays false). A DEV
+    // Skip Intro that fast-forwarded through here still ends it outright.
+    if (skipCinematicRef.current) finishIntro();
+    else setIntroStage('partC:explore');
 
     setMapHint(true);
     window.setTimeout(() => setMapHint(false), MAP_HINT_VISIBLE_MS);
+  }
+
+
+  // ===== Intro Part C (step 1 of 3): return to Mitchy → pay → token =====
+  // Runs on the same DialogueBox/choice/cinematic machinery as runIntro()
+  // above; progression lives in introStage (introPartC.ts). The conversation
+  // holds the cinematic lock ('introC'); the payment Inventory is a modal,
+  // which blocks movement and world input by itself.
+  const partCBusyRef = useRef(false); // one conversation at a time
+  const partCPurchasedRef = useRef(false); // the trade happens exactly once
+
+  async function sayPartC(lines: PartCLine[]) {
+    for (const l of lines) {
+      if (l.pause) await sleep(PART_C_PAUSE_MS);
+      setDialogue({ speaker: PART_C_SPEAKER, text: l.text });
+      await waitForDialogueAdvance();
+    }
+  }
+
+  async function askPartC(line: PartCLine, choices: readonly string[]): Promise<number> {
+    if (line.pause) await sleep(PART_C_PAUSE_MS);
+    setDialogue({ speaker: PART_C_SPEAKER, text: line.text, choices });
+    return waitForDialogueChoice();
+  }
+
+  function endPartCTalk() {
+    setDialogue(null);
+    setCinematic(null);
+    partCBusyRef.current = false;
+  }
+
+  // Talking to Mitchy while Part C is waiting on the player.
+  async function talkToMitchyPartC() {
+    if (partCBusyRef.current) return;
+    partCBusyRef.current = true;
+    setModal(null);
+    setBubble(null);
+    setCinematic('introC');
+    let pay: number;
+    if (introStageRef.current === 'partC:explore') {
+      if ((await askPartC(RETURN_GREETING, RETURN_CHOICES)) === 0) {
+        await sayPartC(OBJECTIVE_REMINDER);
+        return endPartCTalk();
+      }
+      await sayPartC(TOKEN_EXPLANATION.slice(0, -1));
+      // explained from here on: coming back later resumes at the payment
+      setIntroStage('partC:payment');
+      pay = await askPartC(TOKEN_EXPLANATION[TOKEN_EXPLANATION.length - 1], PAYMENT_CHOICES);
+    } else {
+      pay = await askPartC(PAYMENT_RESUME, PAYMENT_CHOICES);
+    }
+    if (pay === 0) {
+      openPartCPayment();
+      return;
+    }
+    await sayPartC(COLLECT_MORE);
+    endPartCTalk();
+  }
+
+  function openPartCPayment() {
+    setDialogue(null);
+    setCinematic(null); // the modal takes over the input lock
+    partCBusyRef.current = false;
+    const first = ITEM_TYPES.find((t) => invRef.current[t] > 0) ?? null;
+    setModal({ t: 'pay', sel: first, offer: {}, help: false });
+  }
+
+  // Cancel (button, ✕, Esc): the offer is simply dropped, nothing is taken.
+  async function cancelPartCPayment() {
+    if (partCBusyRef.current) return;
+    partCBusyRef.current = true;
+    setModal(null);
+    setCinematic('introC');
+    await sayPartC(COLLECT_MORE);
+    endPartCTalk();
+  }
+
+  // The trade, all at once: only a valid offer of at least the price, only
+  // once (a second click, a repeated callback or a re-render can't charge
+  // twice), and resources + token change in the same update.
+  function buyPartCToken(offer: Partial<Record<ItemType, number>>) {
+    if (partCPurchasedRef.current || introStageRef.current !== 'partC:payment') return;
+    const have = invRef.current;
+    const lines = ITEM_TYPES.map((t) => [t, Math.floor(offer[t] ?? 0)] as const).filter(([, n]) => n > 0);
+    if (lines.some(([t, n]) => n > have[t])) return; // offers more than owned: refuse, change nothing
+    const value = lines.reduce((sum, [t, n]) => sum + n * basePrice(t), 0);
+    if (value < TOKEN_PRICE_PART_C) return;
+    partCPurchasedRef.current = true;
+    setInv((v) => {
+      const next = { ...v };
+      for (const [t, n] of lines) next[t] = v[t] - n;
+      return next;
+    });
+    const token: OwnedItem = { ...universalToken(hourSeed), ownedId: `own-${Date.now()}-quest` };
+    setBag((b) => [...b, token]);
+    setIntroStage('partC:questCraft');
+    setModal(null);
+    void handOverPartCToken(token);
+  }
+
+  // Mitchy hands the token over; stops at the step 2 handoff.
+  async function handOverPartCToken(token: OwnedItem) {
+    partCBusyRef.current = true;
+    setCinematic('introC');
+    const hop = mitchyHop();
+    await sayPartC(HANDOFF_BEFORE);
+    await hop;
+    setDialogue(null);
+    // the token flies from Mitchy to the player
+    const from = mitchyPosRef.current ?? { x: catDef.x, y: catDef.y };
+    const to = playerRef.current;
+    setTokenFx({ sprite: token.sprite, from, to, go: false });
+    await sleep(40);
+    setTokenFx((f) => (f ? { ...f, go: true } : f));
+    await sleep(TOKEN_FX_MS);
+    setTokenFx(null);
+    showToast('you received a Craft Token!');
+    await sayPartC(HANDOFF_AFTER);
+    // ---- Part C step 1 ends here. ----
+    // Stage 'partC:questCraft' + one unused token in the bag is the handoff:
+    // step 2 (the quest craft) starts from this point. Until it exists,
+    // control simply returns to the player.
+    endPartCTalk();
   }
 
   // Kicks off once IntroA (stages 1-14) has finished AND we're still "not
@@ -2096,7 +2272,8 @@ function Game() {
   // stage 15 wait for stage 14 to actually finish instead of auto-starting
   // underneath it — the one thing the old two-system split got wrong.
   useEffect(() => {
-    if (introDone || introAActive) return;
+    // Part C is driven by talking to Mitchy, not by this mount effect
+    if (introDone || introAActive || introStage !== 'partB') return;
     const ps = getMarkerPosition(MARKER_PLAYER_START);
     const ms = getMarkerPosition(MARKER_MITCHY_START);
     const me = getMarkerPosition(MARKER_MITCHY_EXIT);
@@ -2121,7 +2298,7 @@ function Game() {
       mitchyExit: { x: me.x!, y: me.y! },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [introDone, introAActive]);
+  }, [introDone, introAActive, introStage]);
 
   // DEV-only Skip Intro — see the render below for the actual button.
   // Stages 1-14 (IntroA): tell it to clean up its own timers and jump
@@ -2141,6 +2318,17 @@ function Game() {
       return;
     }
     if (introDone) return;
+    if (isPartC(introStageRef.current)) {
+      // Part C: fast-forward whatever conversation is open, then end the intro
+      skipCinematicRef.current = true;
+      dialogueAdvanceRef.current?.();
+      dialogueChoiceRef.current?.(1);
+      setModal(null);
+      setDialogue(null);
+      setCinematic(null);
+      finishIntro();
+      return;
+    }
     skipCinematicRef.current = true;
     dialogueAdvanceRef.current?.();
     dialogueChoiceRef.current?.(1);
@@ -2180,6 +2368,7 @@ function Game() {
       // calling this, to make DialogueBox/NameEntryPanel auto-advance on a
       // timer instead of waiting for real clicks.
       setAutoAdvanceMode(!!(window as unknown as { __introBAuto?: boolean }).__introBAuto);
+      setIntroStage('partB');
       setIntroDone(false);
     };
     return () => {
@@ -2615,7 +2804,10 @@ function Game() {
   const interactActions: InteractActions = {
     collect,
     shakeTree,
-    openDialog: () => setModal({ t: 'dialog', sel: 0 }),
+    openDialog: () =>
+      introStageRef.current === 'partC:explore' || introStageRef.current === 'partC:payment'
+        ? void talkToMitchyPartC()
+        : setModal({ t: 'dialog', sel: 0 }),
     // the shop building skips Mitchy's dialog and opens the shop directly
     openShop: () => setModal(FRESH_SHOP),
     openHouseMenu: () => setModal({ t: 'houseMenu', sel: 0 }),
@@ -2777,6 +2969,12 @@ function Game() {
   }
 
   function escClose() {
+    // Payment Inventory: Esc closes the reminder first, otherwise it cancels
+    const cur = modalRef.current;
+    if (cur?.t === 'pay' && !cur.help) {
+      void cancelPartCPayment();
+      return;
+    }
     setModal((m) => {
       if (!m) return m;
       if (m.t === 'detail' || m.t === 'detailOwned') return { t: 'inventory' };
@@ -2785,6 +2983,7 @@ function Game() {
       if (m.t === 'storage') {
         return m.menuOpen ? { ...m, menuOpen: false } : { t: 'houseMenu', sel: m.slot };
       }
+      if (m.t === 'pay') return { ...m, help: false };
       if (m.t === 'craft') {
         // Leaving the workshop always asks ([F] leave, Esc again = stay)
         return { ...m, confirmClose: !m.confirmClose };
@@ -2794,6 +2993,10 @@ function Game() {
   }
 
   function xClose() {
+    if (modalRef.current?.t === 'pay') {
+      void cancelPartCPayment(); // ✕ on the payment Inventory = Cancel
+      return;
+    }
     setModal((m) => {
       if (!m) return m;
       if (m.t === 'detail' || m.t === 'detailOwned') return { t: 'inventory' };
@@ -3910,7 +4113,13 @@ function Game() {
                                 Math.max(2, Math.round(footprint(e).row) - 500)
                               : e.kind === 'hotspot'
                                 ? Math.round(footprint(e).row) + 500
-                                : Math.round(footprint(e).row),
+                                : // Mitchy is a character like the player: always
+                                  // drawn (and clickable) above the scenery he
+                                  // stands in, e.g. palm3, which covers his
+                                  // east-coast waiting spot (MITCHY EXIT)
+                                  e.kind === 'cat'
+                                  ? Math.round(footprint(e).row) + 200
+                                  : Math.round(footprint(e).row),
                       ...(k !== 1 ? { scale: `${k}` } : {}),
                       ...(e.fallFrom
                         ? ({ '--fall-from': `${-e.fallFrom}em` } as React.CSSProperties)
@@ -4125,6 +4334,22 @@ function Game() {
                   with fixed offsets in the rig's own grid, so they can never
                   desync from the player or from each other. Only the rig moves;
                   visual sizing is done with transform, never font-size. */}
+              {/* Intro Part C: the crafting token flying from Mitchy to the player */}
+              {tokenFx && (
+                <ColoredSprite
+                  className="token-fx"
+                  sprite={tokenFx.sprite}
+                  style={{
+                    left: `${tokenFx.from.x * TILE_CH + 2}ch`,
+                    top: `${tokenFx.from.y * TILE_LN - 2}em`,
+                    transform: tokenFx.go
+                      ? `translate(${(tokenFx.to.x - tokenFx.from.x) * TILE_CH}ch, ${(tokenFx.to.y - tokenFx.from.y) * TILE_LN}em)`
+                      : 'none',
+                    transition: `transform ${TOKEN_FX_MS}ms ease-in-out`,
+                  }}
+                />
+              )}
+
               <div
                 className="player-rig"
                 ref={rigRef}
@@ -4357,6 +4582,35 @@ function Game() {
               ownedOptList={ownedOptList}
               onBack={escClose}
               onClose={() => setModal(null)}
+            />
+          )}
+
+          {modal.t === 'pay' && (
+            <InventorySheet
+              inv={inv}
+              bag={bag}
+              money={money}
+              equippedId={equipped?.ownedId ?? null}
+              equipPick={false}
+              selected={modal.sel}
+              onSelectBase={(it) => setModal((m) => (m && m.t === 'pay' ? { ...m, sel: it } : m))}
+              onSelectOwned={() => {}}
+              onEquipPick={() => {}}
+              onPlantBase={() => {}}
+              ownedOptList={ownedOptList}
+              onBack={escClose}
+              onClose={() => void cancelPartCPayment()}
+              pay={{
+                offer: modal.offer,
+                price: TOKEN_PRICE_PART_C,
+                help: modal.help,
+                reminder: PAYMENT_REMINDER,
+                onOffer: (it, n) =>
+                  setModal((m) => (m && m.t === 'pay' ? { ...m, offer: { ...m.offer, [it]: n } } : m)),
+                onHelp: (open) => setModal((m) => (m && m.t === 'pay' ? { ...m, help: open } : m)),
+                onCancel: () => void cancelPartCPayment(),
+                onBuy: () => buyPartCToken(modal.offer),
+              }}
             />
           )}
 
@@ -4746,6 +5000,29 @@ type InvSlot = { t: 'base'; it: ItemType } | { t: 'own'; o: OwnedItem };
 // slots on the left, the selected one's details and actions on the right.
 // equipPick (opened from the HUD hand slot) greys out whatever can't be held
 // and equips on click instead of showing details.
+//
+// `pay` turns the same inventory into Intro Part C's resource-payment mode:
+// only resources can be picked, the detail panel gains − n + for the amount
+// to give, and the running offer, the reminder, Cancel and Buy sit under it.
+// The offer lives in the caller's state, so switching items or opening the
+// reminder never loses it.
+export interface PayMode {
+  offer: Partial<Record<ItemType, number>>;
+  price: number;
+  help: boolean;
+  reminder: { title: string; price: string; goal: string; payment: string };
+  onOffer: (it: ItemType, n: number) => void;
+  onHelp: (open: boolean) => void;
+  onCancel: () => void;
+  onBuy: () => void;
+}
+
+const coinValue = (n: number) => (
+  <>
+    <IconCoin size={18} /> {n}
+  </>
+);
+
 function InventorySheet({
   inv,
   bag,
@@ -4760,6 +5037,7 @@ function InventorySheet({
   ownedOptList,
   onBack,
   onClose,
+  pay,
 }: {
   inv: Record<ItemType, number>;
   bag: OwnedItem[];
@@ -4774,6 +5052,7 @@ function InventorySheet({
   ownedOptList: (o: OwnedItem) => { labels: string[]; pick: (i: number) => void };
   onBack: () => void;
   onClose: () => void;
+  pay?: PayMode;
 }) {
   const bases = ITEM_TYPES.filter((t) => inv[t] > 0);
   const slots: Slot[] = [
@@ -4789,14 +5068,77 @@ function InventorySheet({
       look: { sprite: o.sprite, colors: o.colors, palette: o.palette, color: o.color, texture: o.textureModifier },
       tag: o.kind === 'token' ? 'TOKEN' : equippedId === o.ownedId ? 'EQ' : undefined,
       label: o.name,
-      disabled: equipPick && (o.kind === 'token' || !o.equip),
+      // payment takes resources only; equip-pick only what can be held
+      disabled: !!pay || (equipPick && (o.kind === 'token' || !o.equip)),
     })),
   ];
   // Nothing picked yet: show the first item, like the reference does.
   const shown = selected ?? (equipPick ? null : (slots[0]?.key ?? null));
   const base = bases.find((b) => b === shown) ?? null;
-  const owned = base ? null : (bag.find((o) => o.ownedId === shown) ?? null);
+  const owned = base || pay ? null : (bag.find((o) => o.ownedId === shown) ?? null);
   const fact = useFunFact(base);
+
+  // ---- payment mode: the running offer ----
+  const offered = pay
+    ? ITEM_TYPES.reduce((sum, t) => sum + Math.min(pay.offer[t] ?? 0, inv[t]) * basePrice(t), 0)
+    : 0;
+  const enough = !!pay && offered >= pay.price;
+  const payBlock = pay && (
+    <div className="ds-pay">
+      {pay.help ? (
+        <div className="ds-reminder">
+          <div className="ds-reminder-title">{pay.reminder.title}</div>
+          <Row label="Price" value={pay.reminder.price} />
+          <p>
+            <span className="ds-muted">Goal: </span>
+            {pay.reminder.goal}
+          </p>
+          <p>
+            <span className="ds-muted">Payment: </span>
+            {pay.reminder.payment}
+          </p>
+        </div>
+      ) : (
+        <>
+          {base && (
+            <>
+              <Row
+                label="Amount to give"
+                value={
+                  <Stepper
+                    label="Amount to give"
+                    value={pay.offer[base] ?? 0}
+                    max={inv[base]}
+                    onChange={(n) => pay.onOffer(base, n)}
+                  />
+                }
+              />
+              <Row label="Value from this item" value={coinValue((pay.offer[base] ?? 0) * basePrice(base))} />
+            </>
+          )}
+          <div className="ds-pay-total">
+            <Row label="Current offer" value={`${offered} / ${pay.price}`} strong />
+            <div className={'ds-pay-status' + (enough ? ' ok' : '')}>
+              {offered < pay.price
+                ? `${pay.price - offered} gold still needed`
+                : offered > pay.price
+                  ? `${offered - pay.price} gold over`
+                  : 'Exactly enough'}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+  const payActions: Action[] = pay
+    ? pay.help
+      ? [{ label: 'Back to my offer', onClick: () => pay.onHelp(false) }]
+      : [
+          { label: 'What am I buying again?', onClick: () => pay.onHelp(true), variant: 'link' },
+          { label: 'Cancel', onClick: pay.onCancel },
+          { icon: <IconSpark />, label: 'Buy Crafting Token', onClick: pay.onBuy, disabled: !enough, variant: 'go' },
+        ]
+    : [];
 
   let detail: ReactNode;
   if (equipPick) {
@@ -4806,18 +5148,23 @@ function InventorySheet({
       <DetailPanel
         look={{ sprite: ITEM_SPRITES[base] }}
         title={ITEM_INFO[base].name}
-        stats={[
-          { icon: <IconCoin />, value: basePrice(base), label: 'Value' },
-          { icon: <IconBag />, value: inv[base], label: 'In Inventory' },
-        ]}
+        titleAside={coinValue(basePrice(base))}
+        stats={[{ icon: <IconBag />, value: inv[base], label: pay ? 'Owned' : 'In Inventory' }]}
+        extra={payBlock}
         actions={
-          PLANTABLE_BASE.includes(base)
-            ? [{ icon: <IconSprout />, label: 'Plant in garden', onClick: () => onPlantBase(base) }]
-            : []
+          pay
+            ? payActions
+            : PLANTABLE_BASE.includes(base)
+              ? [{ icon: <IconSprout />, label: 'Plant in garden', onClick: () => onPlantBase(base) }]
+              : []
         }
       >
-        <p>{ITEM_INFO[base].desc}</p>
-        <p className="ds-muted">Fun fact: {fact ?? '…'}</p>
+        {!pay?.help && (
+          <>
+            <p>{ITEM_INFO[base].desc}</p>
+            {!pay && <p className="ds-muted">Fun fact: {fact ?? '…'}</p>}
+          </>
+        )}
       </DetailPanel>
     );
   } else if (owned) {
@@ -4829,10 +5176,8 @@ function InventorySheet({
       <DetailPanel
         look={{ sprite: owned.sprite, colors: owned.colors, palette: owned.palette, color: owned.color, texture: owned.textureModifier }}
         title={owned.name}
-        stats={[
-          { icon: <IconCoin />, value: owned.price, label: 'Value' },
-          { icon: <IconBag />, value: 1, label: equippedId === owned.ownedId ? 'In Hand' : 'In Inventory' },
-        ]}
+        titleAside={coinValue(owned.price)}
+        stats={[{ icon: <IconBag />, value: 1, label: equippedId === owned.ownedId ? 'In Hand' : 'In Inventory' }]}
         actions={labels.map((l, i) => ({ icon: iconFor(l), label: nameFor(l), onClick: () => pick(i) }))}
       >
         <p>{owned.desc}</p>
@@ -4855,13 +5200,34 @@ function InventorySheet({
         )}
       </DetailPanel>
     );
+  } else if (pay) {
+    // nothing to trade yet: still show the offer, the reminder and Cancel
+    detail = (
+      <aside className="ds-detail">
+        <p className="ds-muted">You have no resources to trade yet.</p>
+        {payBlock}
+        <div className="ds-actions">
+          {payActions.map((a) => (
+            <button
+              key={a.label}
+              className={a.variant === 'link' ? 'ds-link' : 'ds-action' + (a.variant === 'go' ? ' go' : '')}
+              onClick={a.onClick}
+              disabled={a.disabled}
+            >
+              {a.icon && a.variant !== 'link' && <span className="ds-action-icon">{a.icon}</span>}
+              <span>{a.label}</span>
+            </button>
+          ))}
+        </div>
+      </aside>
+    );
   } else {
     detail = <DetailPanel empty="Your inventory is empty." />;
   }
 
   return (
     <Sheet
-      label={equipPick ? 'Equip what?' : 'Inventory'}
+      label={pay ? 'Trade with Mitchy' : equipPick ? 'Equip what?' : 'Inventory'}
       onBack={onBack}
       onClose={onClose}
       money={money}

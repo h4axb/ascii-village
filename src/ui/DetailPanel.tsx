@@ -12,24 +12,32 @@ export interface Stat {
 }
 
 export interface Action {
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  // default: the outlined action button. 'go': the one primary action of a
+  // screen, green once enabled. 'link': a small underlined help action that
+  // must not compete with the others.
+  variant?: 'default' | 'go' | 'link';
 }
 
 export function DetailPanel({
   look,
   title,
+  titleAside,
   stats = [],
   children,
+  extra,
   actions = [],
   empty,
 }: {
   look?: SpriteLook;
   title?: string;
+  titleAside?: ReactNode; // right of the title, e.g. the item's coin value
   stats?: Stat[];
   children?: ReactNode; // description block
+  extra?: ReactNode; // a screen-specific block under the description (e.g. payment controls)
   actions?: Action[];
   empty?: ReactNode; // shown instead when nothing is selected
 }) {
@@ -41,7 +49,10 @@ export function DetailPanel({
       <div className="ds-detail-head">
         <FitSprite className="ds-detail-art" look={look} fill={0.8} maxScale={2.6} />
         <div className="ds-detail-titles">
-          <div className="ds-detail-title">{title}</div>
+          <div className="ds-detail-title">
+            <span>{title}</span>
+            {titleAside && <span className="ds-detail-title-aside">{titleAside}</span>}
+          </div>
           {stats.map((s) => (
             <div key={s.label} className="ds-stat">
               <span className="ds-stat-icon">{s.icon}</span>
@@ -52,14 +63,26 @@ export function DetailPanel({
         </div>
       </div>
       {children && <div className="ds-detail-desc">{children}</div>}
+      {extra}
       {actions.length > 0 && (
         <div className="ds-actions">
-          {actions.map((a) => (
-            <button key={a.label} className="ds-action" onClick={a.onClick} disabled={a.disabled}>
-              <span className="ds-action-icon">{a.icon}</span>
-              <span>{a.label}</span>
-            </button>
-          ))}
+          {actions.map((a) =>
+            a.variant === 'link' ? (
+              <button key={a.label} className="ds-link" onClick={a.onClick} disabled={a.disabled}>
+                {a.label}
+              </button>
+            ) : (
+              <button
+                key={a.label}
+                className={'ds-action' + (a.variant === 'go' ? ' go' : '')}
+                onClick={a.onClick}
+                disabled={a.disabled}
+              >
+                <span className="ds-action-icon">{a.icon}</span>
+                <span>{a.label}</span>
+              </button>
+            ),
+          )}
         </div>
       )}
     </aside>

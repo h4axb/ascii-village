@@ -84,15 +84,8 @@ export const BAKED_ASSETS: BakedAssetEntry[] = [
     scale: 0.5,
     varRef: { sprite: 'S.FLOWER_PLUS', palette: 'S.FLOWER_PLUS_PALETTE', colors: 'S.FLOWER_PLUS_COLORS' },
   },
-  {
-    slug: 'built-cat',
-    label: 'Cat (Mitchy)',
-    kind: 'cat',
-    sprite: S.CAT,
-    color: '#e9dcc1',
-    scale: 1,
-    varRef: { sprite: 'S.CAT' },
-  },
+  // No Mitchy here: there is only ever one (STRUCT_ENTS' 'cat', moved by the
+  // intro), and a stamped copy looks identical but can't be talked to.
   {
     slug: 'built-stone',
     label: 'Stone',

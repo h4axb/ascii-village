@@ -1,10 +1,13 @@
 + repository: git/ascii-village
 + project: 
 
-
+## Link
+regular: https://asciia-bay-2.app-testing.workers.dev/
+no intro: https://asciia-bay-2.app-testing.workers.dev/0
+always intro: https://asciia-bay-2.app-testing.workers.dev/intro
 
 ## Project structure
-+ rendering: vite, water as canvas
++ rendering: vite, water+static assets on canvas
 + libraries: vite, react 
 + assets: uploaded svg (assets), rendered in json (src/data)
 First the text signs in json are translated to letters and each letter has a predefined color (ColoredSprite.tsx). 

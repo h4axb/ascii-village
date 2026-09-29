@@ -71,14 +71,8 @@ import type { InteractRef, InteractCtx, InteractActions } from './interact';
 import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOUSE_GARMENT_REGIONS } from './outfit';
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon } from './icons';
-// The three orbit-menu icons are glyph-art SVGs (a grid of coloured <text>
-// cells, same shape as the game's own assets/svg exports), not line-art like
-// icons.tsx's set — so they're asset imports rather than inline components.
-import gearIcon from './assets/gear.svg';
-import inventoryIcon from './assets/inventory.svg';
-import handSlotIcon from './assets/hand_slot.svg';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
-import { Sheet, Split, SlotGrid, DetailPanel, Row, Stepper, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, type Slot, type Action } from './ui';
+import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, type Slot, type Action } from './ui';
 import { useLayoutTool } from './devLayout';
 import { useWorldAssetTool } from './devWorldAssets';
 import { useSceneMarkerTool } from './devSceneMarkers';
@@ -3550,7 +3544,7 @@ function Game() {
       id: 'settings',
       label: 'SETTINGS',
       tint: '#6b6b94',
-      node: <img className="hud-orbit-icon" src={gearIcon} alt="" />,
+      node: <IconGear size={28} />,
       keep: false,
       run: () => setModal({ t: 'settings' }),
     },
@@ -3558,7 +3552,7 @@ function Game() {
       id: 'inventory',
       label: 'INVENTORY',
       tint: '#e0a9b0',
-      node: <img className="hud-orbit-icon" src={inventoryIcon} alt="" />,
+      node: <IconBag size={28} />,
       keep: false,
       run: () => setModal({ t: 'inventory' }),
     },
@@ -3576,7 +3570,7 @@ function Game() {
           texture={equipped.textureModifier}
         />
       ) : (
-        <img className="hud-orbit-icon" src={handSlotIcon} alt="" />
+        <IconHand size={28} />
       ),
       keep: true,
       run: () => setHandMenu((v) => !v),
@@ -3671,11 +3665,14 @@ function Game() {
                   with ragged rows the <pre> is sized by max-content, and any
                   slack in that box makes flex centre the BOX while the ink
                   sits off to one side. */}
+              {/* same per-cell backing and eyes as the player in the world */}
               <ColoredSprite
                 style={{ width: `${avatarCols}ch` }}
                 sprite={avatarSprite}
                 colors={avatarRecolored.colors}
                 palette={avatarRecolored.palette}
+                solidCells
+                eyeRow={14}
               />
             </button>
 
@@ -4615,47 +4612,42 @@ function Game() {
           )}
 
           {modal.t === 'settings' && (
-            <div className="panel">
-              <div className="panel-title">Settings</div>
-              <button
-                className="btn btn-primary settings-save-btn"
-                onClick={saveGameToStorage}
-                disabled={saving}
-              >
-                Save Game
-              </button>
-              <div className="hint">writes your progress to this browser &#183; [Esc] to close</div>
-            </div>
+            <Panel title="Settings" hint="writes your progress to this browser · [Esc] to close">
+              <div className="ds-actions">
+                <button className="ds-action" onClick={saveGameToStorage} disabled={saving}>
+                  <span className="ds-action-icon">
+                    <SaveIcon className="ds-save-icon" />
+                  </span>
+                  <span>Save Game</span>
+                </button>
+              </div>
+            </Panel>
           )}
 
           {modal.t === 'dialog' && (
-            <div className="panel dialog-panel">
-              <pre className="portrait small cat">{S.CAT.join('\n')}</pre>
-              <div className="dialog-name">Mitchy</div>
-              <OptList
-                opts={['Talk', 'Open Shop']}
-                sel={modal.sel}
-                onSel={(i) => setModal({ t: 'dialog', sel: i })}
-                onPick={confirmDialog}
-              />
-              <div className="hint">[&#8593;/&#8595;] select &#183; [Enter] confirm &#183; [Esc] close</div>
-            </div>
+            <ChoicePanel
+              title="Mitchy"
+              art={<pre className="ds-panel-portrait">{S.CAT.join('\n')}</pre>}
+              options={['Talk', 'Open Shop']}
+              sel={modal.sel}
+              onSel={(i) => setModal({ t: 'dialog', sel: i })}
+              onPick={confirmDialog}
+              hint="[↑/↓] select · [Enter] confirm · [Esc] close"
+            />
           )}
 
           {modal.t === 'houseMenu' && (
-            <div className="panel dialog-panel">
-              <div className="dialog-name">Home Storage</div>
-              <OptList
-                opts={storages.map((s, i) => {
-                  const n = ITEM_TYPES.reduce((sum, t) => sum + s[t], 0);
-                  return `Storage ${i + 1}${n ? ` (${n} items)` : ' (empty)'}`;
-                })}
-                sel={modal.sel}
-                onSel={(i) => setModal({ t: 'houseMenu', sel: i })}
-                onPick={(i) => setModal({ t: 'storage', slot: i, sel: 0, menuOpen: false })}
-              />
-              <div className="hint">[&#8593;/&#8595;] select &#183; [Enter] open &#183; [Esc] close</div>
-            </div>
+            <ChoicePanel
+              title="Home Storage"
+              options={storages.map((s, i) => {
+                const n = ITEM_TYPES.reduce((sum, t) => sum + s[t], 0);
+                return `Storage ${i + 1}${n ? ` (${n} items)` : ' (empty)'}`;
+              })}
+              sel={modal.sel}
+              onSel={(i) => setModal({ t: 'houseMenu', sel: i })}
+              onPick={(i) => setModal({ t: 'storage', slot: i, sel: 0, menuOpen: false })}
+              hint="[↑/↓] select · [Enter] open · [Esc] close"
+            />
           )}
 
           {modal.t === 'storage' && (
@@ -4865,22 +4857,20 @@ function Game() {
               const copy = describeInteraction(modal.ref, interactCtx);
               if (!copy) return null;
               return (
-                <div className="panel detail-panel">
-                  <div className="panel-title">{copy.name}</div>
-                  <p className="detail-desc">{copy.question}</p>
-                  <OptList
-                    opts={['Yes', 'No']}
-                    sel={modal.sel}
-                    onSel={(i) => setModal({ ...modal, sel: i })}
-                    onPick={(i) => {
-                      // close before acting — see the 'interact' case in
-                      // optInfo() for why the order matters
-                      setModal(null);
-                      if (i === 0) runInteraction(modal.ref, interactCtx, interactActions);
-                    }}
-                  />
-                  <div className="hint">[F] yes &#183; [Esc] no &#183; click to choose</div>
-                </div>
+                <ChoicePanel
+                  title={copy.name}
+                  question={copy.question}
+                  options={['Yes', 'No']}
+                  sel={modal.sel}
+                  onSel={(i) => setModal({ ...modal, sel: i })}
+                  onPick={(i) => {
+                    // close before acting — see the 'interact' case in
+                    // optInfo() for why the order matters
+                    setModal(null);
+                    if (i === 0) runInteraction(modal.ref, interactCtx, interactActions);
+                  }}
+                  hint="[F] yes · [Esc] no · click to choose"
+                />
               );
             })()}
 

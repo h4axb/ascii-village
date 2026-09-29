@@ -8,6 +8,7 @@
 //   <FitSprite>    an ASCII sprite fitted into a fixed box
 //   <Dialogue>     a character's line: name tab, framed box, ▼, options
 //   <Row> <Stepper> label/value rows and a − n + control for detail panels
+//   <Panel> <ChoicePanel>  small centred card; question + options (confirms, menus)
 //   icons          thin-line icons (currentColor)
 //
 // The inventory is the first user; crafting, dialogue, settings and confirm
@@ -20,4 +21,5 @@ export { DetailPanel, type Stat, type Action } from './DetailPanel';
 export { FitSprite, type SpriteLook } from './FitSprite';
 export { Dialogue, NextArrow } from './Dialogue';
 export { Row, Stepper } from './Controls';
+export { Panel, ChoicePanel } from './Panel';
 export * from './icons';

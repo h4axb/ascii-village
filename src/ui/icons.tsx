@@ -82,3 +82,12 @@ export const IconSpark = ({ size }: IconProps) => (
     <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />
   </Icon>
 );
+
+// settings: a cog (8 teeth around a ring)
+export const IconGear = ({ size }: IconProps) => (
+  <Icon size={size}>
+    <circle cx="12" cy="12" r="3.2" />
+    <path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8" />
+    <circle cx="12" cy="12" r="6.4" />
+  </Icon>
+);

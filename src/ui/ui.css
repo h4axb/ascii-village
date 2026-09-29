@@ -552,6 +552,123 @@
   color: var(--ds-text);
 }
 
+/* ---- Panel / ChoicePanel: small centred cards (confirms, menus, settings) */
+.overlay:has(> .ds-panel) {
+  background: var(--ds-scrim);
+  align-items: center;
+}
+.ds-panel {
+  position: relative;
+  min-width: min(380px, 92vw);
+  max-width: min(460px, 92vw);
+  box-sizing: border-box;
+  padding: 26px 28px 20px;
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  color: var(--ds-text);
+  font-size: 15px;
+}
+.ds-panel button {
+  font: inherit;
+}
+.ds-panel-title {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ds-line-soft);
+  color: var(--ds-name);
+  font-size: 18px;
+  letter-spacing: 0.5px;
+}
+.ds-panel-text {
+  margin: 0 0 18px;
+  line-height: 1.6;
+}
+.ds-panel-art {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.ds-panel-portrait {
+  margin: 0;
+  line-height: 1;
+  white-space: pre;
+  color: #e9dcc1;
+}
+.ds-panel-hint {
+  margin-top: 16px;
+  text-align: center;
+  color: var(--ds-text-muted);
+  font-size: 12px;
+}
+/* options inside a panel: full width, the ▶ marker sits in the padding */
+.ds-panel .ds-options {
+  width: auto;
+  padding-left: 22px;
+}
+.ds-panel .ds-option {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.ds-panel .ds-actions {
+  margin-top: 4px;
+}
+.ds-save-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---- HUD: the portrait and the menu around it ---------------------------- */
+/* (one class more specific than styles.css's rules: this file loads first) */
+.hud-avatar-wrap .hud-avatar {
+  border-color: var(--ds-line-strong);
+  background: var(--ds-dialogue);
+}
+.hud-avatar-wrap .hud-avatar:hover,
+.hud-avatar-wrap .hud-avatar[aria-expanded='true'] {
+  border-color: var(--ds-select);
+  background: var(--ds-dialogue);
+}
+.hud-orbit .hud-orbit-btn {
+  border: 1px solid var(--ds-line-strong);
+  background: var(--ds-dialogue);
+  color: var(--ds-text);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+}
+.hud-orbit .hud-orbit-btn:hover {
+  filter: none;
+  border-color: var(--ds-select);
+  background: rgba(46, 52, 34, 0.92);
+}
+.hud-orbit .hud-orbit-arcs {
+  color: var(--ds-line);
+}
+.hud-orbit .hud-orbit-label {
+  color: var(--ds-text);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.hud-orbit .hud-hand-menu {
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+}
+.hud-orbit .hud-hand-menu button {
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+  color: var(--ds-text);
+}
+.hud-orbit .hud-hand-menu button:hover:not(:disabled) {
+  border-color: var(--ds-line-strong);
+  background: var(--ds-surface-hi);
+}
+
 /* small chips (e.g. a crafted item's prompt tags) */
 .ds-chips {
   display: flex;

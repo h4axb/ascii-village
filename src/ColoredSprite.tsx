@@ -313,13 +313,15 @@ function styleEqual(a?: React.CSSProperties, b?: React.CSSProperties): boolean {
   return true;
 }
 
-// onClick/onMouseEnter/onMouseLeave are deliberately NOT compared: callers
-// build these as fresh closures every render too, but each one only ever
-// closes over that entity's own stable id and calls a stable outer setter
-// the same way every time — semantically identical between renders for a
-// given entity, so treating them as always-equal is correct (a memoized
-// instance keeps whichever closure it mounted with, which behaves
-// identically to a freshly-built one), not just a convenient shortcut.
+// onClick/onMouseEnter/onMouseLeave: callers build these as fresh closures
+// every render, but each one only closes over that entity's own stable id
+// and calls a stable outer setter, so a new closure behaves exactly like the
+// one already mounted — comparing identity would defeat the memo. What DOES
+// matter is whether a handler exists at all: App passes `undefined` while an
+// entity is out of interaction range and a handler once the player walks up
+// to it. Ignoring that switch kept the handler-less version mounted, so
+// Mitchy, the shop or a house hotspot stayed unclickable for anyone who
+// loaded the game away from them.
 function propsAreEqual(prev: Props, next: Props): boolean {
   return (
     prev.sprite === next.sprite &&
@@ -331,6 +333,9 @@ function propsAreEqual(prev: Props, next: Props): boolean {
     prev.solidCells === next.solidCells &&
     prev.eyeRow === next.eyeRow &&
     prev.texture === next.texture &&
+    !prev.onClick === !next.onClick &&
+    !prev.onMouseEnter === !next.onMouseEnter &&
+    !prev.onMouseLeave === !next.onMouseLeave &&
     styleEqual(prev.style, next.style)
   );
 }

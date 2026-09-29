@@ -3,8 +3,9 @@
 // browser re-rasterise ~400k characters on every animation tick.
 //
 // Three layers, all inside .world so they share the camera transform:
-//   1. COLOUR: one small canvas, one pixel per character cell, stretched so
-//      every cell is a solid block (the mosaic look) — crisp blocks when
+//   1. COLOUR: one small canvas, one pixel per square block (terrain.ts
+//      samples the colour on a grid of square blocks), stretched so every
+//      block is solid (the mosaic look) — crisp blocks when
 //      zoomed in, smoothed when zoomed far out so it doesn't shimmer.
 //   2. GLYPHS: canvas tiles (TW x TH chars) drawn lazily for what's near the
 //      viewport, at the resolution the screen actually shows them (field

@@ -367,7 +367,7 @@ const G_ROCK = [RAMP.length + 2, RAMP.length + 3, RAMP.length + 8, RAMP.length -
 // ---- the field ---------------------------------------------------------------
 
 export interface TerrainField {
-  /** Background colour, RGBA, one pixel per character cell (drawn as blocks). */
+  /** Background colour, RGBA, one pixel per SQUARE block (bgW x bgH, drawn stretched over the ground). */
   bg: Uint8ClampedArray;
   bgW: number;
   bgH: number;
@@ -385,10 +385,12 @@ const pack = (r: number, g: number, b: number) =>
 
 let FIELD: TerrainField | null = null;
 
+// a character cell's height / width (14px line / 8.4px char, see App.tsx)
+const CELL_ASPECT = 14 / 8.4;
+
 export function terrainField(): TerrainField {
   if (FIELD) return FIELD;
   const n = GROUND_W * GROUND_H;
-  const bg = new Uint8ClampedArray(n * 4);
   const ndv = new Float32Array(n);
   const kind = new Uint8Array(n);
   const glyph = new Uint8Array(n);
@@ -404,14 +406,6 @@ export function terrainField(): TerrainField {
       sample(fx, fy, (h3 - 0.5) * 0.012);
       ndv[idx] = out.ndv;
       kind[idx] = out.kind;
-
-      // mosaic: each cell its own block, slightly varied like a painted tile
-      const v = (h3 - 0.5) * 10;
-      const k4 = idx * 4;
-      bg[k4] = out.r + v;
-      bg[k4 + 1] = out.g + v;
-      bg[k4 + 2] = out.b + v * 0.8;
-      bg[k4 + 3] = 255;
 
       // glyph + its colour. Like the hand-made assets, every surface cell
       // carries a glyph from the density ramp, drawn as a LIGHTER tone of
@@ -513,7 +507,29 @@ export function terrainField(): TerrainField {
         : 0;
     }
   }
-  FIELD = { bg, bgW: GROUND_W, bgH: GROUND_H, ndv, kind, glyph, color };
+  // Mosaic: its own grid of SQUARE blocks. A character cell is 5/3 as tall
+  // as it is wide (8.4 x 14 px), so one block per cell drew tall
+  // rectangles; with 5/3 as many rows each block is one cell wide and one
+  // cell-width tall. Same colour field, sampled at the block centres, each
+  // block slightly varied like a painted tile.
+  const bgW = GROUND_W;
+  const bgH = Math.round(GROUND_H * CELL_ASPECT);
+  const bg = new Uint8ClampedArray(bgW * bgH * 4);
+  for (let by = 0; by < bgH; by++) {
+    const fy = ((by + 0.5) / bgH) * (GROUND_H / TILE_LN);
+    for (let bx = 0; bx < bgW; bx++) {
+      const fx = (bx + 0.5) / TILE_CH;
+      const h3 = hash2(bx * 0.377 + 19, by * 1.27 + 41);
+      sample(fx, fy, (h3 - 0.5) * 0.012);
+      const v = (h3 - 0.5) * 10;
+      const k4 = (by * bgW + bx) * 4;
+      bg[k4] = out.r + v;
+      bg[k4 + 1] = out.g + v;
+      bg[k4 + 2] = out.b + v * 0.8;
+      bg[k4 + 3] = 255;
+    }
+  }
+  FIELD = { bg, bgW, bgH, ndv, kind, glyph, color };
   return FIELD;
 }
 

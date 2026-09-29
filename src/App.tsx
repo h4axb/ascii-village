@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as S from './sprites';
 import {
   TILE_CH,
@@ -78,6 +78,7 @@ import gearIcon from './assets/gear.svg';
 import inventoryIcon from './assets/inventory.svg';
 import handSlotIcon from './assets/hand_slot.svg';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
+import { Sheet, Split, SlotGrid, DetailPanel, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, type Slot } from './ui';
 import { useLayoutTool } from './devLayout';
 import { useWorldAssetTool } from './devWorldAssets';
 import { useSceneMarkerTool } from './devSceneMarkers';
@@ -4341,60 +4342,23 @@ function Game() {
               panel, not a click-through to a second screen. equipPick mode
               (opened from the HUD hand slot) skips the sidebar entirely —
               there's nothing to inspect, a click just equips. */}
-          {(modal.t === 'inventory' || modal.t === 'detail' || modal.t === 'detailOwned') &&
-            (() => {
-              const equipPick = modal.t === 'inventory' && !!modal.equipPick;
-              const selectedKey =
-                modal.t === 'detail' ? modal.item : modal.t === 'detailOwned' ? modal.ownedId : null;
-              const owned = modal.t === 'detailOwned' ? bag.find((o) => o.ownedId === modal.ownedId) : null;
-              return (
-                <div className="panel">
-                  <button className="panel-close" onClick={() => setModal(null)} aria-label="close">
-                    &#215;
-                  </button>
-                  <div className="panel-title">{equipPick ? 'Equip What?' : 'Inventory'}</div>
-                  <div className="inv-body">
-                    <InvGrid
-                      inv={inv}
-                      onItem={(it) => setModal({ t: 'detail', item: it })}
-                      selected={selectedKey}
-                      bag={bag}
-                      equippedId={equipped?.ownedId ?? null}
-                      onBagItem={(o) => setModal({ t: 'detailOwned', ownedId: o.ownedId, sel: 0 })}
-                      equipPick={equipPick}
-                      onEquipPick={(o) => equipOwned(o)}
-                    />
-                    {!equipPick && (
-                      <div className="inv-detail-side">
-                        {modal.t === 'detail' ? (
-                          <DetailSide
-                            item={modal.item}
-                            qty={inv[modal.item]}
-                            onPlant={
-                              PLANTABLE_BASE.includes(modal.item) && inv[modal.item] > 0
-                                ? () => plantBase(modal.item)
-                                : undefined
-                            }
-                          />
-                        ) : modal.t === 'detailOwned' && owned ? (
-                          (() => {
-                            const { labels, pick } = ownedOptList(owned);
-                            return <DetailOwnedSide owned={owned} labels={labels} onPick={pick} />;
-                          })()
-                        ) : (
-                          <div className="inv-detail-empty">click an item for details</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="hint">
-                    {equipPick
-                      ? 'pick something to hold · greyed items can’t be equipped · [Esc] cancel'
-                      : 'click an item for details · [Esc] to close'}
-                  </div>
-                </div>
-              );
-            })()}
+          {(modal.t === 'inventory' || modal.t === 'detail' || modal.t === 'detailOwned') && (
+            <InventorySheet
+              inv={inv}
+              bag={bag}
+              money={money}
+              equippedId={equipped?.ownedId ?? null}
+              equipPick={modal.t === 'inventory' && !!modal.equipPick}
+              selected={modal.t === 'detail' ? modal.item : modal.t === 'detailOwned' ? modal.ownedId : null}
+              onSelectBase={(it) => setModal({ t: 'detail', item: it })}
+              onSelectOwned={(o) => setModal({ t: 'detailOwned', ownedId: o.ownedId, sel: 0 })}
+              onEquipPick={equipOwned}
+              onPlantBase={plantBase}
+              ownedOptList={ownedOptList}
+              onBack={escClose}
+              onClose={() => setModal(null)}
+            />
+          )}
 
           {modal.t === 'settings' && (
             <div className="panel">
@@ -4778,6 +4742,166 @@ function OptList({
 
 type InvSlot = { t: 'base'; it: ItemType } | { t: 'own'; o: OwnedItem };
 
+// The inventory, on the shared UI design system (src/ui): the items in equal
+// slots on the left, the selected one's details and actions on the right.
+// equipPick (opened from the HUD hand slot) greys out whatever can't be held
+// and equips on click instead of showing details.
+function InventorySheet({
+  inv,
+  bag,
+  money,
+  equippedId,
+  equipPick,
+  selected,
+  onSelectBase,
+  onSelectOwned,
+  onEquipPick,
+  onPlantBase,
+  ownedOptList,
+  onBack,
+  onClose,
+}: {
+  inv: Record<ItemType, number>;
+  bag: OwnedItem[];
+  money: number;
+  equippedId: string | null;
+  equipPick: boolean;
+  selected: string | null;
+  onSelectBase: (it: ItemType) => void;
+  onSelectOwned: (o: OwnedItem) => void;
+  onEquipPick: (o: OwnedItem) => void;
+  onPlantBase: (it: ItemType) => void;
+  ownedOptList: (o: OwnedItem) => { labels: string[]; pick: (i: number) => void };
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const bases = ITEM_TYPES.filter((t) => inv[t] > 0);
+  const slots: Slot[] = [
+    ...bases.map((it) => ({
+      key: it,
+      look: { sprite: ITEM_SPRITES[it] },
+      count: inv[it],
+      label: ITEM_INFO[it].name,
+      disabled: equipPick, // raw materials can't be held
+    })),
+    ...bag.map((o) => ({
+      key: o.ownedId,
+      look: { sprite: o.sprite, colors: o.colors, palette: o.palette, color: o.color, texture: o.textureModifier },
+      tag: o.kind === 'token' ? 'TOKEN' : equippedId === o.ownedId ? 'EQ' : undefined,
+      label: o.name,
+      disabled: equipPick && (o.kind === 'token' || !o.equip),
+    })),
+  ];
+  // Nothing picked yet: show the first item, like the reference does.
+  const shown = selected ?? (equipPick ? null : (slots[0]?.key ?? null));
+  const base = bases.find((b) => b === shown) ?? null;
+  const owned = base ? null : (bag.find((o) => o.ownedId === shown) ?? null);
+  const fact = useFunFact(base);
+
+  let detail: ReactNode;
+  if (equipPick) {
+    detail = <DetailPanel empty="Pick something to hold." />;
+  } else if (base) {
+    detail = (
+      <DetailPanel
+        look={{ sprite: ITEM_SPRITES[base] }}
+        title={ITEM_INFO[base].name}
+        stats={[
+          { icon: <IconCoin />, value: basePrice(base), label: 'Value' },
+          { icon: <IconBag />, value: inv[base], label: 'In Inventory' },
+        ]}
+        actions={
+          PLANTABLE_BASE.includes(base)
+            ? [{ icon: <IconSprout />, label: 'Plant in garden', onClick: () => onPlantBase(base) }]
+            : []
+        }
+      >
+        <p>{ITEM_INFO[base].desc}</p>
+        <p className="ds-muted">Fun fact: {fact ?? '…'}</p>
+      </DetailPanel>
+    );
+  } else if (owned) {
+    const { labels, pick } = ownedOptList(owned);
+    const iconFor = (l: string) =>
+      l === 'Plant in garden' ? <IconSprout /> : l === 'Place in world' ? <IconMap /> : l === 'Use token' ? <IconSpark /> : <IconHand />;
+    const nameFor = (l: string) => (l === 'Equip' ? 'Equip to hand' : l === 'Unequip' ? 'Put away' : l);
+    detail = (
+      <DetailPanel
+        look={{ sprite: owned.sprite, colors: owned.colors, palette: owned.palette, color: owned.color, texture: owned.textureModifier }}
+        title={owned.name}
+        stats={[
+          { icon: <IconCoin />, value: owned.price, label: 'Value' },
+          { icon: <IconBag />, value: 1, label: equippedId === owned.ownedId ? 'In Hand' : 'In Inventory' },
+        ]}
+        actions={labels.map((l, i) => ({ icon: iconFor(l), label: nameFor(l), onClick: () => pick(i) }))}
+      >
+        <p>{owned.desc}</p>
+        {owned.funcDesc && <p className="ds-muted">{owned.funcDesc}</p>}
+        {/* A crafted item's effect only applies once it's PLACED near the
+            beds; without saying so, a magical-sounding item looks broken. */}
+        {owned.fn && !isCosmetic(owned.fn) && (
+          <p>
+            Effect: {describeEffect(owned.fn)} <span className="ds-muted">(place it near your crops)</span>
+          </p>
+        )}
+        {owned.tags && owned.tags.length > 0 && (
+          <div className="ds-chips">
+            {owned.tags.map((t) => (
+              <span key={t} className="ds-chip">
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+      </DetailPanel>
+    );
+  } else {
+    detail = <DetailPanel empty="Your inventory is empty." />;
+  }
+
+  return (
+    <Sheet
+      label={equipPick ? 'Equip what?' : 'Inventory'}
+      onBack={onBack}
+      onClose={onClose}
+      money={money}
+      footer={equipPick ? 'pick something to hold · [Esc] cancel' : undefined}
+    >
+      <Split>
+        <SlotGrid
+          slots={slots}
+          selected={shown}
+          onSelect={(s) => {
+            const o = bag.find((b) => b.ownedId === s.key);
+            if (equipPick) {
+              if (o) onEquipPick(o);
+            } else if (o) onSelectOwned(o);
+            else onSelectBase(s.key as ItemType);
+          }}
+        />
+        {detail}
+      </Split>
+    </Sheet>
+  );
+}
+
+// The fun-fact line for a base item, fetched once per item shown.
+function useFunFact(item: ItemType | null): string | null {
+  const [fact, setFact] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setFact(null);
+    if (item)
+      getFunFact(item).then((f) => {
+        if (alive) setFact(f);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [item]);
+  return fact;
+}
+
 function InvGrid({
   inv,
   onItem,
@@ -4867,121 +4991,6 @@ function InvGrid({
         </div>
       ))}
     </div>
-  );
-}
-
-// The inventory's right-hand sidebar for a selected BASE item (flower,
-// stone, date, ...) — see the merged 'inventory'/'detail'/'detailOwned'
-// render above. Its own component (not inlined there) because the fun-fact
-// fetch needs its own effect keyed on `item`.
-function DetailSide({
-  item,
-  qty,
-  onPlant,
-}: {
-  item: ItemType;
-  qty: number;
-  onPlant?: () => void;
-}) {
-  const [fact, setFact] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    setFact(null);
-    getFunFact(item).then((f) => {
-      if (alive) setFact(f);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [item]);
-  return (
-    <>
-      <div className="inv-detail-icon">
-        <pre className="detail-sprite">{ITEM_SPRITES[item].join('\n')}</pre>
-      </div>
-      <div className="inv-detail-name">{ITEM_INFO[item].name}</div>
-      <p className="inv-detail-desc">{ITEM_INFO[item].desc}</p>
-      <p className="inv-detail-fact">* fun fact: {fact ?? '...'}</p>
-      <div className="inv-detail-qty">
-        <span>Quantity</span>
-        <b>{qty}</b>
-      </div>
-      {onPlant && (
-        <div className="inv-detail-actions">
-          <button className="btn btn-primary" onClick={onPlant}>
-            Plant in garden
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
-
-// Same sidebar, for a selected OWNED item (bag: tools, gear, craft tokens) —
-// these are unique instances, not stackable counts, so there's no Quantity
-// row; the action buttons are whatever ownedOptList() says applies (Equip /
-// Unequip / Use token / Plant in garden), the first one styled as primary.
-function DetailOwnedSide({
-  owned,
-  labels,
-  onPick,
-}: {
-  owned: OwnedItem;
-  labels: string[];
-  onPick: (i: number) => void;
-}) {
-  return (
-    <>
-      <div className="inv-detail-icon">
-        <ColoredSprite
-          className="detail-sprite"
-          sprite={owned.sprite}
-          colors={owned.colors}
-          palette={owned.palette}
-          color={owned.color}
-          texture={owned.textureModifier}
-        />
-      </div>
-      <div className="inv-detail-name">{owned.name}</div>
-      <p className="inv-detail-desc">{owned.desc}</p>
-      <p className="inv-detail-fact">* {owned.funcDesc}</p>
-      {/* A crafted item's translated effect only applies once it's PLACED in
-          the world near the beds — without saying so, an item that reads as
-          magical does nothing in the bag and looks broken. */}
-      {owned.fn && !isCosmetic(owned.fn) && (
-        <div className="inv-detail-effect">
-          <span className="inv-detail-effect-head">effect</span>
-          <span>{describeEffect(owned.fn)}</span>
-          <span className="inv-detail-effect-hint">place it near your crops to use it</span>
-        </div>
-      )}
-      {/* Prompt-memory tags — crafted items only. A lightweight tooltip: the
-          player can always see what they typed (the "prompt: ..." tag, added
-          verbatim in code — see craftDescribe in llm.ts) alongside a few
-          inferred traits, without digging through a history log. */}
-      {owned.tags && owned.tags.length > 0 && (
-        <div className="inv-detail-tags">
-          {owned.tags.map((t) => (
-            <span key={t} className="tag-chip">
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
-      {labels.length > 0 && (
-        <div className="inv-detail-actions">
-          {labels.map((label, i) => (
-            <button
-              key={label}
-              className={'btn ' + (i === 0 ? 'btn-primary' : 'btn-secondary')}
-              onClick={() => onPick(i)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-    </>
   );
 }
 

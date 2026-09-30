@@ -29,6 +29,8 @@ for the esbuild build permission (`allowBuilds`).
 | <https://asciia-bay-2.app-testing.workers.dev/> | The game as a new player gets it: **with the intro** for a new save, straight into the island for a finished one. |
 | <https://asciia-bay-2.app-testing.workers.dev/0> | **Skips the intro** and starts straight on the island, whatever the save says. |
 | <https://asciia-bay-2.app-testing.workers.dev/intro> | **Always plays the intro**, even over a finished save (for testing it again). |
+| <https://asciia-bay-2.app-testing.workers.dev/1> | **Crafting test link (panel 1), without the intro:** skips the intro like `/0`, and the workshop runs the new flow: a preflight offers two concepts or "Surprise me" for requests that can't be drawn as asked, no automatic re-plan, and leaving keeps the last finished design. |
+| <https://asciia-bay-2.app-testing.workers.dev/intro/1> | **Crafting panel 1 with the intro:** always plays the intro like `/intro`, then the workshop runs the same flow as `/1`. |
 
 These paths work because `wrangler.jsonc` sets `not_found_handling:
 "single-page-application"`, so the Worker serves the game for any path;

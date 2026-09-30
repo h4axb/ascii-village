@@ -9,6 +9,7 @@
 //   <Dialogue>     a character's line: name tab, framed box, ▼, options
 //   <Row> <Stepper> label/value rows and a − n + control for detail panels
 //   <Panel> <ChoicePanel>  small centred card; question + options (confirms, menus)
+//   <ChatMessage> <Bubble> <Portrait> <Frame>  a conversation: face box + name, framed bubbles
 //   icons          thin-line icons (currentColor)
 //
 // The inventory is the first user; crafting, dialogue, settings and confirm
@@ -22,4 +23,5 @@ export { FitSprite, type SpriteLook } from './FitSprite';
 export { Dialogue, NextArrow } from './Dialogue';
 export { Row, Stepper } from './Controls';
 export { Panel, ChoicePanel } from './Panel';
+export { ChatMessage, Bubble, Portrait, Frame, type Speaker } from './Chat';
 export * from './icons';

@@ -16,7 +16,7 @@
 // movement while the map is open).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ColoredSprite, darken } from './ColoredSprite';
-import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, STRUCT_ENTS, PLAYER_T, grassKeepOut, footprint } from './world';
+import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, STRUCT_ENTS, PLAYER_T, MITCHY_T, grassKeepOut, footprint } from './world';
 import type { Ent } from './world';
 import { terrainField, GLYPHS, KIND_WATER } from './terrain';
 
@@ -27,7 +27,8 @@ export interface MapCharacterEntry {
   sprite: string[];
   colors?: string[];
   palette?: Record<string, string>;
-  color?: string; // base colour for mono sprites (e.g. Mitchy's — see .ent.cat)
+  color?: string; // base colour for mono sprites
+  solid?: boolean; // per-cell backing, as the character is drawn in the world
   ringColor?: string; // border accent so the player/Mitchy read as distinct
 }
 
@@ -189,7 +190,7 @@ function Head({ c, size }: { c: MapCharacterEntry; size: number }) {
       className="map-head"
       style={{ width: size, height: size, borderColor: c.ringColor ?? 'var(--ui-accent)', fontSize }}
     >
-      <ColoredSprite sprite={c.sprite} colors={c.colors} palette={c.palette} color={c.color} />
+      <ColoredSprite sprite={c.sprite} colors={c.colors} palette={c.palette} color={c.color} solidCells={c.solid} />
     </div>
   );
 }
@@ -326,9 +327,10 @@ export default function GameMap({
     .map((c) => {
       const pos = c.getPos();
       if (!pos) return null;
-      // player: its tile box; Mitchy: his sprite (getPos returns his entity)
-      const cx = c.id === 'player' ? (pos.x + PLAYER_T.wT / 2) * TILE_CH : pos.x * TILE_CH + 5;
-      const cy = c.id === 'player' ? (pos.y + PLAYER_T.hT / 2) * TILE_LN : pos.y * TILE_LN + 2;
+      // the centre of the character's tile box (getPos returns Mitchy's entity)
+      const t = c.id === 'player' ? PLAYER_T : MITCHY_T;
+      const cx = (pos.x + t.wT / 2) * TILE_CH;
+      const cy = (pos.y + t.hT / 2) * TILE_LN;
       return { c, left: cx * pxPerCell, top: cy * pxPerLine };
     })
     .filter(Boolean) as { c: MapCharacterEntry; left: number; top: number }[];

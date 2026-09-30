@@ -274,6 +274,8 @@ function houseSlice(rawColStart: number, rawColEnd: number, rawRowStart: number,
 // at their own larger font-size.
 export const PLAYER_SCALE = 0.15;
 export const PLAYER_T = spriteTiles(S.PLAYER, PLAYER_SCALE);
+export const MITCHY_SCALE = PLAYER_SCALE;
+export const MITCHY_T = spriteTiles(S.MITCHY, MITCHY_SCALE);
 
 // An entity's footprint is the bottom row of tiles it covers. Used for
 // interaction distance (near) and dropped-fruit placement.
@@ -739,11 +741,13 @@ const STRUCT_ENTS_BASE: Ent[] = [
     kind: 'cat',
     x: 35,
     y: 33,
-    sprite: S.CAT,
+    sprite: S.MITCHY,
+    colors: S.MITCHY_COLORS,
+    palette: S.MITCHY_PALETTE,
+    // same render scale as the player: both are baked from same-sized
+    // reference glyph grids, so this keeps them in proportion
+    scale: MITCHY_SCALE,
     interactable: true,
-    // no colours grid: the cat is a single light beige (.ent.cat in styles.css).
-    // The old grid targeted the previous face and pointed at glyphs that no
-    // longer exist in this sprite.
   },
   // ── trees (decorative scatter) ──
   // Date palms — shake one and it drops dates. These are 8x12 TILES, well

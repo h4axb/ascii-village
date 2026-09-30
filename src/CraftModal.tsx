@@ -3,118 +3,106 @@
 // (streaming hooks, alternatives, mitchy chat); this file is purely the UI +
 // state machine.
 //
-// Layout (a translucent, blurred sheet over the world):
-//   ← back                                              ✕
-//                                                       ¤ money
-//   [ 20 fixed item slots — the inventory ]   [ info on the selection /
-//                                               the live drawing / result ]
-//   Mitchy's latest line                       [ options, when there are any ]
-//   [ your prompt ]
-//   show chat history
+// Layout (design system, see src/ui):
+//   ← back                                                        ✕
+//                                                                 ¤ money
+//   ┌ the chat ────────────────────────────────────────────┐▐ bookmark
+//   │ [Mitchy]  ┌ bubble ┐                                 │  (past chats)
+//   │           └────────┘              ┌ bubble ┐ [You]   │
+//   │                                   └────────┘         │
+//   │ ┌ your prompt (80 signs) ─────────────┐ [ Craft it! ] │
+//   └──────────────────────────────────────────────────────┘
 //
-// "show chat history" opens a window over the slots + info area listing past
-// crafts; picking one swaps the slots for that craft's chat. ← steps back
-// (history → main, chat → items); Esc, ✕ and ← on the main view always ask
+// The bookmark opens the chat history as a column on the right; picking a
+// past craft shows its chat in place of the current one. ← steps back
+// (history → current chat); Esc, ✕ and ← on the current chat always ask
 // before leaving, and [F] confirms like the world's interaction prompts.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+//
+// With `choices` (the /1 test link) a craft first runs a preflight: when the
+// request can't be drawn as asked, Mitchy offers two concepts or her own
+// hunch ("Surprise me") before drawing anything; the shown result is always
+// exactly what the player gets. There, leaving never throws a finished
+// design away: the last result goes into the inventory.
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import * as S from './sprites';
-import { craftItem, mitchyChat, getMitchyLine } from './llm';
-import type { OwnedItem, ShopItem } from './llm';
-import type { TextureModifier } from './craft';
-import { appendHistory, groupByDay, loadHistory, timeOf, type CraftRecord, type ChatLine } from './craftHistory';
-import { ColoredSprite } from './ColoredSprite';
+import { craftItem, mitchyChat, getMitchyLine, preflightCraft } from './llm';
+import type { CraftConcept, OwnedItem, ShopItem } from './llm';
+import { appendHistory, ago, loadHistory, type CraftRecord, type ChatLine } from './craftHistory';
+import { MITCHY_NAME } from './introPartB';
+import {
+  Bubble,
+  ChatMessage,
+  ChoicePanel,
+  FitSprite,
+  Frame,
+  IconHammer,
+  IconHistory,
+  Sheet,
+  type Speaker,
+  type SpriteLook,
+} from './ui';
 
-const MITCHY_FACE = S.CAT.slice(0, 2);
-export const CRAFT_SLOTS = 20;
+export const PROMPT_MAX = 80;
+// One paid rework of a finished design: the player says what to change and
+// Mitchy crafts it again. Once per token; refunded if the rework fails.
+export const ADJUST_PRICE = 12;
 
-// One inventory entry as the panel shows it (App builds these from inv/bag).
-export interface CraftSlot {
-  key: string;
-  name: string;
-  sprite: string[];
-  colors?: string[];
-  palette?: Record<string, string>;
-  color?: string;
-  texture?: TextureModifier;
-  count?: number; // stackable materials
-  price?: number;
-  priceLabel?: string; // 'Base price' for negotiated materials
-  desc: string;
-  note?: string; // an owned item's function line
-  tag?: string; // TOKEN / EQ
-}
+const MITCHY: Speaker = { name: MITCHY_NAME, look: S.MITCHY_FACE_LOOK, solid: {} };
 
-// input → working → failed → success → folded
-type Phase = 'input' | 'working' | 'failed' | 'success' | 'folded';
+// input → working → (choosing →) working → failed | success → folded
+type Phase = 'input' | 'working' | 'choosing' | 'failed' | 'success' | 'folded';
+
+type Result = { item: ShopItem; prompt: string };
 
 type Turn =
   | { who: 'mitchy' | 'me'; kind: 'text'; text: string }
   | { who: 'mitchy'; kind: 'result'; item: ShopItem; prompt: string; status?: string }
-  | { who: 'mitchy'; kind: 'alts'; intro: string; options: string[] };
+  | { who: 'mitchy'; kind: 'alts'; intro: string; options: string[] }
+  | { who: 'mitchy'; kind: 'concepts'; concepts: [CraftConcept, CraftConcept]; surprise: string };
+
+const CONCEPT_LETTERS = ['A', 'B'] as const;
 
 const STAGE_TEXT: Record<string, string> = {
   image: 'sketching a reference…',
   drawing: 'drawing…',
   retrying: 'hmm, adjusting…',
+  thinking: 'thinking it over…',
 };
 
-// A sprite drawn at its natural size, then shrunk (never enlarged) to fit its
-// box, so every slot keeps the same size whatever the item's dimensions.
-function FitSprite(p: {
+const lookOf = (it: {
   sprite: string[];
   colors?: string[];
   palette?: Record<string, string>;
   color?: string;
-  texture?: TextureModifier;
-  className?: string;
-}) {
-  const box = useRef<HTMLDivElement>(null);
-  const [k, setK] = useState(1);
-  useLayoutEffect(() => {
-    const b = box.current;
-    const inner = b?.firstElementChild as HTMLElement | null;
-    if (!b || !inner) return;
-    const fit = () => {
-      const w = inner.offsetWidth;
-      const h = inner.offsetHeight;
-      if (!w || !h) return;
-      setK(Math.min(1, (b.clientWidth - 8) / w, (b.clientHeight - 8) / h));
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(b);
-    return () => ro.disconnect();
-  }, [p.sprite]);
+  textureModifier?: SpriteLook['texture'];
+}): SpriteLook => ({
+  sprite: it.sprite,
+  colors: it.colors,
+  palette: it.palette,
+  color: it.color,
+  texture: it.textureModifier,
+});
+
+// A crafted item inside a bubble: the picture in its own frame, name and
+// its one-line function under it.
+function ResultCard({ look, name, desc }: { look: SpriteLook; name: string; desc?: string }) {
   return (
-    <div className={'cw2-fit ' + (p.className ?? '')} ref={box}>
-      <ColoredSprite
-        sprite={p.sprite}
-        colors={p.colors}
-        palette={p.palette}
-        color={p.color}
-        texture={p.texture}
-        style={{ transform: `translate(-50%, -50%) scale(${k})` }}
-      />
+    <div className="cw3-card">
+      <Frame className="cw3-art">
+        <FitSprite look={look} fill={0.82} maxScale={2.4} />
+      </Frame>
+      <div className="cw3-card-name">{name}</div>
+      {desc && <div className="ds-muted">“{desc}”</div>}
     </div>
   );
 }
 
-// thin-line icons, same stroke as everything else on the sheet
-const BackIcon = () => (
-  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
-    <path d="M20 12H5M11 6l-6 6 6 6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
-    <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-  </svg>
-);
-
 export default function CraftModal({
   token,
-  slots,
+  player,
+  choices = false,
   money,
+  onSpend,
   onConsume,
   onClose,
   confirmClose,
@@ -123,8 +111,10 @@ export default function CraftModal({
   onDoneChange,
 }: {
   token: OwnedItem;
-  slots: CraftSlot[];
+  player: Speaker; // the player's name and face, for their side of the chat
+  choices?: boolean; // the /1 flow: preflight + concepts, no auto retry, keep the last result on leave
   money: number;
+  onSpend: (coins: number) => void; // negative = refund
   onConsume: (equip: boolean, item: ShopItem) => void; // spend token, equip if asked — does NOT close
   onClose: () => void;
   confirmClose: boolean; // App raises this on Esc / outside-click
@@ -146,13 +136,21 @@ export default function CraftModal({
   const [stage, setStage] = useState<string | null>(null);
   const [partial, setPartial] = useState<string[]>([]);
   const partialLevel = useRef(-1);
-  const [popup, setPopup] = useState<{ item: ShopItem; prompt: string } | null>(null);
+  const [popup, setPopup] = useState<Result | null>(null);
+  // (choices) the latest finished design not yet taken, kept while a rework
+  // runs — what leaving saves; plus whether a paid rework is in flight
+  const lastResult = useRef<Result | null>(null);
+  const reworking = useRef(false);
+  const closed = useRef(false); // left the workshop: late results are ignored
   const [history, setHistory] = useState<CraftRecord[]>(() => loadHistory());
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [viewRec, setViewRec] = useState<CraftRecord | null>(null); // a past craft's chat in place of the slots
-  const [sel, setSel] = useState<string | null>(slots[0]?.key ?? null);
+  const [viewRec, setViewRec] = useState<CraftRecord | null>(null); // a past craft's chat in place of the current one
+  const [adjusting, setAdjusting] = useState(false); // typing what to change
+  const [adjusted, setAdjusted] = useState(false); // the one rework is used
   const [optSel, setOptSel] = useState(0);
+  const [leaveSel, setLeaveSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
 
   const busy = phase === 'working';
   const done = phase === 'folded';
@@ -162,42 +160,106 @@ export default function CraftModal({
   const push = (t: Turn) => setThread((l) => [...l, t]);
 
   // ---- crafting ----
-  function startCraft(text: string) {
-    push({ who: 'me', kind: 'text', text });
+  // `rework`: the previous result being adjusted — `text` is then only the
+  // change, and the craft runs on the old prompt plus that change.
+  // `how.say`: the player's line when it isn't the prompt itself (a concept
+  // pick); `how.direct`: skip the preflight (a picked concept or one of
+  // Mitchy's alternatives); `how.surprise`: Mitchy's own hunch, revealed.
+  function startCraft(
+    text: string,
+    rework?: Result,
+    how: { say?: string; direct?: boolean; surprise?: boolean } = {},
+  ) {
+    const craftPrompt = rework ? `${rework.prompt}, but ${text}` : text;
+    push({ who: 'me', kind: 'text', text: how.say ?? text });
     setPhase('working');
     setStage(null);
     setPartial([]);
     setBusyLine(null);
     partialLevel.current = -1;
+    reworking.current = !!rework;
     getMitchyLine('a "hold on, building your thing right now" busy').then(setBusyLine);
 
-    craftItem(text, {
-      onStage: (s: string) => setStage(s),
-      onLine: (line: string, _i: number, level: number) => {
-        if (level !== partialLevel.current) {
-          partialLevel.current = level;
-          setPartial([line]);
-        } else setPartial((p) => [...p, line]);
-      },
-    }).then((r) => {
+    const draw = () =>
+      craftItem(
+        craftPrompt,
+        {
+          onStage: (s: string) => setStage(s),
+          onLine: (line: string, _i: number, level: number) => {
+            if (level !== partialLevel.current) {
+              partialLevel.current = level;
+              setPartial([line]);
+            } else setPartial((p) => [...p, line]);
+          },
+        },
+        { retry: !choices },
+      ).then((r) => finish(r));
+
+    if (choices && !rework && !how.direct) {
+      setStage('thinking');
+      preflightCraft(craftPrompt).then((pf) => {
+        if (closed.current) return;
+        if (!pf.needsChoice) return draw();
+        setStage(null);
+        setPhase('choosing');
+        push({
+          who: 'mitchy',
+          kind: 'text',
+          text: "Ooh, that's a lot of wonderful ideas for one little token. I see two ways to build it, or I can follow my own hunch:",
+        });
+        push({ who: 'mitchy', kind: 'concepts', concepts: pf.concepts, surprise: pf.surprise });
+      });
+    } else draw();
+
+    function finish(r: Awaited<ReturnType<typeof craftItem>>) {
+      if (closed.current) return; // left meanwhile; leave() already settled it
+      reworking.current = false;
       setStage(null);
       setPartial([]);
       if (r.ok) {
         setPhase('success');
-        push({ who: 'mitchy', kind: 'result', item: r.item, prompt: text });
-        setPopup({ item: r.item, prompt: text });
+        if (rework) setAdjusted(true);
+        if (how.surprise) push({ who: 'mitchy', kind: 'text', text: "Ta-da! Here's what I came up with." });
+        push({ who: 'mitchy', kind: 'result', item: r.item, prompt: craftPrompt });
+        setPopup({ item: r.item, prompt: craftPrompt });
+        lastResult.current = { item: r.item, prompt: craftPrompt };
+      } else if (rework) {
+        // the rework failed: coins back, and the previous design is still
+        // there to take (or to try adjusting again)
+        onSpend(-ADJUST_PRICE);
+        setPhase('success');
+        push({ who: 'mitchy', kind: 'text', text: `${r.reply} (Your ${ADJUST_PRICE} coins are back in your pocket.)` });
+        push({ who: 'mitchy', kind: 'result', item: rework.item, prompt: rework.prompt });
+        setPopup(rework);
       } else {
         setPhase('failed');
-        setInput(text); // pre-fill so they can edit instead of retype
+        setInput(text.slice(0, PROMPT_MAX)); // pre-fill so they can edit instead of retype
         if (r.suggestions?.length) push({ who: 'mitchy', kind: 'alts', intro: r.reply, options: r.suggestions });
         else push({ who: 'mitchy', kind: 'text', text: r.reply });
       }
-    });
+    }
   }
 
+  // (an adjustment is sent from its own option, not from Craft it!)
+  const canSend = !!input.trim() && !done && !popup;
   function submit() {
     const text = input.trim();
-    if (!text) return;
+    if (!text || done) return; // token spent
+    if (popup) {
+      if (!adjusting || money < ADJUST_PRICE) return; // awaiting a choice
+      const rework = popup;
+      onSpend(ADJUST_PRICE);
+      setAdjusting(false);
+      setPopup(null);
+      setInput('');
+      setThread((l) =>
+        l.map((t) => (t.kind === 'result' && t.item === rework.item && !t.status ? { ...t, status: 'Let me rework this one…' } : t)),
+      );
+      startCraft(text, rework);
+      return;
+    }
+    setViewRec(null); // back to the current chat
+    setHistoryOpen(false);
     if (busy) {
       // chat with Mitchy while she works — independent of the pipeline
       push({ who: 'me', kind: 'text', text });
@@ -205,15 +267,15 @@ export default function CraftModal({
       mitchyChat(text).then((reply) => push({ who: 'mitchy', kind: 'text', text: reply }));
       return;
     }
-    if (phase === 'folded' || popup) return; // token spent / awaiting choice
     setInput('');
     startCraft(text);
   }
 
   // ---- success → folded (player chose equip / inventory) ----
-  function choose(equip: boolean) {
-    if (!popup) return;
-    const { item } = popup;
+  function choose(equip: boolean, res: Result | null = popup) {
+    if (!res) return;
+    const { item } = res;
+    lastResult.current = null;
     onConsume(equip, item); // spend the token; App does NOT close the panel
     const status = equip ? 'Equipped to your hand.' : 'Tucked into your inventory.';
     const turns = thread.map((t) => (t.kind === 'result' && t.item === item ? { ...t, status } : t));
@@ -221,7 +283,7 @@ export default function CraftModal({
     const rec: CraftRecord = {
       id: `h-${Date.now()}`,
       name: item.name,
-      prompt: popup.prompt,
+      prompt: res.prompt,
       category: item.category,
       sprite: item.sprite,
       color: item.color,
@@ -240,10 +302,37 @@ export default function CraftModal({
     );
   }
 
+  // ---- adjusting a finished design (paid, once) ----
+  function startAdjust() {
+    if (!popup || adjusted || money < ADJUST_PRICE) return;
+    setAdjusting(true);
+    push({ who: 'mitchy', kind: 'text', text: 'Sure! What should I change? Tell me in a few words.' });
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+  function cancelAdjust() {
+    setAdjusting(false);
+    setInput('');
+  }
+
+  // ---- leaving ----
+  // (choices) a finished design is never thrown away: the last one goes into
+  // the inventory (token spent), and a rework still running is dropped with
+  // its coins refunded. Otherwise the unused token simply stays.
+  function leave() {
+    if (closed.current) return;
+    closed.current = true;
+    if (choices && !done) {
+      if (reworking.current) onSpend(-ADJUST_PRICE);
+      if (lastResult.current) choose(false, lastResult.current);
+    }
+    onClose();
+  }
+
   // ---- navigation ----
   function back() {
     if (historyOpen) setHistoryOpen(false);
     else if (viewRec) setViewRec(null);
+    else if (adjusting) cancelAdjust();
     else onConfirmChange(true);
   }
 
@@ -252,42 +341,74 @@ export default function CraftModal({
   // prompt field (which stops key events from reaching the world).
   useEffect(() => {
     if (!confirmClose) return;
+    setLeaveSel(0);
     inputRef.current?.blur();
+  }, [confirmClose]);
+  useEffect(() => {
+    if (!confirmClose) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === 'f') {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        leave();
       }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [confirmClose, onClose]);
+  });
 
-  // ---- what the dialogue line, the info panel and the options show ----
+  // ---- the reply options (the player's side) ----
   const lastMitchy = [...thread].reverse().find((t) => t.who === 'mitchy');
-  const line = busy
-    ? (busyLine ?? '…')
-    : lastMitchy?.kind === 'text'
-      ? lastMitchy.text
-      : lastMitchy?.kind === 'alts'
-        ? lastMitchy.intro
-        : lastMitchy?.kind === 'result'
-          ? `Here you go: ${lastMitchy.item.name}! Want to hold it, or keep it in your inventory?`
-          : '';
   const lastAlts = !busy && phase === 'failed' && lastMitchy?.kind === 'alts' ? lastMitchy.options : null;
-  type Opt = { label: string; go: () => void };
-  const options: Opt[] = popup
-    ? [
-        { label: 'Equip it.', go: () => choose(true) },
-        { label: 'Into my inventory.', go: () => choose(false) },
-      ]
-    : lastAlts
-      ? lastAlts.map((o) => ({ label: o, go: () => startCraft(o) }))
-      : done
-        ? [{ label: 'Leave the workshop.', go: onClose }]
-        : [];
-  useEffect(() => setOptSel(0), [options.length, popup, lastAlts]);
+  const lastConcepts = phase === 'choosing' && lastMitchy?.kind === 'concepts' ? lastMitchy : null;
+  type Opt = { label: string; go: () => void; disabled?: boolean; title?: string };
+  const options: Opt[] = viewRec
+    ? []
+    : popup && adjusting
+      ? [
+          {
+            label: `Adjust it (${ADJUST_PRICE} coins)`,
+            go: submit,
+            disabled: !input.trim(),
+            title: input.trim() ? undefined : 'Type what should change first.',
+          },
+          { label: 'Never mind, keep this one.', go: cancelAdjust },
+        ]
+      : popup
+      ? [
+          { label: 'Equip it.', go: () => choose(true) },
+          { label: 'Into my inventory.', go: () => choose(false) },
+          ...(adjusted
+            ? []
+            : [
+                {
+                  label: `Adjust the design (${ADJUST_PRICE} coins)`,
+                  go: startAdjust,
+                  disabled: money < ADJUST_PRICE,
+                  title:
+                    money < ADJUST_PRICE
+                      ? `You need ${ADJUST_PRICE} coins to adjust it.`
+                      : 'Tell Mitchy what to change; she crafts it once more.',
+                },
+              ]),
+        ]
+      : lastConcepts
+        ? [
+            ...lastConcepts.concepts.map((c, i) => {
+              const say = `${CONCEPT_LETTERS[i]}: ${c.name}`;
+              return { label: say, go: () => startCraft(c.prompt, undefined, { say, direct: true }) };
+            }),
+            {
+              label: 'Surprise me!',
+              go: () => startCraft(lastConcepts.surprise, undefined, { say: 'Surprise me!', direct: true, surprise: true }),
+            },
+          ]
+        : lastAlts
+          ? lastAlts.map((o) => ({ label: o, go: () => startCraft(o, undefined, { direct: true }) }))
+          : done
+            ? [{ label: 'Leave the workshop.', go: leave }]
+            : [];
+  useEffect(() => setOptSel(0), [options.length, popup, lastAlts, lastConcepts, adjusting]);
 
   // arrows + Enter pick an option while the prompt field is empty
   useEffect(() => {
@@ -302,270 +423,239 @@ export default function CraftModal({
       } else if (e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
-        options[Math.min(optSel, options.length - 1)].go();
+        const o = options[Math.min(optSel, options.length - 1)];
+        if (!o.disabled) o.go();
       }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   });
 
-  const selected = slots.find((s) => s.key === sel) ?? null;
-  const grid: (CraftSlot | null)[] = Array.from({ length: CRAFT_SLOTS }, (_, i) => slots[i] ?? null);
+  // ---- the chat: consecutive turns of one speaker share a face ----
+  type Group = { who: 'mitchy' | 'me'; bubbles: ReactNode[] };
+  const groups: Group[] = [];
+  const add = (who: 'mitchy' | 'me', ...bubbles: ReactNode[]) => {
+    const last = groups[groups.length - 1];
+    if (last && last.who === who) last.bubbles.push(...bubbles);
+    else groups.push({ who, bubbles });
+  };
+  if (viewRec) {
+    const lines = viewRec.chat ?? [{ who: 'me' as const, text: viewRec.prompt }];
+    lines.forEach((c, i) => add(c.who, <Bubble key={`l${i}`}>{c.text}</Bubble>));
+    add(
+      'mitchy',
+      <Bubble key="res">
+        <ResultCard look={lookOf(viewRec)} name={viewRec.name} desc={viewRec.punchline} />
+      </Bubble>,
+    );
+  } else {
+    thread.forEach((t, i) => {
+      if (t.kind === 'text') add(t.who, <Bubble key={i}>{t.text}</Bubble>);
+      else if (t.kind === 'alts') add('mitchy', <Bubble key={i}>{t.intro}</Bubble>);
+      else if (t.kind === 'concepts')
+        add(
+          'mitchy',
+          <Bubble key={i} className="cw3-concepts-bubble">
+            <div className="cw3-concepts">
+              {t.concepts.map((c, j) => (
+                <Frame key={j} className="cw3-concept">
+                  <span className="cw3-concept-letter">{CONCEPT_LETTERS[j]}</span>
+                  <span className="cw3-concept-name">{c.name}</span>
+                  <span className="ds-muted">{c.summary}</span>
+                </Frame>
+              ))}
+              <Frame className="cw3-concept surprise">
+                <span className="cw3-concept-letter">?</span>
+                <span className="cw3-concept-name">Surprise me</span>
+                <span className="ds-muted">Mitchy's own interpretation</span>
+              </Frame>
+            </div>
+          </Bubble>,
+        );
+      else
+        add(
+          'mitchy',
+          <Bubble key={i}>
+            <ResultCard look={lookOf(t.item)} name={t.item.name} desc={t.item.funcDesc} />
+          </Bubble>,
+          <Bubble key={`${i}q`}>
+            {t.status ?? `Here you go: ${t.item.name}! Want to hold it, or keep it in your inventory?`}
+          </Bubble>,
+        );
+    });
+    if (busy)
+      add(
+        'mitchy',
+        <Bubble key="busy">
+          {busyLine ?? '…'}
+        </Bubble>,
+        <Bubble key="drawing">
+          <div className="cw3-card">
+            <Frame className="cw3-art">
+              <pre className="cw3-drawing">{partial.join('\n') || ' '}</pre>
+            </Frame>
+            <div className="ds-muted">
+              {stage === 'drawing' && partial.length
+                ? `drawing line ${partial.length}`
+                : (STAGE_TEXT[stage ?? ''] ?? 'working')}
+              <span className="cw-ellipsis" />
+            </div>
+            <div className="cw-progress-bar">
+              <span />
+            </div>
+          </div>
+        </Bubble>,
+      );
+  }
+
+  // keep the newest message in view
+  const chatSize = groups.reduce((n, g) => n + g.bubbles.length, 0) + partial.length + options.length;
+  useLayoutEffect(() => {
+    const el = chatRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [chatSize, viewRec, busyLine, adjusting]);
+
+  // what leaving now keeps (see leave())
+  function leaveText(): string | undefined {
+    if (done) return undefined;
+    const last = choices ? lastResult.current : null;
+    if (last && reworking.current)
+      return `Mitchy is still reworking it. Your last finished design, ${last.item.name}, goes into your inventory, and your ${ADJUST_PRICE} coins come back.`;
+    if (last) return `Your last design, ${last.item.name}, goes into your inventory.`;
+    if (busy) return 'Mitchy is still building. Your unused token stays safe in your inventory.';
+    return 'Your unused token stays safe in your inventory.';
+  }
+
+  const placeholder = busy
+    ? 'Chat with Mitchy while she works …'
+    : adjusting
+      ? 'What should change? e.g. make the sail red …'
+      : popup
+      ? 'Pick an option above'
+      : done
+        ? 'Come back with another token'
+        : "Describe what you'd like to craft …";
 
   return (
-    <div className="cw2" role="dialog" aria-label="Mitchy's Workshop" aria-modal="true">
-      <button className="cw2-back" onClick={back} aria-label="back">
-        <BackIcon />
-      </button>
-      <div className="cw2-corner">
-        <button className="cw2-x" onClick={() => onConfirmChange(true)} aria-label="close workshop">
-          <CloseIcon />
+    <Sheet label="Mitchy's Workshop" onBack={back} onClose={() => onConfirmChange(true)} money={money}>
+      <Frame className="cw3">
+        <button
+          className={'cw3-bookmark' + (historyOpen ? ' open' : '')}
+          onClick={() => setHistoryOpen((o) => !o)}
+          aria-label={historyOpen ? 'hide chat history' : 'show chat history'}
+          aria-expanded={historyOpen}
+          title="Chat history"
+        >
+          <IconHistory size={20} />
         </button>
-        <div className="cw2-money" title="your coins">
-          <span className="cw2-coin">¤</span>
-          {money.toLocaleString()}
-        </div>
-      </div>
 
-      <div className="cw2-main">
-        {/* LEFT: 20 slots, or a past craft's chat */}
-        {viewRec ? (
-          <div className="cw2-chatview">
-            <div className="cw2-chatview-head">
-              <span>{viewRec.name}</span>
-              <span className="cw2-muted">{timeOf(viewRec.at)}</span>
-            </div>
-            <div className="cw2-chatview-list">
-              {(viewRec.chat ?? [{ who: 'me' as const, text: viewRec.prompt }]).map((c, i) => (
-                <div key={i} className={'cw2-msg ' + c.who}>
-                  <div className="cw2-msg-who">{c.who === 'me' ? 'You' : 'Mitchy'}</div>
-                  <div className="cw2-msg-text">{c.text}</div>
-                </div>
-              ))}
-              <div className="cw2-msg mitchy">
-                <div className="cw2-msg-who">Result</div>
-                <div className="cw2-result">
-                  <FitSprite
-                    className="cw2-result-sprite"
-                    sprite={viewRec.sprite}
-                    colors={viewRec.colors}
-                    palette={viewRec.palette}
-                    color={viewRec.color}
-                    texture={viewRec.textureModifier}
-                  />
-                  <div>
-                    <div className="cw2-result-name">{viewRec.name}</div>
-                    <div className="cw2-muted">“{viewRec.punchline}”</div>
-                  </div>
-                </div>
+        <div className="cw3-body">
+          <div className="cw3-chat" ref={chatRef}>
+            {viewRec && (
+              <div className="cw3-past">
+                <span>Past chat · {ago(viewRec.at)}</span>
+                <button className="ds-link" onClick={() => setViewRec(null)}>
+                  back to the current chat
+                </button>
               </div>
-            </div>
-          </div>
-        ) : (
-          <div className="cw2-grid">
-            {grid.map((s, i) => (
-              <button
-                key={s?.key ?? `empty-${i}`}
-                className={'cw2-slot' + (s ? ' filled' : '') + (s && s.key === sel ? ' sel' : '')}
-                onClick={s ? () => setSel(s.key) : undefined}
-                disabled={!s}
-                aria-label={s?.name ?? 'empty slot'}
-              >
-                {s && (
-                  <>
-                    <FitSprite sprite={s.sprite} colors={s.colors} palette={s.palette} color={s.color} texture={s.texture} />
-                    {s.count !== undefined && <span className="cw2-count">x{s.count}</span>}
-                    {s.tag && <span className="cw2-tag">{s.tag}</span>}
-                  </>
-                )}
-              </button>
+            )}
+            {groups.map((g, i) => (
+              <ChatMessage key={i} who={g.who === 'me' ? player : MITCHY} side={g.who === 'me' ? 'right' : 'left'}>
+                {g.bubbles}
+              </ChatMessage>
             ))}
+            {options.length > 0 && (
+              <div className="ds-options cw3-replies" role="listbox">
+                {options.map((o, i) => (
+                  <button
+                    key={o.label}
+                    role="option"
+                    aria-selected={i === optSel}
+                    className={'ds-option' + (i === optSel ? ' sel' : '')}
+                    onMouseEnter={() => setOptSel(i)}
+                    onClick={o.go}
+                    disabled={o.disabled}
+                    title={o.title}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
 
-        {/* RIGHT: info — the live drawing, the fresh result, or the selection */}
-        <div className="cw2-info">
-          {busy ? (
-            <>
-              <div className="cw2-info-art">
-                <pre className="cw2-drawing">{partial.join('\n') || ' '}</pre>
+          {historyOpen && (
+            <aside className="cw3-history" aria-label="Chat history">
+              <div className="cw3-history-head">Chat history</div>
+              <div className="cw3-history-list">
+                {history.length === 0 && <div className="ds-muted cw3-history-empty">Nothing crafted yet.</div>}
+                {history.map((r) => (
+                  <button
+                    key={r.id}
+                    className={'cw3-hrow' + (viewRec?.id === r.id ? ' sel' : '')}
+                    onClick={() => {
+                      setViewRec(r);
+                      setHistoryOpen(false);
+                    }}
+                  >
+                    <span className="cw3-hthumb">
+                      <FitSprite look={lookOf(r)} fill={0.8} maxScale={1.6} />
+                    </span>
+                    <span className="cw3-hrow-text">
+                      <span className="cw3-hrow-prompt">{r.prompt}</span>
+                      <span className="ds-muted">{ago(r.at)}</span>
+                    </span>
+                  </button>
+                ))}
               </div>
-              <div className="cw2-info-name">Crafting…</div>
-              <div className="cw2-info-desc">
-                {stage === 'drawing' && partial.length
-                  ? `drawing line ${partial.length}`
-                  : (STAGE_TEXT[stage ?? ''] ?? 'working')}
-                <span className="cw-ellipsis" />
-              </div>
-              <div className="cw-progress-bar">
-                <span />
-              </div>
-            </>
-          ) : popup ? (
-            <>
-              <FitSprite
-                className="cw2-info-art"
-                sprite={popup.item.sprite}
-                colors={popup.item.colors}
-                palette={popup.item.palette}
-                color={popup.item.color}
-                texture={popup.item.textureModifier}
-              />
-              <div className="cw2-info-name">{popup.item.name}</div>
-              <div className="cw2-info-rule" />
-              <div className="cw2-info-desc">“{popup.item.funcDesc}”</div>
-              <div className="cw2-muted">You asked for “{popup.prompt}”</div>
-            </>
-          ) : selected ? (
-            <>
-              <div className="cw2-info-top">
-                <FitSprite
-                  className="cw2-info-art"
-                  sprite={selected.sprite}
-                  colors={selected.colors}
-                  palette={selected.palette}
-                  color={selected.color}
-                  texture={selected.texture}
-                />
-                <div className="cw2-info-stats">
-                  {selected.price !== undefined && (
-                    <div className="cw2-stat">
-                      <span>¤ {selected.price}</span>
-                      <span className="cw2-muted">{selected.priceLabel ?? 'Price'}</span>
-                    </div>
-                  )}
-                  <div className="cw2-stat">
-                    <span>x{selected.count ?? 1}</span>
-                    <span className="cw2-muted">In Inventory</span>
-                  </div>
-                </div>
-              </div>
-              <div className="cw2-info-name">{selected.name}</div>
-              <div className="cw2-info-rule" />
-              <div className="cw2-info-desc">{selected.desc}</div>
-              {selected.note && <div className="cw2-muted">{selected.note}</div>}
-            </>
-          ) : (
-            <div className="cw2-muted cw2-center">Your inventory is empty.</div>
+            </aside>
           )}
         </div>
 
-        {/* History window — the size of the slots + info area */}
-        {historyOpen && (
-          <div className="cw2-history">
-            <div className="cw2-history-head">
-              <span>Chat history</span>
-              <span className="cw2-muted">{history.length} crafts</span>
-            </div>
-            <div className="cw2-history-list">
-              {history.length === 0 && <div className="cw2-muted">Nothing crafted yet.</div>}
-              {groupByDay(history).map((g) => (
-                <div key={g.label}>
-                  <div className="cw2-day">{g.label}</div>
-                  {g.items.map((r) => (
-                    <button
-                      key={r.id}
-                      className="cw2-hrow"
-                      onClick={() => {
-                        setViewRec(r);
-                        setHistoryOpen(false);
-                      }}
-                    >
-                      <FitSprite
-                        className="cw2-hthumb"
-                        sprite={r.sprite}
-                        colors={r.colors}
-                        palette={r.palette}
-                        color={r.color}
-                        texture={r.textureModifier}
-                      />
-                      <span className="cw2-hrow-text">
-                        <span className="cw2-hrow-name">{r.name}</span>
-                        <span className="cw2-muted">“{r.prompt}”</span>
-                      </span>
-                      <span className="cw2-muted">{timeOf(r.at)}</span>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* BOTTOM: Mitchy's line + your prompt; options to the right */}
-      <div className="cw2-bottom">
-        <div className="cw2-talk">
-          <div className="cw2-dialog">
-            <div className="cw2-speaker">
-              <pre className="cw2-face">{MITCHY_FACE.join('\n')}</pre>
-              Mitchy
-            </div>
-            <div className="cw2-line">{line}</div>
-          </div>
-          {!done && (
-            <div className="cw2-prompt">
-              <input
-                ref={inputRef}
-                className="cw2-input"
-                value={input}
-                autoFocus
-                maxLength={100}
-                disabled={!!popup}
-                placeholder={
-                  busy ? 'Chat with Mitchy while she works…' : popup ? 'Pick an option' : 'Describe it, and what it should do…'
-                }
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') return; // global save
-                  if (e.key === 'Enter' && input.trim()) submit();
-                  if (e.key !== 'Escape') e.stopPropagation(); // movement keys stay out of the world
-                }}
-              />
-              <button className="cw2-send" onClick={submit} disabled={!input.trim()} aria-label="send">
-                ↵
-              </button>
-            </div>
-          )}
-          <button className="cw2-history-link" onClick={() => setHistoryOpen((o) => !o)}>
-            {historyOpen ? 'hide chat history' : 'show chat history'}
+        <div className="cw3-bottom">
+          <Frame className="cw3-prompt">
+            <input
+              ref={inputRef}
+              className="cw3-input"
+              value={input}
+              autoFocus
+              maxLength={PROMPT_MAX}
+              disabled={(!!popup && !adjusting) || done}
+              placeholder={placeholder}
+              aria-label="Describe what you'd like to craft"
+              onChange={(e) => setInput(e.target.value.slice(0, PROMPT_MAX))}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') return; // global save
+                if (e.key === 'Enter' && input.trim()) submit();
+                if (e.key !== 'Escape') e.stopPropagation(); // movement keys stay out of the world
+              }}
+            />
+            <span className={'cw3-count' + (input.length >= PROMPT_MAX ? ' full' : '')}>
+              {input.length}/{PROMPT_MAX}
+            </span>
+          </Frame>
+          <button className="cw3-craft" onClick={submit} disabled={!canSend}>
+            <IconHammer />
+            <span>{busy ? 'Send' : 'Craft it!'}</span>
           </button>
         </div>
-
-        <div className="cw2-options">
-          {options.map((o, i) => (
-            <button
-              key={o.label}
-              className={'cw2-opt' + (i === optSel ? ' sel' : '')}
-              onMouseEnter={() => setOptSel(i)}
-              onClick={o.go}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      </Frame>
 
       {/* Leaving always asks. [F] leave · [Esc] stay */}
       {confirmClose && (
-        <div className="cw2-scrim">
-          <div className="cw2-confirm">
-            <div className="cw2-confirm-text">
-              {busy ? 'Mitchy is still building. Leave anyway?' : 'Leave the workshop?'}
-            </div>
-            {!done && <div className="cw2-muted">Your unused token stays safe in your inventory.</div>}
-            <div className="cw2-confirm-btns">
-              <button className="cw2-opt" onClick={onClose}>
-                [F] Leave
-              </button>
-              <button className="cw2-opt" onClick={() => onConfirmChange(false)}>
-                [Esc] Stay
-              </button>
-            </div>
-          </div>
+        <div className="cw3-scrim">
+          <ChoicePanel
+            title="Leave the workshop?"
+            question={leaveText()}
+            options={['Leave', 'Stay']}
+            sel={leaveSel}
+            onSel={setLeaveSel}
+            onPick={(i) => (i === 0 ? leave() : onConfirmChange(false))}
+            hint="[F] leave · [Esc] stay"
+          />
         </div>
       )}
-    </div>
+    </Sheet>
   );
 }
 
@@ -576,6 +666,11 @@ function toChat(turns: Turn[]): ChatLine[] {
   for (const t of turns) {
     if (t.kind === 'text') out.push({ who: t.who, text: t.text });
     else if (t.kind === 'alts') out.push({ who: 'mitchy', text: `${t.intro} (${t.options.join(' / ')})` });
+    else if (t.kind === 'concepts')
+      out.push({
+        who: 'mitchy',
+        text: `Ideas: ${t.concepts.map((c, i) => `${CONCEPT_LETTERS[i]} ${c.name}`).join(' / ')} / Surprise me`,
+      });
   }
   return out;
 }

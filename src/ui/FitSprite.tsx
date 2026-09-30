@@ -18,11 +18,18 @@ export function FitSprite({
   className,
   fill = 0.8,
   maxScale = 1,
+  cover = false,
+  solid,
 }: {
   look: SpriteLook;
   className?: string;
   fill?: number; // share of the box the sprite may cover
   maxScale?: number;
+  // fill the box on its SHORT side and let the rest be clipped (a portrait
+  // crop of a wide face) instead of fitting the whole sprite in
+  cover?: boolean;
+  // the player's per-cell backing + eyes, as in the world (see ColoredSprite)
+  solid?: { eyeRow?: number };
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [k, setK] = useState(1);
@@ -34,13 +41,15 @@ export function FitSprite({
       const w = inner.offsetWidth;
       const h = inner.offsetHeight;
       if (!w || !h) return;
-      setK(Math.min(maxScale, (b.clientWidth * fill) / w, (b.clientHeight * fill) / h));
+      const kw = (b.clientWidth * fill) / w;
+      const kh = (b.clientHeight * fill) / h;
+      setK(Math.min(maxScale, cover ? Math.max(kw, kh) : Math.min(kw, kh)));
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(b);
     return () => ro.disconnect();
-  }, [look.sprite, fill, maxScale]);
+  }, [look.sprite, fill, maxScale, cover]);
   return (
     <div className={'ds-fit' + (className ? ' ' + className : '')} ref={box}>
       <ColoredSprite
@@ -49,6 +58,8 @@ export function FitSprite({
         palette={look.palette}
         color={look.color}
         texture={look.texture}
+        solidCells={!!solid}
+        eyeRow={solid?.eyeRow}
         style={{ transform: `translate(-50%, -50%) scale(${k})` }}
       />
     </div>

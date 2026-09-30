@@ -39,6 +39,8 @@ export interface PlanAndRenderDeps {
   chat: VisionJSON;
   model?: string;
   fallbackModel?: string;
+  // false: no automatic re-plan after a failed first plan (the /1 test link)
+  retry?: boolean;
 }
 
 export async function planAndRender(
@@ -109,6 +111,7 @@ export async function planAndRender(
   const a0 = await tryRender(initialPlan, 0);
   if (a0.ok) return done(a0.sprite, 0, false, a0.warnings);
   attempts.push({ level: 0, error: a0.error });
+  if (deps.retry === false) return failed(false);
 
   // level 1: one retry, seeded with the concrete validation error. Retrying
   // the PLAN, not the render — rendering is deterministic, so retrying an
@@ -118,20 +121,23 @@ export async function planAndRender(
   const a1 = await tryRender(plan1, 1);
   if (a1.ok) return done(a1.sprite, 1, true, a1.warnings);
   attempts.push({ level: 1, error: a1.error });
+  return failed(true);
 
-  const lastError = attempts[attempts.length - 1]?.error ?? 'generation failed';
-  return {
-    sprite: null,
-    error: lastError,
-    log: {
-      prompt,
-      category,
-      sizeClass: initialPlan.sizeClass,
-      parts: [],
-      retried: true,
-      fallbackLevel: 2, // 2 = both attempts failed, no sprite produced
-      durationMs: Date.now() - start,
-      ...(attempts.length ? { attempts: [...attempts] } : {}),
-    } satisfies CraftLog,
-  };
+  function failed(retried: boolean) {
+    const lastError = attempts[attempts.length - 1]?.error ?? 'generation failed';
+    return {
+      sprite: null,
+      error: lastError,
+      log: {
+        prompt,
+        category,
+        sizeClass: initialPlan.sizeClass,
+        parts: [],
+        retried,
+        fallbackLevel: 2, // 2 = every attempt failed, no sprite produced
+        durationMs: Date.now() - start,
+        ...(attempts.length ? { attempts: [...attempts] } : {}),
+      } satisfies CraftLog,
+    };
+  }
 }

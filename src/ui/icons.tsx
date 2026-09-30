@@ -83,6 +83,23 @@ export const IconSpark = ({ size }: IconProps) => (
   </Icon>
 );
 
+// the craft button: a small hammer
+export const IconHammer = ({ size }: IconProps) => (
+  <Icon size={size}>
+    <path d="M13.5 6.5 5 15a1.8 1.8 0 0 0 2.5 2.5L16 9" />
+    <path d="M11.5 4.5 15 3l6 6-1.5 3.5-2-2-2 2-4-4 2-2z" />
+  </Icon>
+);
+
+// past chats: a clock with a turn-back arrow
+export const IconHistory = ({ size }: IconProps) => (
+  <Icon size={size}>
+    <path d="M4 12a8 8 0 1 0 2.4-5.7" />
+    <path d="M4 4v4h4" />
+    <path d="M12 8v4.5l3 2" />
+  </Icon>
+);
+
 // settings: a cog (8 teeth around a ring)
 export const IconGear = ({ size }: IconProps) => (
   <Icon size={size}>

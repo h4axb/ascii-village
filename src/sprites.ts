@@ -2,6 +2,7 @@
 // backslashes are preserved exactly. Render with .join('\n') in a <pre>.
 
 import playerData from './data/player.json';
+import mitchyData from './data/mitchy.json';
 import walkDownData from './data/walkDown.json';
 import walkUpData from './data/walkUp.json';
 import walkLeftData from './data/walkLeft.json';
@@ -245,6 +246,51 @@ export const WALK_LEFT_PAD_TOP: number = (walkLeftData as { padTop?: number }).p
 export const WALK_RIGHT_FRAMES: WalkFrame[] = walkRightData.frames;
 export const WALK_RIGHT_PALETTE: Record<string, string> = walkRightData.palette;
 export const WALK_RIGHT_PAD_TOP: number = (walkRightData as { padTop?: number }).padTop ?? 0;
+
+// ---------------------------------------------------------------------------
+// MITCHY — baked from cat3_sized.svg the same way as the player (player.json):
+// glyph + colour per cell, columns doubled, drawn with the player's solid
+// per-cell backing and outline (SolidSpriteCanvas). MITCHY_FACE is the head
+// crop for portraits (map, menus), like the player's `face`.
+// ---------------------------------------------------------------------------
+export const MITCHY: string[] = mitchyData.sprite;
+export const MITCHY_COLORS: string[] = mitchyData.colors;
+export const MITCHY_PALETTE: Record<string, string> = mitchyData.palette;
+const MITCHY_HEAD_ROWS = 17; // rows 0-16: ears to chin, above the collar line
+export const MITCHY_FACE: string[] = MITCHY.slice(0, MITCHY_HEAD_ROWS);
+export const MITCHY_FACE_COLORS: string[] = MITCHY_COLORS.slice(0, MITCHY_HEAD_ROWS);
+
+// His happy slow-blink (shown when a sale closes): the warm eye cells turn
+// into fur, with a '^' where each eye's middle row was — eyes squeezed shut
+// in a smile. Derived from the art rather than hand-drawn, so it always
+// matches the baked sprite.
+const MITCHY_EYE_ROWS = [13, 14, 15];
+const isWarm = (hex: string | undefined) => {
+  if (!hex) return false;
+  const n = parseInt(hex.slice(1), 16);
+  const r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return r > 200 && g > 120 && b < 110;
+};
+const MITCHY_FUR_KEY = (() => {
+  const counts = new Map<string, number>();
+  for (const row of MITCHY_COLORS) for (const k of row) if (k !== ' ') counts.set(k, (counts.get(k) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+})();
+function mitchyBlink(): { sprite: string[]; colors: string[] } {
+  const sprite = MITCHY.map((l) => [...l]);
+  const colors = MITCHY_COLORS.map((l) => [...l]);
+  for (const y of MITCHY_EYE_ROWS) {
+    for (let x = 0; x < colors[y].length; x++) {
+      if (!isWarm(MITCHY_PALETTE[colors[y][x]])) continue;
+      sprite[y][x] = y === 14 ? '^' : '¬';
+      colors[y][x] = y === 14 ? MITCHY_BLINK_KEY : MITCHY_FUR_KEY;
+    }
+  }
+  return { sprite: sprite.map((l) => l.join('')), colors: colors.map((l) => l.join('')) };
+}
+const MITCHY_BLINK_KEY = '~'; // the closed-eye line: added to the palette below
+export const MITCHY_BLINK_PALETTE: Record<string, string> = { ...MITCHY_PALETTE, [MITCHY_BLINK_KEY]: '#ffcd4b' };
+export const MITCHY_HAPPY = mitchyBlink();
 
 export const CAT = [
  '   /\\_/\\',
@@ -751,3 +797,8 @@ export function makeBubble(text: string, width = 26): string {
   out.push('   |/');
   return out.join('\n');
 }
+
+// Ready-made looks (sprite + colours + palette) for Mitchy's portraits.
+export const MITCHY_LOOK = { sprite: MITCHY, colors: MITCHY_COLORS, palette: MITCHY_PALETTE };
+export const MITCHY_FACE_LOOK = { sprite: MITCHY_FACE, colors: MITCHY_FACE_COLORS, palette: MITCHY_PALETTE };
+export const MITCHY_HAPPY_LOOK = { sprite: MITCHY_HAPPY.sprite, colors: MITCHY_HAPPY.colors, palette: MITCHY_BLINK_PALETTE };

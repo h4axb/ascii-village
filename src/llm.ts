@@ -20,7 +20,9 @@ import {
   planCraft,
   planAndRender,
   suggestAlternatives,
+  analyzeCraft,
   textureModifierFor,
+  type CraftPreflight,
   type CraftLog,
   type TextureModifier,
 } from './craft';
@@ -377,7 +379,13 @@ function inferCategory(specCategory: string, hint?: Category): Category {
 // generate → validate → shared-store → fail pipeline and produces a real
 // per-prompt sprite (plus the player's colour/size). Offline, it falls back to
 // the keyword-based mock below so the game still crafts.
-export async function craftItem(prompt: string, ui?: CraftUiHooks): Promise<CraftResult> {
+// `opts.retry: false` skips the automatic re-plan after a failed first plan
+// (the /1 test link); by default it runs as before.
+export async function craftItem(
+  prompt: string,
+  ui?: CraftUiHooks,
+  opts: { retry?: boolean } = {},
+): Promise<CraftResult> {
   // Local content policy runs FIRST and on every path — before any network
   // call, and equally in offline/mock mode. The model-side `sensitive` check
   // below is fail-open by design (a failed request returns "not sensitive"),
@@ -418,6 +426,7 @@ export async function craftItem(prompt: string, ui?: CraftUiHooks): Promise<Craf
         chat: chatJSON,
         model: MODELS.fast,
         fallbackModel: MODELS.fastFallback,
+        retry: opts.retry,
       });
       if (log.retried) ui?.onStage?.('retrying');
       if (sprite) sprite.lines.forEach((line, i) => ui?.onLine?.(line, i, log.fallbackLevel as 0 | 1));
@@ -502,6 +511,14 @@ export async function craftItem(prompt: string, ui?: CraftUiHooks): Promise<Craf
   item.tags = [...description.tags, `prompt: ${prompt.trim()}`];
   item.textureModifier = textureModifierFor(offlineSpec.finish);
   return { ok: true, item };
+}
+
+// The /1 preflight: can this be drawn as asked, or should the player pick a
+// concept first? Offline it always crafts directly.
+export type { CraftPreflight, CraftConcept } from './craft';
+export async function preflightCraft(prompt: string): Promise<CraftPreflight> {
+  if (!llmEnabled || !checkPolicy(prompt).allowed) return { needsChoice: false };
+  return analyzeCraft(prompt, chatJSON, { model: MODELS.fast, fallbackModel: MODELS.fastFallback });
 }
 
 function mockFunFact(itemName: string): string {

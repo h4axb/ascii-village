@@ -109,6 +109,17 @@ export function groupByDay(records: CraftRecord[], now = Date.now()): HistoryGro
   return groups;
 }
 
+// "Just now", "5 min ago", "3 hours ago", "2 days ago"
+export function ago(at: number, now = Date.now()): string {
+  const min = Math.floor((now - at) / 60_000);
+  if (min < 1) return 'Just now';
+  if (min < 60) return `${min} min ago`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return h === 1 ? '1 hour ago' : `${h} hours ago`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? '1 day ago' : `${d} days ago`;
+}
+
 export function timeOf(at: number): string {
   return new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }

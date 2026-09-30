@@ -416,3 +416,88 @@ export async function suggestAlternatives(
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// PREFLIGHT (the /1 test link) — before drawing, decide whether the request
+// can be drawn as asked or needs a choice. Two cases need one: important
+// requested features that compete for the tiny canvas (some would have to
+// be dropped — planAndRender's budget trim does that silently today), or a
+// prompt that allows clearly different readings. Then the player picks one
+// of two coherent visual CONCEPTS (grouped for a strong silhouette, not an
+// even split of keywords) or lets Mitchy follow her own hunch (`surprise`,
+// never shown). Nothing is drawn until they pick, so a choice costs no
+// extra drawing. Fail-open: any error means "craft as asked".
+// ---------------------------------------------------------------------------
+
+export interface CraftConcept {
+  name: string; // evocative, shown to the player ("Dragon Voyager")
+  summary: string; // one line: what it keeps, what it simplifies
+  prompt: string; // the craft prompt actually drawn
+}
+
+export type CraftPreflight =
+  | { needsChoice: false }
+  | { needsChoice: true; concepts: [CraftConcept, CraftConcept]; surprise: string };
+
+const CONCEPT_PROMPT_MAX = 80;
+
+export async function analyzeCraft(
+  prompt: string,
+  chat: VisionJSON,
+  opts: { model?: string; fallbackModel?: string } = {},
+): Promise<CraftPreflight> {
+  const no: CraftPreflight = { needsChoice: false };
+  // a few words can't overload the canvas; don't spend a call on them
+  if (prompt.trim().split(/\s+/).length <= 3) return no;
+  try {
+    const r = await chat<{ needsChoice?: unknown; concepts?: unknown; surprise?: unknown }>(
+      [
+        {
+          role: 'system',
+          content:
+            'You are the craft planner for Asciia Bay, a cozy ASCII island-village game. The player describes ONE ' +
+            'item and it is drawn as a SMALL sprite (at most about 22x9 character cells) from a handful of simple ' +
+            'shapes, so only the few features that define its silhouette can really show.\n\n' +
+            'Decide "needsChoice". It is true ONLY when (a) several important requested features compete for that ' +
+            'tiny canvas and some would have to be sacrificed or reduced to noise, or (b) the request allows clearly ' +
+            'different readings worth choosing between. A request that can be drawn as asked is false — e.g. ' +
+            '"a small wooden boat with a red sail and cat ears" is false. Most requests are false.\n\n' +
+            'When true, give exactly 2 "concepts": two COHERENT visual ideas, each built around the features that ' +
+            'belong together visually and give the strongest recognizable silhouette and identity. Never just split ' +
+            'the keywords evenly or pair unrelated details (no "flowers + shields" vs "lantern + carved sides"). When ' +
+            'the request has few details but is ambiguous, make the two concepts deliberately different takes on the ' +
+            'same idea (e.g. a classic strawberry with leaves and sparkles vs a fantastical one with a big leafy crown ' +
+            'and a glowing centre). Both must honour the player\'s idea. Each concept: "name" (2-3 evocative words, ' +
+            'title case), "summary" (one line under 14 words: what it keeps, what is simplified), "prompt" (the full ' +
+            'item description to draw, under 80 characters). Also give "surprise": your own favourite reading, the ' +
+            'combination you believe makes the strongest recognizable sprite (a prompt under 80 characters; it may ' +
+            'match neither concept).\n\n' +
+            'Every prompt must be CRAFTABLE: a SINGLE concrete physical object (not a scene, not two things); ' +
+            'compact in silhouette; recognisable from its outline alone; family-friendly; no text, letters, numbers ' +
+            'or logos. Keep any function the player described (what the item does) in every prompt.\n\n' +
+            'Reply with JSON only: {"needsChoice": false} or {"needsChoice": true, "concepts": [{"name": "...", ' +
+            '"summary": "...", "prompt": "..."}, {...}], "surprise": "..."}.',
+        },
+        { role: 'user', content: `The player asked for: "${prompt}".` },
+      ],
+      { model: opts.model, temperature: 0.4, maxTokens: 380, thinking: { type: 'disabled' }, fallbackModel: opts.fallbackModel },
+    );
+    if (r?.needsChoice !== true) return no;
+    const text = (v: unknown, max: number) =>
+      typeof v === 'string' && v.trim() && v.trim().length <= max ? v.trim() : null;
+    const concepts = (Array.isArray(r.concepts) ? r.concepts : [])
+      .map((c) => {
+        const o = (c ?? {}) as Record<string, unknown>;
+        const name = text(o.name, 40);
+        const summary = text(o.summary, 120);
+        const p = text(o.prompt, CONCEPT_PROMPT_MAX);
+        return name && summary && p && checkPolicy(p).allowed ? { name, summary, prompt: p } : null;
+      })
+      .filter((c): c is CraftConcept => c !== null);
+    const surprise = text(r.surprise, CONCEPT_PROMPT_MAX);
+    if (concepts.length < 2 || !surprise || !checkPolicy(surprise).allowed) return no;
+    return { needsChoice: true, concepts: [concepts[0], concepts[1]], surprise };
+  } catch {
+    return no;
+  }
+}

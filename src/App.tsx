@@ -72,7 +72,7 @@ import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOU
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
-import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, type Slot, type Action } from './ui';
+import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, type SpriteLook, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, type Slot, type Action } from './ui';
 import { useLayoutTool } from './devLayout';
 import { useWorldAssetTool } from './devWorldAssets';
 import { useSceneMarkerTool } from './devSceneMarkers';
@@ -135,7 +135,7 @@ import { ownedToPlaced, placedToOwned, placedToEnt, placementFits } from './plac
 import type { PlacedItem } from './placement';
 import { palmFrame, bundleLandingX, SHAKE_FRAMES, SHAKE_FRAME_MS, SHAKE_MS } from './palmAnim';
 import { pondFrame, POND_FRAME_MS } from './pondAnim';
-import CraftModal, { CRAFT_SLOTS, type CraftSlot } from './CraftModal';
+import CraftModal from './CraftModal';
 
 const INTRO_TEXT =
   "Hey, are u the new villager here? I'm Mitchy and own this shop. in this world u can go around and collect materials and if u give them back to me ill pay u fair.";
@@ -595,11 +595,18 @@ function readIntroBMarkers(): {
   };
 }
 
-// Which link opened the game: …/0 skips the intro, …/intro forces it,
-// anything else (the plain link) uses the save to decide.
-const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/0\/?$/.test(window.location.pathname)
+// Which link opened the game:
+//   /          the save decides whether the intro plays
+//   /0         skips the intro
+//   /intro     always plays the intro
+//   /1         skips the intro; the workshop runs crafting panel 1 (preflight
+//              + concepts, see CraftModal's `choices`)
+//   /intro/1   always plays the intro; crafting panel 1 as on /1
+const PATH = window.location.pathname;
+const CRAFT_CHOICES = /^(\/intro)?\/1\/?$/.test(PATH);
+const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[01]\/?$/.test(PATH)
   ? 'skip'
-  : /^\/intro\/?$/.test(window.location.pathname)
+  : /^\/intro(\/1)?\/?$/.test(PATH)
     ? 'force'
     : 'default';
 
@@ -949,21 +956,11 @@ function Game() {
     return () => window.clearTimeout(t);
   }, [blinkFrame]);
   // Bounds-checked at the READ site, not just trusted from the effect above:
-  // that effect corrects an out-of-range blinkFrame back to -1, but it's a
-  // plain useEffect, which runs AFTER React has already painted whatever
-  // render triggered it — so the render with blinkFrame at CAT_HAPPY_BLINK's
-  // own length (one past its last valid index) genuinely reaches the screen
-  // before the correction does. Indexing an array one past its end doesn't
-  // throw (JS just returns undefined) — it's catWithFace() doing `face.length`
-  // on that undefined that did, crashing the whole tree with no error
-  // boundary to catch it. Every sale advances blinkFrame through exactly this
-  // transition, which is what made it read as "crashes whenever you sell
-  // something."
-  const catFace = S.catWithFace(
-    blinkFrame >= 0 && blinkFrame < S.CAT_HAPPY_BLINK.length
-      ? S.CAT_HAPPY_BLINK[blinkFrame]
-      : S.CAT_FACE_REST,
-  );
+  // that effect corrects an out-of-range blinkFrame back to -1 only after the
+  // render that overshot has already painted. While the blink runs, the shop
+  // shows Mitchy's eyes-closed frame (S.MITCHY_HAPPY_LOOK).
+  const catFace: SpriteLook =
+    blinkFrame >= 0 && blinkFrame < S.CAT_HAPPY_BLINK.length ? S.MITCHY_HAPPY_LOOK : S.MITCHY_LOOK;
 
   // ---- dev-only clock scrubber (open the browser console) --------------------
   //   time.hour(19)  → freeze the clock at 19:00 to preview that tint
@@ -1378,6 +1375,14 @@ function Game() {
       // whether the rest of the (taller) player sprite overlaps the rock face
       // drawn below them. Testing the whole body would stop you a body-height
       // short of the brink instead of at it.
+      // 'cat': Mitchy collides like the player does — feet against feet, so
+      // you can pass in front of or behind him (depth sorting draws the
+      // right one on top) but never stand on the spot where he stands.
+      if (e.kind === 'cat') {
+        const f = footprint(e);
+        if (feetY === f.row && pbox.x0 <= f.x1 && pbox.x1 >= f.x0) return true;
+        continue;
+      }
       const tbox =
         e.kind === 'house' || e.kind === 'cliff'
           ? { x0: pbox.x0, x1: pbox.x1, y0: feetY, y1: feetY }
@@ -3374,33 +3379,6 @@ function Game() {
     );
   }
 
-  // The workshop's 20 fixed slots: the same entries, in the same order, as
-  // the inventory grid (materials, then owned items).
-  const craftSlots: CraftSlot[] = [
-    ...ITEM_TYPES.filter((t) => inv[t] > 0).map((t) => ({
-      key: t,
-      name: ITEM_INFO[t].name,
-      sprite: ITEM_SPRITES[t],
-      count: inv[t],
-      price: basePrice(t),
-      priceLabel: 'Base price', // sale prices are negotiated around this
-      desc: ITEM_INFO[t].desc,
-    })),
-    ...bag.map((o) => ({
-      key: o.ownedId,
-      name: o.name,
-      sprite: o.sprite,
-      colors: o.colors,
-      palette: o.palette,
-      color: o.color,
-      texture: o.textureModifier,
-      price: o.price,
-      desc: o.desc,
-      note: o.funcDesc ? `* ${o.funcDesc}` : undefined,
-      tag: o.kind === 'token' ? 'TOKEN' : equipped?.ownedId === o.ownedId ? 'EQ' : undefined,
-    })),
-  ].slice(0, CRAFT_SLOTS);
-
   const nothingEnt = nothingId ? ents.find((e) => e.id === nothingId) : null;
 
   // ---- camera: follows the player, clamped to the map edges ----
@@ -3614,8 +3592,10 @@ function Game() {
         // useMemo's 'cat' override above — so this is always his true
         // current position, cinematic or not.
         getPos: () => catDef,
-        sprite: S.CAT,
-        color: '#e9dcc1', // matches .ent.cat / .portrait.cat — Mitchy has no colour grid
+        sprite: S.MITCHY_FACE,
+        colors: S.MITCHY_FACE_COLORS,
+        palette: S.MITCHY_PALETTE,
+        solid: true,
         ringColor: 'var(--ui-petal-core)',
       },
     ],
@@ -4158,7 +4138,7 @@ function Game() {
                     // ground colour. Bridge never had a rectangular
                     // background to begin with — this just stops terrain
                     // showing through its own glyph gaps, same principle.
-                    solidCells={e.kind === 'house' || e.kind === 'bridge'}
+                    solidCells={e.kind === 'house' || e.kind === 'bridge' || e.kind === 'cat'}
                     onMouseEnter={
                       canInteract(e) ? () => setHovered({ kind: 'entity', id: e.id }) : undefined
                     }
@@ -4170,7 +4150,10 @@ function Game() {
                     }
                     onClick={
                       canInteract(e)
-                        ? () => setModal({ t: 'interact', ref: { kind: 'entity', id: e.id }, sel: 1 })
+                        ? e.kind === 'cat'
+                          ? // no "talk to Mitchy?" confirm: straight to his menu
+                            () => runInteraction({ kind: 'entity', id: e.id }, interactCtx, interactActions)
+                          : () => setModal({ t: 'interact', ref: { kind: 'entity', id: e.id }, sel: 1 })
                         : undefined
                     }
                   />
@@ -4627,7 +4610,11 @@ function Game() {
           {modal.t === 'dialog' && (
             <ChoicePanel
               title="Mitchy"
-              art={<pre className="ds-panel-portrait">{S.CAT.join('\n')}</pre>}
+              art={
+                <div className="ds-portrait-box ds-panel-face">
+                  <FitSprite look={S.MITCHY_FACE_LOOK} solid={{}} fill={0.92} maxScale={3} />
+                </div>
+              }
               options={['Talk', 'Open Shop']}
               sel={modal.sel}
               onSel={(i) => setModal({ t: 'dialog', sel: i })}
@@ -4777,7 +4764,9 @@ function Game() {
               )}
               {modal.tab === 'sell' && (
               <div className="shop-top">
-                <pre className="portrait cat">{catFace.join('\n')}</pre>
+                <div className="ds-portrait-box shop-mitchy">
+                  <FitSprite look={catFace} solid={{}} fill={0.9} maxScale={3} />
+                </div>
                 {modal.offer ? (
                   <div className="offer">
                     <pre className="offer-bubble">
@@ -4878,8 +4867,15 @@ function Game() {
             <CraftModal
               key={modal.token.ownedId}
               token={modal.token}
-              slots={craftSlots}
+              choices={CRAFT_CHOICES}
+              player={{
+                name: playerName || DEFAULT_PLAYER_NAME,
+                look: { sprite: avatarSprite, colors: avatarRecolored.colors, palette: avatarRecolored.palette },
+                solid: { eyeRow: 14 },
+                cover: true,
+              }}
               money={money}
+              onSpend={(coins) => setMoney((mo) => mo - coins)}
               onConsume={(equip, item) => consumeCraft(modal.token.ownedId, item, equip)}
               onClose={() => setModal(null)}
               confirmClose={!!modal.confirmClose}
@@ -5599,7 +5595,9 @@ function PlacedItemView({
 // ~12ms of every frame while moving; ~1.5ms with these four on canvas).
 // Same props as ColoredSprite, so the entity map needs no other change;
 // anything else (or a sprite without colour data) stays a ColoredSprite.
-const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed']);
+// 'cat': Mitchy is drawn like the player — solid per-cell backing plus the
+// player's outline ring (every other canvas kind has no ring).
+const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat']);
 function EntSprite({
   kind,
   charW,
@@ -5616,7 +5614,7 @@ function EntSprite({
         colors={p.colors}
         palette={p.palette}
         solid={!!p.solidCells}
-        outline={null}
+        outline={kind === 'cat' ? undefined : null}
         charW={charW}
         lineH={lineH}
         res={res}

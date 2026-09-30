@@ -1,8 +1,0 @@
-# check latest commit
-git show --stat HEAD
-
-# lists every file
-git fetch
-
-# numbers of files that changed
-git status

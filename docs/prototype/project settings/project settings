@@ -6,6 +6,9 @@ regular: https://asciia-bay-2.app-testing.workers.dev/
 no intro: https://asciia-bay-2.app-testing.workers.dev/0
 always intro: https://asciia-bay-2.app-testing.workers.dev/intro
 
+crafting panel 1: https://asciia-bay-2.app-testing.workers.dev/1
+crafting panel 1 + intro: https://asciia-bay-2.app-testing.workers.dev/intro/1
+
 ## Project structure
 + rendering: vite, water+static assets on canvas
 + libraries: vite, react 
@@ -14,7 +17,7 @@ First the text signs in json are translated to letters and each letter has a pre
 
 ## Deployment
 + hosting provider: cloudflare (https://dash.cloudflare.com/c09514d3d422733cfb67e78b94475238/workers/services/view/asciia-bay-2/production)
-+ platform: workers (more flexible setup), config file: wrangler.jsonc
++ platform: workers (more flexible setup than pages), config file: wrangler.jsonc
 + package manager: pnpm (takes less storage)
 
 

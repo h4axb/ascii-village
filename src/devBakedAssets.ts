@@ -60,9 +60,9 @@ export const BAKED_ASSETS: BakedAssetEntry[] = [
     kind: 'shop',
     sprite: S.SHOP,
     colors: S.SHOP_COLORS,
-    palette: S.ARCH_PALETTE,
-    scale: 1,
-    varRef: { sprite: 'S.SHOP', palette: 'S.ARCH_PALETTE', colors: 'S.SHOP_COLORS' },
+    palette: S.SHOP_PALETTE,
+    scale: 0.25, // matches SHOP_SCALE (world.ts)
+    varRef: { sprite: 'S.SHOP', palette: 'S.SHOP_PALETTE', colors: 'S.SHOP_COLORS' },
   },
   {
     slug: 'built-grasshalm',

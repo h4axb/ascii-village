@@ -1374,7 +1374,9 @@ function Game() {
       // so what decides whether a step is legal is where the feet land, not
       // whether the rest of the (taller) player sprite overlaps the rock face
       // drawn below them. Testing the whole body would stop you a body-height
-      // short of the brink instead of at it.
+      // short of the brink instead of at it. 'shop': the same, against its
+      // drawn glyphs (S.SHOP_SOLID), so you can walk up to the storefront and
+      // the empty space around it never blocks.
       // 'cat': Mitchy collides like the player does — feet against feet, so
       // you can pass in front of or behind him (depth sorting draws the
       // right one on top) but never stand on the spot where he stands.
@@ -1384,7 +1386,7 @@ function Game() {
         continue;
       }
       const tbox =
-        e.kind === 'house' || e.kind === 'cliff'
+        e.kind === 'house' || e.kind === 'cliff' || e.kind === 'shop'
           ? { x0: pbox.x0, x1: pbox.x1, y0: feetY, y1: feetY }
           : pbox;
       const ox0 = Math.max(tbox.x0, cbox.x0), ox1 = Math.min(tbox.x1, cbox.x1);
@@ -4138,7 +4140,7 @@ function Game() {
                     // ground colour. Bridge never had a rectangular
                     // background to begin with — this just stops terrain
                     // showing through its own glyph gaps, same principle.
-                    solidCells={e.kind === 'house' || e.kind === 'bridge' || e.kind === 'cat'}
+                    solidCells={e.kind === 'house' || e.kind === 'bridge' || e.kind === 'cat' || e.kind === 'shop'}
                     onMouseEnter={
                       canInteract(e) ? () => setHovered({ kind: 'entity', id: e.id }) : undefined
                     }
@@ -5597,7 +5599,7 @@ function PlacedItemView({
 // anything else (or a sprite without colour data) stays a ColoredSprite.
 // 'cat': Mitchy is drawn like the player — solid per-cell backing plus the
 // player's outline ring (every other canvas kind has no ring).
-const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat']);
+const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop']);
 function EntSprite({
   kind,
   charW,

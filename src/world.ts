@@ -274,7 +274,9 @@ function houseSlice(rawColStart: number, rawColEnd: number, rawRowStart: number,
 // at their own larger font-size.
 export const PLAYER_SCALE = 0.15;
 export const PLAYER_T = spriteTiles(S.PLAYER, PLAYER_SCALE);
-export const MITCHY_SCALE = PLAYER_SCALE;
+// His art has 37 rows (the player's 22): scaled so he stays the same 4.2
+// lines tall as his earlier 28-row sprite at the player's scale.
+export const MITCHY_SCALE = (PLAYER_SCALE * 28) / 37;
 export const MITCHY_T = spriteTiles(S.MITCHY, MITCHY_SCALE);
 
 // An entity's footprint is the bottom row of tiles it covers. Used for
@@ -442,6 +444,9 @@ export const PALM_SCALE = 1;
 // pinned over that picture MUST share this exact scale, or the hit-boxes
 // drift off the thing they're supposed to cover.
 export const HOUSE_SCALE = 0.36;
+// The shop's art is 120 columns wide: at 0.25 it is 30 characters, about as
+// wide as the house, so the two buildings read at the same scale.
+export const SHOP_SCALE = 0.25;
 
 // 11 x 8 tiles is 44 x 16 character cells on screen. At scale 1, that's the
 // most art that could be shown here at one glyph per cell — the ceiling on
@@ -698,11 +703,14 @@ const STRUCT_ENTS_BASE: Ent[] = [
     id: 'shop',
     kind: 'shop',
     x: 40,
-    y: 30,
+    // its base row stays on row 38, where the old hand-typed shop stood
+    y: 31,
     sprite: S.SHOP,
     interactable: true,
-    palette: S.ARCH_PALETTE,
+    palette: S.SHOP_PALETTE,
     colors: S.SHOP_COLORS,
+    scale: SHOP_SCALE,
+    solidMask: S.SHOP_SOLID,
   },
   // Tufts of grass scattered near where the fern used to be — pure scenery
   // (no [F] prompt). Hand-transcribed from a glyph-art reference, not
@@ -744,8 +752,8 @@ const STRUCT_ENTS_BASE: Ent[] = [
     sprite: S.MITCHY,
     colors: S.MITCHY_COLORS,
     palette: S.MITCHY_PALETTE,
-    // same render scale as the player: both are baked from same-sized
-    // reference glyph grids, so this keeps them in proportion
+    // sized against the player's scale (see MITCHY_SCALE), so the two stay
+    // in proportion whatever the resolution of his reference art
     scale: MITCHY_SCALE,
     interactable: true,
   },

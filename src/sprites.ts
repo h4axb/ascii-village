@@ -9,6 +9,7 @@ import walkLeftData from './data/walkLeft.json';
 import walkRightData from './data/walkRight.json';
 import palmData from './data/palm.json';
 import houseData from './data/house.json';
+import shopData from './data/shop.json';
 import gardenBedData from './data/gardenBed.json';
 import cliffData from './data/cliff.json';
 import pondData from './data/pond-a.json';
@@ -256,15 +257,18 @@ export const WALK_RIGHT_PAD_TOP: number = (walkRightData as { padTop?: number })
 export const MITCHY: string[] = mitchyData.sprite;
 export const MITCHY_COLORS: string[] = mitchyData.colors;
 export const MITCHY_PALETTE: Record<string, string> = mitchyData.palette;
-const MITCHY_HEAD_ROWS = 17; // rows 0-16: ears to chin, above the collar line
+const MITCHY_HEAD_ROWS = 23; // rows 0-22: ears to glasses and chin, above the collar line
 export const MITCHY_FACE: string[] = MITCHY.slice(0, MITCHY_HEAD_ROWS);
 export const MITCHY_FACE_COLORS: string[] = MITCHY_COLORS.slice(0, MITCHY_HEAD_ROWS);
 
-// His happy slow-blink (shown when a sale closes): the warm eye cells turn
-// into fur, with a '^' where each eye's middle row was — eyes squeezed shut
-// in a smile. Derived from the art rather than hand-drawn, so it always
-// matches the baked sprite.
-const MITCHY_EYE_ROWS = [13, 14, 15];
+// His happy slow-blink (shown when a sale closes): the eye cells (the yellow
+// iris, the pupils and the highlight) turn into fur, with a '^' across the
+// iris row — eyes squeezed shut in a smile. Derived from the art rather than
+// hand-drawn, so it always matches the baked sprite; the glasses below
+// (rows 19-21) are left alone.
+const MITCHY_EYE_ROWS = [16, 17, 18];
+const MITCHY_BLINK_ROW = 17;
+const isEyeDetail = (hex: string | undefined) => hex === '#120c10' || hex === '#ffffff';
 const isWarm = (hex: string | undefined) => {
   if (!hex) return false;
   const n = parseInt(hex.slice(1), 16);
@@ -281,9 +285,11 @@ function mitchyBlink(): { sprite: string[]; colors: string[] } {
   const colors = MITCHY_COLORS.map((l) => [...l]);
   for (const y of MITCHY_EYE_ROWS) {
     for (let x = 0; x < colors[y].length; x++) {
-      if (!isWarm(MITCHY_PALETTE[colors[y][x]])) continue;
-      sprite[y][x] = y === 14 ? '^' : '¬';
-      colors[y][x] = y === 14 ? MITCHY_BLINK_KEY : MITCHY_FUR_KEY;
+      const hex = MITCHY_PALETTE[colors[y][x]];
+      if (!isWarm(hex) && !isEyeDetail(hex)) continue;
+      const line = y === MITCHY_BLINK_ROW && isWarm(hex);
+      sprite[y][x] = line ? '^' : '¬';
+      colors[y][x] = line ? MITCHY_BLINK_KEY : MITCHY_FUR_KEY;
     }
   }
   return { sprite: sprite.map((l) => l.join('')), colors: colors.map((l) => l.join('')) };
@@ -688,51 +694,16 @@ const GATE_GAP = findGate(gardenBedData.sprite);
 export const GARDEN_BED_SHUT: string[] = shutGate(GARDEN_BED, GATE_GAP);
 export const GARDEN_BED_SHUT_COLORS: string[] = shutGate(GARDEN_BED_COLORS, GATE_GAP);
 
-// "Mitchy's Odds & Ends" — a tall, wonky, stacked tower shop (a cat napping on
-// the antenna, a domed observatory window, the MITCHY sign, awning wings, a
-// cluttered storefront on stilts) with a SHOP sandwich-board chalkboard beside
-// it on the floor. Hand-authored, so it can be taller than the small sprites.
-export const SHOP = [
-  '    _______',
-  '   /..___..\\',
-  '  /|..`_`..|\\',
-  '   |.(***).|',
-  '   |:::-:::|',
-  '   |=[]====|_',
-  '  /|_________|\\',
-  ' //|:[]:[]:|\\\\',
-  '   |:|__|__|:|',
-  '   |_________|',
-  '  _|___:::___|_',
-  ' /  |:|[]|:O:| \\',
-  '   |:|__|_|__|:|',
-  '   |___________|     .------.',
-  '   |__|_____|__|     | SHOP |',
-  '     |       |       |______|',
-  '     |_|   |_|        /|  |\\',
-];
-
-// Cell-for-cell with SHOP. The stilt gap on the second-to-last row stays blank
-// on purpose — it's open air under the shop, not wall.
-export const SHOP_COLORS = [
-  '...........',
-  '....rr...rr.',
-  '....rr...rr..',
-  '....r.LLL.r.',
-  '....www.www.',
-  '.....LL......',
-  '...............',
-  '....wLLwLLw...',
-  '....w.......w.',
-  '..............',
-  '.......www.....',
-  '.....w.LL.wLw...',
-  '....w.........w.',
-  '.............................',
-  '.......................LLLL..',
-  '.............................',
-  '............................',
-];
+// THE SHOP — parsed straight from a glyph-grid reference SVG (60 by 58
+// glyphs, columns doubled), the same technique as HOUSE and PLAYER: a
+// two-storey shop with a planted side wing, its storefront and the deck in
+// front. SHOP_SOLID is the collision mask: the art minus isolated glyphs and
+// minus the deck rows, which are walkable (feet-only check in App.tsx's
+// blocked(), same as the house deck).
+export const SHOP: string[] = shopData.sprite;
+export const SHOP_COLORS: string[] = shopData.colors;
+export const SHOP_PALETTE: Record<string, string> = shopData.palette;
+export const SHOP_SOLID: string[] = shopData.solid;
 
 export const CACTUS = [
   ' _|_',

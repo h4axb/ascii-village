@@ -9,3 +9,8 @@ dist
 # Cloudflare Wrangler: local secrets and cache
 .dev.vars
 .wrangler
+
+# personal logs
+project settings
+Sep_Implementation
+July_Ideation

@@ -446,7 +446,7 @@ export const PALM_SCALE = 1;
 export const HOUSE_SCALE = 0.36;
 // The shop's art is 120 columns wide: at 0.25 it is 30 characters, about as
 // wide as the house, so the two buildings read at the same scale.
-export const SHOP_SCALE = 0.25;
+export const SHOP_SCALE = 0.3;
 
 // 11 x 8 tiles is 44 x 16 character cells on screen. At scale 1, that's the
 // most art that could be shown here at one glyph per cell — the ceiling on

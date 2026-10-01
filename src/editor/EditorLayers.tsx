@@ -4,7 +4,7 @@
 // the objects they point at.
 import { ColoredSprite } from '../ColoredSprite';
 import { MARKER_REGISTRY } from '../sceneMarkers';
-import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile } from '../world';
+import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint } from '../world';
 import type { Ent } from '../world';
 import { isEditable } from './useWorldEditor';
 import type { WorldEditor } from './useWorldEditor';
@@ -27,10 +27,12 @@ function artBox(e: Ent) {
 
 function Colliders({ e, withEmpty }: { e: Ent; withEmpty: boolean }) {
   const b = collisionBox(e);
+  // Mitchy blocks by his feet row (see blocked() in App.tsx), not his shape
+  const feet = e.kind === 'cat' ? footprint(e) : null;
   const cells = [];
   for (let ty = b.y0; ty <= b.y1; ty++) {
     for (let tx = b.x0; tx <= b.x1; tx++) {
-      const solid = entityBlocksTile(e, tx, ty);
+      const solid = feet ? ty === feet.row && tx >= feet.x0 && tx <= feet.x1 : entityBlocksTile(e, tx, ty);
       if (!solid && !withEmpty) continue;
       cells.push(
         <div
@@ -51,10 +53,27 @@ export function EditorWorldLayers({ ed, ents }: { ed: WorldEditor; ents: Ent[] }
     <>
       <div className="dev-tile-grid" style={{ width: `${GROUND_W}ch`, height: `${GROUND_H}em` }} />
 
-      {ed.showColliders &&
-        ents.filter((e) => isEditable(e) || e.kind === 'blocker').map((e) => <Colliders key={e.id} e={e} withEmpty={false} />)}
-      {!ed.showColliders && sel && ed.tab === 'colliders' && <Colliders e={sel} withEmpty />}
-      {ed.showColliders && sel && ed.tab === 'colliders' && <Colliders e={sel} withEmpty />}
+      {/* every collider: in the Colliders tab, or with "show every collider" */}
+      {(ed.showColliders || ed.tab === 'colliders') && (
+        <>
+          {ents
+            .filter((e) => isEditable(e) || e.kind === 'blocker')
+            .map((e) => (
+              <Colliders key={e.id} e={e} withEmpty={false} />
+            ))}
+          {(ed.doc.blockedTiles ?? []).map((k) => {
+            const [tx, ty] = k.split(',').map(Number);
+            return (
+              <div
+                key={`wall-${k}`}
+                className="wed-col-tile solid wall"
+                style={{ left: `${tx * TILE_CH}ch`, top: `${ty * TILE_LN}em` }}
+              />
+            );
+          })}
+        </>
+      )}
+      {sel && ed.tab === 'colliders' && <Colliders e={sel} withEmpty />}
 
       {sel &&
         (() => {

@@ -1035,6 +1035,10 @@ function Game() {
   editorOpenRef.current = editorOpen;
   // The structures as they stand: saved (STRUCT_ENTS), or as being edited.
   const structEnts = editor.structEnts;
+  // single map tiles painted as walls in the editor's Colliders tab
+  const blockedTiles = useMemo(() => new Set(editor.doc.blockedTiles ?? []), [editor.doc.blockedTiles]);
+  const blockedTilesRef = useRef(blockedTiles);
+  blockedTilesRef.current = blockedTiles;
   const gardenEnt = structEnts.find((e) => e.id === 'garden-bed');
 
   // The garden travels as ONE thing. Its fence art, its collider, its gate and
@@ -1392,6 +1396,11 @@ function Game() {
           if (entityBlocksTile(e, tx, ty)) return true;
         }
       }
+    }
+    // painted map tiles (the editor's Colliders tab): walls for the feet, like
+    // the buildings
+    for (let tx = pbox.x0; tx <= pbox.x1; tx++) {
+      if (blockedTilesRef.current.has(`${tx},${feetY}`)) return true;
     }
     // the garden fence blocks movement except through open doors
     if (gardenBlocks(nx, ny, PLAYER_T.wT, PLAYER_T.hT, doorsRef.current, plotRef.current)) return true;

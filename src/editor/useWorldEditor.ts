@@ -142,6 +142,7 @@ export interface WorldEditor {
   setMarker(id: string, pos: { x: number; y: number } | null): void;
   setMeta(slug: string, patch: AssetMeta): void;
   resetCollider(slug: string): void;
+  clearBlockedTiles(): void; // remove every painted map tile
 
   undo(): void;
   redo(): void;
@@ -317,7 +318,7 @@ type Drag =
   | { type: 'object'; id: string; startX: number; startY: number; wx0: number; wy0: number; moved: boolean }
   | { type: 'marker'; id: string; moved: boolean }
   | { type: 'pan'; px0: number; py0: number; pan0: { x: number; y: number } }
-  | { type: 'paint'; id: string; solid: boolean; done: Set<string> };
+  | { type: 'paint'; solid: boolean; done: Set<string> };
 
 export function useWorldEditor(opts: {
   fieldRef: React.RefObject<HTMLElement | null>;
@@ -569,10 +570,14 @@ export function useWorldEditor(opts: {
     });
   }
 
-  // ---- colliders: painted per tile of the selected object, stored per asset ----
-  function paintTile(id: string, tx: number, ty: number, solid: boolean, record: boolean) {
-    const e = entOf(id);
-    if (!e?.asset || (e.rotation ?? 0) !== 0) return;
+  // ---- colliders ----
+  // Can this object's collider be painted? Mitchy collides by his feet, not
+  // his drawn shape, and a rotated object blocks its whole box.
+  const paintable = (e: Ent) => !!e.asset && e.kind !== 'cat' && (e.rotation ?? 0) === 0 && assetMap.has(e.asset);
+
+  // Set one tile of an object's collider (stored per asset, so every copy
+  // changes) — inside a doc update.
+  function paintObjectTile(d: WorldDoc, e: Ent, tx: number, ty: number, solid: boolean) {
     const k = e.scale ?? 1;
     // tile-local -> the sprite cells that tile covers at this object's scale
     const lx = tx - e.x;
@@ -581,15 +586,65 @@ export function useWorldEditor(opts: {
     const c1 = Math.ceil(((lx + 1) * TILE_CH) / k);
     const r0 = Math.max(0, Math.floor((ly * TILE_LN) / k));
     const r1 = Math.ceil(((ly + 1) * TILE_LN) / k);
-    const slug = e.asset;
+    const slug = e.asset!;
+    const current = d.colliders[slug] ?? (e.solidMask ?? e.sprite).map((row) => row.replace(/[^ ]/g, '#'));
+    const rows = current.map((row) => row.split(''));
+    for (let y = r0; y < r1 && y < rows.length; y++) {
+      for (let x = c0; x < c1 && x < rows[y].length; x++) rows[y][x] = solid ? '#' : ' ';
+    }
+    d.colliders[slug] = rows.map((r) => r.join(''));
+  }
+
+  // What blocks tile (tx,ty) right now: a painted map tile, and/or objects.
+  function blockersAt(tx: number, ty: number) {
+    const wall = (stateRef.current.doc.blockedTiles ?? []).includes(`${tx},${ty}`);
+    const objects = structRef.current.filter((e) => e.kind !== 'hotspot' && entityBlocksTile(e, tx, ty));
+    return { wall, objects };
+  }
+
+  // The Colliders tab's click: a tile that blocks stops blocking, an empty
+  // one starts. Turning a tile ON paints the SELECTED object's collider when
+  // the tile is inside it (so the shape travels with the object), otherwise
+  // it becomes a map tile of its own. Turning one OFF clears whatever
+  // blocks it: the map tile, and the collider of every object there.
+  function toggleTile(tx: number, ty: number, solid: boolean, record: boolean) {
+    const { wall, objects } = blockersAt(tx, ty);
+    if (solid === (wall || objects.length > 0)) return; // already that way
+    const key = `${tx},${ty}`;
+    const sel = selected && !selected.startsWith('marker:') ? entOf(selected) : undefined;
+    const notes: string[] = [];
     updateDoc((d) => {
-      const current = d.colliders[slug] ?? (e.solidMask ?? e.sprite).map((row) => row.replace(/[^ ]/g, '#'));
-      const rows = current.map((row) => row.split(''));
-      for (let y = r0; y < r1 && y < rows.length; y++) {
-        for (let x = c0; x < c1 && x < rows[y].length; x++) rows[y][x] = solid ? '#' : ' ';
+      const tiles = new Set(d.blockedTiles ?? []);
+      if (solid) {
+        const box = sel ? collisionBox(sel) : null;
+        if (sel && box && paintable(sel) && tx >= box.x0 && tx <= box.x1 && ty >= box.y0 && ty <= box.y1) {
+          paintObjectTile(d, sel, tx, ty, true);
+        } else tiles.add(key);
+      } else {
+        tiles.delete(key);
+        for (const e of objects) {
+          if (paintable(e)) {
+            paintObjectTile(d, e, tx, ty, false);
+            notes.push(e.asset!);
+          } else notes.push(`!${e.id}`);
+        }
       }
-      d.colliders[slug] = rows.map((r) => r.join(''));
+      if (tiles.size) d.blockedTiles = [...tiles].sort();
+      else delete d.blockedTiles;
     }, record);
+    const stuck = notes.filter((n) => n.startsWith('!')).map((n) => n.slice(1));
+    const assets = [...new Set(notes.filter((n) => !n.startsWith('!')))];
+    if (stuck.length) {
+      setStatus({ kind: 'info', text: `${stuck.join(', ')} still blocks here (${stuck.includes('cat') ? 'Mitchy blocks by his feet' : 'rotated objects and the house stairs block as a whole'}).` });
+    } else if (assets.length && record) {
+      setStatus({ kind: 'info', text: `Changed the collider of every ${assets.join(', ')} — reset it in this tab if that's not what you wanted.` });
+    }
+  }
+
+  function clearBlockedTiles() {
+    updateDoc((d) => {
+      delete d.blockedTiles;
+    });
   }
 
   function resetCollider(slug: string) {
@@ -852,16 +907,13 @@ export function useWorldEditor(opts: {
         setArmed(null);
         return;
       }
-      // painting the selected object's collider
-      if (tab === 'colliders' && selected && !selected.startsWith('marker:')) {
-        const e = entOf(selected);
-        const box = e ? collisionBox(e) : null;
-        if (e && box && tx >= box.x0 && tx <= box.x1 && ty >= box.y0 && ty <= box.y1) {
-          const solid = !entityBlocksTile(e, tx, ty);
-          dragRef.current = { type: 'paint', id: e.id, solid, done: new Set([`${tx},${ty}`]) };
-          paintTile(e.id, tx, ty, solid, true);
-          return;
-        }
+      // Colliders tab: every click toggles the tile under it
+      if (tab === 'colliders') {
+        const { wall, objects } = blockersAt(tx, ty);
+        const solid = !(wall || objects.length > 0);
+        dragRef.current = { type: 'paint', solid, done: new Set([`${tx},${ty}`]) };
+        toggleTile(tx, ty, solid, true);
+        return;
       }
       const m = tab === 'markers' || tab === 'objects' ? hitMarker(w.wx, w.wy) : null;
       if (m) {
@@ -908,13 +960,11 @@ export function useWorldEditor(opts: {
         setMarker(d.id, { x: tx, y: ty }, !d.moved);
         d.moved = true;
       } else if (d.type === 'paint') {
+        // a drag keeps doing what its first tile did (adding or clearing)
         const key = `${tx},${ty}`;
         if (d.done.has(key)) return;
-        const e = entOf(d.id);
-        const box = e ? collisionBox(e) : null;
-        if (!box || tx < box.x0 || tx > box.x1 || ty < box.y0 || ty > box.y1) return;
         d.done.add(key);
-        paintTile(d.id, tx, ty, d.solid, false);
+        toggleTile(tx, ty, d.solid, false);
       }
     },
     onPointerUp() {
@@ -974,6 +1024,7 @@ export function useWorldEditor(opts: {
     setMarker: (id, pos) => setMarker(id, pos),
     setMeta,
     resetCollider,
+    clearBlockedTiles,
     undo,
     redo,
     canUndo: undoStack.length > 0,

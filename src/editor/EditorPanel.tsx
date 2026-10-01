@@ -349,17 +349,30 @@ function CollidersTab({ ed, sel }: { ed: WorldEditor; sel: Ent | null }) {
   return (
     <div>
       <div className="wed-hint">
-        Select an object, then click or drag over its tiles to make them block (red) or not. The collider belongs to the
-        asset, so every copy changes.
+        Click a tile to flip it: a blocking tile (red) stops blocking, an empty one starts. Drag to flip many — a drag
+        keeps doing what its first tile did. Blocking tiles stop the player's feet.
+      </div>
+      <div className="wed-hint">
+        A new tile inside the <b>selected</b> object becomes part of that object's collider (it moves with it, and every
+        copy of the asset gets it). Anywhere else it's a map tile of its own (orange). Clearing a tile on an object
+        changes that asset's collider for every copy.
+      </div>
+      <div className="wed-row wed-btns">
+        <span>
+          {(ed.doc.blockedTiles ?? []).length} map tile{(ed.doc.blockedTiles ?? []).length === 1 ? '' : 's'}
+        </span>
+        <button onClick={ed.clearBlockedTiles} disabled={!(ed.doc.blockedTiles ?? []).length}>
+          clear map tiles
+        </button>
       </div>
       <label className="wed-check">
         <input type="checkbox" checked={ed.showColliders} onChange={(ev) => ed.setShowColliders(ev.target.checked)} />
-        show every collider on the map
+        show colliders in the other tabs too
       </label>
       {sel ? (
         sel.asset ? (
           (sel.rotation ?? 0) !== 0 ? (
-            <div className="wed-hint">Rotated objects block their whole box — set rotation to 0° to paint.</div>
+            <div className="wed-hint">Rotated objects block their whole box — set rotation to 0° to change it.</div>
           ) : (
             <div className="wed-row wed-btns">
               <span>
@@ -374,7 +387,7 @@ function CollidersTab({ ed, sel }: { ed: WorldEditor; sel: Ent | null }) {
           <div className="wed-hint">{sel.id} has no asset, so its collider can't be painted.</div>
         )
       ) : (
-        <div className="wed-hint">Nothing selected.</div>
+        <div className="wed-hint">No object selected — new tiles become map tiles.</div>
       )}
       <div className="wed-hint">
         The house, shop and cliff only collide with the player's feet, so their tall art stays walk-behind.

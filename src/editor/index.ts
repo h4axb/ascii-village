@@ -41,6 +41,7 @@ const OFF: WorldEditor = {
   setMarker: noop,
   setMeta: noop,
   resetCollider: noop,
+  clearBlockedTiles: noop,
   undo: noop,
   redo: noop,
   canUndo: false,

@@ -4253,6 +4253,11 @@ pre {
 .wed-col-tile.solid {
   background: rgba(255, 60, 60, 0.35);
 }
+/* a single painted map tile, not part of any object */
+.wed-col-tile.wall {
+  background: rgba(255, 150, 40, 0.45);
+  border-color: rgba(255, 170, 60, 0.8);
+}
 .ent.wed-ghost {
   z-index: 4800;
   opacity: 0.7;

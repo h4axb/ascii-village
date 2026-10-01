@@ -42,9 +42,13 @@ a message instead of overwriting it: reload to get the new version.
   (Shift+click keeps placing). Each new object gets its own id (`grasshalm-3`).
 - **Markers** — named positions cutscenes read by id. *place*/*move*, then
   click the map; drag them afterwards.
-- **Colliders** — select an object, then click or drag over its tiles to
-  make them block (red) or not. A collider belongs to the asset, so every copy
-  changes. "show every collider" overlays them all.
+- **Colliders** — every collider is shown in red. Click a tile to flip it:
+  a blocking tile stops blocking, an empty one starts. Drag to flip many (a
+  drag keeps doing what its first tile did). A new blocking tile inside the
+  *selected* object becomes part of that object's collider (it moves with it;
+  stored per asset, so every copy gets it). Anywhere else it's a map tile of
+  its own (orange), saved in `world.json` as `blockedTiles`. Blocking tiles
+  stop the player's feet, like the buildings do.
 - **Intro** — the intro narration editor (it has its own save button).
 
 The inspector (shown when something is selected) edits x, y, scale and

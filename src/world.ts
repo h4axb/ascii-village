@@ -814,6 +814,10 @@ export interface WorldDoc {
   removed: string[]; // built-in ids
   added: WorldAdded[];
   colliders: Record<string, string[]>; // asset slug -> solid mask, the sprite's shape
+  // Single map tiles that block on their own ("x,y"), painted anywhere in the
+  // editor's Colliders tab — an invisible wall, independent of any object.
+  // Like the buildings, they stop the player's feet.
+  blockedTiles?: string[];
 }
 
 export const WORLD_DOC: WorldDoc = worldDocData as unknown as WorldDoc;

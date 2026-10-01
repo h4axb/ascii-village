@@ -33,6 +33,7 @@ import {
   entityBlocksTile,
   collisionBox,
   setLiveStructEnts,
+  fitMask,
 } from '../world';
 import type { Ent, EntityKind, WorldDoc, WorldPose, WorldAdded } from '../world';
 import { RAW_ASSETS, FIXED_ASSETS, ASSET_META, assetOf } from '../assets';
@@ -587,8 +588,10 @@ export function useWorldEditor(opts: {
     const r0 = Math.max(0, Math.floor((ly * TILE_LN) / k));
     const r1 = Math.ceil(((ly + 1) * TILE_LN) / k);
     const slug = e.asset!;
-    const current = d.colliders[slug] ?? (e.solidMask ?? e.sprite).map((row) => row.replace(/[^ ]/g, '#'));
-    const rows = current.map((row) => row.split(''));
+    // always in the sprite's exact shape, or world.ts's colliderFor would
+    // discard it (some baked masks are narrower than their art)
+    const start = d.colliders[slug] ?? (e.solidMask ?? e.sprite).map((row) => row.replace(/[^ ]/g, '#'));
+    const rows = fitMask(start, e.sprite).map((row) => row.split(''));
     for (let y = r0; y < r1 && y < rows.length; y++) {
       for (let x = c0; x < c1 && x < rows[y].length; x++) rows[y][x] = solid ? '#' : ' ';
     }
@@ -617,8 +620,15 @@ export function useWorldEditor(opts: {
       const tiles = new Set(d.blockedTiles ?? []);
       if (solid) {
         const box = sel ? collisionBox(sel) : null;
+        // an object that normally blocks here (its default collider) gets
+        // the tile back, so off-then-on returns to where it started
+        const owner = structRef.current.find(
+          (e) => paintable(e) && entityBlocksTile({ ...e, solidMask: assetMap.get(e.asset!)?.solid }, tx, ty),
+        );
         if (sel && box && paintable(sel) && tx >= box.x0 && tx <= box.x1 && ty >= box.y0 && ty <= box.y1) {
           paintObjectTile(d, sel, tx, ty, true);
+        } else if (owner) {
+          paintObjectTile(d, owner, tx, ty, true);
         } else tiles.add(key);
       } else {
         tiles.delete(key);

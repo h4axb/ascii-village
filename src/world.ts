@@ -828,13 +828,18 @@ export const BASE_ENTS: readonly Ent[] = STRUCT_ENTS_BASE.map((e) =>
 );
 const BASE_HOUSE = BASE_ENTS.find((e) => e.id === 'house');
 
-// A painted collider only applies when it still matches the art's shape — a
-// redrawn sprite of a different size falls back to its default collider
+// A painted collider applies while it still has the art's row count; each row
+// is fitted to its sprite row (padded with blanks or cut), because some baked
+// masks (house.json, cliff.json) are a little narrower than their art. A
+// redrawn sprite of a different height falls back to its default collider
 // rather than blocking the wrong cells.
+export function fitMask(mask: string[], sprite: string[]): string[] {
+  return sprite.map((row, i) => (mask[i] ?? '').padEnd(row.length, ' ').slice(0, row.length));
+}
 function colliderFor(doc: WorldDoc, asset: string | undefined, sprite: string[]): string[] | undefined {
   const m = asset ? doc.colliders[asset] : undefined;
   if (!m || m.length !== sprite.length) return undefined;
-  return m.every((row, i) => row.length === sprite[i].length) ? m : undefined;
+  return fitMask(m, sprite);
 }
 
 export function buildStructEnts(doc: WorldDoc): Ent[] {

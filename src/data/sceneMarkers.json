@@ -1,14 +1,14 @@
 {
   "intro.partB.playerStart": {
-    "x": 18,
-    "y": 59
+    "x": 17,
+    "y": 56
   },
   "intro.partB.mitchyStart": {
-    "x": 37,
-    "y": 59
+    "x": 41,
+    "y": 56
   },
   "intro.partB.mitchyExit": {
-    "x": 72,
-    "y": 56
+    "x": 73,
+    "y": 53
   }
 }

@@ -537,7 +537,7 @@ export default function CraftModal({
         : "Describe what you'd like to craft …";
 
   return (
-    <Sheet label="Mitchy's Workshop" onBack={back} onClose={() => onConfirmChange(true)} money={money}>
+    <Sheet label="Mitchy's Workshop" onBack={back} onClose={() => onConfirmChange(true)} money={money} fill>
       <Frame className="cw3">
         <button
           className={'cw3-bookmark' + (historyOpen ? ' open' : '')}

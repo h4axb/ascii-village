@@ -40,10 +40,22 @@
   --ds-font-size: 14px;
 }
 
-/* the page behind any sheet stays visible, just dimmed a little */
+/* the page behind any sheet stays visible, just dimmed a little. A sheet
+   always fits the window (see useFitToScreen in Sheet.tsx), so the overlay
+   never scrolls: its natural, unscaled box may be taller than the window,
+   and that invisible overhang must not produce a scrollbar. */
 .overlay:has(> .ds-sheet) {
   background: var(--ds-scrim);
   align-items: center;
+  overflow: hidden;
+  padding: 0;
+  /* above the HUD (clock, avatar, coins: z-index 1000), which would
+     otherwise sit on the sheet's corners; the sheet shows the coins itself */
+  z-index: 1100;
+}
+.ds-sheet {
+  flex: none; /* keep its natural size; the fit scales it instead */
+  transform-origin: center center;
 }
 
 /* ---- Sheet ------------------------------------------------------------- */
@@ -907,15 +919,24 @@
   background: rgb(38, 43, 28);
 }
 
-/* chat history: a column on the right, opened by the bookmark */
+/* chat history: a column on the right, opened by the bookmark. It lies OVER
+   the chat (the chat keeps its full width underneath) rather than pushing it
+   aside. */
 .cw3-history {
-  flex: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
   width: min(340px, 36%);
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--ds-line);
+  border: 1px solid var(--ds-line-strong);
   border-radius: var(--ds-radius-sm);
-  background: var(--ds-surface);
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  box-shadow: -10px 0 28px rgba(0, 0, 0, 0.35);
 }
 .cw3-history-head {
   padding: 14px 18px 12px;
@@ -1225,4 +1246,93 @@
 .ds-sheet .shop-buy {
   width: calc(var(--ds-slot) * 5 + var(--ds-gap) * 4 + 40px + var(--ds-detail-w));
   max-width: 100%;
+}
+
+/* ---- Settings: sections (Game, Controls) and key chips ---------------- */
+.ds-settings-section {
+  margin: 18px 0 6px;
+  color: var(--ds-text-muted);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.ds-settings-section:first-of-type {
+  margin-top: 0;
+}
+.ds-actions.ds-settings-actions {
+  margin-top: 6px;
+}
+.ds-settings-note {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.ds-controls .ds-row {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--ds-line-soft);
+}
+.ds-controls .ds-row:last-child {
+  border-bottom: none;
+}
+.ds-kbd {
+  min-width: 1.4em;
+  padding: 2px 7px;
+  border: 1px solid var(--ds-line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--ds-surface);
+  color: var(--ds-text);
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ---- a sheet that fills the screen's height (crafting, shop) ---------- */
+.ds-sheet.fill {
+  height: 100vh;
+  height: 100dvh;
+  padding: 22px 40px 26px;
+  border-top: none;
+  border-bottom: none;
+  border-radius: 0;
+  align-items: flex-start;
+}
+.ds-sheet.fill .ds-sheet-inner {
+  min-height: 100%;
+  box-sizing: border-box;
+  transform-origin: top center;
+}
+.ds-sheet.fill .ds-sheet-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.ds-sheet.fill .ds-sheet-body.has-rail {
+  flex-direction: row;
+}
+.ds-sheet.fill .ds-sheet-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+/* the shop: its content (slots + details, Mitchy's line + sell buttons)
+   stays one block, centred in the screen's height beside the rail */
+.ds-sheet.fill .ds-sheet-body.has-rail {
+  align-items: stretch;
+}
+.ds-sheet.fill .ds-sheet-rail {
+  align-self: flex-start;
+}
+.ds-sheet.fill .ds-sheet-main {
+  justify-content: center;
+}
+/* the workshop: the chat takes all the height there is */
+.ds-sheet.fill .cw3 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.ds-sheet.fill .cw3-body {
+  flex: 1;
+  height: auto;
+  min-height: 240px;
 }

@@ -445,6 +445,21 @@ type Modal =
   | { t: 'pay'; sel: ItemType | null; offer: Partial<Record<ItemType, number>>; help: boolean }
   | null;
 
+// Settings > Controls: every key the game listens to (the handler is
+// handlerRef further down), in the order a new player needs them.
+const CONTROLS: [string, string[]][] = [
+  ['Move', ['W', 'A', 'S', 'D']],
+  ['Dash', ['Shift']],
+  ['Interact / yes', ['F']],
+  ['Inventory', ['I']],
+  ['Map', ['M']],
+  ['Back to the player', ['Space']],
+  ['Zoom', ['Mouse wheel']],
+  ['Choose in menus', ['↑', '↓', 'Enter']],
+  ['Back / close', ['Esc']],
+  ['Download a save backup', ['Ctrl', 'S']],
+];
+
 const FRESH_SHOP: Modal = {
   t: 'shop',
   tab: 'sell',
@@ -4347,12 +4362,6 @@ function Game() {
         </div>
       </div>
 
-      {!modal && !cinematic && (
-        <div className="kbd-hint">
-          [WASD] move &#183; [Shift] dash &#183; [F] interact &#183; [I] inventory &#183; [M] map
-        </div>
-      )}
-
       {!cinematic && <TouchControls onHold={holdStart} onRelease={holdEnd} onF={pressF} onI={toggleInventory} />}
 
       {/* ---- unified intro overlay stack ----
@@ -4489,14 +4498,30 @@ function Game() {
           )}
 
           {modal.t === 'settings' && (
-            <Panel title="Settings" hint="writes your progress to this browser · [Esc] to close">
-              <div className="ds-actions">
+            <Panel title="Settings" hint="[Esc] to close">
+              <div className="ds-settings-section">Game</div>
+              <div className="ds-actions ds-settings-actions">
                 <button className="ds-action" onClick={saveGameToStorage} disabled={saving}>
                   <span className="ds-action-icon">
                     <SaveIcon className="ds-save-icon" />
                   </span>
                   <span>Save Game</span>
                 </button>
+              </div>
+              <div className="ds-muted ds-settings-note">writes your progress to this browser</div>
+              <div className="ds-settings-section">Controls</div>
+              <div className="ds-controls">
+                {CONTROLS.map(([what, keys]) => (
+                  <Row
+                    key={what}
+                    label={what}
+                    value={keys.map((k) => (
+                      <kbd key={k} className="ds-kbd">
+                        {k}
+                      </kbd>
+                    ))}
+                  />
+                ))}
               </div>
             </Panel>
           )}
@@ -4888,7 +4913,7 @@ function ShopSheet({
   );
 
   return (
-    <Sheet label={tab === 'sell' ? 'Sell to Mitchy' : 'Buy from Mitchy'} onClose={onClose} onBack={onClose} money={money} rail={rail}>
+    <Sheet label={tab === 'sell' ? 'Sell to Mitchy' : 'Buy from Mitchy'} onClose={onClose} onBack={onClose} money={money} rail={rail} fill>
       {tab === 'buy' ? (
         children
       ) : (

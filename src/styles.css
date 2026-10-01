@@ -178,7 +178,10 @@ pre {
   /* The HUD is an overlay now, so the header reserves no space and the world
      runs edge to edge (as in the design sketch). */
   --hdr-h: 0px;
-  --foot-h: 22px;
+  /* the key hints live in Settings > Controls now, so on desktop nothing is
+     reserved at the bottom either; touch screens keep room for their
+     on-screen controls (below) */
+  --foot-h: 0px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -547,23 +550,6 @@ pre {
 
 .scale-box {
   overflow: visible;
-}
-
-.kbd-hint {
-  position: fixed;
-  bottom: 6px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  color: #555;
-  font-size: 11px;
-  pointer-events: none;
-}
-
-@media (hover: none), (pointer: coarse) {
-  .kbd-hint {
-    display: none;
-  }
 }
 
 /* ---------- game field ---------- */

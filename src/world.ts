@@ -1,6 +1,7 @@
 ﻿import * as S from './sprites';
 import { GARDEN } from './farm';
-import worldOverridesData from './data/worldOverrides.json';
+import worldDocData from './data/world.json';
+import { assetOf, ASSET_OF_KIND } from './assets';
 
 // The map is a tile grid. Each tile is 4 characters wide and 2 lines tall, so
 // the ground layer is (MAP_W*4) x (MAP_H*2) characters. Entities are positioned
@@ -44,6 +45,9 @@ export type EntityKind =
   // crown is ground you stand ON (feet-only collision, like the house's deck)
   // and only the rock face beneath it blocks — see CLIFF_SOLID in sprites.ts.
   | 'cliff'
+  // A new asset placed with the world editor that hasn't been given a kind
+  // of its own (see src/assets.ts): drawn in its own colours, no behaviour.
+  | 'decor'
   | 'placed'; // a player-placed decoration/furniture entity (see placement.ts)
 
 // ---------------------------------------------------------------------------
@@ -219,6 +223,9 @@ export interface Ent {
   // 90°-clockwise steps (0-3), used by player-placed items only. Undefined
   // behaves exactly like 0 everywhere — every existing entity is unaffected.
   rotation?: 0 | 1 | 2 | 3;
+  // The registry slug it draws (src/assets.ts) — set on everything the world
+  // editor knows about, so a collider painted for an asset reaches every copy.
+  asset?: string;
 }
 
 // Tile footprint of a sprite. `scale` is the CSS scale it is DRAWN at (see
@@ -545,10 +552,8 @@ const PALM_SPOTS = [
 
 const STRUCT_ENTS_BASE: Ent[] = [
   // THE CLIFF, directly below the cottage — the house now stands at the top of
-  // a drop instead of in open meadow. Listed FIRST for the same reason the
-  // garden bed is: devLayout's hit() walks this array backwards and returns the
-  // last match, so anything standing on the bluff still wins the grab over the
-  // landscape under it.
+  // a drop instead of in open meadow. Listed FIRST, under everything that
+  // stands on it.
   //
   // Position: the art is 18.7 tiles wide against the cottage's 7.35, and x 22
   // centres it (22 + 18.7/2 = 31.4) on the house's own centre (31.5). y 42 puts
@@ -575,11 +580,9 @@ const STRUCT_ENTS_BASE: Ent[] = [
     interactable: false,
     solidMask: noCollide(S.CLIFF),
   },
-  // The fenced garden plot. Listed near the top so it hit-tests underneath the
-  // things that stand on top of it — devLayout's hit() walks this array
-  // backwards and returns the last match, so an entity placed inside the plot
-  // still wins the grab. Its position is farm.ts's GARDEN_HOME: drag it, then paste the
-  // dumped x/y back into that constant (not into this entry, which reads it).
+  // The fenced garden plot. Listed near the top, under the things that stand on
+  // it. Its position is farm.ts's GARDEN_HOME, which a move saved by the world
+  // editor (src/data/world.json) overrides.
   // Never solid on its own — the fence collider is farm.ts's gardenBlocks, so
   // this carries a blank mask to stop the glyphs blocking a second time.
   {
@@ -779,64 +782,120 @@ const STRUCT_ENTS_BASE: Ent[] = [
   // removed — the date palms above are the only trees on the island now.
   // The Olmec statue (olmec1), the procedural waterfall garden and the old
   // arch bridge were removed too — the pond and the SVG-transcribed bridge
-  // (both placed via the dev world editor, see worldOverrides.json) now
+  // (both placed via the world editor, see src/data/world.json) now
   // stand in for that whole corner of the map.
 ];
 
-// Dev world-editor overrides (src/devWorldAssets.ts's "E" panel), written
-// live to disk by a Vite dev-only middleware (vite.config.ts) every time
-// something is placed/removed/undone/redone there — see postWorldOverrides
-// in devWorldAssets.ts for why entries carry their own sprite/colors/
-// palette data inline rather than a code reference: this file can't import
-// anything from the dev-tool side (devBakedAssets.ts, the manifest) without
-// pulling the whole editor into the production bundle. Starts empty
-// (`{"removedIds":[],"added":[]}`) and is the ONLY thing this module writes
-// to — STRUCT_ENTS_BASE above stays hand-authored/untouched by the tool.
-const worldOverrides = worldOverridesData as unknown as { removedIds: string[]; added: Ent[] };
+// ═══ THE WORLD EDITOR'S FILE — src/data/world.json ═══
+// Everything the in-game world editor (src/editor/, dev only, press E)
+// changes is saved to this ONE file, and applied here once, at load:
+//
+//   STRUCT_ENTS = STRUCT_ENTS_BASE, with `moved` positions/scales applied,
+//                 minus `removed`, plus `added` (resolved by asset slug
+//                 through src/assets.ts), with `colliders` painted per asset.
+//
+// The game build reads exactly what was committed; nothing here depends on
+// the editor, which never ships.
+export interface WorldPose {
+  x: number;
+  y: number;
+  scale?: number;
+  rotation?: 0 | 1 | 2 | 3;
+}
+export interface WorldAdded extends WorldPose {
+  id: string;
+  asset: string;
+  kind?: EntityKind; // default: the asset's kind
+  interactable?: boolean; // default: the asset's
+}
+export interface WorldDoc {
+  version: 2;
+  moved: Record<string, WorldPose>; // built-in (STRUCT_ENTS_BASE) objects, by id
+  removed: string[]; // built-in ids
+  added: WorldAdded[];
+  colliders: Record<string, string[]>; // asset slug -> solid mask, the sprite's shape
+}
 
-// Every id STRUCT_ENTS_BASE actually has, BEFORE removal is applied — needed
-// by devWorldAssets.ts's own localStorage staleness check (loadRemovedStructIds):
-// checking a saved "removed" id against the POST-removal STRUCT_ENTS is
-// self-defeating (a removed id is, by definition, never present there), which
-// silently discarded every real deletion on reload and re-posted an empty
-// removedIds back to disk — the bug where deleting cliff/bridge/etc. in the
-// editor "came back" on refresh. See STRUCT_ENTS's own comment below.
-export const STRUCT_ENTS_BASE_IDS: string[] = STRUCT_ENTS_BASE.map((e) => e.id);
-// The disk file's OWN removedIds, straight from JSON — the authoritative
-// record of what's actually been deleted, independent of this browser's
-// localStorage copy. Also used by devWorldAssets.ts to reseed correctly.
-export const PERSISTED_REMOVED_IDS: string[] = worldOverrides.removedIds;
-// The disk file's OWN `added` list, straight from JSON. devWorldAssets.ts's
-// `drafts` state deliberately EXCLUDES anything already merged into
-// STRUCT_ENTS (loadDrafts's own staleness dedup — a draft that's already a
-// real entity would otherwise render twice), which means `drafts` alone is
-// NOT a complete picture of what should stay in `added` on disk. Without
-// this export, postWorldOverrides had no way to know that, so a placed
-// entity's very next disk write (triggered by ANY drafts/removedStructIds
-// change in ANY browser tab — even just mounting the panel) would overwrite
-// `added` with `drafts` alone and silently drop every already-persisted
-// placement. See postWorldOverrides's own comment for the merge that fixes it.
-export const PERSISTED_ADDED: Ent[] = worldOverrides.added;
+export const WORLD_DOC: WorldDoc = worldDocData as unknown as WorldDoc;
 
-// The array every other module actually imports as `STRUCT_ENTS` — same
-// name/shape as before this override system existed, so collision, spawn
-// logic, and every render path keep working unchanged; only the VALUE it's
-// computed from is now base-minus-removed-plus-added instead of a bare
-// literal.
-export const STRUCT_ENTS: Ent[] = (() => {
-  const removed = new Set(worldOverrides.removedIds);
-  const kept = STRUCT_ENTS_BASE.filter((e) => !removed.has(e.id));
-  // `removed` applies to `added` too, not just the hand-authored base: once a
-  // placed entity has been committed to disk, a later delete (toggleStructRemoved
-  // in devWorldAssets.ts) marks its id removed the SAME way a hand-authored
-  // entity's delete does — the two are indistinguishable by the time either
-  // lives here. Without this filter a deleted placed entity kept reappearing
-  // forever (never actually stripped from `added`), which is what made two
-  // ponds show up: the "deleted" one stayed on disk, then a newly-placed one
-  // stacked on top of it.
-  const addedKept = worldOverrides.added.filter((e) => !removed.has(e.id));
-  return [...kept, ...addedKept];
-})();
+// The built-in objects, with the registry slug each one draws.
+export const BASE_ENTS: readonly Ent[] = STRUCT_ENTS_BASE.map((e) =>
+  ASSET_OF_KIND[e.kind] ? { ...e, asset: ASSET_OF_KIND[e.kind] } : e,
+);
+const BASE_HOUSE = BASE_ENTS.find((e) => e.id === 'house');
+
+// A painted collider only applies when it still matches the art's shape — a
+// redrawn sprite of a different size falls back to its default collider
+// rather than blocking the wrong cells.
+function colliderFor(doc: WorldDoc, asset: string | undefined, sprite: string[]): string[] | undefined {
+  const m = asset ? doc.colliders[asset] : undefined;
+  if (!m || m.length !== sprite.length) return undefined;
+  return m.every((row, i) => row.length === sprite[i].length) ? m : undefined;
+}
+
+export function buildStructEnts(doc: WorldDoc): Ent[] {
+  const removed = new Set(doc.removed);
+  const house = doc.moved.house;
+  const out: Ent[] = [];
+  for (const base of BASE_ENTS) {
+    if (removed.has(base.id)) continue;
+    let e: Ent = base;
+    const own = doc.moved[base.id];
+    if (own) {
+      e = { ...e, ...own };
+    } else if (house && BASE_HOUSE && base.id.startsWith('house-')) {
+      // The house's clickable hotspots and stair blockers are pinned to its
+      // picture: they follow its move and scale.
+      const k = (house.scale ?? BASE_HOUSE.scale ?? 1) / (BASE_HOUSE.scale ?? 1);
+      e = {
+        ...e,
+        x: house.x + (base.x - BASE_HOUSE.x) * k,
+        y: house.y + (base.y - BASE_HOUSE.y) * k,
+        scale: (base.scale ?? 1) * k,
+      };
+    }
+    const painted = colliderFor(doc, e.asset, e.sprite);
+    out.push(painted ? { ...e, solidMask: painted } : e);
+  }
+  for (const a of doc.added) {
+    const def = assetOf(a.asset);
+    if (!def) {
+      if (import.meta.env.DEV) console.warn(`[world] "${a.id}" uses unknown asset "${a.asset}" — skipped`);
+      continue;
+    }
+    out.push({
+      id: a.id,
+      kind: a.kind ?? def.kind,
+      asset: def.slug,
+      x: a.x,
+      y: a.y,
+      sprite: def.sprite,
+      colors: def.colors,
+      palette: def.palette,
+      scale: a.scale ?? def.scale,
+      rotation: a.rotation,
+      interactable: a.interactable ?? def.interactable,
+      solidMask: colliderFor(doc, def.slug, def.sprite) ?? def.solid,
+    });
+  }
+  return out;
+}
+
+// The array every other module imports: the world as saved.
+export const STRUCT_ENTS: Ent[] = buildStructEnts(WORLD_DOC);
+
+// The structures as they stand RIGHT NOW: STRUCT_ENTS, except while the world
+// editor is changing them. Read by what's derived from the layout rather than
+// drawn from it — the ground glyphs kept clear around each object, the
+// terrain's bushes, where wild flora may sprout — so an edit shows the ground
+// the way the saved file will. Only the editor ever sets it.
+let liveStruct: Ent[] = STRUCT_ENTS;
+export function liveStructEnts(): Ent[] {
+  return liveStruct;
+}
+export function setLiveStructEnts(ents: Ent[]): void {
+  liveStruct = ents;
+}
 
 // Dev-only sanity check for the hand-placed layout above: warns (never throws)
 // if a piece runs off the map, sits on water, or if two solid buildings
@@ -908,7 +967,7 @@ export function wildSpawns(window: number, garden: TileBox = GARDEN): Ent[] {
   // canopy or roof, not just its base row) plus the whole garden plot with a
   // one-tile margin (so no wild flora crowds the planting beds).
   const taken: TileBox[] = [
-    ...STRUCT_ENTS.map((e) => bbox(e)),
+    ...liveStruct.map((e) => bbox(e)),
     { x0: garden.x0 - 1, y0: garden.y0 - 1, x1: garden.x1 + 1, y1: garden.y1 + 1 },
   ];
   const out: Ent[] = [];
@@ -1003,7 +1062,7 @@ export function silhouetteMask(
 // Cells the ground glyphs must stay off: the structures' and this growth
 // window's wild flora's silhouettes (1-cell margin), plus the garden plot.
 export function grassKeepOut(window: number): Uint8Array {
-  const mask = silhouetteMask([...STRUCT_ENTS, ...wildSpawns(window)], 1);
+  const mask = silhouetteMask([...liveStruct, ...wildSpawns(window)], 1);
   const g = GARDEN;
   for (let y = g.y0 * TILE_LN; y < (g.y1 + 1) * TILE_LN; y++) {
     mask.fill(1, y * GROUND_W + g.x0 * TILE_CH, y * GROUND_W + (g.x1 + 1) * TILE_CH);

@@ -2,10 +2,9 @@
 // SCENE MARKER REGISTRY — the semantic-id catalogue of every world position
 // a future cinematic/tutorial/quest sequence needs. This module defines WHAT
 // markers exist and how they're organized in the dev editor's collapsible
-// tree; it does NOT own their placed positions — that's devSceneMarkers.ts's
-// job (the editor hook) and src/data/sceneMarkers.json (the persisted disk
-// file), kept separate from this static catalogue the same way
-// STRUCT_ENTS_BASE (world.ts) is kept separate from worldOverrides.json.
+// tree; it does NOT own their placed positions — that's the world editor's
+// job (src/editor/, Markers tab) and src/data/sceneMarkers.json (the file it
+// saves), kept separate from this static catalogue.
 //
 // To add a future sequence, extend MARKER_REGISTRY below — nothing else
 // needs to change: the editor tree, the drag/drop placement, persistence and
@@ -32,7 +31,7 @@ export interface MarkerCategory {
 // Intro > Part B — Wake Up > PLAYER START / MITCHY START / MITCHY EXIT, per
 // the current request. Later sequences (Intro Part A/C, Tutorial, Quests,
 // ...) are added as additional entries in this same array — the tree in
-// DevAssetPanel/SceneMarkingsPanel renders whatever's here, it doesn't need
+// world editor's Markers tab renders whatever's here, it doesn't need
 // to know about any specific category.
 export const MARKER_REGISTRY: MarkerCategory[] = [
   {
@@ -53,9 +52,7 @@ export const MARKER_REGISTRY: MarkerCategory[] = [
 ];
 
 // Every marker id the registry currently knows about — used both by the
-// editor hook (to drop stale/renamed ids from persisted data, same
-// staleness-guard convention devWorldAssets.ts's loadDrafts/
-// loadRemovedStructIds already use) and available here for anything that
+// editor hook (to drop stale/renamed ids from persisted data, ) and available here for anything that
 // wants to validate an id before looking it up.
 export const ALL_MARKER_IDS: ReadonlySet<string> = new Set(
   MARKER_REGISTRY.flatMap((cat) => cat.groups.flatMap((g) => g.markers.map((m) => m.id))),
@@ -64,7 +61,7 @@ export const ALL_MARKER_IDS: ReadonlySet<string> = new Set(
 export type MarkerPositions = Record<string, { x: number; y: number }>;
 
 // The disk file IS the source of truth for "where is this marker" outside
-// the editor's own React state — devSceneMarkers.ts's hook reads the same
+// the editor's own React state — the world editor reads the same
 // file to seed its live state, and this reads it directly so cinematic code
 // (which has no reason to mount the dev editor's hook) can ask for a
 // position without any editor machinery in the loop.

@@ -2,7 +2,7 @@
 // DEV-ONLY: reference image -> 3 ASCII/glyph world-asset variants, via a real
 // vision-capable LLM call. User-confirmed tradeoff (this is the ONE place in
 // the world-asset tooling that costs real API money per call — everything
-// else in devWorldAssets.ts/DevAssetPanel.tsx is free/local).
+// else in the world editor is free/local).
 //
 // Model choice: this project's own .env carries an explicit note that the
 // whole app was consolidated onto the cheapest model everywhere because the

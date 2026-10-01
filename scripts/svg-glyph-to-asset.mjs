@@ -2,7 +2,9 @@
 // Transcribe a square-celled reference .svg (one <text x y fill>glyph</text>
 // per cell, text-anchor:middle + dominant-baseline:central, viewBox divided
 // evenly into cols x rows -- the format these two reference files use) into
-// a baked src/data/<slug>.json, per docs/AssetTranscriptionWorkflow.md.
+// a baked src/data/assets/<slug>.json, per docs/AssetTranscriptionWorkflow.md.
+// Every file in src/data/assets/ shows up in the world editor's asset list
+// automatically (src/assets.ts), ready to place - see docs/Editor.md.
 //
 // This is a MECHANICAL decode + column-double, not a creative transcription
 // pass -- the glyph/colour choice was already made by whatever produced the
@@ -82,17 +84,17 @@ const out = {
     transcribedBy: 'claude',
     promptVersion: 1,
     generatedAt: new Date().toISOString(),
-    note: 'Mechanically decoded from a pre-rendered square-celled glyph SVG, then column-doubled (ArtStyleGuide §1) -- not a from-scratch palette transcription, so the palette is per-source-tone (many keys) rather than the usual small curated set. solid mask omitted (advisory only, add in the placement editor after eyeballing collision needs).',
+    note: 'Mechanically decoded from a pre-rendered square-celled glyph SVG, then column-doubled (ArtStyleGuide §1) -- not a from-scratch palette transcription, so the palette is per-source-tone (many keys) rather than the usual small curated set. no solid mask: it collides wherever a glyph is drawn until you paint a collider in the world editor.',
   },
   palette,
   sprite: doubledSprite,
   colors: doubledColors,
 };
 
-const outPath = new URL(`../src/data/${slug}.json`, import.meta.url);
+const outPath = new URL(`../src/data/assets/${slug}.json`, import.meta.url);
 await writeFile(outPath, JSON.stringify(out, null, 2) + '\n');
 
 console.log(
-  `Wrote src/data/${slug}.json -- ${doubledSprite[0].length}x${doubledSprite.length} chars ` +
+  `Wrote src/data/assets/${slug}.json -- ${doubledSprite[0].length}x${doubledSprite.length} chars ` +
     `(source ${cols}x${rows}, doubled), ${Object.keys(palette).length} palette keys, ${count} glyphs decoded.`,
 );

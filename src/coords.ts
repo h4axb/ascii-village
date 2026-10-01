@@ -1,15 +1,18 @@
-// Shared screen-pixel → world-tile conversion. Extracted from devLayout.ts's
-// private `toTile` closure, which was itself a copy of the same inverse
-// transform already inline in App.tsx's onWheel zoom-to-cursor handler — one
+// Shared screen-pixel → world-tile conversion. The same inverse
+// transform as the one already inline in App.tsx's onWheel zoom-to-cursor handler — one
 // piece of math, one place, instead of drifting copies.
 
 import { TILE_CH, TILE_LN } from './world';
 
 // What a caller needs from the camera to turn a screen pixel into a map
 // tile. App.tsx keeps this current every render on the same ref the wheel
-// handler and the dev layout tool both read.
+// handler and the world editor both read.
 export interface CamSnapshot {
   zoom: number;
+  pcx: number; // the player's centre, world chars / lines: the camera follows it
+  pcy: number;
+  panX: number; // the camera's offset from the player (see `pan` in App.tsx)
+  panY: number;
   camX: number; // world chars at the left edge of the view (already clamped)
   camY: number; // world lines at the top edge
   dims: { scale: number; charW: number; lineH: number };

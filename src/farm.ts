@@ -9,18 +9,25 @@
 
 import type { ItemType } from './world';
 import type { Category, ShopItem } from './llm';
+import worldDoc from './data/world.json';
 
 // ---- garden geometry (tile coordinates) -----------------------------------
 // A fenced plot NORTH (above) of the house. The house sits at y32-35, so the
 // garden's home corner puts it at y23-30, a one-tile gap (y31) between them.
 //
 // The plot is described as ONE CORNER plus offsets, not four absolute edges,
-// because the whole thing is movable: the dev layout tool drags it as a single
+// because the whole thing is movable: the world editor drags it as a single
 // structure (see the 'gardenbed' entry in STRUCT_ENTS) and everything below —
 // fence ring, gate, planting beds — has to travel with it. Read the live plot
-// through gardenAt(); GARDEN/DOOR_TILES/SLOTS are just the home-corner values,
+// through gardenAt(); GARDEN/DOOR_TILES/SLOTS are the saved-corner values,
 // kept for the many places where the garden never moves at runtime.
-export const GARDEN_HOME = { x: 28, y: 23 } as const;
+// A position saved by the world editor (src/data/world.json) wins over the
+// default corner here.
+const GARDEN_DEFAULT = { x: 28, y: 23 };
+const gardenMoved = (worldDoc as { moved?: Record<string, { x: number; y: number }> }).moved?.['garden-bed'];
+export const GARDEN_HOME: { readonly x: number; readonly y: number } = gardenMoved
+  ? { x: gardenMoved.x, y: gardenMoved.y }
+  : GARDEN_DEFAULT;
 
 // NOT a free parameter: the size traces the baked bed picture (GARDEN_BED,
 // from garden-fence.svg). At GARDEN_BED_SCALE the art measures 10.91 x 7.99

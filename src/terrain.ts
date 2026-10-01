@@ -27,7 +27,7 @@ import {
   MAP_W,
   MAP_H,
   nearestIsland,
-  STRUCT_ENTS,
+  liveStructEnts,
   bbox,
   collisionBox,
   silhouetteMask,
@@ -180,7 +180,7 @@ let STRUCT_MASK: Uint8Array | null = null;
 function structMask(): Uint8Array {
   if (STRUCT_MASK) return STRUCT_MASK;
   const m = new Uint8Array(MAP_W * MAP_H);
-  for (const e of STRUCT_ENTS) {
+  for (const e of liveStructEnts()) {
     if (e.kind === 'hotspot' || e.kind === 'blocker') continue;
     for (const b of [bbox(e), collisionBox(e)]) {
       for (let ty = b.y0 - 1; ty <= b.y1 + 1; ty++) {
@@ -203,7 +203,7 @@ const masked = (fx: number, fy: number) => {
 let GLYPH_MASK: Uint8Array | null = null;
 function glyphMask(): Uint8Array {
   return (GLYPH_MASK ??= silhouetteMask(
-    STRUCT_ENTS.filter((e) => e.kind !== 'hotspot' && e.kind !== 'blocker'),
+    liveStructEnts().filter((e) => e.kind !== 'hotspot' && e.kind !== 'blocker'),
     1,
   ));
 }
@@ -384,6 +384,15 @@ const pack = (r: number, g: number, b: number) =>
   Math.max(0, Math.min(255, Math.round(b)));
 
 let FIELD: TerrainField | null = null;
+
+// Forget everything derived from the structures' layout (the world editor
+// calls this after moving things; see setLiveStructEnts in world.ts).
+export function resetTerrainStructs(): void {
+  STRUCT_MASK = null;
+  GLYPH_MASK = null;
+  BUSHES = null;
+  FIELD = null;
+}
 
 // a character cell's height / width (14px line / 8.4px char, see App.tsx)
 const CELL_ASPECT = 14 / 8.4;

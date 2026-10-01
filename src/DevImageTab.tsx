@@ -3,9 +3,9 @@
 // a real vision-LLM call (devImageTranscribe.ts — the one place in this
 // tooling that costs real API money, by explicit user request). Each variant
 // is editable here (live scale preview, a colour picker per palette key)
-// before you copy/download it — nothing is written to disk automatically,
-// same "review before it lands in your source tree" convention as the rest
-// of this tool (DevAssetPanel's dump(), devLayout.ts's dump()).
+// before you copy/download it — nothing is written to disk automatically:
+// save the downloaded file into src/data/assets/ and, after a reload, it's in
+// the world editor's asset list (src/assets.ts) under "New".
 // ---------------------------------------------------------------------------
 import { useState } from 'react';
 import { ColoredSprite } from './ColoredSprite';
@@ -88,6 +88,7 @@ export function DevImageTab() {
           promptVersion: 1,
           generatedAt: new Date().toISOString(),
         },
+        scale: v.suggestedScale,
         palette: v.palette,
         sprite: v.sprite,
         colors: v.colors,
@@ -96,27 +97,6 @@ export function DevImageTab() {
       null,
       2,
     );
-
-  const manifestGroupJson = () => {
-    if (!variants) return '';
-    return JSON.stringify(
-      {
-        group: groupSlug,
-        sourceImage: fileName,
-        variants: variants.map((v, i) => ({
-          slug: variantSlug(i),
-          dataFile: `${variantSlug(i)}.json`,
-          suggestedKind: groupSlug,
-          sizeTier: v.sizeTier,
-          suggestedScale: v.suggestedScale,
-          spriteDims: { w: Math.max(0, ...v.sprite.map((l) => l.length)), h: v.sprite.length },
-          warnings: v.warnings,
-        })),
-      },
-      null,
-      2,
-    );
-  };
 
   return (
     <div className="dev-image-tab">
@@ -187,10 +167,8 @@ export function DevImageTab() {
             ))}
           </div>
           <div className="dev-image-manifest">
-            <div className="dev-asset-group-name">manifest group — merge into worldAssets.manifest.json</div>
-            <button className="dev-asset-dump-btn" onClick={() => copyText(manifestGroupJson())}>
-              copy manifest group json
-            </button>
+            Save a downloaded file into <code>src/data/assets/</code> and reload: it shows up in the asset list under
+            New, ready to place.
           </div>
         </>
       )}

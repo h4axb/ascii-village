@@ -1,0 +1,238 @@
+{
+  "version": 2,
+  "moved": {},
+  "removed": [
+    "cliff"
+  ],
+  "added": [
+    {
+      "id": "grasshalm-1",
+      "asset": "grasshalm",
+      "x": 59,
+      "y": 27
+    },
+    {
+      "id": "grasshalm-2",
+      "asset": "grasshalm",
+      "x": 58,
+      "y": 27
+    },
+    {
+      "id": "grasshalm-3",
+      "asset": "grasshalm",
+      "x": 46,
+      "y": 25
+    },
+    {
+      "id": "grasshalm-4",
+      "asset": "grasshalm",
+      "x": 46,
+      "y": 26
+    },
+    {
+      "id": "grasshalm-5",
+      "asset": "grasshalm",
+      "x": 45,
+      "y": 27
+    },
+    {
+      "id": "grasshalm-6",
+      "asset": "grasshalm",
+      "x": 25,
+      "y": 26
+    },
+    {
+      "id": "grasshalm-7",
+      "asset": "grasshalm",
+      "x": 27,
+      "y": 27
+    },
+    {
+      "id": "grasshalm-8",
+      "asset": "grasshalm",
+      "x": 27,
+      "y": 28
+    },
+    {
+      "id": "grasshalm-9",
+      "asset": "grasshalm",
+      "x": 28,
+      "y": 28
+    },
+    {
+      "id": "grasshalm-10",
+      "asset": "grasshalm",
+      "x": 28,
+      "y": 27
+    },
+    {
+      "id": "grasshalm-11",
+      "asset": "grasshalm",
+      "x": 12,
+      "y": 45
+    },
+    {
+      "id": "grasshalm-12",
+      "asset": "grasshalm",
+      "x": 20,
+      "y": 54
+    },
+    {
+      "id": "grasshalm-13",
+      "asset": "grasshalm",
+      "x": 20,
+      "y": 35
+    },
+    {
+      "id": "grasshalm-14",
+      "asset": "grasshalm",
+      "x": 21,
+      "y": 35
+    },
+    {
+      "id": "grasshalm-15",
+      "asset": "grasshalm",
+      "x": 24,
+      "y": 35
+    },
+    {
+      "id": "grasshalm-16",
+      "asset": "grasshalm",
+      "x": 56,
+      "y": 48
+    },
+    {
+      "id": "grasshalm-17",
+      "asset": "grasshalm",
+      "x": 56,
+      "y": 49
+    },
+    {
+      "id": "grasshalm-18",
+      "asset": "grasshalm",
+      "x": 56,
+      "y": 50
+    },
+    {
+      "id": "grasshalm-19",
+      "asset": "grasshalm",
+      "x": 58,
+      "y": 51
+    },
+    {
+      "id": "grasshalm-20",
+      "asset": "grasshalm",
+      "x": 56,
+      "y": 53
+    },
+    {
+      "id": "grasshalm-21",
+      "asset": "grasshalm",
+      "x": 55,
+      "y": 54
+    },
+    {
+      "id": "grasshalm-22",
+      "asset": "grasshalm",
+      "x": 54,
+      "y": 55
+    },
+    {
+      "id": "grasshalm-23",
+      "asset": "grasshalm",
+      "x": 45,
+      "y": 53
+    },
+    {
+      "id": "grasshalm-24",
+      "asset": "grasshalm",
+      "x": 46,
+      "y": 53
+    },
+    {
+      "id": "flowerplus-1",
+      "asset": "flowerplus",
+      "x": 58,
+      "y": 30,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-2",
+      "asset": "flowerplus",
+      "x": 57,
+      "y": 30,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-3",
+      "asset": "flowerplus",
+      "x": 19,
+      "y": 28,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-4",
+      "asset": "flowerplus",
+      "x": 26,
+      "y": 24,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-5",
+      "asset": "flowerplus",
+      "x": 27,
+      "y": 24,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-6",
+      "asset": "flowerplus",
+      "x": 32,
+      "y": 13,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-7",
+      "asset": "flowerplus",
+      "x": 63,
+      "y": 57,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-8",
+      "asset": "flowerplus",
+      "x": 62,
+      "y": 57,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-9",
+      "asset": "flowerplus",
+      "x": 61,
+      "y": 56,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-10",
+      "asset": "flowerplus",
+      "x": 42,
+      "y": 42,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-11",
+      "asset": "flowerplus",
+      "x": 42,
+      "y": 43,
+      "interactable": false
+    },
+    {
+      "id": "flowerplus-12",
+      "asset": "flowerplus",
+      "x": 41,
+      "y": 43,
+      "interactable": false
+    }
+  ],
+  "colliders": {}
+}

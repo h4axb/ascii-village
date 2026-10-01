@@ -73,12 +73,11 @@ import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
 import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, type SpriteLook, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, type Slot, type Action } from './ui';
-import { useLayoutTool } from './devLayout';
-import { useWorldAssetTool } from './devWorldAssets';
-import { useSceneMarkerTool } from './devSceneMarkers';
 import { useIntroNarrationTool } from './devIntroNarration';
-import { MARKER_REGISTRY, getMarkerPosition } from './sceneMarkers';
-import { DevAssetPanel } from './DevAssetPanel';
+import { getMarkerPosition } from './sceneMarkers';
+import { useWorldEditor } from './editor';
+import { EditorPanel } from './editor/EditorPanel';
+import { EditorWorldLayers } from './editor/EditorLayers';
 import DialogueBox from './DialogueBox';
 import type { DialogueLine } from './DialogueBox';
 import NameEntryPanel from './NameEntryPanel';
@@ -505,8 +504,7 @@ function Landing({ onStart }: { onStart: () => void }) {
   }
 
   // Deletes ONLY the gameplay save (see save.ts's deleteSave — never
-  // localStorage.clear(), so Scene Markings/devWorldAssets/dev layout and
-  // every other piece of developer/editor persistence survive untouched),
+  // localStorage.clear(), so every piece of developer/editor persistence survive untouched),
   // then starts a genuinely fresh runtime game. Nothing writes a new save
   // to localStorage here — the new game stays unsaved until the player
   // explicitly uses Settings -> Save Game, so Intro Part B (gated on
@@ -1022,17 +1020,29 @@ function Game() {
     dims: { scale: 1, charW: 8.4, lineH: 14, viewW: VIEW_W, viewH: VIEW_H, w: 940, h: 560 },
   });
 
-  // dev-only: alt+drag structures into place, then layout.dump() for the source
-  // to paste back into STRUCT_ENTS. Inert in a production build.
-  const { place, scale: devScale, dragId, cursor } = useLayoutTool({ fieldRef, camRef, modalRef });
+  // dev-only: the world editor (press E; see src/editor/ and docs/Editor.md).
+  // In a production build this is a stub whose structEnts is STRUCT_ENTS.
+  const editor = useWorldEditor({
+    fieldRef,
+    camRef,
+    setPan,
+    blocked: () => !!(cinematicRef.current || modalRef.current || mapOpenRef.current),
+  });
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+  const editorOpen = editor.open;
+  const editorOpenRef = useRef(editorOpen);
+  editorOpenRef.current = editorOpen;
+  // The structures as they stand: saved (STRUCT_ENTS), or as being edited.
+  const structEnts = editor.structEnts;
+  const gardenEnt = structEnts.find((e) => e.id === 'garden-bed');
 
   // The garden travels as ONE thing. Its fence art, its collider, its gate and
   // its six planting beds all resolve against whichever corner the bed entity
-  // currently sits on, so dragging it with the layout tool moves the whole plot
-  // instead of sliding the picture off its own collider. `place` is empty
-  // outside the dev tool, so this is GARDEN_HOME in a normal session.
-  const gardenX = place['garden-bed']?.x ?? GARDEN_HOME.x;
-  const gardenY = place['garden-bed']?.y ?? GARDEN_HOME.y;
+  // currently sits on, so moving it in the editor moves the whole plot
+  // instead of sliding the picture off its own collider.
+  const gardenX = gardenEnt?.x ?? GARDEN_HOME.x;
+  const gardenY = gardenEnt?.y ?? GARDEN_HOME.y;
   const plot: GardenPlot = useMemo(() => gardenAt(gardenX, gardenY), [gardenX, gardenY]);
   const plotRef = useRef(plot);
   plotRef.current = plot;
@@ -1041,43 +1051,23 @@ function Game() {
   const growthWindow = growthWindowOf(wt);
   const ents = useMemo(
     () => [
-      // `place`/`devScale` are empty except while the dev layout tool is being
-      // used, where they shadow world.ts until the values are pasted back.
-      // Filtered by `removed` too now: STRUCT_ENTS is otherwise permanent
-      // (buildings, the palm, decorations), but a collectable placed there
-      // (the flowerplus decorations) needs to actually disappear once picked
-      // — see collect() below. Nothing else in STRUCT_ENTS is ever collected,
-      // so this is a no-op for everything else.
-      // 'gardenbed' is skipped: it sits in STRUCT_ENTS only so the dev layout
-      // tool can hit-test and drag it, and the garden block further down draws
-      // it itself (the picture it shows depends on the gate).
-      ...STRUCT_ENTS.filter((e) => !removed.has(e.id) && e.kind !== 'gardenbed').map((e) => {
-        const s = devScale[e.kind];
-        // The chair/laundry hotspots and the two stair-flank blockers aren't
-        // draggable themselves — they're positioned relative to the house by
-        // the anchor formula in world.ts, using its OWN world.ts coordinates.
-        // If only 'house' gets an alt-drag override, these would stay behind
-        // at their old spot while the house moves out from under them. Rather
-        // than requiring every one of them to be dragged individually, carry
-        // the house's own move (if any) over onto every 'house-*' id that
-        // doesn't already have its own explicit override.
-        let p = place[e.id];
-        if (!p && e.id.startsWith('house-') && place['house']) {
-          const houseBase = STRUCT_ENTS.find((h) => h.id === 'house');
-          if (houseBase) {
-            p = {
-              x: e.x + (place['house'].x - houseBase.x),
-              y: e.y + (place['house'].y - houseBase.y),
-            };
-          }
-        }
+      // The structures (the editor's live copy in dev), filtered by `removed`
+      // too: STRUCT_ENTS is otherwise permanent (buildings, the palm,
+      // decorations), but a collectable placed there (the flowerplus
+      // decorations) needs to actually disappear once picked — see collect()
+      // below. Nothing else in STRUCT_ENTS is ever collected, so this is a
+      // no-op for everything else.
+      // 'gardenbed' is skipped: it sits in STRUCT_ENTS so the editor can
+      // select and move it, and the garden block further down draws it
+      // itself (the picture it shows depends on the gate).
+      ...structEnts.filter((e) => !removed.has(e.id) && e.kind !== 'gardenbed').map((e) =>
         // Mitchy's live position (Intro Part B's entrance/exit tweens, then
-        // his post-cinematic resting spot) overrides his STRUCT_ENTS static
-        // x:35,y:33 the same way a dev-layout drag would — see mitchyPos's
-        // own comment above for why null means "leave him where he was".
-        if (e.id === 'cat' && mitchyPos) p = { ...(p ?? {}), x: mitchyPos.x, y: mitchyPos.y };
-        return p || s !== undefined ? { ...e, ...p, ...(s !== undefined ? { scale: s } : {}) } : e;
-      }),
+        // his post-cinematic resting spot) overrides his saved spot — see
+        // mitchyPos's own comment above for why null means "leave him where
+        // he was". Not while the editor is open: there he stands where the
+        // saved layout puts him, which is what you'd be moving.
+        e.id === 'cat' && mitchyPos && !editorOpen ? { ...e, x: mitchyPos.x, y: mitchyPos.y } : e,
+      ),
       // wild spawns skip the garden footprint so nothing sprouts inside the
       // fence — measured against where the bed actually is, so a dragged plot
       // doesn't end up with flora growing through it
@@ -1090,7 +1080,7 @@ function Game() {
       // blocked() treat them as solid "for free," with no changes inside it.
       ...placedItems.map(placedToEnt),
     ],
-    [growthWindow, removed, dynamicEnts, place, devScale, placedItems, plot, mitchyPos],
+    [growthWindow, removed, dynamicEnts, structEnts, placedItems, plot, mitchyPos, editorOpen],
   );
 
   // House-sprite recolor for the wardrobe swap (interact.ts's 'outfit' act +
@@ -1114,24 +1104,32 @@ function Game() {
     return { colors, palette };
   }, [houseBaseEnt, lineColors]);
 
-  const worldAssetTool = useWorldAssetTool({ fieldRef, camRef, ents, plot });
-  // the wheel handler below binds once (empty dep array, same convention as
-  // the zoom effect it shares an event with) so it reads this ref rather than
-  // closing over a stale `worldAssetTool` from mount time.
-  const worldAssetToolRef = useRef(worldAssetTool);
-  worldAssetToolRef.current = worldAssetTool;
-
-  // dev-only: Scene Markings ("E" panel's second tab) — place/reposition the
-  // named world positions later cinematics read by stable id. Alt+drag
-  // reposition only listens while the editor panel is actually open (see
-  // devSceneMarkers.ts's `active`), same as every other editor-only gesture.
-  const sceneMarkerTool = useSceneMarkerTool({ fieldRef, camRef, modalRef, active: worldAssetTool.panelOpen });
-
   // dev-only: INTRO narration/timing editor ("E" panel's third tab) — see
   // src/devIntroNarration.ts/DevIntroTab.tsx. Self-contained (no fieldRef/
   // camRef dependency, unlike the two tools above), since it edits plain
   // data + previews via its own <IntroA/>/<IntroNarration/> instances.
   const introNarrationTool = useIntroNarrationTool();
+
+  // The world editor's "go to": pan the camera so an object (or a
+  // `marker:<id>`) sits in the middle of the screen.
+  function focusEditorTarget(id: string) {
+    let cx: number;
+    let cy: number;
+    if (id.startsWith('marker:')) {
+      const p = editor.markers[id.slice(7)];
+      if (!p) return;
+      cx = (p.x + 0.5) * TILE_CH;
+      cy = (p.y + 0.5) * TILE_LN;
+    } else {
+      const e = structEnts.find((x) => x.id === id);
+      if (!e) return;
+      const { wT, hT } = spriteTiles(e.sprite, e.scale, e.rotation);
+      cx = (e.x + wT / 2) * TILE_CH;
+      cy = (e.y + hT / 2) * TILE_LN;
+    }
+    const c = camRef.current;
+    setPan({ x: cx - c.pcx, y: cy - c.pcy });
+  }
 
   // when the growth window rolls over: loose apples despawn, stale
   // exceptions (from old windows) are pruned so the save doesn't grow forever
@@ -1192,9 +1190,8 @@ function Game() {
 
   // ---- Settings -> Save Game ----
   // The ONLY action that writes the persistent gameplay SaveState to
-  // localStorage. Does not touch developer/editor persistence (Scene
-  // Markings, devWorldAssets overrides, dev layout), which live under
-  // their own separate keys/files entirely.
+  // localStorage. Does not touch developer/editor persistence (the
+  // world editor's files), which live elsewhere entirely.
   function saveGameToStorage() {
     if (savingRef.current) return;
     writeSave(snapRef.current());
@@ -1211,7 +1208,6 @@ function Game() {
   function downloadBackup() {
     if (savingRef.current) return; // ignore a second Ctrl+S while already showing
     downloadSaveFile(snapRef.current());
-    if (import.meta.env.DEV) worldAssetTool.flushDrafts();
     flashSavingIndicator();
   }
 
@@ -1263,7 +1259,7 @@ function Game() {
   const CLOSE_RANGE_KINDS = new Set<EntityKind>(['cat', 'house', 'shop', 'hotspot']);
   const CLOSE_RANGE_TILES = 4;
   function canInteract(e: Ent): boolean {
-    if (cinematic || mapOpen) return false;
+    if (cinematic || mapOpen || editorOpen) return false;
     if (!e.interactable) return false;
     if (nearestIsland(player.x, player.y).idx !== nearestIsland(e.x, e.y).idx) return false;
     if (CLOSE_RANGE_KINDS.has(e.kind) && near(e, player) > CLOSE_RANGE_TILES) return false;
@@ -1726,6 +1722,7 @@ function Game() {
         savingRef.current ||
         cinematicRef.current ||
         mapOpenRef.current ||
+        editorOpenRef.current ||
         heldRef.current.size === 0
       ) {
         if (slidingRef.current) {
@@ -2419,16 +2416,15 @@ function Game() {
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       if (modalRef.current) return; // let modals scroll normally
-      // Dev-only: Alt+scroll while a world-asset ghost is active adjusts its
-      // scale live instead of zooming the camera — the fastest way to judge
-      // a size is to watch it change in place, same reasoning as
-      // devLayout.ts's layout.scale() console command, just live and
-      // per-instance instead of console-only and per-kind.
-      if (import.meta.env.DEV && e.altKey && worldAssetToolRef.current.ghost) {
-        e.preventDefault();
-        const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
-        worldAssetToolRef.current.adjustGhostScale(-e.deltaY * unit * 0.001);
-        return;
+      // The world editor: its panel scrolls normally, and Alt+scroll scales
+      // the selected object instead of zooming the camera.
+      if (import.meta.env.DEV && editorOpenRef.current) {
+        if ((e.target as Element | null)?.closest?.('.wed-panel')) return;
+        if (e.altKey) {
+          e.preventDefault();
+          const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
+          if (editorRef.current.onWheelScale(e.deltaY * unit)) return;
+        }
       }
       e.preventDefault();
       const el = fieldRef.current;
@@ -2503,7 +2499,7 @@ function Game() {
 
   // ghost cursor: while placing, track the mouse and snap to the tile under
   // it. Dedupe to actual tile changes (not every pixel of motion), same
-  // convention devLayout.ts's own drag tracking uses.
+  // convention the world editor's drag tracking uses.
   useEffect(() => {
     if (!placing) return;
     const onMove = (ev: PointerEvent) => {
@@ -2526,6 +2522,14 @@ function Game() {
   // longer matters for triggering, only for whether the object is on screen
   // to click at all.
   const [hovered, setHovered] = useState<InteractRef | null>(null);
+  // Opening the world editor freezes the game where it stands: drop any held
+  // walk keys and hover highlight, so nothing carries on underneath it.
+  useEffect(() => {
+    if (!editorOpen) return;
+    heldRef.current.clear();
+    syncWalkDir();
+    setHovered(null);
+  }, [editorOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // is the ghost's current spot a legal placement? drives both the tint and
   // whether Enter is allowed to commit.
@@ -3252,6 +3256,14 @@ function Game() {
     // every other mode so it always works regardless of what else is going
     // on (same precedence reasoning as the ghost-mode check right below
     // it). !shiftKey leaves Ctrl+Shift+S ("Save As") to the browser.
+    // The world editor (dev) owns the keyboard while it's open — WASD pans
+    // the camera there instead of walking — and its Ctrl+S saves the world
+    // files instead of downloading a backup. With it closed but unsaved
+    // changes pending, Ctrl+S still saves those rather than the backup.
+    if (import.meta.env.DEV && (editorOpenRef.current || (editorRef.current.dirty && (ev.ctrlKey || ev.metaKey) && k === 's'))) {
+      editorRef.current.onKey(ev);
+      return;
+    }
     if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && k === 's') {
       ev.preventDefault(); // stop the browser's native "Save Page" dialog
       if (!ev.repeat) downloadBackup();
@@ -3280,16 +3292,6 @@ function Game() {
     // and interactive-looking behind the ghost — so it's checked first, ahead
     // of the modal branch below, and swallows every other key while active
     // (mouse-driven, not WASD).
-    // Dev-only world-asset ghost — same f/enter/escape convention as the
-    // player's own placement mode above, checked first so the two modes can
-    // never fight over the same keys (they're not expected to run at once,
-    // but this keeps the precedence unambiguous either way).
-    if (import.meta.env.DEV && worldAssetTool.ghost) {
-      if (k === 'escape') { worldAssetTool.cancelGhost(); return; }
-      if (k === 'f') { worldAssetTool.rotateGhost(); return; }
-      if (k === 'enter') { worldAssetTool.commitGhost(); return; }
-      return;
-    }
     if (placingRef.current) {
       if (k === 'escape') { cancelPlacement(); return; }
       if (k === 'f') { rotatePlacement(); return; }
@@ -3771,21 +3773,17 @@ function Game() {
           }
         }}
       >
-        {/* dev-only tile readout — so you can read a position straight off the
-            screen instead of inferring it. Stripped from production builds.
-            Tied to the SAME "editor open" gate as the tile-grid/asset panel —
-            devLayout.ts's own cursor tracking has no activity gate of its own
-            (it updates on every pointer move over the field regardless of
-            whether alt+drag is in use), so without this it showed constantly,
-            not just while actually editing. */}
-        {import.meta.env.DEV && worldAssetTool.panelOpen && cursor && (
-          <div className="layout-readout">
-            {dragId ? `${dragId} → ` : ''}
-            {cursor.x}, {cursor.y}
-          </div>
-        )}
-        {import.meta.env.DEV && (
-          <DevAssetPanel tool={worldAssetTool} markerTool={sceneMarkerTool} introTool={introNarrationTool} />
+        {/* the world editor (dev only; press E) — see src/editor/ */}
+        {import.meta.env.DEV && editor.open && (
+          <>
+            <EditorPanel ed={editor} introTool={introNarrationTool} onFocus={focusEditorTarget} />
+            {editor.cursor && (
+              <div className="layout-readout">
+                {editor.cursor.x}, {editor.cursor.y}
+                {editor.armed ? ` · placing ${editor.armed.id} (Esc cancels)` : ''}
+              </div>
+            )}
+          </>
         )}
         <div
           className="scale-box"
@@ -3796,42 +3794,24 @@ function Game() {
               className="field"
               ref={fieldRef}
               style={{ width: dims.w, height: dims.h }}
-              onDragOver={
-                import.meta.env.DEV
-                  ? (e) => {
-                      // required for onDrop to ever fire at all — browsers
-                      // reject a drop by default unless dragover explicitly
-                      // allows it
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = 'copy';
-                    }
-                  : undefined
-              }
-              onDrop={
-                import.meta.env.DEV
-                  ? (e) => {
-                      e.preventDefault();
-                      const data = e.dataTransfer.getData('text/plain');
-                      if (!data) return;
-                      const t = screenToTile(e.clientX, e.clientY, fieldRef.current, camRef.current);
-                      if (!t) return;
-                      // Scene marker chips are dragged with a distinct payload
-                      // prefix (see DevAssetPanel.tsx's SceneMarkingsPanel) so
-                      // this one drop target can route to either placement
-                      // system without them colliding on a bare slug string.
-                      if (data.startsWith('scene-marker:')) {
-                        sceneMarkerTool.dropMarker(data.slice('scene-marker:'.length), t.x, t.y);
-                      } else {
-                        worldAssetTool.startGhost(data, t.x, t.y);
-                      }
-                    }
-                  : undefined
-              }
             >
               {/* Dark backdrop — same as the starting page (#0a0a0a, in CSS).
                   The world is ASCII signs on this dark canvas; only the signs
                   themselves switch colour with the day/night palette. */}
               <div className="sky-bg" />
+              {/* While the world editor is open this layer takes every
+                  click, so nothing in the game underneath can be clicked
+                  or hovered: the editor selects/drags/places instead. */}
+              {import.meta.env.DEV && editor.open && (
+                <div
+                  className={'wed-capture' + (editor.armed ? ' armed' : '')}
+                  onPointerDown={editor.pointer.onPointerDown}
+                  onPointerMove={editor.pointer.onPointerMove}
+                  onPointerUp={editor.pointer.onPointerUp}
+                  onPointerCancel={editor.pointer.onPointerUp}
+                  onPointerLeave={editor.pointer.onPointerLeave}
+                />
+              )}
               <div
                 className="world"
                 ref={worldRef}
@@ -3851,6 +3831,7 @@ function Game() {
                 }}
               >
               <TerrainCanvas
+                structKey={editor.structKey}
                 camX={camX}
                 camY={camY}
                 viewW={viewW}
@@ -3870,7 +3851,7 @@ function Game() {
                   below: .garden-bed scales about its bottom-centre, so the
                   offsets put the scaled top-left back on the plot's corner —
                   wherever the layout tool has dragged that corner to. */}
-              {!(import.meta.env.DEV && worldAssetTool.removedStructIds.has('garden-bed')) &&
+              {gardenEnt &&
                 (() => {
                 const open = doors.gate;
                 const bed = open ? S.GARDEN_BED : S.GARDEN_BED_SHUT;
@@ -3985,7 +3966,7 @@ function Game() {
                   other entity. It still lives in STRUCT_ENTS, so collision,
                   spawn exclusion and layout checks all see it. */}
               {ents
-                .filter((e) => e.kind === 'pond' && !(import.meta.env.DEV && worldAssetTool.removedStructIds.has(e.id)))
+                .filter((e) => e.kind === 'pond')
                 .map((e) => (
                   <PondLayer
                     key={e.id}
@@ -3998,11 +3979,6 @@ function Game() {
 
               {ents.map((e) => {
                 if (e.kind === 'pond' || e.kind === 'placed') return null; // drawn below, own component
-                // Dev-only preview hide from the world-assets panel's "already
-                // in world" list (devWorldAssets.ts's removedStructIds) — a
-                // rendering skip, not a real removal; see toggleStructRemoved's
-                // own comment for why collision/hover elsewhere still see it.
-                if (import.meta.env.DEV && worldAssetTool.removedStructIds.has(e.id)) return null;
                 // A scaled sprite (the palm) keeps its full character grid and
                 // is only DRAWN smaller. It shrinks about its bottom-centre —
                 // the same origin .shaking rotates about, so a shaken palm
@@ -4018,6 +3994,11 @@ function Game() {
                 const cw = Math.max(...e.sprite.map((l) => l.length));
                 const offX = ((1 - k) * cw) / 2;
                 const offY = (1 - k) * e.sprite.length;
+                // Rotated (by the world editor): turn about the art's own
+                // centre, placed on the centre of its rotated tile box — the
+                // same box collision and footprint use.
+                const rot = e.rotation ?? 0;
+                const rotBox = rot ? spriteTiles(e.sprite, k, rot) : null;
                 // A shaking palm draws a live frame instead of its baked one.
                 // Same grid size either way, so nothing about its footprint,
                 // offset or z-order changes mid-animation.
@@ -4045,8 +4026,9 @@ function Game() {
                       (e.fallFrom ? ' falling' : '')
                     }
                     style={{
-                      left: `${e.x * TILE_CH - offX}ch`,
-                      top: `${e.y * TILE_LN - offY}em`,
+                      left: rotBox ? `${(e.x + rotBox.wT / 2) * TILE_CH - cw / 2}ch` : `${e.x * TILE_CH - offX}ch`,
+                      top: rotBox ? `${(e.y + rotBox.hT / 2) * TILE_LN - e.sprite.length / 2}em` : `${e.y * TILE_LN - offY}em`,
+                      ...(rotBox ? { rotate: `${rot * 90}deg`, transformOrigin: '50% 50%' } : {}),
                       // A bridge is meant to read as sitting OVER whatever
                       // water/pond it straddles regardless of its own
                       // (typically short) footprint row, so it's forced to a
@@ -4182,24 +4164,6 @@ function Game() {
                 />
               ))}
 
-              {import.meta.env.DEV &&
-                worldAssetTool.drafts.map((d) => {
-                  const sd = worldAssetTool.sprites[d.slug];
-                  if (!sd) return null;
-                  return (
-                    <PlacedItemView
-                      key={d.id}
-                      x={d.x}
-                      y={d.y}
-                      sprite={sd.sprite}
-                      colors={sd.colors}
-                      palette={sd.palette}
-                      scale={d.scale}
-                      rotation={d.rotation}
-                    />
-                  );
-                })}
-
               {placing && (
                 <PlacedItemView
                   x={placing.x}
@@ -4211,59 +4175,13 @@ function Game() {
                 />
               )}
 
-              {import.meta.env.DEV &&
-                worldAssetTool.ghost &&
-                worldAssetTool.sprites[worldAssetTool.ghost.slug] && (
-                  <PlacedItemView
-                    x={worldAssetTool.ghost.x}
-                    y={worldAssetTool.ghost.y}
-                    sprite={worldAssetTool.sprites[worldAssetTool.ghost.slug].sprite}
-                    scale={worldAssetTool.ghost.scale}
-                    rotation={worldAssetTool.ghost.rotation}
-                    ghost={
-                      worldAssetTool.ghost.legality === 'ok'
-                        ? 'valid'
-                        : worldAssetTool.ghost.legality === 'warn'
-                          ? 'warn'
-                          : 'invalid'
-                    }
-                  />
-                )}
-
-              {/* Tile-grid overlay for the "E" world editor — only while the
-                  panel is open, per the same "nothing shows before E" rule
-                  as the panel itself. A single child of .world, sized to the
-                  exact same play area, so it inherits the SAME camera pan/
-                  zoom transform every entity already gets — no separate
-                  coordinate math to keep in sync, it just can't drift. */}
-              {import.meta.env.DEV && worldAssetTool.panelOpen && (
-                <div
-                  className="dev-tile-grid"
-                  style={{ width: `${GROUND_W}ch`, height: `${GROUND_H}em` }}
-                />
+              {/* The world editor's layers (dev only): the tile grid, what's
+                  being placed, the selection, colliders, ids and scene
+                  markers. Children of .world, so they share the camera's
+                  pan/zoom with everything they point at. */}
+              {import.meta.env.DEV && editor.open && (
+                <EditorWorldLayers ed={editor} ents={structEnts} />
               )}
-
-              {/* Scene marker overlay — editor-only (gated on panelOpen, same
-                  as the tile grid above), never a game entity: no collision,
-                  never interactable, never rendered outside DEV. A child of
-                  .world so it inherits the same camera pan/zoom transform as
-                  every entity/the grid above, no separate coordinate math. */}
-              {import.meta.env.DEV &&
-                worldAssetTool.panelOpen &&
-                MARKER_REGISTRY.flatMap((c) => c.groups.flatMap((g) => g.markers)).map((m) => {
-                  const p = sceneMarkerTool.positions[m.id];
-                  if (!p) return null;
-                  return (
-                    <div
-                      key={m.id}
-                      className="dev-marker-dot"
-                      style={{ left: `${p.x * TILE_CH}ch`, top: `${p.y * TILE_LN}em` }}
-                    >
-                      <span className="dev-marker-dot-circle" />
-                      <span className="dev-marker-dot-label">[ {m.label} ]</span>
-                    </div>
-                  );
-                })}
 
               {pickupMenuId &&
                 (() => {

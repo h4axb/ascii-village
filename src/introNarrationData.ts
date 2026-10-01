@@ -101,7 +101,7 @@ export const INTRO_STAGE_LABELS: Record<IntroStageId, string> = {
 //
 // HAND-AUTHORED BASE. Never mutated by the DEV Intro Editor — same
 // "base file + override file merged at load time" precedent as world.ts's
-// STRUCT_ENTS_BASE/worldOverrides.json. The editor writes to
+// STRUCT_ENTS_BASE + src/data/world.json. The editor writes to
 // src/data/introNarrationOverrides.json instead (see INTRO_NARRATION_OVERRIDES
 // and the merge below); THIS constant stays exactly what a person typed.
 const INTRO_NARRATION_BASE: Partial<Record<IntroStageId, NarrationBeat[]>> = {
@@ -195,7 +195,7 @@ const INTRO_NARRATION_BASE: Partial<Record<IntroStageId, NarrationBeat[]>> = {
 // via a Vite dev-only middleware (see vite.config.ts's introNarrationSavePlugin)
 // straight to src/data/introNarrationOverrides.json — same shape as
 // INTRO_NARRATION_BASE above (stage id -> ordered beat array), same spirit as
-// worldOverrides.json mirroring Ent[]'s own shape. A stage present here
+// src/data/world.json layering over STRUCT_ENTS_BASE. A stage present here
 // REPLACES that stage's base array wholesale (the editor always saves a
 // stage's FULL current beat list, never a partial patch), so there is never
 // any per-beat merge ambiguity between base and override. Starts as `{}`.

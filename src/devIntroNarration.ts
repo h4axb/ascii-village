@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // DEV-ONLY INTRO NARRATION EDITOR — the "INTRO" tab's logic half (presentation
-// is src/DevIntroTab.tsx). Same shape as devWorldAssets.ts/devSceneMarkers.ts:
+// is src/DevIntroTab.tsx). Same shape as the world editor (src/editor/):
 // this hook owns all state, the component just renders it.
 //
 // Reads/writes the SAME data the runtime consumes — src/introNarrationData.ts's
@@ -17,7 +17,7 @@
 //
 // Every effect/handler below is meant to be used only from DEV — the hook
 // itself doesn't gate on import.meta.env.DEV because its only call site
-// (DevAssetPanel, via App.tsx) is already import.meta.env.DEV-gated, same
+// (the world editor's panel, via App.tsx) is already import.meta.env.DEV-gated, same
 // convention as useSceneMarkerTool.
 // ---------------------------------------------------------------------------
 import { useMemo, useRef, useState } from 'react';
@@ -168,7 +168,7 @@ export function useIntroNarrationTool(): IntroNarrationTool {
     } catch (err) {
       // No dev endpoint (e.g. a production preview server) or the request
       // failed — surface it rather than silently pretending it saved, since
-      // (unlike devWorldAssets' localStorage fallback) there is no secondary
+      // there is no secondary
       // persistence layer here to fall back on.
       setLastSaveError(String(err));
     } finally {

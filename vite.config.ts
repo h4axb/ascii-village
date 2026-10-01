@@ -1,33 +1,45 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { docHash } from './src/editor/docHash';
 
-// Dev-only save endpoint for the in-game world editor (src/devWorldAssets.ts,
-// "E" panel). Placing/deleting there used to only ever reach localStorage —
-// this is what makes it a REAL, permanent change: the browser POSTs its
-// current {removedIds, added} state here and this writes it straight to
-// src/data/worldOverrides.json, which src/world.ts merges into STRUCT_ENTS
-// at module load. Registered via configureServer so it only exists while
-// running `vite dev` (never in a production build/preview) — same
-// dev-only boundary every other piece of this feature already respects
-// (import.meta.env.DEV on the client side).
-function worldOverridesSavePlugin(): Plugin {
-  const filePath = path.resolve(__dirname, 'src/data/worldOverrides.json');
+// Dev-only save endpoint for the in-game world editor (src/editor/, press E).
+// The editor never writes on its own: Ctrl+S / Save POSTs everything it edits
+// in one request, and this writes the files you then commit and push:
+//
+//   src/data/world.json         objects moved / removed / added, colliders
+//   src/data/sceneMarkers.json  scene marker positions
+//   src/data/assets.meta.json   per-asset kind / scale / label
+//
+// Each file comes with the fingerprint (src/editor/docHash.ts) of the copy
+// the editor loaded. If the file on disk no longer matches it (another tab
+// saved, a git pull, a hand edit), nothing is written and the editor gets a
+// 409 naming the files, instead of silently overwriting newer work.
+//
+// Registered via configureServer, so it only exists under `vite dev` — never
+// in a build or `vite preview`.
+const EDITOR_FILES = {
+  world: 'src/data/world.json',
+  markers: 'src/data/sceneMarkers.json',
+  meta: 'src/data/assets.meta.json',
+} as const;
+type EditorFile = keyof typeof EDITOR_FILES;
+
+function worldEditorSavePlugin(): Plugin {
+  const abs = (f: EditorFile) => path.resolve(__dirname, EDITOR_FILES[f]);
+  const files = Object.keys(EDITOR_FILES) as EditorFile[];
   return {
-    name: 'world-overrides-save',
-    // Without this, every write below would trigger Vite's normal HMR
-    // reload for anything importing this JSON — which is effectively the
-    // whole app via world.ts — forcing a full page reload (camera/player
-    // position and all) after every single placement or deletion. The
-    // running session's React state already reflects the change live; the
-    // disk write is purely for NEXT load's persistence, so suppress the
-    // reload here rather than disrupt whatever's currently happening.
+    name: 'world-editor-save',
+    // Without this, writing world.json would hot-reload everything that
+    // imports it (effectively the whole game, via world.ts) and throw away
+    // the editing session. The editor already shows what it saved; the next
+    // page load reads the new files.
     handleHotUpdate(ctx) {
-      if (ctx.file === filePath) return [];
+      if (files.some((f) => ctx.file === abs(f))) return [];
     },
     configureServer(server) {
-      server.middlewares.use('/__dev/world-overrides', (req, res, next) => {
+      server.middlewares.use('/__dev/save-world', (req, res, next) => {
         if (req.method !== 'POST') return next();
         let body = '';
         req.on('data', (chunk) => {
@@ -35,58 +47,42 @@ function worldOverridesSavePlugin(): Plugin {
         });
         req.on('end', () => {
           (async () => {
+            const reply = (status: number, data: unknown) => {
+              res.statusCode = status;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(data));
+            };
             try {
-              const parsed = JSON.parse(body);
-              if (!Array.isArray(parsed.removedIds) || !Array.isArray(parsed.added)) {
-                throw new Error('expected { removedIds: string[], added: Ent[] }');
+              const parsed = JSON.parse(body) as {
+                docs: Partial<Record<EditorFile, unknown>>;
+                base: Partial<Record<EditorFile, string>>;
+              };
+              const w = parsed.docs?.world as { version?: number; added?: unknown; removed?: unknown } | undefined;
+              if (w && (w.version !== 2 || !Array.isArray(w.added) || !Array.isArray(w.removed))) {
+                return reply(400, { error: 'world.json must be a version 2 document' });
               }
-              await writeFile(filePath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
-              res.statusCode = 204;
-              res.end();
-            } catch (err) {
-              res.statusCode = 400;
-              res.end(String(err));
-            }
-          })();
-        });
-      });
-    },
-  };
-}
-
-// Dev-only save endpoint for the in-game Scene Markings tool
-// (src/devSceneMarkers.ts, part of the "E" editor's own second tab). Same
-// shape as worldOverridesSavePlugin above, deliberately a SEPARATE endpoint
-// and a SEPARATE file (src/data/sceneMarkers.json) — markers are editor
-// metadata for later cinematics, not world entities, so they don't belong
-// in worldOverrides.json alongside STRUCT_ENTS overrides.
-function sceneMarkersSavePlugin(): Plugin {
-  const filePath = path.resolve(__dirname, 'src/data/sceneMarkers.json');
-  return {
-    name: 'scene-markers-save',
-    handleHotUpdate(ctx) {
-      if (ctx.file === filePath) return [];
-    },
-    configureServer(server) {
-      server.middlewares.use('/__dev/scene-markers', (req, res, next) => {
-        if (req.method !== 'POST') return next();
-        let body = '';
-        req.on('data', (chunk) => {
-          body += chunk;
-        });
-        req.on('end', () => {
-          (async () => {
-            try {
-              const parsed = JSON.parse(body);
-              if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-                throw new Error('expected Record<string, {x:number,y:number}>');
+              const conflicts: string[] = [];
+              for (const f of files) {
+                if (parsed.docs?.[f] === undefined) continue;
+                let onDisk: unknown = {};
+                try {
+                  onDisk = JSON.parse(await readFile(abs(f), 'utf-8'));
+                } catch {
+                  // missing file: counts as empty
+                }
+                if (docHash(onDisk) !== parsed.base?.[f]) conflicts.push(EDITOR_FILES[f]);
               }
-              await writeFile(filePath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
-              res.statusCode = 204;
-              res.end();
+              if (conflicts.length) return reply(409, { error: 'changed on disk', files: conflicts });
+              const hashes: Partial<Record<EditorFile, string>> = {};
+              for (const f of files) {
+                const doc = parsed.docs?.[f];
+                if (doc === undefined) continue;
+                await writeFile(abs(f), JSON.stringify(doc, null, 2) + '\n', 'utf-8');
+                hashes[f] = docHash(doc);
+              }
+              reply(200, { saved: Object.keys(hashes).map((f) => EDITOR_FILES[f as EditorFile]), hashes });
             } catch (err) {
-              res.statusCode = 400;
-              res.end(String(err));
+              reply(400, { error: String(err) });
             }
           })();
         });
@@ -96,7 +92,7 @@ function sceneMarkersSavePlugin(): Plugin {
 }
 
 // Dev-only save endpoint for the DEV Intro Editor's "INTRO" tab
-// (src/devIntroNarration.ts, part of the "E" editor). Same shape again:
+// (src/devIntroNarration.ts, part of the "E" editor). Same idea as above:
 // POSTs the editor's current { [stageId]: NarrationBeat[] } working copy
 // (mirroring introNarrationData.ts's own INTRO_NARRATION shape) straight to
 // src/data/introNarrationOverrides.json, which introNarrationData.ts merges
@@ -139,7 +135,7 @@ function introNarrationSavePlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), worldOverridesSavePlugin(), sceneMarkersSavePlugin(), introNarrationSavePlugin()],
+  plugins: [react(), worldEditorSavePlugin(), introNarrationSavePlugin()],
   server: {
     // Pinned so a dev server never silently drifts onto a different port
     // (Vite's default is to auto-increment on conflict) — localStorage is

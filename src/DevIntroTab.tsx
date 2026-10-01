@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// DEV-ONLY UI for the "INTRO" tab of the E editor (src/DevAssetPanel.tsx) —
+// DEV-ONLY UI for the "INTRO" tab of the E world editor (src/editor/EditorPanel.tsx) —
 // authoring layer on top of the already-complete unified intro/narration
 // architecture. Presentational: all state/logic lives in
 // src/devIntroNarration.ts's useIntroNarrationTool, this just renders it.

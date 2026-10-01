@@ -68,6 +68,9 @@ interface Props {
   charW: number;
   lineH: number;
   growthWindow: number;
+  // Bumped by the world editor after it moves structures: the ground glyphs
+  // around them are repainted (see resetTerrainStructs in terrain.ts).
+  structKey?: number;
 }
 
 export default function TerrainCanvas(props: Props) {
@@ -112,14 +115,17 @@ export default function TerrainCanvas(props: Props) {
   }, []);
 
   // grass must stay clear of the wild flora, which moves every growth window
+  // (and of the structures, which move while the world editor is open)
+  const firstStructKey = useRef(props.structKey);
   useEffect(() => {
     const s = st.current;
+    if (props.structKey !== firstStructKey.current) paintBg();
     s.keep = grassKeepOut(props.growthWindow);
     for (const t of s.tiles.values()) freeCanvas(t.el);
     s.tiles.clear();
     schedule();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.growthWindow]);
+  }, [props.growthWindow, props.structKey]);
 
   function drawTile(ti: number, res: number) {
     const s = st.current;

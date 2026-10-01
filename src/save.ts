@@ -153,8 +153,7 @@ export function writeSave(s: SaveState) {
 
 // Start Screen -> New Game: deletes ONLY the gameplay save, by its exact
 // key — never localStorage.clear(), which would also wipe unrelated
-// developer/editor persistence (Scene Markings, devWorldAssets overrides,
-// dev layout state, etc.) that happens to live in the same origin's
+// developer/editor state that happens to live in the same origin's
 // localStorage.
 export function deleteSave() {
   try {

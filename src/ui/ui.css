@@ -1128,3 +1128,101 @@
   width: 110px;
   height: 110px;
 }
+
+/* ---- Sheet rail: icon buttons under the back button (the shop's Sell / Buy) */
+.ds-sheet-body.has-rail {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+}
+.ds-sheet-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ds-rail-btn {
+  color: var(--ds-text-muted);
+}
+.ds-rail-btn.on {
+  color: var(--ds-text);
+  border-color: var(--ds-line-strong);
+  background: var(--ds-surface-hi);
+  box-shadow: 0 0 0 1px var(--ds-line-strong) inset;
+}
+
+/* ---- Shop (Sell): Mitchy's line under the slots, the amount / Sell /
+   Never mind column under the details — same widths and gap as the Split
+   above, so both rows share their edges */
+.ds-shop-bottom {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 40px;
+  margin-top: 30px;
+}
+.ds-dialogue.ds-shop-talk {
+  width: calc(var(--ds-slot) * 5 + var(--ds-gap) * 4);
+  min-height: 0;
+  padding: 34px 34px 30px;
+  box-shadow: none;
+}
+.ds-shop-actions {
+  width: var(--ds-detail-w);
+  box-sizing: border-box;
+  padding: 14px 16px 14px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+}
+.ds-shop-actions .ds-options {
+  width: auto;
+}
+.ds-shop-actions .ds-option {
+  text-align: center;
+}
+.ds-shop-actions .ds-option:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ds-shop-sell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+/* ◀ n ▶ */
+.ds-shop-amount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-dialogue);
+  font-size: 16px;
+}
+.ds-shop-amount button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ds-text);
+  cursor: pointer;
+}
+.ds-shop-amount button:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* the Buy view inside the shop sheet: as wide as the Sell view, so switching
+   doesn't resize the sheet */
+.ds-sheet .shop-buy {
+  width: calc(var(--ds-slot) * 5 + var(--ds-gap) * 4 + 40px + var(--ds-detail-w));
+  max-width: 100%;
+}

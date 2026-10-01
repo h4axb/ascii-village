@@ -108,3 +108,21 @@ export const IconGear = ({ size }: IconProps) => (
     <circle cx="12" cy="12" r="6.4" />
   </Icon>
 );
+
+// the shop's two modes, stacked under its back button: selling hands a coin
+// over (coin + arrow out), buying fills your bag (bag + plus)
+export const IconSell = ({ size }: IconProps) => (
+  <Icon size={size}>
+    <circle cx="10" cy="13" r="6" />
+    <path d="M10 10.5v5M8.5 12h3" />
+    <path d="M15 5h5v5M20 5l-6 6" />
+  </Icon>
+);
+
+export const IconBuy = ({ size }: IconProps) => (
+  <Icon size={size}>
+    <path d="M5 9h14l-1.2 10.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8z" />
+    <path d="M9 9V7a3 3 0 0 1 6 0v2" />
+    <path d="M12 12.5v4M10 14.5h4" />
+  </Icon>
+);

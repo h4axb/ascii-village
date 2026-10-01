@@ -27,7 +27,6 @@ import TerrainCanvas from './TerrainCanvas';
 import type { Ent, ItemType, EntityKind } from './world';
 import {
   getFunFact,
-  getPrice,
   basePrice,
   getShopStock,
   getMitchyLine,
@@ -72,7 +71,7 @@ import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOU
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
-import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, type SpriteLook, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, type Slot, type Action } from './ui';
+import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, type Slot, type Action } from './ui';
 import { useIntroNarrationTool } from './devIntroNarration';
 import { getMarkerPosition } from './sceneMarkers';
 import { useWorldEditor } from './editor';
@@ -380,10 +379,6 @@ const MAX_ZOOM = 1;
 // fine control and a mouse notch a bigger jump, naturally.
 const ZOOM_SENSITIVITY = 0.0018; // ~17% per 100px notch
 const ZOOM_MS = 110; // tween length for the camera transform
-// One frame of the shop cat's slow blink. Deliberately slow — the whole read of
-// a cat's slow blink is that it is unhurried; drop this much below ~700ms and
-// it stops looking affectionate and starts looking like a twitch.
-const CAT_BLINK_MS = 1000;
 // Each wheel notch pulls the world point under the cursor this far toward the
 // screen CENTRE, so a few notches bring whatever you pointed at to the middle
 // (1 = jump straight there, 0 = ignore the mouse entirely).
@@ -410,12 +405,6 @@ function storageList(
   ];
 }
 
-type Offer = {
-  item: ItemType;
-  price: number | null;
-  sel: number;
-  declined: boolean;
-};
 
 type Modal =
   // equipPick: opened from the hand slot's "Equip" — non-equippable slots are
@@ -429,8 +418,11 @@ type Modal =
       t: 'shop';
       tab: 'sell' | 'buy';
       cat: Category;
-      offer: Offer | null;
+      // Sell: the selected resource (null = the first one), how many to sell
+      // and Mitchy's line (null = his default question)
       pick: ItemType | null;
+      amount: number;
+      line: string | null;
       confirm: ShopItem | null;
       csel: number;
       poor: boolean;
@@ -457,8 +449,9 @@ const FRESH_SHOP: Modal = {
   t: 'shop',
   tab: 'sell',
   cat: 'plant',
-  offer: null,
   pick: null,
+  amount: 1,
+  line: null,
   confirm: null,
   csel: 0,
   poor: false,
@@ -937,28 +930,6 @@ function Game() {
     const t = window.setTimeout(() => setShakeFrame((f) => (f === null ? null : f + 1)), SHAKE_FRAME_MS);
     return () => window.clearTimeout(t);
   }, [shakeFrame]);
-
-  // ---- the shop cat's happy slow-blink ---------------------------------------
-  // Fires when a sale closes. -1 = resting; otherwise the index into
-  // S.CAT_HAPPY_BLINK we're currently showing. The effect walks one frame per
-  // CAT_BLINK_MS and parks itself back at -1 when the sequence runs out, so a
-  // second sale mid-blink just restarts it cleanly.
-  const [blinkFrame, setBlinkFrame] = useState(-1);
-  useEffect(() => {
-    if (blinkFrame < 0) return;
-    if (blinkFrame >= S.CAT_HAPPY_BLINK.length) {
-      setBlinkFrame(-1);
-      return;
-    }
-    const t = window.setTimeout(() => setBlinkFrame((f) => f + 1), CAT_BLINK_MS);
-    return () => window.clearTimeout(t);
-  }, [blinkFrame]);
-  // Bounds-checked at the READ site, not just trusted from the effect above:
-  // that effect corrects an out-of-range blinkFrame back to -1 only after the
-  // render that overshot has already painted. While the blink runs, the shop
-  // shows Mitchy's eyes-closed frame (S.MITCHY_HAPPY_LOOK).
-  const catFace: SpriteLook =
-    blinkFrame >= 0 && blinkFrame < S.CAT_HAPPY_BLINK.length ? S.MITCHY_HAPPY_LOOK : S.MITCHY_LOOK;
 
   // ---- dev-only clock scrubber (open the browser console) --------------------
   //   time.hour(19)  → freeze the clock at 19:00 to preview that tint
@@ -2952,34 +2923,29 @@ function Game() {
     }
   }
 
-  function startOffer(item: ItemType) {
-    setModal((m) =>
-      m && m.t === 'shop'
-        ? { ...m, offer: { item, price: null, sel: 0, declined: false }, pick: null }
-        : m,
+  // Sell `amount` of the shop's selected resource at its fixed price — the
+  // same coin value the inventory shows for it (basePrice).
+  function sellPick() {
+    const m = modalRef.current;
+    if (!m || m.t !== 'shop' || m.tab !== 'sell') return;
+    const item = m.pick ?? ITEM_TYPES.find((t) => inv[t] > 0);
+    if (!item || inv[item] <= 0) return;
+    const n = Math.max(1, Math.min(m.amount, inv[item]));
+    const coins = n * basePrice(item);
+    setInv((v) => ({ ...v, [item]: Math.max(0, v[item] - n) }));
+    setMoney((mo) => mo + coins);
+    const left = inv[item] - n;
+    setModal((cur) =>
+      cur && cur.t === 'shop'
+        ? {
+            ...cur,
+            // sold out: fall back to the first resource still in the bag
+            pick: left > 0 ? item : null,
+            amount: 1,
+            line: `Thanks! ${n} ${ITEM_INFO[item].name} for ${coins} coin${coins === 1 ? '' : 's'}.`,
+          }
+        : cur,
     );
-    getPrice(item).then((p) => {
-      setModal((m) =>
-        m && m.t === 'shop' && m.offer && m.offer.item === item && m.offer.price === null
-          ? { ...m, offer: { ...m.offer, price: p } }
-          : m,
-      );
-    });
-  }
-
-  function confirmOffer(sel: number) {
-    setModal((m) => {
-      if (!m || m.t !== 'shop' || !m.offer) return m;
-      const o = m.offer;
-      if (o.declined || o.price === null) return { ...m, offer: null };
-      if (sel === 0) {
-        setInv((v) => ({ ...v, [o.item]: Math.max(0, v[o.item] - 1) }));
-        setMoney((mo) => mo + (o.price as number));
-        setBlinkFrame(0); // Mitchy slow-blinks at you — a happy cat's thank-you
-        return { ...m, offer: null };
-      }
-      return { ...m, offer: { ...o, declined: true } };
-    });
   }
 
   function escClose() {
@@ -2993,7 +2959,6 @@ function Game() {
       if (!m) return m;
       if (m.t === 'detail' || m.t === 'detailOwned') return { t: 'inventory' };
       if (m.t === 'shop' && m.confirm) return { ...m, confirm: null, poor: false };
-      if (m.t === 'shop' && (m.offer || m.pick)) return { ...m, offer: null, pick: null };
       if (m.t === 'storage') {
         return m.menuOpen ? { ...m, menuOpen: false } : { t: 'houseMenu', sel: m.slot };
       }
@@ -3044,13 +3009,13 @@ function Game() {
         go: (s) => (s === 0 ? buyConfirm() : setModal({ ...m, confirm: null, poor: false })),
       };
     }
-    if (m.t === 'shop' && m.offer) {
-      const o = m.offer;
+    if (m.t === 'shop' && m.tab === 'sell') {
+      // 0 = Sell for …, 1 = Never mind.
       return {
-        sel: o.sel,
+        sel: m.csel,
         n: 2,
-        upd: (s) => ({ ...m, offer: { ...o, sel: s } }),
-        go: confirmOffer,
+        upd: (s) => ({ ...m, csel: s }),
+        go: (s) => (s === 0 ? sellPick() : setModal(null)),
       };
     }
     if (m.t === 'detailOwned') {
@@ -4584,165 +4549,107 @@ function Game() {
           )}
 
           {modal.t === 'shop' && !modal.confirm && (
-            <div
-              className="panel shop-panel"
-              onClick={() => setModal((m) => (m && m.t === 'shop' ? { ...m, pick: null } : m))}
+            <ShopSheet
+              tab={modal.tab}
+              inv={inv}
+              money={money}
+              pick={modal.pick}
+              amount={modal.amount}
+              line={modal.line}
+              sel={modal.csel}
+              onTab={(tb) => setModal({ ...modal, tab: tb, pick: null, amount: 1, line: null, csel: 0 })}
+              onPick={(it) => setModal((m) => (m && m.t === 'shop' ? { ...m, pick: it, amount: 1 } : m))}
+              onAmount={(n) => setModal((m) => (m && m.t === 'shop' ? { ...m, amount: n } : m))}
+              onSel={(i) => setModal((m) => (m && m.t === 'shop' ? { ...m, csel: i } : m))}
+              onSell={sellPick}
+              onClose={() => setModal(null)}
             >
-              <div className="shop-tabs">
-                {(['sell', 'buy'] as const).map((tb) => (
-                  <button
-                    key={tb}
-                    className={'shop-tab' + (modal.tab === tb ? ' active' : '')}
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      setModal({ ...modal, tab: tb, offer: null, pick: null });
-                    }}
-                  >
-                    {tb === 'sell' ? 'Sell' : 'Buy'}
-                  </button>
-                ))}
-              </div>
-              <div className="shop-hdr">
-                <span className="shop-hdr-title">Shop</span>
-                <span className="shop-hdr-timer" title="restocks hourly">
-                  &#9719; {refreshStr}
-                </span>
-                <span className="shop-hdr-money">&#164; {money}</span>
-                <button className="shop-x" onClick={() => setModal(null)} aria-label="close shop">
-                  &#215;
-                </button>
-              </div>
-              {modal.tab === 'buy' && (
-                <>
-                  {/* One universal token, outside the category tabs — it used
-                      to be a per-category token prepended to every tab's
-                      stock, which with a single token would render six times. */}
-                  {(() => {
-                    const tok = universalToken(hourSeed);
-                    const out = tokensLeftToday <= 0;
-                    return (
-                      <div
-                        className={'token-offer' + (out ? ' spent' : '')}
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          // A toast, not the modal's `limited` flag: that flag
-                          // only renders inside the confirm panel, which never
-                          // opens on this path — so setting it would refuse the
-                          // click silently.
-                          if (out) {
-                            showToast(`that's all ${TOKENS_PER_DAY} tokens for today. come back tomorrow!`);
-                            return;
-                          }
-                          setModal({ ...modal, confirm: tok, csel: 0, poor: false, limited: false });
-                        }}
-                      >
-                        <pre className="mini">{tok.sprite.join('\n')}</pre>
-                        <div className="token-offer-text">
-                          <span className="token-tag">TOKEN</span>
-                          <span className="token-offer-name">{tok.name}</span>
-                          <span className="token-offer-sub">
-                            craft anything · &#164; {tok.price}
-                          </span>
-                        </div>
-                        <span className="token-offer-left">
-                          {out ? 'none left today' : `${tokensLeftToday} left today`}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                  <div className="cat-row">
-                    {CATEGORIES.map((c) => (
-                      <button
-                        key={c}
-                        className={'cat-tag' + (modal.cat === c ? ' active' : '')}
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          setModal({ ...modal, cat: c });
-                        }}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                  {stock ? (
-                    <div className="buy-grid">
-                      {stock[modal.cat].map((it) => (
+              <div className="shop-buy">
+                <div className="shop-hdr">
+                  <span className="shop-hdr-title">Buy</span>
+                  <span className="shop-hdr-timer" title="restocks hourly">
+                    &#9719; {refreshStr}
+                  </span>
+                </div>
+  <>
+                    {/* One universal token, outside the category tabs — it used
+                        to be a per-category token prepended to every tab's
+                        stock, which with a single token would render six times. */}
+                    {(() => {
+                      const tok = universalToken(hourSeed);
+                      const out = tokensLeftToday <= 0;
+                      return (
                         <div
-                          key={it.id}
-                          className="slot filled buy-slot"
+                          className={'token-offer' + (out ? ' spent' : '')}
                           onClick={(ev) => {
                             ev.stopPropagation();
-                            setModal({ ...modal, confirm: it, csel: 0, poor: false });
+                            // A toast, not the modal's `limited` flag: that flag
+                            // only renders inside the confirm panel, which never
+                            // opens on this path — so setting it would refuse the
+                            // click silently.
+                            if (out) {
+                              showToast(`that's all ${TOKENS_PER_DAY} tokens for today. come back tomorrow!`);
+                              return;
+                            }
+                            setModal({ ...modal, confirm: tok, csel: 0, poor: false, limited: false });
                           }}
                         >
-                          {it.kind === 'token' && <span className="token-tag">TOKEN</span>}
-                          <pre className="mini">{it.sprite.join('\n')}</pre>
-                          <span className="buy-name">{it.name}</span>
-                          <span className="price-tri" />
-                          <span className="price">
-                            &#164;{it.price}
+                          <pre className="mini">{tok.sprite.join('\n')}</pre>
+                          <div className="token-offer-text">
+                            <span className="token-tag">TOKEN</span>
+                            <span className="token-offer-name">{tok.name}</span>
+                            <span className="token-offer-sub">
+                              craft anything · &#164; {tok.price}
+                            </span>
+                          </div>
+                          <span className="token-offer-left">
+                            {out ? 'none left today' : `${tokensLeftToday} left today`}
                           </span>
                         </div>
+                      );
+                    })()}
+                    <div className="cat-row">
+                      {CATEGORIES.map((c) => (
+                        <button
+                          key={c}
+                          className={'cat-tag' + (modal.cat === c ? ' active' : '')}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            setModal({ ...modal, cat: c });
+                          }}
+                        >
+                          {c}
+                        </button>
                       ))}
                     </div>
-                  ) : (
-                    <div className="shop-hint">restocking...</div>
-                  )}
-                  <div className="hint">click an item or token to buy it</div>
-                </>
-              )}
-              {modal.tab === 'sell' && (
-              <div className="shop-top">
-                <div className="ds-portrait-box shop-mitchy">
-                  <FitSprite look={catFace} solid={{}} fill={0.9} maxScale={3} />
-                </div>
-                {modal.offer ? (
-                  <div className="offer">
-                    <pre className="offer-bubble">
-                      {S.makeBubble(
-                        modal.offer.price === null
-                          ? '...'
-                          : modal.offer.declined
-                            ? 'thats a bummer...maybe next time.'
-                            : `that's cool i can give u ${modal.offer.price} for it? Sounds like a deal?`,
-                        24,
-                      )}
-                    </pre>
-                    {modal.offer.price !== null && !modal.offer.declined && (
-                      <OptList
-                        opts={['Sell', "Don't sell"]}
-                        sel={modal.offer.sel}
-                        onSel={(i) =>
-                          setModal((m) =>
-                            m && m.t === 'shop' && m.offer
-                              ? { ...m, offer: { ...m.offer, sel: i } }
-                              : m,
-                          )
-                        }
-                        onPick={confirmOffer}
-                      />
+                    {stock ? (
+                      <div className="buy-grid">
+                        {stock[modal.cat].map((it) => (
+                          <div
+                            key={it.id}
+                            className="slot filled buy-slot"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              setModal({ ...modal, confirm: it, csel: 0, poor: false });
+                            }}
+                          >
+                            {it.kind === 'token' && <span className="token-tag">TOKEN</span>}
+                            <pre className="mini">{it.sprite.join('\n')}</pre>
+                            <span className="buy-name">{it.name}</span>
+                            <span className="price-tri" />
+                            <span className="price">
+                              &#164;{it.price}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="shop-hint">restocking...</div>
                     )}
-                  </div>
-                ) : (
-                  <div className="shop-hint">
-                    &quot;whatcha got?&quot;
-                    <br />
-                    <span>click an item below to sell it</span>
-                  </div>
-                )}
+                    <div className="hint">click an item or token to buy it</div>
+                  </>
               </div>
-              )}
-              {modal.tab === 'sell' && (
-                <InvGrid
-                  inv={inv}
-                  pick={modal.pick}
-                  onItem={(it) =>
-                    setModal((m) => (m && m.t === 'shop' ? { ...m, pick: it, offer: null } : m))
-                  }
-                  onSell={startOffer}
-                />
-              )}
-            </div>
+            </ShopSheet>
           )}
 
           {modal.t === 'shop' && modal.confirm && (
@@ -4909,7 +4816,162 @@ function OptList({
   );
 }
 
-type InvSlot = { t: 'base'; it: ItemType } | { t: 'own'; o: OwnedItem };
+// A resource's description, as the Inventory shows it — the shop's sell
+// screen shows the very same text for the same item.
+function BaseItemText({ item, fact }: { item: ItemType; fact: string | null }) {
+  return (
+    <>
+      <p>{ITEM_INFO[item].desc}</p>
+      <p className="ds-muted">Fun fact: {fact ?? '…'}</p>
+    </>
+  );
+}
+
+// The shop, on the shared UI design system: Sell lists your resources in the
+// Inventory's slots, the selected one's details on the right (same text as
+// the Inventory), Mitchy's line under the slots and the amount / Sell / Never
+// mind column under the details. Prices are fixed: the coin value the
+// Inventory shows (basePrice). The rail under the back button switches to
+// Buy, which renders `children`.
+function ShopSheet({
+  tab,
+  inv,
+  money,
+  pick,
+  amount,
+  line,
+  sel,
+  onTab,
+  onPick,
+  onAmount,
+  onSel,
+  onSell,
+  onClose,
+  children,
+}: {
+  tab: 'sell' | 'buy';
+  inv: Record<ItemType, number>;
+  money: number;
+  pick: ItemType | null;
+  amount: number;
+  line: string | null;
+  sel: number; // 0 = Sell, 1 = Never mind (keyboard)
+  onTab: (tab: 'sell' | 'buy') => void;
+  onPick: (it: ItemType) => void;
+  onAmount: (n: number) => void;
+  onSel: (i: number) => void;
+  onSell: () => void;
+  onClose: () => void;
+  children: ReactNode; // the Buy view
+}) {
+  const owned = ITEM_TYPES.filter((t) => inv[t] > 0);
+  const item = pick && inv[pick] > 0 ? pick : (owned[0] ?? null);
+  const fact = useFunFact(tab === 'sell' ? item : null);
+  const price = item ? basePrice(item) : 0;
+  const n = item ? Math.max(1, Math.min(amount, inv[item])) : 0;
+
+  const rail = (
+    <>
+      {(['sell', 'buy'] as const).map((t) => (
+        <button
+          key={t}
+          className={'ds-iconbtn ds-rail-btn' + (tab === t ? ' on' : '')}
+          onClick={() => onTab(t)}
+          aria-label={t === 'sell' ? 'Sell' : 'Buy'}
+          aria-pressed={tab === t}
+          title={t === 'sell' ? 'Sell' : 'Buy'}
+        >
+          {t === 'sell' ? <IconSell /> : <IconBuy />}
+        </button>
+      ))}
+    </>
+  );
+
+  return (
+    <Sheet label={tab === 'sell' ? 'Sell to Mitchy' : 'Buy from Mitchy'} onClose={onClose} onBack={onClose} money={money} rail={rail}>
+      {tab === 'buy' ? (
+        children
+      ) : (
+        <>
+          <Split>
+            <SlotGrid
+              slots={owned.map((it) => ({
+                key: it,
+                look: { sprite: ITEM_SPRITES[it] },
+                count: inv[it],
+                label: ITEM_INFO[it].name,
+              }))}
+              selected={item}
+              onSelect={(s) => onPick(s.key as ItemType)}
+            />
+            {item ? (
+              <DetailPanel
+                look={{ sprite: ITEM_SPRITES[item] }}
+                title={ITEM_INFO[item].name}
+                stats={[
+                  { icon: <IconCoin />, value: price, label: 'Sell Price' },
+                  { icon: <IconBag />, value: inv[item], label: 'In Inventory' },
+                ]}
+              >
+                <BaseItemText item={item} fact={fact} />
+              </DetailPanel>
+            ) : (
+              <DetailPanel empty="Nothing to sell yet." />
+            )}
+          </Split>
+          <div className="ds-shop-bottom">
+            <div className="ds-dialogue ds-shop-talk">
+              <div className="ds-dialogue-name">Mitchy</div>
+              <span className="ds-bracket tl" />
+              <span className="ds-bracket tr" />
+              <span className="ds-bracket bl" />
+              <span className="ds-bracket br" />
+              <div className="ds-dialogue-text">
+                {line ?? (item ? 'Which items would you like to sell?' : 'Looks like you have nothing to sell yet.')}
+              </div>
+            </div>
+            <div className="ds-shop-actions">
+              <div className="ds-shop-amount" role="group" aria-label="Amount to sell">
+                <button disabled={!item || n <= 1} onClick={() => onAmount(n - 1)} aria-label="fewer">
+                  <svg viewBox="0 0 12 14" width="12" height="14" aria-hidden>
+                    <path d="M11 1L2 7l9 6z" fill="currentColor" />
+                  </svg>
+                </button>
+                <span aria-live="polite">{n}</span>
+                <button disabled={!item || n >= inv[item]} onClick={() => onAmount(n + 1)} aria-label="more">
+                  <svg viewBox="0 0 12 14" width="12" height="14" aria-hidden>
+                    <path d="M1 1l9 6-9 6z" fill="currentColor" />
+                  </svg>
+                </button>
+              </div>
+              <div className="ds-options" role="listbox">
+                <button
+                  role="option"
+                  aria-selected={sel === 0}
+                  className={'ds-option ds-shop-sell' + (sel === 0 ? ' sel' : '')}
+                  disabled={!item}
+                  onMouseEnter={() => onSel(0)}
+                  onClick={onSell}
+                >
+                  Sell for <IconCoin size={16} /> {n * price}
+                </button>
+                <button
+                  role="option"
+                  aria-selected={sel === 1}
+                  className={'ds-option' + (sel === 1 ? ' sel' : '')}
+                  onMouseEnter={() => onSel(1)}
+                  onClick={onClose}
+                >
+                  Never mind.
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </Sheet>
+  );
+}
 
 // The inventory, on the shared UI design system (src/ui): the items in equal
 // slots on the left, the selected one's details and actions on the right.
@@ -5074,12 +5136,7 @@ function InventorySheet({
               : []
         }
       >
-        {!pay?.help && (
-          <>
-            <p>{ITEM_INFO[base].desc}</p>
-            {!pay && <p className="ds-muted">Fun fact: {fact ?? '…'}</p>}
-          </>
-        )}
+        {!pay?.help && (pay ? <p>{ITEM_INFO[base].desc}</p> : <BaseItemText item={base} fact={fact} />)}
       </DetailPanel>
     );
   } else if (owned) {
@@ -5167,112 +5224,30 @@ function InventorySheet({
 }
 
 // The fun-fact line for a base item, fetched once per item shown.
+// One fact per item for the session, so the Inventory and the shop's sell
+// screen tell the same one for the same item.
+const FUN_FACTS = new Map<ItemType, Promise<string>>();
 function useFunFact(item: ItemType | null): string | null {
   const [fact, setFact] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     setFact(null);
-    if (item)
-      getFunFact(item).then((f) => {
-        if (alive) setFact(f);
-      });
+    if (item) {
+      let f = FUN_FACTS.get(item);
+      if (!f) {
+        f = getFunFact(item);
+        FUN_FACTS.set(item, f);
+        f.catch(() => FUN_FACTS.delete(item)); // a failed fetch may retry
+      }
+      f.then((v) => {
+        if (alive) setFact(v);
+      }).catch(() => {});
+    }
     return () => {
       alive = false;
     };
   }, [item]);
   return fact;
-}
-
-function InvGrid({
-  inv,
-  onItem,
-  pick,
-  selected,
-  onSell,
-  bag,
-  equippedId,
-  onBagItem,
-  equipPick,
-  onEquipPick,
-}: {
-  inv: Record<ItemType, number>;
-  onItem: (it: ItemType) => void;
-  pick?: ItemType | null;
-  // Which slot the inventory's detail sidebar is currently showing (an
-  // ItemType string for a base item, an ownedId for a bag item) — purely a
-  // highlight, independent of `pick` (the shop's separate "Sell" popup).
-  selected?: string | null;
-  onSell?: (it: ItemType) => void;
-  bag?: OwnedItem[];
-  equippedId?: string | null;
-  onBagItem?: (o: OwnedItem) => void;
-  // "choose something to hold" mode, opened from the HUD hand slot
-  equipPick?: boolean;
-  onEquipPick?: (o: OwnedItem) => void;
-}) {
-  // Only owned things with an equip mode can go in the hand — raw materials
-  // and craft tokens can't, so in equipPick mode they're greyed and inert.
-  const canEquip = (s: InvSlot) => s.t === 'own' && s.o.kind !== 'token' && !!s.o.equip;
-  const isSelected = (s: InvSlot) =>
-    !!selected && ((s.t === 'base' && s.it === selected) || (s.t === 'own' && s.o.ownedId === selected));
-  const entries: InvSlot[] = [
-    ...ITEM_TYPES.filter((t) => inv[t] > 0).map((it) => ({ t: 'base' as const, it })),
-    ...(bag ?? []).map((o) => ({ t: 'own' as const, o })),
-  ];
-  const nSlots = Math.max(16, Math.ceil(entries.length / 8) * 8);
-  const slots: (InvSlot | null)[] = Array.from({ length: nSlots }, (_, i) => entries[i] ?? null);
-  return (
-    <div className="inv-grid">
-      {slots.map((s, i) => (
-        <div
-          key={i}
-          className={
-            'slot' +
-            (s ? ' filled' : '') +
-            (s && equipPick && !canEquip(s) ? ' disabled' : '') +
-            (s && isSelected(s) ? ' sel' : '')
-          }
-          onClick={
-            s && !(equipPick && !canEquip(s))
-              ? (ev) => {
-                  ev.stopPropagation();
-                  if (equipPick) {
-                    if (s.t === 'own') onEquipPick?.(s.o);
-                  } else if (s.t === 'base') onItem(s.it);
-                  else onBagItem?.(s.o);
-                }
-              : undefined
-          }
-        >
-          {s && s.t === 'base' && (
-            <>
-              <pre className="mini">{ITEM_SPRITES[s.it].join('\n')}</pre>
-              <span className="count">x{inv[s.it]}</span>
-              {pick === s.it && onSell && (
-                <div className="pick" onClick={(ev) => ev.stopPropagation()}>
-                  <OptList opts={['Sell']} sel={0} onSel={() => {}} onPick={() => onSell(s.it)} />
-                </div>
-              )}
-            </>
-          )}
-          {s && s.t === 'own' && (
-            <>
-              <ColoredSprite
-                className="mini"
-                sprite={s.o.sprite}
-                colors={s.o.colors}
-                palette={s.o.palette}
-                color={s.o.color}
-                texture={s.o.textureModifier}
-              />
-              {s.o.kind === 'token' && <span className="token-tag">TOKEN</span>}
-              {equippedId === s.o.ownedId && <span className="equipped-tag">EQ</span>}
-            </>
-          )}
-        </div>
-      ))}
-    </div>
-  );
 }
 
 // Storage modal: the chest's contents on top, the player's inventory below.

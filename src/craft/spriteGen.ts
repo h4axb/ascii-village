@@ -80,6 +80,11 @@ export function planPrompt(): string {
       'subject); "bigger" only when distinctly larger than typical ("giant"/"huge", or an unusually large ' +
       'example like a bus among vehicles).',
 
+    '(5) "kind" — what KIND of thing the craft is, judged by its MAIN element only, ignoring extra ' +
+      'details: one of plant, pets (any animal or creature), clothing (anything worn), vehicle (anything ' +
+      'ridden), food, utensils (any other object). "a dog with a witch hat" is pets, "a cat on a ' +
+      'skateboard" is pets, "a hat with a feather" is clothing.',
+
     'Then decide "width" and "height" as an ASPECT-RATIO HINT ONLY — any two positive numbers describing ' +
       'the object\'s proportions (e.g. 3 and 1 for a long thin snake, 1 and 1 for something roughly as ' +
       'wide as tall). These are NOT literal cell counts — code picks the actual canvas size afterward, ' +
@@ -172,6 +177,7 @@ export function planPrompt(): string {
     'Reply with JSON only, this exact shape:\n' +
       '{"fit": true|false, "tokenHint": "plant|pets|clothing|vehicle|food|utensils|none", ' +
       '"sensitive": true|false, "sizeAdjust": "smaller"|"default"|"bigger", ' +
+      '"kind": "plant|pets|clothing|vehicle|food|utensils", ' +
       '"width": number, "height": number, "name": string, "parts": [string, ...], ' +
       '"regions": [{"id": string, "primitive": string, "bounds": {"cx":n,"cy":n,"width":n,"height":n,' +
       '"rotation":n}, "cornerRadius":n, "topWidth":n, "bottomWidth":n, "startAngle":n, "endAngle":n, ' +
@@ -267,11 +273,44 @@ function coerceRelations(v: unknown): ShapeRelation[] {
   return out;
 }
 
+const KIND_SET = new Set(['plant', 'pets', 'clothing', 'vehicle', 'food', 'utensils']);
+
+// The KIND of a request before planning it (its main element: plant, pets,
+// clothing, vehicle, food or utensils) — a tiny call, made only when the
+// player has preferences saved for one kind (craft/prefs.ts), which have to
+// be known before the planner runs. null when unsure or offline.
+export async function classifyKind(
+  prompt: string,
+  chat: VisionJSON,
+  opts: { model?: string; fallbackModel?: string } = {},
+): Promise<string | null> {
+  try {
+    const r = await chat<{ kind?: unknown }>(
+      [
+        {
+          role: 'system',
+          content:
+            'Classify a crafting request by its MAIN element only, ignoring extra details, as one of: plant, pets ' +
+            '(any animal or creature), clothing (anything worn), vehicle (anything ridden), food, utensils (any other ' +
+            'object). "a dog with a witch hat" is pets. Reply with JSON only: {"kind": "..."}.',
+        },
+        { role: 'user', content: `Request: "${prompt}".` },
+      ],
+      { model: opts.model, temperature: 0, maxTokens: 20, thinking: { type: 'disabled' }, fallbackModel: opts.fallbackModel },
+    );
+    return typeof r?.kind === 'string' && KIND_SET.has(r.kind) ? r.kind : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function planCraft(
   prompt: string,
   category: string,
   chat: VisionJSON,
-  opts: { model?: string; fallbackModel?: string } = {},
+  // prefsText: the player's crafting preferences (craft/prefs.ts) as extra
+  // planner instructions; temperature: their "surprise" setting
+  opts: { model?: string; fallbackModel?: string; prefsText?: string; temperature?: number } = {},
 ): Promise<CraftPlan> {
   const base = CATEGORY_SIZE_DEFAULT[category as CraftCategory] ?? 'medium';
   const empty: CraftPlan = {
@@ -281,7 +320,7 @@ export async function planCraft(
   try {
     const r = await chat<Record<string, unknown>>(
       [
-        { role: 'system', content: planPrompt() },
+        { role: 'system', content: opts.prefsText ? `${planPrompt()}\n\n${opts.prefsText}` : planPrompt() },
         { role: 'user', content: `Token category: ${category}. Request: "${prompt}".` },
       ],
       // 1000 -> 1500 (Stage 2): confirmed live-necessary, not precautionary —
@@ -294,13 +333,14 @@ export async function planCraft(
       // fix as the original 700->1000 raise during Phase A. 1300 alone
       // still occasionally clipped the trailing "relations" array on the
       // same worst-case prompt; 1500 gave it comfortable headroom live.
-      { model: opts.model, temperature: 0.7, maxTokens: 1500, thinking: { type: 'disabled' }, fallbackModel: opts.fallbackModel },
+      { model: opts.model, temperature: opts.temperature ?? 0.7, maxTokens: 1500, thinking: { type: 'disabled' }, fallbackModel: opts.fallbackModel },
     );
     const adj = r?.sizeAdjust;
     const sizeClass = adjustSizeTier(base, adj === 'smaller' || adj === 'bigger' ? adj : 'default');
     return {
       fit: r?.fit !== false,
       tokenHint: typeof r?.tokenHint === 'string' && r.tokenHint !== 'none' ? r.tokenHint : undefined,
+      kind: typeof r?.kind === 'string' && KIND_SET.has(r.kind) ? r.kind : undefined,
       sensitive: r?.sensitive === true,
       sizeAdjust: (adj === 'smaller' || adj === 'bigger' ? adj : 'default') as CraftPlan['sizeAdjust'],
       sizeClass,

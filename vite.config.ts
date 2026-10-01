@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { docHash } from './src/editor/docHash';
+import { normalizeFeedback, type FeedbackRecord } from './src/feedback/schema';
 
 // Dev-only save endpoint for the in-game world editor (src/editor/, press E).
 // The editor never writes on its own: Ctrl+S / Save POSTs everything it edits
@@ -134,8 +135,59 @@ function introNarrationSavePlugin(): Plugin {
   };
 }
 
+// Dev-only stand-in for the Worker's /api/feedback (functions/api/feedback.ts),
+// so crafting panel 2's feedback and the /2/feedback dashboard work under
+// `pnpm dev` without Cloudflare: records go to .feedback-dev.json (not
+// committed). The dashboard password here is FEEDBACK_ADMIN_TOKEN from the
+// environment, or "dev" when that isn't set.
+function feedbackDevStorePlugin(): Plugin {
+  const file = path.resolve(__dirname, '.feedback-dev.json');
+  const load = async (): Promise<FeedbackRecord[]> => {
+    try {
+      return JSON.parse(await readFile(file, 'utf-8'));
+    } catch {
+      return [];
+    }
+  };
+  return {
+    name: 'feedback-dev-store',
+    configureServer(server) {
+      server.middlewares.use('/api/feedback', (req, res, next) => {
+        const reply = (status: number, data: unknown) => {
+          res.statusCode = status;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(data));
+        };
+        if (req.method === 'GET') {
+          const token = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+          if (token !== (process.env.FEEDBACK_ADMIN_TOKEN || 'dev')) return reply(401, { error: 'wrong password' });
+          load().then((rows) => reply(200, [...rows].sort((a, b) => b.at - a.at)));
+          return;
+        }
+        if (req.method !== 'POST') return next();
+        let body = '';
+        req.on('data', (c) => (body += c));
+        req.on('end', async () => {
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(body);
+          } catch {
+            return reply(400, { error: 'invalid JSON' });
+          }
+          const rec = normalizeFeedback(parsed);
+          if (typeof rec === 'string') return reply(400, { error: rec });
+          const rows = (await load()).filter((r) => r.id !== rec.id);
+          rows.push(rec);
+          await writeFile(file, JSON.stringify(rows, null, 1));
+          reply(200, { ok: true });
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), worldEditorSavePlugin(), introNarrationSavePlugin()],
+  plugins: [react(), worldEditorSavePlugin(), introNarrationSavePlugin(), feedbackDevStorePlugin()],
   server: {
     // Pinned so a dev server never silently drifts onto a different port
     // (Vite's default is to auto-increment on conflict) — localStorage is

@@ -27,6 +27,10 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import * as S from './sprites';
 import { craftItem, mitchyChat, getMitchyLine, preflightCraft } from './llm';
 import type { CraftConcept, OwnedItem, ShopItem } from './llm';
+import { FeedbackVote, TuneQuestions } from './CraftFeedback';
+import { appliedLabels, isKind, KIND_LABEL, savePrefs, type Kind, type Prefs, type Scope } from './craft/prefs';
+import type { FeedbackReason } from './feedback/schema';
+import { newFeedbackId, playerId, sendFeedback, SESSION } from './feedback/client';
 import { appendHistory, ago, loadHistory, type CraftRecord, type ChatLine } from './craftHistory';
 import { MITCHY_NAME } from './introPartB';
 import {
@@ -54,9 +58,26 @@ type Phase = 'input' | 'working' | 'choosing' | 'failed' | 'success' | 'folded';
 
 type Result = { item: ShopItem; prompt: string };
 
+// (feedback) the rating of the result on the table — see CraftFeedback.tsx
+interface Fb {
+  id: string;
+  at: number;
+  result: Result;
+  kind: Kind | null;
+  applied: Prefs;
+  adjusted: boolean;
+  vote: 'up' | 'down' | null;
+  reasons: FeedbackReason[];
+  commentOpen: boolean;
+  comment: string;
+  step: 'vote' | 'tuning' | 'tuned';
+  answers: Prefs | null;
+  scope: Scope | null;
+}
+
 type Turn =
   | { who: 'mitchy' | 'me'; kind: 'text'; text: string }
-  | { who: 'mitchy'; kind: 'result'; item: ShopItem; prompt: string; status?: string }
+  | { who: 'mitchy'; kind: 'result'; item: ShopItem; prompt: string; status?: string; tag?: string; made?: string[] }
   | { who: 'mitchy'; kind: 'alts'; intro: string; options: string[] }
   | { who: 'mitchy'; kind: 'concepts'; concepts: [CraftConcept, CraftConcept]; surprise: string };
 
@@ -85,14 +106,31 @@ const lookOf = (it: {
 
 // A crafted item inside a bubble: the picture in its own frame, name and
 // its one-line function under it.
-function ResultCard({ look, name, desc }: { look: SpriteLook; name: string; desc?: string }) {
+// (feedback) `tag`: its kind, `made`: the preferences it was crafted with.
+function ResultCard({
+  look,
+  name,
+  desc,
+  tag,
+  made,
+}: {
+  look: SpriteLook;
+  name: string;
+  desc?: string;
+  tag?: string;
+  made?: string[];
+}) {
   return (
     <div className="cw3-card">
       <Frame className="cw3-art">
         <FitSprite look={look} fill={0.82} maxScale={2.4} />
       </Frame>
-      <div className="cw3-card-name">{name}</div>
+      <div className="cw3-card-name">
+        {name}
+        {tag && <span className="fb-kind-tag">{tag}</span>}
+      </div>
       {desc && <div className="ds-muted">“{desc}”</div>}
+      {made && made.length > 0 && <div className="fb-made">made with: {made.join(' · ')}</div>}
     </div>
   );
 }
@@ -101,6 +139,7 @@ export default function CraftModal({
   token,
   player,
   choices = false,
+  feedback = false,
   money,
   onSpend,
   onConsume,
@@ -113,6 +152,7 @@ export default function CraftModal({
   token: OwnedItem;
   player: Speaker; // the player's name and face, for their side of the chat
   choices?: boolean; // the /1 flow: preflight + concepts, no auto retry, keep the last result on leave
+  feedback?: boolean; // the /2 flow: rate each result, tune future crafts (CraftFeedback.tsx), keep the last result on leave
   money: number;
   onSpend: (coins: number) => void; // negative = refund
   onConsume: (equip: boolean, item: ShopItem) => void; // spend token, equip if asked — does NOT close
@@ -148,6 +188,9 @@ export default function CraftModal({
   const [adjusting, setAdjusting] = useState(false); // typing what to change
   const [adjusted, setAdjusted] = useState(false); // the one rework is used
   const [optSel, setOptSel] = useState(0);
+  const [fb, setFb] = useState<Fb | null>(null);
+  const fbRef = useRef(fb);
+  fbRef.current = fb;
   const [leaveSel, setLeaveSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
@@ -192,7 +235,7 @@ export default function CraftModal({
             } else setPartial((p) => [...p, line]);
           },
         },
-        { retry: !choices },
+        { retry: !choices, prefs: feedback },
       ).then((r) => finish(r));
 
     if (choices && !rework && !how.direct) {
@@ -220,9 +263,38 @@ export default function CraftModal({
         setPhase('success');
         if (rework) setAdjusted(true);
         if (how.surprise) push({ who: 'mitchy', kind: 'text', text: "Ta-da! Here's what I came up with." });
-        push({ who: 'mitchy', kind: 'result', item: r.item, prompt: craftPrompt });
+        const kind = feedback && isKind(r.kind) ? r.kind : null;
+        push({
+          who: 'mitchy',
+          kind: 'result',
+          item: r.item,
+          prompt: craftPrompt,
+          ...(feedback
+            ? {
+                tag: kind ? KIND_LABEL[kind].one : undefined,
+                made: appliedLabels(r.applied ?? {}),
+                status: 'There it is. First impression?',
+              }
+            : {}),
+        });
         setPopup({ item: r.item, prompt: craftPrompt });
         lastResult.current = { item: r.item, prompt: craftPrompt };
+        if (feedback)
+          setFb({
+            id: newFeedbackId(),
+            at: Date.now(),
+            result: { item: r.item, prompt: craftPrompt },
+            kind,
+            applied: r.applied ?? {},
+            adjusted: !!rework,
+            vote: null,
+            reasons: [],
+            commentOpen: false,
+            comment: '',
+            step: 'vote',
+            answers: null,
+            scope: null,
+          });
       } else if (rework) {
         // the rework failed: coins back, and the previous design is still
         // there to take (or to try adjusting again)
@@ -248,6 +320,8 @@ export default function CraftModal({
     if (popup) {
       if (!adjusting || money < ADJUST_PRICE) return; // awaiting a choice
       const rework = popup;
+      flushFb(); // the rating of the old design is final now
+      setFb(null);
       onSpend(ADJUST_PRICE);
       setAdjusting(false);
       setPopup(null);
@@ -271,11 +345,53 @@ export default function CraftModal({
     startCraft(text);
   }
 
+  // ---- (feedback) storing the rating ----
+  // Sent once voted, again (same id) when reasons, comment or tuning answers
+  // change — debounced, and flushed right away on taking or leaving.
+  function fbRecord(f: Fb) {
+    const { item, prompt } = f.result;
+    return {
+      v: 1 as const,
+      id: f.id,
+      at: f.at,
+      player: playerId(),
+      session: SESSION,
+      link: window.location.pathname,
+      prompt,
+      name: item.name,
+      kind: f.kind ?? '',
+      adjusted: f.adjusted,
+      vote: f.vote as 'up' | 'down',
+      reasons: f.vote === 'down' ? f.reasons : [],
+      comment: f.vote === 'down' && f.commentOpen ? f.comment.trim() : '',
+      applied: f.applied,
+      answers: f.answers,
+      scope: f.scope,
+      sprite: { lines: item.sprite, ...(item.palette && item.colors ? { palette: item.palette, colors: item.colors } : {}) },
+    };
+  }
+  const sentFb = useRef('');
+  function flushFb(f: Fb | null = fbRef.current) {
+    if (!f || !f.vote) return;
+    const rec = fbRecord(f);
+    const key = JSON.stringify(rec);
+    if (key === sentFb.current) return;
+    sentFb.current = key;
+    void sendFeedback(rec);
+  }
+  useEffect(() => {
+    if (!fb?.vote) return;
+    const t = window.setTimeout(() => flushFb(fb), 800);
+    return () => window.clearTimeout(t);
+  }, [fb]); // eslint-disable-line react-hooks/exhaustive-deps
+  const updFb = (patch: Partial<Fb>) => setFb((f) => (f ? { ...f, ...patch } : f));
+
   // ---- success → folded (player chose equip / inventory) ----
   function choose(equip: boolean, res: Result | null = popup) {
     if (!res) return;
     const { item } = res;
     lastResult.current = null;
+    flushFb();
     onConsume(equip, item); // spend the token; App does NOT close the panel
     const status = equip ? 'Equipped to your hand.' : 'Tucked into your inventory.';
     const turns = thread.map((t) => (t.kind === 'result' && t.item === item ? { ...t, status } : t));
@@ -321,16 +437,18 @@ export default function CraftModal({
   function leave() {
     if (closed.current) return;
     closed.current = true;
-    if (choices && !done) {
+    if ((choices || feedback) && !done) {
       if (reworking.current) onSpend(-ADJUST_PRICE);
       if (lastResult.current) choose(false, lastResult.current);
     }
+    flushFb();
     onClose();
   }
 
   // ---- navigation ----
   function back() {
-    if (historyOpen) setHistoryOpen(false);
+    if (fb?.step === 'tuning') updFb({ step: 'vote' });
+    else if (historyOpen) setHistoryOpen(false);
     else if (viewRec) setViewRec(null);
     else if (adjusting) cancelAdjust();
     else onConfirmChange(true);
@@ -374,15 +492,20 @@ export default function CraftModal({
           },
           { label: 'Never mind, keep this one.', go: cancelAdjust },
         ]
+      : popup && fb && (!fb.vote || fb.step === 'tuning')
+      ? [] // (feedback) rate it first / answering the questions
       : popup
       ? [
           { label: 'Equip it.', go: () => choose(true) },
           { label: 'Into my inventory.', go: () => choose(false) },
+          ...(fb && fb.step === 'vote'
+            ? [{ label: 'Tune future crafts →', go: () => updFb({ step: 'tuning' }) }]
+            : []),
           ...(adjusted
             ? []
             : [
                 {
-                  label: `Adjust the design (${ADJUST_PRICE} coins)`,
+                  label: `${fb?.step === 'tuned' ? 'Adjust it with these' : 'Adjust the design'} (${ADJUST_PRICE} coins)`,
                   go: startAdjust,
                   disabled: money < ADJUST_PRICE,
                   title:
@@ -408,7 +531,7 @@ export default function CraftModal({
           : done
             ? [{ label: 'Leave the workshop.', go: leave }]
             : [];
-  useEffect(() => setOptSel(0), [options.length, popup, lastAlts, lastConcepts, adjusting]);
+  useEffect(() => setOptSel(0), [options.length, popup, lastAlts, lastConcepts, adjusting, fb?.step]);
 
   // arrows + Enter pick an option while the prompt field is empty
   useEffect(() => {
@@ -476,7 +599,7 @@ export default function CraftModal({
         add(
           'mitchy',
           <Bubble key={i}>
-            <ResultCard look={lookOf(t.item)} name={t.item.name} desc={t.item.funcDesc} />
+            <ResultCard look={lookOf(t.item)} name={t.item.name} desc={t.item.funcDesc} tag={t.tag} made={t.made} />
           </Bubble>,
           <Bubble key={`${i}q`}>
             {t.status ?? `Here you go: ${t.item.name}! Want to hold it, or keep it in your inventory?`}
@@ -513,12 +636,12 @@ export default function CraftModal({
   useLayoutEffect(() => {
     const el = chatRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [chatSize, viewRec, busyLine, adjusting]);
+  }, [chatSize, viewRec, busyLine, adjusting, fb?.vote, fb?.reasons.length, fb?.commentOpen]);
 
   // what leaving now keeps (see leave())
   function leaveText(): string | undefined {
     if (done) return undefined;
-    const last = choices ? lastResult.current : null;
+    const last = choices || feedback ? lastResult.current : null;
     if (last && reworking.current)
       return `Mitchy is still reworking it. Your last finished design, ${last.item.name}, goes into your inventory, and your ${ADJUST_PRICE} coins come back.`;
     if (last) return `Your last design, ${last.item.name}, goes into your inventory.`;
@@ -530,6 +653,10 @@ export default function CraftModal({
     ? 'Chat with Mitchy while she works …'
     : adjusting
       ? 'What should change? e.g. make the sail red …'
+      : popup && fb && !fb.vote
+      ? 'Rate it above first: I like it / Not quite'
+      : fb?.step === 'tuning'
+      ? 'One answer per question, or skip'
       : popup
       ? 'Pick an option above'
       : done
@@ -559,11 +686,43 @@ export default function CraftModal({
                 </button>
               </div>
             )}
-            {groups.map((g, i) => (
-              <ChatMessage key={i} who={g.who === 'me' ? player : MITCHY} side={g.who === 'me' ? 'right' : 'left'}>
-                {g.bubbles}
-              </ChatMessage>
-            ))}
+            {fb?.step === 'tuning' && !viewRec ? (
+              <TuneQuestions
+                kind={fb.kind}
+                onSave={(answers, scope) => {
+                  savePrefs(answers, scope, fb.kind);
+                  updFb({ answers, scope });
+                }}
+                onClose={() => {
+                  updFb({ step: 'tuned' });
+                  push({
+                    who: 'mitchy',
+                    kind: 'text',
+                    text:
+                      'Got it, I’ll remember that. You can change these anytime in Settings → Crafting preferences. ' +
+                      (adjusted ? 'Want to keep this one?' : `Want me to adjust this one with them (${ADJUST_PRICE} coins), or keep it?`),
+                  });
+                }}
+              />
+            ) : (
+              groups.map((g, i) => (
+                <ChatMessage key={i} who={g.who === 'me' ? player : MITCHY} side={g.who === 'me' ? 'right' : 'left'}>
+                  {g.bubbles}
+                </ChatMessage>
+              ))
+            )}
+            {fb && popup && fb.step === 'vote' && !viewRec && !adjusting && (
+              <FeedbackVote
+                vote={fb.vote}
+                reasons={fb.reasons}
+                commentOpen={fb.commentOpen}
+                comment={fb.comment}
+                onVote={(vote) => updFb({ vote, ...(vote === 'up' ? { reasons: [], commentOpen: false, comment: '' } : {}) })}
+                onReasons={(reasons) => updFb({ reasons })}
+                onCommentOpen={(commentOpen) => updFb({ commentOpen })}
+                onComment={(comment) => updFb({ comment })}
+              />
+            )}
             {options.length > 0 && (
               <div className="ds-options cw3-replies" role="listbox">
                 {options.map((o, i) => (

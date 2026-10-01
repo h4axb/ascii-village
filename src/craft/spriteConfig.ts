@@ -232,6 +232,9 @@ export interface FaceMark {
 export interface CraftPlan {
   fit: boolean;
   tokenHint?: string;
+  // what kind of thing it is, by its MAIN element (plant, pets, clothing,
+  // vehicle, food, utensils) — absent when the model didn't say
+  kind?: string;
   sensitive: boolean;
   sizeAdjust: 'smaller' | 'default' | 'bigger';
   sizeClass: SizeClass; // derived via adjustSizeTier, same convention as before

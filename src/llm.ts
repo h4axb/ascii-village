@@ -18,6 +18,14 @@ import {
   resolveStyle,
   instanceFromSpec,
   planCraft,
+  classifyKind,
+  resolvePrefs,
+  hasKindPrefs,
+  densityOf,
+  temperatureOf,
+  planPrefsText,
+  isKind,
+  type Prefs,
   planAndRender,
   suggestAlternatives,
   analyzeCraft,
@@ -283,7 +291,9 @@ const GENERATED_POOL: Record<Category, Omit<ShopItem, 'id' | 'kind'>[]> = (() =>
 })();
 
 export type CraftResult =
-  | { ok: true; item: ShopItem; refImage?: string }
+  // kind: what kind of thing it is (its main element) and applied: the
+  // player's crafting preferences used for it — both only with opts.prefs
+  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs }
   // `suggestions`: up to 3 alternative craft prompts (shown as clickable
   // buttons). Present only on BENIGN failures — never on category mismatches
   // or blocked (sensitive) input.
@@ -384,7 +394,9 @@ function inferCategory(specCategory: string, hint?: Category): Category {
 export async function craftItem(
   prompt: string,
   ui?: CraftUiHooks,
-  opts: { retry?: boolean } = {},
+  // prefs: apply the player's crafting preferences (craft/prefs.ts) — the
+  // /2 link; without it everything crafts exactly as before
+  opts: { retry?: boolean; prefs?: boolean } = {},
 ): Promise<CraftResult> {
   // Local content policy runs FIRST and on every path — before any network
   // call, and equally in offline/mock mode. The model-side `sensitive` check
@@ -401,9 +413,23 @@ export async function craftItem(
       // `fit` field no longer gates anything: a universal token has no
       // category to mismatch against, so the only rejection left here is a
       // blocked prompt. `tokenHint` is still useful as a category guess.
+      // The preferences for the planner (interpretation, surprise) have to be
+      // known before it runs; when some are saved for one KIND of thing, a
+      // tiny call finds this request's kind first.
+      let planPrefs: Prefs = {};
+      if (opts.prefs) {
+        const guess = hasKindPrefs()
+          ? await classifyKind(prompt, chatJSON, { model: MODELS.fast, fallbackModel: MODELS.fastFallback })
+          : null;
+        planPrefs = resolvePrefs(isKind(guess) ? guess : null);
+      }
+      const prefsText = opts.prefs ? planPrefsText(planPrefs) : '';
+      const temperature = opts.prefs ? temperatureOf(planPrefs) : undefined;
       const plan = await planCraft(prompt, spec.category, chatJSON, {
         model: MODELS.fast,
         fallbackModel: MODELS.fastFallback,
+        prefsText,
+        temperature,
       });
       if (plan.sensitive) {
         // deliberately NO suggestions on blocked input
@@ -412,7 +438,22 @@ export async function craftItem(
           reply: "let's keep it cozy in my shop... i won't craft that one. try something friendlier?",
         };
       }
-      const category = inferCategory(spec.category, plan.tokenHint as Category | undefined);
+      // With preferences, the planner's own judgement of the main element is
+      // the kind — and the item's category, since they are the same six.
+      const category =
+        opts.prefs && isKind(plan.kind)
+          ? (plan.kind as Category)
+          : inferCategory(spec.category, plan.tokenHint as Category | undefined);
+      // density and colour act after planning, so they follow the final kind
+      const postPrefs: Prefs = opts.prefs ? resolvePrefs(category) : {};
+      const applied: Prefs = opts.prefs
+        ? {
+            interpretation: planPrefs.interpretation,
+            surprise: planPrefs.surprise,
+            detail: postPrefs.detail,
+            color: postPrefs.color,
+          }
+        : {};
 
       // Normalize/validate the plan → render locally (deterministic, no
       // LLM) → one retry of the PLAN on a hard failure. If both attempts
@@ -427,6 +468,9 @@ export async function craftItem(
         model: MODELS.fast,
         fallbackModel: MODELS.fastFallback,
         retry: opts.retry,
+        ...(opts.prefs
+          ? { multiplier: densityOf(postPrefs), color: postPrefs.color, prefsText, temperature }
+          : {}),
       });
       if (log.retried) ui?.onStage?.('retrying');
       if (sprite) sprite.lines.forEach((line, i) => ui?.onLine?.(line, i, log.fallbackLevel as 0 | 1));
@@ -482,7 +526,7 @@ export async function craftItem(
       // craftDescribe's own comment on why that tag has to be verbatim.
       item.tags = [...description.tags, `prompt: ${prompt.trim()}`];
       item.textureModifier = textureModifierFor(spec.finish);
-      return { ok: true, item };
+      return opts.prefs ? { ok: true, item, kind: category, applied } : { ok: true, item };
     } catch (err) {
       console.warn('[craft] pipeline error:', err);
       return {
@@ -510,7 +554,7 @@ export async function craftItem(
   item.desc = description.description;
   item.tags = [...description.tags, `prompt: ${prompt.trim()}`];
   item.textureModifier = textureModifierFor(offlineSpec.finish);
-  return { ok: true, item };
+  return opts.prefs ? { ok: true, item, kind: category, applied: {} } : { ok: true, item };
 }
 
 // The /1 preflight: can this be drawn as asked, or should the player pick a

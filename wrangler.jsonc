@@ -16,5 +16,12 @@
   // of wiping them on every deploy. Secrets are always kept.
   "keep_vars": true,
   "workers_dev": true,
+  // Crafting feedback store (the /2 link, read at /2/feedback). Left commented
+  // out until the database exists — a binding to a database that doesn't
+  // exist would fail the deploy. Setup: docs/Deploy-Cloudflare.md, section
+  // "Crafting feedback". Then uncomment and paste the printed database_id:
+  // "d1_databases": [
+  //   { "binding": "FEEDBACK_DB", "database_name": "asciia-feedback", "database_id": "PASTE-ID-HERE" }
+  // ],
   "observability": { "enabled": true }
 }

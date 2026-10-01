@@ -134,6 +134,8 @@ import type { PlacedItem } from './placement';
 import { palmFrame, bundleLandingX, SHAKE_FRAMES, SHAKE_FRAME_MS, SHAKE_MS } from './palmAnim';
 import { pondFrame, POND_FRAME_MS } from './pondAnim';
 import CraftModal from './CraftModal';
+import { flushFeedbackOutbox } from './feedback/client';
+import { CraftPrefsSettings } from './CraftFeedback';
 
 const INTRO_TEXT =
   "Hey, are u the new villager here? I'm Mitchy and own this shop. in this world u can go around and collect materials and if u give them back to me ill pay u fair.";
@@ -476,6 +478,10 @@ type Bubble = { text: string; width: number } | null;
 
 export default function App() {
   const [started, setStarted] = useState(false);
+  // crafting feedback waiting from an earlier visit goes out now
+  useEffect(() => {
+    if (CRAFT_FEEDBACK) flushFeedbackOutbox();
+  }, []);
   return started ? <Game /> : <Landing onStart={() => setStarted(true)} />;
 }
 
@@ -608,11 +614,16 @@ function readIntroBMarkers(): {
 //   /1         skips the intro; the workshop runs crafting panel 1 (preflight
 //              + concepts, see CraftModal's `choices`)
 //   /intro/1   always plays the intro; crafting panel 1 as on /1
+//   /2         skips the intro; the workshop runs crafting panel 2 (rate
+//              each result, tune future crafts — see CraftFeedback.tsx)
+//   /intro/2   always plays the intro; crafting panel 2 as on /2
+//   /2/feedback  the feedback dashboard instead of the game (see main.tsx)
 const PATH = window.location.pathname;
 const CRAFT_CHOICES = /^(\/intro)?\/1\/?$/.test(PATH);
-const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[01]\/?$/.test(PATH)
+const CRAFT_FEEDBACK = /^(\/intro)?\/2\/?$/.test(PATH);
+const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[012]\/?$/.test(PATH)
   ? 'skip'
-  : /^\/intro(\/1)?\/?$/.test(PATH)
+  : /^\/intro(\/[12])?\/?$/.test(PATH)
     ? 'force'
     : 'default';
 
@@ -4498,30 +4509,43 @@ function Game() {
           )}
 
           {modal.t === 'settings' && (
-            <Panel title="Settings" hint="[Esc] to close">
-              <div className="ds-settings-section">Game</div>
-              <div className="ds-actions ds-settings-actions">
-                <button className="ds-action" onClick={saveGameToStorage} disabled={saving}>
-                  <span className="ds-action-icon">
-                    <SaveIcon className="ds-save-icon" />
-                  </span>
-                  <span>Save Game</span>
-                </button>
-              </div>
-              <div className="ds-muted ds-settings-note">writes your progress to this browser</div>
-              <div className="ds-settings-section">Controls</div>
-              <div className="ds-controls">
-                {CONTROLS.map(([what, keys]) => (
-                  <Row
-                    key={what}
-                    label={what}
-                    value={keys.map((k) => (
-                      <kbd key={k} className="ds-kbd">
-                        {k}
-                      </kbd>
+            <Panel title="Settings" hint="[Esc] to close" className={CRAFT_FEEDBACK ? 'ds-settings two' : 'ds-settings'}>
+              <div className="ds-settings-cols">
+                <div>
+                  <div className="ds-settings-section">Game</div>
+                  <div className="ds-actions ds-settings-actions">
+                    <button className="ds-action" onClick={saveGameToStorage} disabled={saving}>
+                      <span className="ds-action-icon">
+                        <SaveIcon className="ds-save-icon" />
+                      </span>
+                      <span>Save Game</span>
+                    </button>
+                  </div>
+                  <div className="ds-muted ds-settings-note">writes your progress to this browser</div>
+                  {/* crafting panel 2 only: the preferences it crafts with */}
+                  {CRAFT_FEEDBACK && (
+                    <>
+                      <div className="ds-settings-section">Crafting preferences</div>
+                      <CraftPrefsSettings />
+                    </>
+                  )}
+                </div>
+                <div>
+                  <div className="ds-settings-section">Controls</div>
+                  <div className="ds-controls">
+                    {CONTROLS.map(([what, keys]) => (
+                      <Row
+                        key={what}
+                        label={what}
+                        value={keys.map((k) => (
+                          <kbd key={k} className="ds-kbd">
+                            {k}
+                          </kbd>
+                        ))}
+                      />
                     ))}
-                  />
-                ))}
+                  </div>
+                </div>
               </div>
             </Panel>
           )}
@@ -4729,6 +4753,7 @@ function Game() {
               key={modal.token.ownedId}
               token={modal.token}
               choices={CRAFT_CHOICES}
+              feedback={CRAFT_FEEDBACK}
               player={{
                 name: playerName || DEFAULT_PLAYER_NAME,
                 look: { sprite: avatarSprite, colors: avatarRecolored.colors, palette: avatarRecolored.palette },

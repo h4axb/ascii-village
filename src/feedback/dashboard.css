@@ -1,0 +1,318 @@
+/* /2/feedback — the crafting-feedback dashboard (Dashboard.tsx). The game's
+   design tokens (src/ui/ui.css) on a solid page; the series colours were
+   validated for this surface (dataviz validator, dark mode, #1c2014). */
+.fbd {
+  --fbd-surface: #1c2014;
+  --fbd-card: #232819;
+  --s1: #3987e5; /* "I like it" / the less end */
+  --s2: #e66767; /* "Not quite" / the more end */
+  --d0: #4a4b40; /* keep (neutral midpoint) */
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 28px clamp(16px, 4vw, 48px) 60px;
+  background: var(--fbd-surface);
+  color: var(--ds-text);
+  font-size: 14px;
+}
+.fbd h1 {
+  margin: 0;
+  font-size: 22px;
+  color: var(--ds-name);
+  letter-spacing: 0.5px;
+}
+.fbd h2 {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: normal;
+  color: var(--ds-text);
+}
+.fbd button,
+.fbd input,
+.fbd select {
+  font: inherit;
+  color: var(--ds-text);
+  background: var(--fbd-card);
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  padding: 6px 12px;
+}
+.fbd button {
+  cursor: pointer;
+}
+.fbd button:hover:not(:disabled) {
+  border-color: var(--ds-line-strong);
+}
+.fbd button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fbd-muted {
+  color: var(--ds-text-muted);
+}
+.fbd-error {
+  color: #f0b0a0;
+}
+.fbd-gate {
+  max-width: 360px;
+  margin: 12vh auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fbd-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.fbd-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--ds-text-soft);
+}
+.fbd-seg {
+  display: flex;
+}
+.fbd-seg button {
+  border-radius: 0;
+}
+.fbd-seg button:first-child {
+  border-radius: var(--ds-radius-sm) 0 0 var(--ds-radius-sm);
+}
+.fbd-seg button:last-child {
+  border-radius: 0 var(--ds-radius-sm) var(--ds-radius-sm) 0;
+}
+.fbd-seg button.on {
+  border-color: var(--ds-line-strong);
+  background: var(--ds-surface-hi);
+}
+.fbd-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.fbd-tile,
+.fbd-card {
+  background: var(--fbd-card);
+  border: 1px solid var(--ds-line-soft);
+  border-radius: var(--ds-radius);
+  padding: 16px 18px;
+}
+.fbd-tile-value {
+  font-size: 28px;
+  color: var(--ds-text);
+}
+.fbd-tile-label {
+  color: var(--ds-text-soft);
+}
+.fbd-tile-sub {
+  font-size: 12px;
+  margin-top: 4px;
+}
+.fbd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.fbd-card.wide {
+  grid-column: 1 / -1;
+}
+.fbd-empty {
+  padding: 40px 0;
+  text-align: center;
+}
+.fbd-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0 0 10px;
+  color: var(--ds-text-soft);
+  font-size: 12px;
+}
+.fbd-legend .sw {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+.s1,
+.sw.s1 {
+  background: var(--s1);
+}
+.s2,
+.sw.s2 {
+  background: var(--s2);
+}
+.d1,
+.sw.d1 {
+  background: var(--s1);
+}
+.d2,
+.sw.d2 {
+  background: var(--s2);
+}
+.d0,
+.sw.d0 {
+  background: var(--d0);
+}
+/* horizontal bars */
+.fbd-bars,
+.fbd-answers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fbd-bar-row,
+.fbd-ans-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 34%) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0; /* a hit target taller than the bar */
+}
+.fbd-bar-label {
+  color: var(--ds-text-soft);
+  font-size: 13px;
+}
+.fbd-bar-track {
+  height: 12px;
+}
+.fbd-bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+}
+.fbd-bar-value {
+  color: var(--ds-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.fbd-note {
+  font-size: 12px;
+  margin-top: 4px;
+}
+/* 100% stacked answer bars, 2px surface gap between segments */
+.fbd-stack {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  align-items: center;
+}
+.fbd-stack-seg {
+  height: 100%;
+  min-width: 3px;
+}
+.fbd-stack-seg:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.fbd-stack-seg:last-child {
+  border-radius: 0 4px 4px 0;
+}
+.fbd-stack-seg:only-child {
+  border-radius: 4px;
+}
+.fbd-ans-row {
+  grid-template-columns: minmax(110px, 18%) 1fr minmax(240px, 40%);
+}
+.fbd-ans-text {
+  color: var(--ds-text-soft);
+}
+/* columns per day */
+.fbd-cols {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  border-bottom: 1px solid var(--ds-line);
+  padding-top: 18px;
+}
+.fbd-axis-max {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 11px;
+}
+.fbd-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  max-width: 28px;
+}
+.fbd-col:hover {
+  background: var(--ds-surface-hi);
+}
+.fbd-seg-bar {
+  display: block;
+  width: 100%;
+}
+.fbd-seg-bar:first-child {
+  border-radius: 4px 4px 0 0;
+}
+.fbd-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-top: 4px;
+}
+/* table */
+.fbd-table-wrap {
+  overflow-x: auto;
+}
+.fbd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.fbd-table th {
+  text-align: left;
+  font-weight: normal;
+  color: var(--ds-text-muted);
+  border-bottom: 1px solid var(--ds-line);
+  padding: 6px 8px;
+}
+.fbd-table td {
+  border-bottom: 1px solid var(--ds-line-soft);
+  padding: 8px;
+  vertical-align: top;
+}
+.fbd-thumb {
+  width: 96px;
+  height: 64px;
+}
+.fbd-thumb > * {
+  width: 96px;
+  height: 64px;
+}
+.fbd-comment {
+  margin-top: 4px;
+  color: var(--ds-text);
+}
+.fbd-more {
+  margin-top: 10px;
+}
+.fbd-tip {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+  padding: 6px 10px;
+  background: #10140b;
+  border: 1px solid var(--ds-line);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--ds-text);
+  max-width: 280px;
+}

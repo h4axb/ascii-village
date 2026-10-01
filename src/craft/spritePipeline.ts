@@ -24,6 +24,7 @@ import {
 } from './spriteConfig';
 import { planCraft, planRetryGuidance, type VisionJSON } from './spriteGen';
 import { renderRegions } from './glyphRender';
+import { applyColorPref, type PrefValue } from './prefs';
 import {
   applyRelationAdjustments,
   cropBlankEdges,
@@ -41,6 +42,13 @@ export interface PlanAndRenderDeps {
   fallbackModel?: string;
   // false: no automatic re-plan after a failed first plan (the /1 test link)
   retry?: boolean;
+  // the player's crafting preferences (craft/prefs.ts, the /2 link):
+  // multiplier = glyph density (render resolution), color = palette shift,
+  // prefsText/temperature = the planner settings, reused by the re-plan
+  multiplier?: number;
+  color?: PrefValue;
+  prefsText?: string;
+  temperature?: number;
 }
 
 export async function planAndRender(
@@ -51,6 +59,7 @@ export async function planAndRender(
 ): Promise<{ sprite: GeneratedSprite | null; log: CraftLog; error?: string }> {
   const start = Date.now();
   const attempts: CraftAttempt[] = [];
+  const mult = deps.multiplier ?? RESOLUTION_MULTIPLIER;
 
   async function tryRender(plan: CraftPlan, level: 0 | 1): Promise<
     { ok: true; sprite: GeneratedSprite; warnings: string[] } | { ok: false; error: string }
@@ -66,7 +75,7 @@ export async function planAndRender(
     // comment. resolveRegions converts the plan's normalized (0..1,
     // centre-based) bounds into concrete cells at that canvas size, then
     // relation nudging runs in that same concrete cell space.
-    const canvas = resolveCanvasSize(validated.sizeClass, validated.width, validated.height);
+    const canvas = resolveCanvasSize(validated.sizeClass, validated.width, validated.height, mult);
     const rasterRegions = resolveRegions(validated.regions, canvas.width, canvas.height);
     const { regions: adjustedRegions, warnings: relationWarnings } = applyRelationAdjustments(
       rasterRegions,
@@ -83,11 +92,12 @@ export async function planAndRender(
       lines: padLines(cropped.lines),
       palette: rendered.palette,
       colors: cropped.colors,
-      resolutionScale: 1 / RESOLUTION_MULTIPLIER,
+      resolutionScale: 1 / mult,
     };
-    const v = validateSpriteCandidate(g, RESOLUTION_MULTIPLIER);
+    const v = validateSpriteCandidate(g, mult);
     if (!v.ok) return { ok: false, error: v.error ?? 'render validation failed' };
     sanitizeColors(g);
+    if (g.palette && deps.color) g.palette = applyColorPref(g.palette, deps.color);
     return { ok: true, sprite: g, warnings: [...check.warnings, ...relationWarnings] };
   }
 
@@ -117,7 +127,12 @@ export async function planAndRender(
   // the PLAN, not the render — rendering is deterministic, so retrying an
   // identical plan would only reproduce the same failure.
   const retryPrompt = `${prompt}\n\nYour previous attempt failed: ${a0.error}.${planRetryGuidance(a0.error)} Fix exactly that.`;
-  const plan1 = await planCraft(retryPrompt, category, deps.chat, { model: deps.model, fallbackModel: deps.fallbackModel });
+  const plan1 = await planCraft(retryPrompt, category, deps.chat, {
+    model: deps.model,
+    fallbackModel: deps.fallbackModel,
+    prefsText: deps.prefsText,
+    temperature: deps.temperature,
+  });
   const a1 = await tryRender(plan1, 1);
   if (a1.ok) return done(a1.sprite, 1, true, a1.warnings);
   attempts.push({ level: 1, error: a1.error });

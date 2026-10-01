@@ -100,7 +100,9 @@ function useFitToScreen(fill: boolean) {
         const cs = getComputedStyle(sheet);
         const availH = sheet.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
         const availW = sheet.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-        k = Math.min(1, availH / el.offsetHeight, availW / el.offsetWidth);
+        // the inner box is exactly the sheet's height; what its content
+        // really needs is its scroll size
+        k = Math.min(1, availH / el.scrollHeight, availW / el.offsetWidth);
       } else {
         k = Math.min(
           1,

@@ -1296,10 +1296,18 @@
   border-radius: 0;
   align-items: flex-start;
 }
+/* exactly the screen's height: a long chat scrolls inside instead of
+   growing the sheet (only a content minimum taller than the screen makes
+   the fit in Sheet.tsx scale it) */
 .ds-sheet.fill .ds-sheet-inner {
-  min-height: 100%;
+  height: 100%;
   box-sizing: border-box;
   transform-origin: top center;
+}
+.ds-sheet.fill .ds-sheet-body,
+.ds-sheet.fill .ds-sheet-main,
+.ds-sheet.fill .cw3 {
+  min-height: 0;
 }
 .ds-sheet.fill .ds-sheet-body {
   flex: 1;
@@ -1335,4 +1343,378 @@
   flex: 1;
   height: auto;
   min-height: 240px;
+}
+
+/* ---- crafting panel 2: rating + "Tune future crafts" (CraftFeedback.tsx) ---- */
+.fb-kind-tag {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--ds-line);
+  border-radius: 999px;
+  color: var(--ds-text-soft);
+  font-size: 11px;
+  vertical-align: 2px;
+}
+.fb-made {
+  margin-top: 4px;
+  color: var(--ds-text-muted);
+  font-size: 12px;
+}
+.fb-vote {
+  align-self: flex-end;
+  width: min(560px, 78%);
+  margin-right: 102px;
+  padding: 16px 18px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius);
+  background: rgb(38, 43, 28);
+  text-align: center;
+}
+.fb-vote-title {
+  font-size: 16px;
+}
+.fb-vote-sub {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.fb-vote-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+.fb-vote-btn {
+  padding: 14px 10px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+  color: var(--ds-text);
+  font: inherit;
+  cursor: pointer;
+}
+.fb-vote-btn:hover {
+  border-color: var(--ds-line-strong);
+}
+.fb-vote-btn.up.on {
+  border-color: var(--ds-go);
+  background: var(--ds-go-fill);
+}
+.fb-vote-btn.down.on {
+  border-color: #d29a85;
+  background: rgba(210, 120, 100, 0.18);
+}
+.fb-reasons {
+  margin-top: 16px;
+  text-align: left;
+}
+.fb-reasons-title {
+  font-size: 14px;
+}
+.fb-reasons-hint,
+.fb-count {
+  font-size: 11px;
+  margin: 2px 0 8px;
+}
+.fb-count {
+  margin: 8px 0 0;
+}
+.fb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.fb-chip {
+  padding: 6px 11px;
+  border: 1px solid var(--ds-line);
+  border-radius: 999px;
+  background: var(--ds-surface);
+  color: var(--ds-text-soft);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.fb-chip:hover:not(:disabled) {
+  border-color: var(--ds-line-strong);
+  color: var(--ds-text);
+}
+.fb-chip.on {
+  border-color: var(--ds-coin);
+  color: var(--ds-text);
+  background: rgba(242, 181, 60, 0.12);
+}
+.fb-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.fb-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+.fb-comment input {
+  padding: 8px 10px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--ds-text);
+  font: inherit;
+}
+.fb-comment input:focus {
+  outline: none;
+  border-color: var(--ds-coin);
+}
+/* the questions take over the chat area */
+.fb-tune {
+  width: min(760px, 100%);
+  margin: auto;
+  padding: 8px 0 12px;
+  text-align: center;
+}
+.fb-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+.fb-dots {
+  display: flex;
+  gap: 7px;
+}
+.fb-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--ds-line);
+  background: transparent;
+  cursor: pointer;
+}
+.fb-dot.done {
+  background: var(--ds-coin-dark);
+  border-color: var(--ds-coin-dark);
+}
+.fb-dot.current {
+  background: var(--ds-coin);
+  border-color: var(--ds-coin);
+  box-shadow: 0 0 0 4px rgba(242, 181, 60, 0.12);
+}
+.fb-dot:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.fb-q-eyebrow {
+  color: var(--ds-text-muted);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.fb-q-title {
+  margin: 6px 0;
+  font-size: 22px;
+  color: var(--ds-text);
+}
+.fb-q-help {
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.fb-answers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.fb-answer {
+  position: relative;
+  min-height: 170px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 10px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+  color: var(--ds-text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, transform 0.12s;
+}
+.fb-answer:hover {
+  border-color: var(--ds-line-strong);
+  transform: translateY(-2px);
+}
+.fb-answer.on {
+  border-color: var(--ds-coin);
+  box-shadow: 0 0 0 1px var(--ds-coin) inset;
+}
+.fb-answer-name {
+  font-size: 15px;
+}
+.fb-answer-desc {
+  font-size: 12px;
+}
+.fb-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: 220px;
+  padding: 8px 10px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  background: rgb(16, 20, 11);
+  color: var(--ds-text);
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+  z-index: 5;
+}
+.fb-answer:hover .fb-tip,
+.fb-skip-row:hover .fb-tip {
+  opacity: 1;
+}
+.fb-skip-row {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+.fb-glyph {
+  margin: 0 0 6px;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1.05;
+  white-space: pre;
+  text-align: left;
+}
+.fb-glyph .t-ink { color: var(--ds-text); }
+.fb-glyph .t-soft { color: var(--ds-text-muted); }
+.fb-glyph .t-gold { color: var(--ds-coin); }
+/* the colour question's swatches: pastel / normal / vivid of one blue */
+.fb-glyph .t-p1 { color: #c9d6e6; }
+.fb-glyph .t-p2 { color: #b3c6dd; }
+.fb-glyph .t-p3 { color: #9fb8d6; }
+.fb-glyph .t-n1 { color: #8aa6c8; }
+.fb-glyph .t-n2 { color: #6d91ba; }
+.fb-glyph .t-n3 { color: #557ca9; }
+.fb-glyph .t-v1 { color: #4a9bf5; }
+.fb-glyph .t-v2 { color: #1f7fe8; }
+.fb-glyph .t-v3 { color: #0f64c4; }
+.fb-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 18px 0 10px;
+  text-align: left;
+}
+.fb-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ds-line-soft);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+}
+.fb-summary-item .fb-glyph {
+  min-height: 0;
+  margin: 0;
+  font-size: 9px;
+}
+.fb-summary-item b {
+  display: block;
+  font-weight: normal;
+}
+.fb-saved-for {
+  font-size: 13px;
+}
+.fb-settings-note {
+  margin: 10px 0 16px;
+  color: var(--ds-text-soft);
+  font-size: 13px;
+}
+.ds-action.fb-back {
+  margin: 0 auto;
+}
+@media (max-width: 760px) {
+  .fb-answers,
+  .fb-summary {
+    grid-template-columns: 1fr;
+  }
+  .fb-vote {
+    width: auto;
+    margin-right: 0;
+  }
+}
+/* Settings → Crafting preferences */
+.fb-settings-intro {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.fb-settings-block {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ds-line-soft);
+}
+.fb-settings-scope {
+  margin-bottom: 4px;
+  color: var(--ds-text);
+}
+.fb-settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+  color: var(--ds-text-soft);
+}
+.fb-settings select {
+  font: inherit;
+  font-size: 12px;
+  color: var(--ds-text);
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  padding: 2px 6px;
+}
+.fb-settings-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+/* Settings: one column; two (Game + Crafting preferences | Controls) when
+   the crafting preferences are shown (crafting panel 2), so it stays short
+   enough for a laptop screen */
+.ds-panel.ds-settings.two {
+  max-width: min(900px, 94vw);
+  width: min(900px, 94vw);
+}
+.ds-settings.two .ds-settings-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+.ds-settings.two .ds-settings-cols > div > .ds-settings-section:first-child {
+  margin-top: 0;
+}
+@media (max-width: 760px) {
+  .ds-settings.two .ds-settings-cols {
+    grid-template-columns: 1fr;
+  }
+}
+.fb-settings-rows {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+}
+.fb-settings-row select {
+  max-width: 120px;
 }

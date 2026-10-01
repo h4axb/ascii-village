@@ -1,10 +1,11 @@
 // Cloudflare Worker entry (see wrangler.jsonc). Serves the built game from
-// dist/ and routes the LLM proxy. The proxy logic itself lives in
+// dist/ and routes the LLM proxy and the crafting-feedback store. The proxy logic itself lives in
 // functions/api/chat/completions.ts so the same code also works as a Pages
 // Function if the project is ever deployed to Pages instead.
 import { onRequestPost } from '../functions/api/chat/completions';
+import { handleFeedback, type FeedbackEnv } from '../functions/api/feedback';
 
-interface Env {
+interface Env extends FeedbackEnv {
   ASSETS: { fetch: (request: Request) => Promise<Response> };
   LLM_API_KEY?: string;
   LLM_BASE_URL?: string;
@@ -22,6 +23,8 @@ export default {
       }
       return onRequestPost({ request, env });
     }
+    // crafting feedback (crafting panel 2) — see functions/api/feedback.ts
+    if (pathname === '/api/feedback') return handleFeedback(request, env);
     return env.ASSETS.fetch(request);
   },
 };

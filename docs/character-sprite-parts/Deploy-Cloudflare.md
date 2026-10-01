@@ -31,10 +31,14 @@ for the esbuild build permission (`allowBuilds`).
 | <https://asciia-bay-2.app-testing.workers.dev/intro> | **Always plays the intro**, even over a finished save (for testing it again). |
 | <https://asciia-bay-2.app-testing.workers.dev/1> | **Crafting test link (panel 1), without the intro:** skips the intro like `/0`, and the workshop runs the new flow: a preflight offers two concepts or "Surprise me" for requests that can't be drawn as asked, no automatic re-plan, and leaving keeps the last finished design. |
 | <https://asciia-bay-2.app-testing.workers.dev/intro/1> | **Crafting panel 1 with the intro:** always plays the intro like `/intro`, then the workshop runs the same flow as `/1`. |
+| <https://asciia-bay-2.app-testing.workers.dev/2> | **Crafting test link (panel 2), without the intro:** the normal workshop, but every result must be rated (▲ I like it / ▼ Not quite, with optional reasons and a one-sentence comment), the player can tune future crafts (detail, colour, interpretation, surprise — remembered per kind, for all crafts or for the session), and only then is "Adjust it (12 coins)" offered. Ratings are stored for the dashboard below. See `docs/CraftFeedback.md`. |
+| <https://asciia-bay-2.app-testing.workers.dev/intro/2> | **Crafting panel 2 with the intro.** |
+| <https://asciia-bay-2.app-testing.workers.dev/2/feedback> | **The feedback dashboard** (password: the `FEEDBACK_ADMIN_TOKEN` secret): every panel-2 rating as charts, a table and CSV/JSON export. Needs the one-time setup in "Crafting feedback" below. |
 
 These paths work because `wrangler.jsonc` sets `not_found_handling:
 "single-page-application"`, so the Worker serves the game for any path;
-`src/App.tsx` (`INTRO_LINK`) reads the path to decide.
+`src/App.tsx` (`INTRO_LINK`) reads the path to decide (and `src/main.tsx`
+for `/2/feedback`).
 
 ## Workers or Pages?
 
@@ -108,6 +112,33 @@ All set in the same **Variables and Secrets** screen (type *Text*):
 | `LLM_BASE_URL` | `https://router.requesty.ai/v1` | Any OpenAI-compatible provider. |
 | `ALLOWED_ORIGINS` | *(none)* | Extra origins, e.g. `https://asciia-bay.com` for a custom domain. The `pages.dev` origin is always allowed. |
 | `VITE_LLM_DISABLED` | *(unset)* | Build-time: `1` ships an offline build using the mock responses. |
+
+## Crafting feedback (one-time setup for `/2` and `/2/feedback`)
+
+Panel-2 ratings are stored in a **Cloudflare D1** database through the same
+Worker (`functions/api/feedback.ts`, routed in `worker/index.ts`). Until this
+is set up the game works normally; ratings wait in each player's browser and
+are sent once the store exists. Run these in the project folder (PowerShell
+works), logged in with `npx wrangler login` if asked:
+
+1. **Create the database:**
+   `npx wrangler d1 create asciia-feedback`
+   It prints a `database_id`.
+2. **Bind it:** in `wrangler.jsonc`, remove the `//` in front of the
+   `"d1_databases"` lines (3 lines) and paste the `database_id` in place of
+   `PASTE-ID-HERE`.
+3. **Create the table:**
+   `npx wrangler d1 execute asciia-feedback --remote --file=worker/feedback.sql`
+4. **Set the dashboard password** (it asks you to type it; it's stored
+   encrypted on Cloudflare, never in the repo):
+   `npx wrangler secret put FEEDBACK_ADMIN_TOKEN`
+5. Commit + push `wrangler.jsonc`. After the deploy, open `/2/feedback` and
+   enter the password.
+
+What it stores, and what it never stores, is in `docs/CraftFeedback.md`.
+Under `pnpm dev` none of this is needed: ratings go to `.feedback-dev.json`
+(not committed) and the dashboard password there is `dev` (or the
+`FEEDBACK_ADMIN_TOKEN` environment variable, if set).
 
 ## What the proxy enforces
 

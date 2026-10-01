@@ -252,11 +252,18 @@ function isStructurallyValidRegion(r: unknown): r is RegionSpec {
 // — both are gone, not layered under a third function.
 // ---------------------------------------------------------------------------
 
-export function resolveCanvasSize(sizeClass: SizeClass, hintWidth: number, hintHeight: number): { width: number; height: number } {
+// `multiplier`: glyph cells per on-screen cell — RESOLUTION_MULTIPLIER by
+// default; the player's "detail" preference (craft/prefs.ts) picks 1-3.
+export function resolveCanvasSize(
+  sizeClass: SizeClass,
+  hintWidth: number,
+  hintHeight: number,
+  multiplier = RESOLUTION_MULTIPLIER,
+): { width: number; height: number } {
   const band = SIZE_BANDS[sizeClass];
-  const maxW = Math.min(band.maxW, MAX_SPRITE_WIDTH) * RESOLUTION_MULTIPLIER;
-  const minW = band.minW * RESOLUTION_MULTIPLIER;
-  const maxH = band.maxH * RESOLUTION_MULTIPLIER;
+  const maxW = Math.min(band.maxW, MAX_SPRITE_WIDTH) * multiplier;
+  const minW = band.minW * multiplier;
+  const maxH = band.maxH * multiplier;
   const ratio = hintWidth > 0 && hintHeight > 0 ? hintWidth / hintHeight : 1;
 
   // Fit the hinted aspect ratio into [minW,maxW] x [1,maxH]: start from the

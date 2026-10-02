@@ -1,27 +1,38 @@
 // Cloudflare Workers config: the game's static files (dist/) plus the LLM
 // proxy in worker/index.ts. See docs/Deploy-Cloudflare.md.
 {
-  // Must match the Worker's name in the Cloudflare dashboard.
-  "name": "asciia-bay-2",
-  "main": "worker/index.ts",
-  "compatibility_date": "2026-09-01",
-  "assets": {
-    "directory": "./dist",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
-    // Always hand /api/* to the Worker, never to the static files.
-    "run_worker_first": ["/api/*"]
-  },
-  // Keep text variables set in the dashboard (e.g. LLM_ALLOWED_MODELS) instead
-  // of wiping them on every deploy. Secrets are always kept.
-  "keep_vars": true,
-  "workers_dev": true,
-  // Crafting feedback store (the /2 link, read at /2/feedback). Left commented
-  // out until the database exists — a binding to a database that doesn't
-  // exist would fail the deploy. Setup: docs/Deploy-Cloudflare.md, section
-  // "Crafting feedback". Then uncomment and paste the printed database_id:
-  // "d1_databases": [
-  //   { "binding": "FEEDBACK_DB", "database_name": "asciia-feedback", "database_id": "PASTE-ID-HERE" }
-  // ],
-  "observability": { "enabled": true }
+	// Must match the Worker's name in the Cloudflare dashboard.
+	"name": "asciia-bay-2",
+	"main": "worker/index.ts",
+	"compatibility_date": "2026-09-01",
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application",
+		// Always hand /api/* to the Worker, never to the static files.
+		"run_worker_first": [
+			"/api/*"
+		]
+	},
+	// Keep text variables set in the dashboard (e.g. LLM_ALLOWED_MODELS) instead
+	// of wiping them on every deploy. Secrets are always kept.
+	"keep_vars": true,
+	"workers_dev": true,
+	// Crafting feedback store (the /2 link, read at /2/feedback). Left commented
+	// out until the database exists — a binding to a database that doesn't
+	// exist would fail the deploy. Setup: docs/Deploy-Cloudflare.md, section
+	// "Crafting feedback". Then uncomment and paste the printed database_id:
+	// "d1_databases": [
+	//   { "binding": "FEEDBACK_DB", "database_name": "asciia-feedback", "database_id": "PASTE-ID-HERE" }
+	// ],
+	"observability": {
+		"enabled": true
+	},
+  "d1_databases": [
+    {
+      "binding": "asciia_feedback",
+      "database_name": "asciia-feedback",
+      "database_id": "72bd1cbb-1ff4-44e0-849f-1ba7c3bd5e6d"
+    }
+	]
 }

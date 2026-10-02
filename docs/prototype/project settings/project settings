@@ -1,5 +1,6 @@
 + repository: git/ascii-village
 + project: 
++ ui/ux focus: test how the ui affects players user experience + does a design decrease the frustration
 
 ## Link
 regular: https://asciia-bay-2.app-testing.workers.dev/

@@ -281,9 +281,9 @@ function houseSlice(rawColStart: number, rawColEnd: number, rawRowStart: number,
 // at their own larger font-size.
 export const PLAYER_SCALE = 0.15;
 export const PLAYER_T = spriteTiles(S.PLAYER, PLAYER_SCALE);
-// His art has 37 rows (the player's 22): scaled so he stays the same 4.2
+// His art has 47 rows (the player's 22): scaled so he stays the same 4.2
 // lines tall as his earlier 28-row sprite at the player's scale.
-export const MITCHY_SCALE = (PLAYER_SCALE * 28) / 37;
+export const MITCHY_SCALE = (PLAYER_SCALE * 28) / 47;
 export const MITCHY_T = spriteTiles(S.MITCHY, MITCHY_SCALE);
 
 // An entity's footprint is the bottom row of tiles it covers. Used for

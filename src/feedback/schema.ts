@@ -5,6 +5,7 @@
 // shared by the browser, the Worker and the dev server (vite.config.ts), so
 // all three accept exactly the same thing.
 // ---------------------------------------------------------------------------
+import { checkPolicy } from '../craft/policy';
 
 export const FEEDBACK_REASONS = [
   "Didn't match my idea",
@@ -17,7 +18,29 @@ export const FEEDBACK_REASONS = [
 ] as const;
 export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
 
+// what "I like it" can say (crafting panel 1, the /1 link)
+export const POSITIVE_REASONS = [
+  'Matches my idea',
+  'Nice colours',
+  'Cute shape',
+  'Fun details',
+  'Great size',
+  'Surprising in a good way',
+] as const;
+export type PositiveReason = (typeof POSITIVE_REASONS)[number];
+
 export const COMMENT_MAX = 120;
+// a player's own tag (the /1 link): short, shown to other /1 players
+export const TAG_MAX = 30;
+
+// The pre-clarification step before a /1 craft: each question asked, the
+// answer picked (null = "You decide"), and whether the player skipped.
+export interface ClarifyLog {
+  questions: { topic: string; q: string; options: string[]; pick: string | null }[];
+  skipped: boolean; // Esc before or during the questions
+  ms: number; // time spent answering
+  outcome: 'crafted' | 'failed' | 'left'; // what followed
+}
 const PROMPT_MAX = 120;
 
 type P = Partial<Record<'detail' | 'color' | 'interpretation' | 'surprise', -1 | 0 | 1>>;
@@ -33,8 +56,11 @@ export interface FeedbackRecord {
   name: string; // the item's name
   kind: string; // plant | pets | clothing | vehicle | food | utensils | ''
   adjusted: boolean; // a paid rework of an earlier result
-  vote: 'up' | 'down';
+  vote: 'up' | 'down' | null; // null only on a /1 record that never reached a result (`clarify` set)
   reasons: FeedbackReason[]; // "Not quite" only, max 3
+  positive: PositiveReason[]; // "I like it" only (the /1 link), max 3
+  tags: string[]; // own or other players' tags (the /1 link), max 3 together with the reasons
+  clarify: ClarifyLog | null; // the /1 pre-clarification behind this result
   comment: string; // one sentence, max COMMENT_MAX, may be ''
   applied: P; // the preferences this result was crafted with
   answers: P | null; // "Tune future crafts" answers (null = not tuned)
@@ -44,6 +70,27 @@ export interface FeedbackRecord {
 
 const KINDS = new Set(['plant', 'pets', 'clothing', 'vehicle', 'food', 'utensils', '']);
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
+
+// a player's own tag, cleaned — or null when it can't be shown to others
+export function cleanTag(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.replace(/\s+/g, ' ').trim().slice(0, TAG_MAX);
+  return t.length >= 2 && checkPolicy(t).allowed ? t : null;
+}
+
+function clarifyLog(v: unknown): ClarifyLog | null {
+  if (!v || typeof v !== 'object') return null;
+  const c = v as Record<string, unknown>;
+  const questions = (Array.isArray(c.questions) ? c.questions : []).slice(0, 2).map((q) => {
+    const o = (q ?? {}) as Record<string, unknown>;
+    const options = (Array.isArray(o.options) ? o.options : []).filter((x): x is string => typeof x === 'string').slice(0, 3).map((x) => x.slice(0, 30));
+    const pick = typeof o.pick === 'string' && options.includes(o.pick) ? o.pick : null;
+    return { topic: str(o.topic, 30), q: str(o.q, 100), options, pick };
+  });
+  const outcome = c.outcome === 'crafted' || c.outcome === 'failed' || c.outcome === 'left' ? c.outcome : 'crafted';
+  const ms = Number(c.ms);
+  return { questions, skipped: c.skipped === true, ms: Number.isFinite(ms) ? Math.max(0, Math.min(3_600_000, Math.round(ms))) : 0, outcome };
+}
 
 function prefs(v: unknown): P {
   const out: P = {};
@@ -64,7 +111,9 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
   const player = str(r.player, 64);
   if (!/^[\w-]{6,64}$/.test(id)) return 'bad id';
   if (!/^[\w-]{6,64}$/.test(player)) return 'bad player';
-  if (r.vote !== 'up' && r.vote !== 'down') return 'vote must be up or down';
+  const clarify = clarifyLog(r.clarify);
+  const vote = r.vote === 'up' || r.vote === 'down' ? r.vote : null;
+  if (!vote && !clarify) return 'vote must be up or down';
   const kind = str(r.kind, 16);
   const reasons = Array.isArray(r.reasons)
     ? [...new Set(r.reasons.filter((x): x is FeedbackReason => (FEEDBACK_REASONS as readonly unknown[]).includes(x)))].slice(0, 3)
@@ -79,6 +128,13 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
       if (k.length <= 2 && typeof hex === 'string' && /^#[0-9a-f]{6}$/i.test(hex)) palette[k] = hex;
     }
   }
+  const positive = Array.isArray(r.positive)
+    ? [...new Set(r.positive.filter((x): x is PositiveReason => (POSITIVE_REASONS as readonly unknown[]).includes(x)))].slice(0, 3)
+    : [];
+  const tags = Array.isArray(r.tags)
+    ? [...new Map(r.tags.map(cleanTag).filter((t): t is string => !!t).map((t) => [t.toLowerCase(), t])).values()]
+    : [];
+  const picked = vote === 'down' ? reasons : vote === 'up' ? positive : [];
   const scope = r.scope === 'kind' || r.scope === 'all' || r.scope === 'session' ? r.scope : null;
   return {
     v: 1,
@@ -91,9 +147,12 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
     name: str(r.name, 40),
     kind: KINDS.has(kind) ? kind : '',
     adjusted: r.adjusted === true,
-    vote: r.vote,
-    reasons: r.vote === 'down' ? reasons : [],
-    comment: r.vote === 'down' ? str(r.comment, COMMENT_MAX).trim() : '',
+    vote,
+    reasons: vote === 'down' ? reasons : [],
+    positive: vote === 'up' ? positive : [],
+    tags: vote ? tags.slice(0, Math.max(0, 3 - picked.length)) : [],
+    clarify,
+    comment: vote === 'down' ? str(r.comment, COMMENT_MAX).trim() : '',
     applied: prefs(r.applied),
     answers: r.answers ? prefs(r.answers) : null,
     scope,

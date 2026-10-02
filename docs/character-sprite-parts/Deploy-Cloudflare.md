@@ -27,13 +27,16 @@ for the esbuild build permission (`allowBuilds`).
 | Link | What it opens |
 |---|---|
 | <https://asciia-bay-2.app-testing.workers.dev/> | The game as a new player gets it: **with the intro** for a new save, straight into the island for a finished one. |
-| <https://asciia-bay-2.app-testing.workers.dev/0> | **Skips the intro** and starts straight on the island, whatever the save says. |
-| <https://asciia-bay-2.app-testing.workers.dev/intro> | **Always plays the intro**, even over a finished save (for testing it again). |
-| <https://asciia-bay-2.app-testing.workers.dev/1> | **Crafting test link (panel 1), without the intro:** skips the intro like `/0`, and the workshop runs the new flow: a preflight offers two concepts or "Surprise me" for requests that can't be drawn as asked, no automatic re-plan, and leaving keeps the last finished design. |
-| <https://asciia-bay-2.app-testing.workers.dev/intro/1> | **Crafting panel 1 with the intro:** always plays the intro like `/intro`, then the workshop runs the same flow as `/1`. |
-| <https://asciia-bay-2.app-testing.workers.dev/2> | **Crafting test link (panel 2), without the intro:** the normal workshop, but every result must be rated (▲ I like it / ▼ Not quite, with optional reasons and a one-sentence comment), the player can tune future crafts (detail, colour, interpretation, surprise — remembered per kind, for all crafts or for the session), and only then is "Adjust it (12 coins)" offered. Ratings are stored for the dashboard below. See `docs/CraftFeedback.md`. |
-| <https://asciia-bay-2.app-testing.workers.dev/intro/2> | **Crafting panel 2 with the intro.** |
-| <https://asciia-bay-2.app-testing.workers.dev/2/feedback> | **The feedback dashboard** (password: the `FEEDBACK_ADMIN_TOKEN` secret): every panel-2 rating as charts, a table and CSV/JSON export. Needs the one-time setup in "Crafting feedback" below. |
+| <https://asciia-bay-2.app-testing.workers.dev/0> | **Standard workshop, without the intro:** starts straight on the island, whatever the save says. |
+| <https://asciia-bay-2.app-testing.workers.dev/intro/0> | **Standard workshop with the intro** (same as `/intro`): always plays the intro, even over a finished save. |
+| <https://asciia-bay-2.app-testing.workers.dev/intro> | Same as `/intro/0`. |
+| <https://asciia-bay-2.app-testing.workers.dev/1> | **Pre-clarification (panel 1), without the intro:** after the player writes a prompt, Mitchy asks 0–2 short questions that really change the picture (one chat message each, answers as buttons, always with "✦ You decide"), then shows her plan, where any answer can be changed by clicking a tag; the green Craft it! button commits, Esc skips. Every result is rated (▲ I like it / ▼ Not quite, then tags, other /1 players' tags and an own 30-character tag), failures offer no alternatives. See `docs/CraftFeedback.md`. |
+| <https://asciia-bay-2.app-testing.workers.dev/intro/1> | **Pre-clarification with the intro.** |
+| <https://asciia-bay-2.app-testing.workers.dev/2> | **Post-reflection (panel 2), without the intro:** the normal workshop, but every result must be rated (▲ I like it / ▼ Not quite, with optional reasons and a one-sentence comment), the player can tune future crafts (detail, colour, interpretation, surprise — remembered per kind, for all crafts or for the session), and only then is "Adjust it (12 coins)" offered. See `docs/CraftFeedback.md`. |
+| <https://asciia-bay-2.app-testing.workers.dev/intro/2> | **Post-reflection with the intro.** |
+| <https://asciia-bay-2.app-testing.workers.dev/3> | **Alternatives (panel 3), without the intro:** a preflight offers two concepts or "Surprise me" for requests that can't be drawn as asked, no automatic re-plan, and leaving keeps the last finished design (this was `/1` before). |
+| <https://asciia-bay-2.app-testing.workers.dev/intro/3> | **Alternatives with the intro.** |
+| <https://asciia-bay-2.app-testing.workers.dev/2/feedback> | **The feedback dashboard** (password: the `FEEDBACK_ADMIN_TOKEN` secret): every rating from /1 and /2 (plus /1's clarification answers) as charts, a table and CSV/JSON export. Needs the one-time setup in "Crafting feedback" below. |
 
 These paths work because `wrangler.jsonc` sets `not_found_handling:
 "single-page-application"`, so the Worker serves the game for any path;

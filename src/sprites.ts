@@ -257,18 +257,24 @@ export const WALK_RIGHT_PAD_TOP: number = (walkRightData as { padTop?: number })
 export const MITCHY: string[] = mitchyData.sprite;
 export const MITCHY_COLORS: string[] = mitchyData.colors;
 export const MITCHY_PALETTE: Record<string, string> = mitchyData.palette;
-const MITCHY_HEAD_ROWS = 23; // rows 0-22: ears to glasses and chin, above the collar line
+const MITCHY_HEAD_ROWS = 29; // rows 0-28: ears to glasses and chin, above the collar line
 export const MITCHY_FACE: string[] = MITCHY.slice(0, MITCHY_HEAD_ROWS);
 export const MITCHY_FACE_COLORS: string[] = MITCHY_COLORS.slice(0, MITCHY_HEAD_ROWS);
 
 // His happy slow-blink (shown when a sale closes): the eye cells (the yellow
 // iris, the pupils and the highlight) turn into fur, with a '^' across the
 // iris row — eyes squeezed shut in a smile. Derived from the art rather than
-// hand-drawn, so it always matches the baked sprite; the glasses below
-// (rows 19-21) are left alone.
-const MITCHY_EYE_ROWS = [16, 17, 18];
-const MITCHY_BLINK_ROW = 17;
-const isEyeDetail = (hex: string | undefined) => hex === '#120c10' || hex === '#ffffff';
+// hand-drawn, so it always matches the baked sprite; the glasses
+// (rows 23-25) are left alone.
+const MITCHY_EYE_ROWS = [20, 21, 22, 23, 24];
+const MITCHY_BLINK_ROW = 22;
+// the pupils, and the pale highlights in the iris (the grey glasses stay)
+const isEyeDetail = (hex: string | undefined) => {
+  if (!hex) return false;
+  if (hex === '#120c10') return true;
+  const n = parseInt(hex.slice(1), 16);
+  return n >> 16 > 240 && ((n >> 8) & 255) > 220;
+};
 const isWarm = (hex: string | undefined) => {
   if (!hex) return false;
   const n = parseInt(hex.slice(1), 16);

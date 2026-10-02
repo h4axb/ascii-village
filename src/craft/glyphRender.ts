@@ -352,6 +352,8 @@ export function renderRegions(
   regions: RasterRegion[],
   seedKey: string,
   face?: FaceMark[],
+  // a mood's glyph sets (craft/moods.ts) in place of BAND_GLYPHS
+  bandGlyphs?: Record<Band, string[]>,
 ): RenderedSprite {
   const w = Math.max(1, Math.round(width));
   const h = Math.max(1, Math.round(height));
@@ -418,7 +420,7 @@ export function renderRegions(
       const coarse = vnoise(seedKey, x, y, 0.25);
       const fine = vnoise(seedKey, x + 100, y + 100, 0.9);
       const bias = Math.min(1, Math.max(0, (cell.edge ?? 0) * 0.55 + coarse * 0.25 + fine * 0.2));
-      const set = BAND_GLYPHS[cell.band];
+      const set = (bandGlyphs ?? BAND_GLYPHS)[cell.band];
       const idx = Math.min(set.length - 1, Math.floor(bias * set.length));
       cell.glyph = set[idx];
     }

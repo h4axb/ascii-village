@@ -24,7 +24,7 @@ export default {
       return onRequestPost({ request, env });
     }
     // crafting feedback (crafting panel 2) — see functions/api/feedback.ts
-    if (pathname === '/api/feedback') return handleFeedback(request, env);
+    if (pathname === '/api/feedback' || pathname === '/api/feedback/tags') return handleFeedback(request, env);
     return env.ASSETS.fetch(request);
   },
 };

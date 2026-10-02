@@ -7,12 +7,15 @@
 //   GET  /api/feedback  — every record, newest first, for the /2/feedback
 //                         dashboard. Needs `Authorization: Bearer <token>`
 //                         matching the FEEDBACK_ADMIN_TOKEN secret.
+//   GET  /api/feedback/tags — public: the tags /1 players wrote, as
+//                         {up: [{tag, count}], down: [...]}, top 8 each.
+//                         Only tag text, nothing else.
 //
 // Setup (once) is in docs/Deploy-Cloudflare.md: create the database, put its
 // id in wrangler.jsonc, create the table (worker/feedback.sql), set the
 // secret. Until then both routes answer 503 and the game keeps feedback in
 // the browser's outbox (src/feedback/client.ts) to resend later.
-import { normalizeFeedback } from '../../src/feedback/schema';
+import { cleanTag, normalizeFeedback } from '../../src/feedback/schema';
 
 // Minimal slice of Cloudflare's D1 API — avoids pulling in
 // @cloudflare/workers-types for these few calls.
@@ -33,6 +36,31 @@ export interface FeedbackEnv {
 
 const MAX_BODY_BYTES = 48 * 1024;
 const MAX_ROWS = 10000;
+const TAG_LINKS = ['/1', '/intro/1'];
+const TAGS_SHOWN = 8;
+
+// [{tag, count}] over the records' own tags, most used first; tags are
+// matched ignoring case and spacing, and re-checked before going public
+export function topTags(records: { tags?: unknown }[]): { tag: string; count: number }[] {
+  const counts = new Map<string, { tag: string; count: number }>();
+  for (const r of records) {
+    for (const raw of Array.isArray(r.tags) ? r.tags : []) {
+      const tag = cleanTag(raw);
+      if (!tag) continue;
+      const key = tag.toLowerCase();
+      const e = counts.get(key);
+      if (e) e.count++;
+      else counts.set(key, { tag, count: 1 });
+    }
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, TAGS_SHOWN);
+}
+export function tagsByVote(records: { tags?: unknown; vote?: unknown }[]) {
+  return {
+    up: topTags(records.filter((r) => r.vote === 'up')),
+    down: topTags(records.filter((r) => r.vote === 'down')),
+  };
+}
 
 const json = (status: number, data: unknown) =>
   new Response(JSON.stringify(data), {
@@ -58,6 +86,23 @@ export async function handleFeedback(request: Request, env: FeedbackEnv): Promis
   if (!env.FEEDBACK_DB) return json(503, { error: 'feedback storage is not set up (FEEDBACK_DB)' });
   const db = env.FEEDBACK_DB;
 
+  if (request.method === 'GET' && new URL(request.url).pathname === '/api/feedback/tags') {
+    const { results } = await db
+      .prepare(`SELECT data FROM feedback WHERE link IN (${TAG_LINKS.map((_, i) => `?${i + 1}`).join(', ')}) ORDER BY at DESC LIMIT ${MAX_ROWS}`)
+      .bind(...TAG_LINKS)
+      .all<{ data: string }>();
+    const recs = results.map((r) => {
+      try {
+        return JSON.parse(r.data) as { tags?: unknown; vote?: unknown };
+      } catch {
+        return {};
+      }
+    });
+    return new Response(JSON.stringify(tagsByVote(recs)), {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' },
+    });
+  }
+
   if (request.method === 'POST') {
     const origin = request.headers.get('Origin');
     const allowed = [new URL(request.url).origin, ...list(env.ALLOWED_ORIGINS)];
@@ -79,7 +124,7 @@ export async function handleFeedback(request: Request, env: FeedbackEnv): Promis
           'ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, vote = excluded.vote, data = excluded.data ' +
           'WHERE feedback.player = excluded.player',
       )
-      .bind(rec.id, rec.at, rec.player, rec.link, rec.kind, rec.vote, JSON.stringify(rec))
+      .bind(rec.id, rec.at, rec.player, rec.link, rec.kind, rec.vote ?? 'none', JSON.stringify(rec))
       .run();
     return json(200, { ok: true });
   }

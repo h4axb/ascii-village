@@ -198,6 +198,32 @@ export function applyColorPref(palette: Record<string, string>, color: PrefValue
   return out;
 }
 
+// A general palette shift (the mood presets, craft/moods.ts): `light` and
+// `sat` pull lightness / saturation toward a target (-1 darker or duller,
+// +1 lighter or stronger), `hue` rotates by degrees.
+export interface PaletteShift {
+  light?: number;
+  sat?: number;
+  hue?: number;
+}
+export function transformPalette(palette: Record<string, string>, shift: PaletteShift): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, hex] of Object.entries(palette)) out[k] = shiftHex(hex, shift);
+  return out;
+}
+
+function shiftHex(hex: string, { light = 0, sat = 0, hue = 0 }: PaletteShift): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const [h, s, l] = rgbToHsl((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  const h2 = (((h + hue / 360) % 1) + 1) % 1;
+  const s2 = sat >= 0 ? s + (1 - s) * sat * 0.6 : s * (1 + sat * 0.7);
+  const l2 = light >= 0 ? l + (0.92 - l) * light * 0.55 : l * (1 + light * 0.5);
+  const [r, g, b] = hslToRgb(h2, Math.max(0, Math.min(1, s2)), Math.max(0, Math.min(1, l2)));
+  return '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+}
+
 function adjustHex(hex: string, dir: -1 | 1): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return hex;

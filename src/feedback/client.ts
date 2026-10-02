@@ -94,3 +94,19 @@ export async function sendFeedback(rec: FeedbackRecord): Promise<void> {
 export function flushFeedbackOutbox(): void {
   void flush();
 }
+
+// Tags other /1 players wrote, per vote (functions/api/feedback.ts
+// tagsByVote). Empty when storage isn't reachable — the chips just don't show.
+export type SharedTags = { up: string[]; down: string[] };
+export async function loadSharedTags(): Promise<SharedTags> {
+  try {
+    const res = await fetch('/api/feedback/tags');
+    if (!res.ok) return { up: [], down: [] };
+    const d = (await res.json()) as Record<'up' | 'down', { tag?: unknown }[] | undefined>;
+    const list = (v: { tag?: unknown }[] | undefined) =>
+      (Array.isArray(v) ? v : []).map((x) => x?.tag).filter((t): t is string => typeof t === 'string').slice(0, 8);
+    return { up: list(d.up), down: list(d.down) };
+  } catch {
+    return { up: [], down: [] };
+  }
+}

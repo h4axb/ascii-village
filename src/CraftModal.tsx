@@ -18,19 +18,34 @@
 // (history → current chat); Esc, ✕ and ← on the current chat always ask
 // before leaving, and [F] confirms like the world's interaction prompts.
 //
-// With `choices` (the /1 test link) a craft first runs a preflight: when the
+// With `choices` (the /3 test link) a craft first runs a preflight: when the
 // request can't be drawn as asked, Mitchy offers two concepts or her own
 // hunch ("Surprise me") before drawing anything; the shown result is always
 // exactly what the player gets. There, leaving never throws a finished
 // design away: the last result goes into the inventory.
+//
+// With `clarify` (the /1 test link) a new idea first gets Mitchy's 0-2
+// questions (one message each, "You decide" always offered), then her plan
+// with every answer changeable; Craft it! commits, Esc skips. Each result is
+// rated in a fixed-size panel (CraftClarify.tsx); failures offer no
+// alternatives. Leaving keeps the last finished design, as above.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import * as S from './sprites';
-import { craftItem, mitchyChat, getMitchyLine, preflightCraft } from './llm';
-import type { CraftConcept, OwnedItem, ShopItem } from './llm';
+import { craftItem, mitchyChat, getMitchyLine, preflightCraft, clarifyPrompt } from './llm';
+import type { ClarifyQuestion, CraftClarify, CraftConcept, OwnedItem, ShopItem } from './llm';
+import { clarifyGuidance } from './craft';
+import { ClarifyPlan, RatingPanel, YOU_DECIDE, type RateStep } from './CraftClarify';
 import { FeedbackVote, TuneQuestions } from './CraftFeedback';
 import { appliedLabels, isKind, KIND_LABEL, savePrefs, type Kind, type Prefs, type Scope } from './craft/prefs';
-import type { FeedbackReason } from './feedback/schema';
-import { newFeedbackId, playerId, sendFeedback, SESSION } from './feedback/client';
+import {
+  cleanTag,
+  FEEDBACK_REASONS,
+  POSITIVE_REASONS,
+  type ClarifyLog,
+  type FeedbackReason,
+  type PositiveReason,
+} from './feedback/schema';
+import { loadSharedTags, newFeedbackId, playerId, sendFeedback, SESSION, type SharedTags } from './feedback/client';
 import { appendHistory, ago, loadHistory, type CraftRecord, type ChatLine } from './craftHistory';
 import { MITCHY_NAME } from './introPartB';
 import {
@@ -53,8 +68,8 @@ export const ADJUST_PRICE = 12;
 
 const MITCHY: Speaker = { name: MITCHY_NAME, look: S.MITCHY_FACE_LOOK, solid: {} };
 
-// input → working → (choosing →) working → failed | success → folded
-type Phase = 'input' | 'working' | 'choosing' | 'failed' | 'success' | 'folded';
+// input → working → (choosing | clarifying →) working → failed | success → folded
+type Phase = 'input' | 'working' | 'choosing' | 'clarifying' | 'failed' | 'success' | 'folded';
 
 type Result = { item: ShopItem; prompt: string };
 
@@ -73,13 +88,33 @@ interface Fb {
   step: 'vote' | 'tuning' | 'tuned';
   answers: Prefs | null;
   scope: Scope | null;
+  // (clarify, the /1 link) the rating panel: vote → tags → thank-you
+  rstep: RateStep;
+  picked: string[]; // standard and other players' tags
+  ownOpen: boolean;
+  own: string; // the player's own tag
+  clarify: ClarifyLog | null; // the pre-clarification behind this result
+}
+
+// (clarify) Mitchy's questions before a craft: picks[i] is the chosen option,
+// null = "You decide", undefined = not answered yet; `step` = the question
+// being asked (questions.length once the plan panel shows); `run` crafts.
+interface Clar {
+  prompt: string;
+  questions: ClarifyQuestion[];
+  picks: (number | null | undefined)[];
+  step: number;
+  t0: number;
+  locked: boolean; // crafting started: the answers are final
+  run: (c: CraftClarify, log: ClarifyLog) => void;
 }
 
 type Turn =
   | { who: 'mitchy' | 'me'; kind: 'text'; text: string }
   | { who: 'mitchy'; kind: 'result'; item: ShopItem; prompt: string; status?: string; tag?: string; made?: string[] }
   | { who: 'mitchy'; kind: 'alts'; intro: string; options: string[] }
-  | { who: 'mitchy'; kind: 'concepts'; concepts: [CraftConcept, CraftConcept]; surprise: string };
+  | { who: 'mitchy'; kind: 'concepts'; concepts: [CraftConcept, CraftConcept]; surprise: string }
+  | { who: 'mitchy'; kind: 'plan' }; // (clarify) the plan panel, live from `clar`
 
 const CONCEPT_LETTERS = ['A', 'B'] as const;
 
@@ -140,6 +175,7 @@ export default function CraftModal({
   player,
   choices = false,
   feedback = false,
+  clarify = false,
   money,
   onSpend,
   onConsume,
@@ -151,8 +187,9 @@ export default function CraftModal({
 }: {
   token: OwnedItem;
   player: Speaker; // the player's name and face, for their side of the chat
-  choices?: boolean; // the /1 flow: preflight + concepts, no auto retry, keep the last result on leave
+  choices?: boolean; // the /3 flow: preflight + concepts, no auto retry, keep the last result on leave
   feedback?: boolean; // the /2 flow: rate each result, tune future crafts (CraftFeedback.tsx), keep the last result on leave
+  clarify?: boolean; // the /1 flow: Mitchy's questions before crafting, then rate each result (CraftClarify.tsx), keep the last result on leave
   money: number;
   onSpend: (coins: number) => void; // negative = refund
   onConsume: (equip: boolean, item: ShopItem) => void; // spend token, equip if asked — does NOT close
@@ -192,6 +229,13 @@ export default function CraftModal({
   const fbRef = useRef(fb);
   fbRef.current = fb;
   const [leaveSel, setLeaveSel] = useState(0);
+  const [clar, setClar] = useState<Clar | null>(null);
+  const clarRef = useRef(clar);
+  clarRef.current = clar;
+  const [peers, setPeers] = useState<SharedTags>({ up: [], down: [] });
+  useEffect(() => {
+    if (clarify) void loadSharedTags().then(setPeers);
+  }, [clarify]);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
 
@@ -221,10 +265,19 @@ export default function CraftModal({
     setBusyLine(null);
     partialLevel.current = -1;
     reworking.current = !!rework;
-    getMitchyLine('a "hold on, building your thing right now" busy').then(setBusyLine);
+    // (clarify) a new idea gets Mitchy's questions first (not a rework)
+    const asking = clarify && !rework && !how.direct;
+    const building = () => getMitchyLine('a "hold on, building your thing right now" busy').then(setBusyLine);
+    if (!asking) void building();
 
-    const draw = () =>
-      craftItem(
+    const draw = (cl?: CraftClarify, log?: ClarifyLog) => {
+      if (asking) {
+        setPhase('working');
+        setStage(null);
+        setBusyLine(null);
+        void building();
+      }
+      void craftItem(
         craftPrompt,
         {
           onStage: (s: string) => setStage(s),
@@ -235,8 +288,9 @@ export default function CraftModal({
             } else setPartial((p) => [...p, line]);
           },
         },
-        { retry: !choices, prefs: feedback },
-      ).then((r) => finish(r));
+        { retry: !choices, prefs: feedback, ...(clarify ? { clarify: cl, noAlts: true } : {}) },
+      ).then((r) => finish(r, log));
+    };
 
     if (choices && !rework && !how.direct) {
       setStage('thinking');
@@ -252,9 +306,27 @@ export default function CraftModal({
         });
         push({ who: 'mitchy', kind: 'concepts', concepts: pf.concepts, surprise: pf.surprise });
       });
+    } else if (asking) {
+      setStage('thinking');
+      setBusyLine('Ooh, let me think about that for a second.');
+      const t0 = Date.now();
+      void clarifyPrompt(craftPrompt).then((qs) => {
+        if (closed.current) return;
+        if (!qs.length) return draw(undefined, { questions: [], skipped: false, ms: Date.now() - t0, outcome: 'crafted' });
+        setStage(null);
+        setBusyLine(null);
+        setPhase('clarifying');
+        setClar({ prompt: craftPrompt, questions: qs, picks: [], step: 0, t0: Date.now(), locked: false, run: draw });
+        push({
+          who: 'mitchy',
+          kind: 'text',
+          text: `Ooh, before I start I have ${qs.length === 1 ? 'one quick question' : 'two quick questions'} so it turns out the way you imagine.`,
+        });
+        push({ who: 'mitchy', kind: 'text', text: qs[0].q });
+      });
     } else draw();
 
-    function finish(r: Awaited<ReturnType<typeof craftItem>>) {
+    function finish(r: Awaited<ReturnType<typeof craftItem>>, log?: ClarifyLog) {
       if (closed.current) return; // left meanwhile; leave() already settled it
       reworking.current = false;
       setStage(null);
@@ -264,6 +336,7 @@ export default function CraftModal({
         if (rework) setAdjusted(true);
         if (how.surprise) push({ who: 'mitchy', kind: 'text', text: "Ta-da! Here's what I came up with." });
         const kind = feedback && isKind(r.kind) ? r.kind : null;
+        const rated = feedback || clarify;
         push({
           who: 'mitchy',
           kind: 'result',
@@ -275,11 +348,13 @@ export default function CraftModal({
                 made: appliedLabels(r.applied ?? {}),
                 status: 'There it is. First impression?',
               }
-            : {}),
+            : clarify
+              ? { status: 'There it is. What do you think?' }
+              : {}),
         });
         setPopup({ item: r.item, prompt: craftPrompt });
         lastResult.current = { item: r.item, prompt: craftPrompt };
-        if (feedback)
+        if (rated)
           setFb({
             id: newFeedbackId(),
             at: Date.now(),
@@ -294,6 +369,11 @@ export default function CraftModal({
             step: 'vote',
             answers: null,
             scope: null,
+            rstep: 'vote',
+            picked: [],
+            ownOpen: false,
+            own: '',
+            clarify: log ?? null,
           });
       } else if (rework) {
         // the rework failed: coins back, and the previous design is still
@@ -304,6 +384,7 @@ export default function CraftModal({
         push({ who: 'mitchy', kind: 'result', item: rework.item, prompt: rework.prompt });
         setPopup(rework);
       } else {
+        if (clarify && log) sendClarifyOnly(craftPrompt, { ...log, outcome: 'failed' });
         setPhase('failed');
         setInput(text.slice(0, PROMPT_MAX)); // pre-fill so they can edit instead of retype
         if (r.suggestions?.length) push({ who: 'mitchy', kind: 'alts', intro: r.reply, options: r.suggestions });
@@ -312,9 +393,107 @@ export default function CraftModal({
     }
   }
 
+  // ---- (clarify) answering Mitchy's questions ----
+  function answerClar(pick: number | null) {
+    const c = clarRef.current;
+    if (!c || c.locked || c.step >= c.questions.length) return;
+    const q = c.questions[c.step];
+    push({ who: 'me', kind: 'text', text: pick === null ? YOU_DECIDE : q.options[pick].label });
+    const picks = [...c.picks];
+    picks[c.step] = pick;
+    const step = c.step + 1;
+    if (step < c.questions.length) push({ who: 'mitchy', kind: 'text', text: c.questions[step].q });
+    else {
+      push({
+        who: 'mitchy',
+        kind: 'text',
+        text: 'Lovely. Here is what I will make. Click any answer to change it, and press Craft it whenever you are ready.',
+      });
+      push({ who: 'mitchy', kind: 'plan' });
+    }
+    setClar({ ...c, picks, step });
+  }
+  // Craft it! on the plan panel, or Esc: open questions become "You decide"
+  function commitClar(skipped: boolean) {
+    const c = clarRef.current;
+    if (!c || c.locked) return;
+    const picks = c.questions.map((_, i) => c.picks[i] ?? null);
+    if (skipped && c.step < c.questions.length)
+      push({ who: 'mitchy', kind: 'text', text: "No problem, I'll decide the rest myself." });
+    setClar({ ...c, picks, locked: true });
+    const answers = c.questions.map((q, i) => ({ topic: q.topic, pick: picks[i] === null ? null : q.options[picks[i]!] }));
+    const chosen = answers.flatMap((a) => (a.pick ? [a.pick] : []));
+    const cl: CraftClarify = {
+      guidance: clarifyGuidance(answers),
+      size: chosen.find((o) => o.size)?.size,
+      finish: chosen.find((o) => o.finish)?.finish,
+      mood: chosen.find((o) => o.mood)?.mood,
+    };
+    c.run(cl, clarLog(c, picks, skipped, 'crafted'));
+  }
+  function clarLog(c: Clar, picks: (number | null | undefined)[], skipped: boolean, outcome: ClarifyLog['outcome']): ClarifyLog {
+    return {
+      questions: c.questions.map((q, i) => ({
+        topic: q.topic,
+        q: q.q,
+        options: q.options.map((o) => o.label),
+        pick: picks[i] == null ? null : q.options[picks[i]!].label,
+      })),
+      skipped,
+      ms: Date.now() - c.t0,
+      outcome,
+    };
+  }
+  // a clarification that never got rated (the craft failed, or the player
+  // left before crafting) — still worth a record
+  function sendClarifyOnly(prompt: string, log: ClarifyLog) {
+    void sendFeedback({
+      v: 1,
+      id: newFeedbackId(),
+      at: Date.now(),
+      player: playerId(),
+      session: SESSION,
+      link: window.location.pathname,
+      prompt,
+      name: '',
+      kind: '',
+      adjusted: false,
+      vote: null,
+      reasons: [],
+      positive: [],
+      tags: [],
+      clarify: log,
+      comment: '',
+      applied: {},
+      answers: null,
+      scope: null,
+      sprite: { lines: [] },
+    });
+  }
+  // Esc skips the questions (or the rating's tags) instead of asking to leave
+  useEffect(() => {
+    const asking = phase === 'clarifying';
+    const tagging = !!fb && fb.rstep === 'tags';
+    if (!clarify || confirmClose || (!asking && !tagging)) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (asking) commitClar(true);
+      else finishRating();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  });
+
   // (an adjustment is sent from its own option, not from Craft it!)
-  const canSend = !!input.trim() && !done && !popup;
+  const planReady = phase === 'clarifying' && !!clar && !clar.locked && clar.step >= clar.questions.length;
+  const canSend = planReady || (!!input.trim() && !done && !popup && phase !== 'clarifying');
   function submit() {
+    if (phase === 'clarifying') {
+      if (planReady) commitClar(false);
+      return;
+    }
     const text = input.trim();
     if (!text || done) return; // token spent
     if (popup) {
@@ -362,7 +541,24 @@ export default function CraftModal({
       kind: f.kind ?? '',
       adjusted: f.adjusted,
       vote: f.vote as 'up' | 'down',
-      reasons: f.vote === 'down' ? f.reasons : [],
+      reasons: clarify
+        ? f.vote === 'down'
+          ? f.picked.filter((t): t is FeedbackReason => (FEEDBACK_REASONS as readonly string[]).includes(t))
+          : []
+        : f.vote === 'down'
+          ? f.reasons
+          : [],
+      positive:
+        clarify && f.vote === 'up'
+          ? f.picked.filter((t): t is PositiveReason => (POSITIVE_REASONS as readonly string[]).includes(t))
+          : [],
+      tags: clarify
+        ? [
+            ...f.picked.filter((t) => !(FEEDBACK_REASONS as readonly string[]).includes(t) && !(POSITIVE_REASONS as readonly string[]).includes(t)),
+            ...(f.ownOpen && cleanTag(f.own) ? [cleanTag(f.own)!] : []),
+          ]
+        : [],
+      clarify: f.clarify,
       comment: f.vote === 'down' && f.commentOpen ? f.comment.trim() : '',
       applied: f.applied,
       answers: f.answers,
@@ -385,6 +581,14 @@ export default function CraftModal({
     return () => window.clearTimeout(t);
   }, [fb]); // eslint-disable-line react-hooks/exhaustive-deps
   const updFb = (patch: Partial<Fb>) => setFb((f) => (f ? { ...f, ...patch } : f));
+  // (clarify) Done or Esc on the rating's tags: thank the player, store it
+  function finishRating() {
+    const f = fbRef.current;
+    if (!f || !f.vote) return;
+    const next = { ...f, rstep: 'done' as const };
+    setFb(next);
+    flushFb(next);
+  }
 
   // ---- success → folded (player chose equip / inventory) ----
   function choose(equip: boolean, res: Result | null = popup) {
@@ -437,7 +641,9 @@ export default function CraftModal({
   function leave() {
     if (closed.current) return;
     closed.current = true;
-    if ((choices || feedback) && !done) {
+    const c = clarRef.current;
+    if (clarify && c && !c.locked) sendClarifyOnly(c.prompt, clarLog(c, c.picks, false, 'left'));
+    if ((choices || feedback || clarify) && !done) {
       if (reworking.current) onSpend(-ADJUST_PRICE);
       if (lastResult.current) choose(false, lastResult.current);
     }
@@ -479,9 +685,17 @@ export default function CraftModal({
   const lastMitchy = [...thread].reverse().find((t) => t.who === 'mitchy');
   const lastAlts = !busy && phase === 'failed' && lastMitchy?.kind === 'alts' ? lastMitchy.options : null;
   const lastConcepts = phase === 'choosing' && lastMitchy?.kind === 'concepts' ? lastMitchy : null;
-  type Opt = { label: string; go: () => void; disabled?: boolean; title?: string };
+  type Opt = { label: string; go: () => void; disabled?: boolean; title?: string; cls?: string };
+  const asked = phase === 'clarifying' && clar && !clar.locked && clar.step < clar.questions.length ? clar.questions[clar.step] : null;
   const options: Opt[] = viewRec
     ? []
+    : asked
+      ? [
+          ...asked.options.map((o, j) => ({ label: o.label, go: () => answerClar(j) })),
+          { label: YOU_DECIDE, go: () => answerClar(null), cls: 'decide' },
+        ]
+    : phase === 'clarifying'
+      ? [] // the plan panel: change answers there, then Craft it!
     : popup && adjusting
       ? [
           {
@@ -492,13 +706,13 @@ export default function CraftModal({
           },
           { label: 'Never mind, keep this one.', go: cancelAdjust },
         ]
-      : popup && fb && (!fb.vote || fb.step === 'tuning')
+      : popup && fb && (clarify ? fb.rstep !== 'done' : !fb.vote || fb.step === 'tuning')
       ? [] // (feedback) rate it first / answering the questions
       : popup
       ? [
           { label: 'Equip it.', go: () => choose(true) },
           { label: 'Into my inventory.', go: () => choose(false) },
-          ...(fb && fb.step === 'vote'
+          ...(feedback && fb && fb.step === 'vote'
             ? [{ label: 'Tune future crafts →', go: () => updFb({ step: 'tuning' }) }]
             : []),
           ...(adjusted
@@ -531,7 +745,7 @@ export default function CraftModal({
           : done
             ? [{ label: 'Leave the workshop.', go: leave }]
             : [];
-  useEffect(() => setOptSel(0), [options.length, popup, lastAlts, lastConcepts, adjusting, fb?.step]);
+  useEffect(() => setOptSel(0), [options.length, popup, lastAlts, lastConcepts, adjusting, fb?.step, fb?.rstep, clar?.step]);
 
   // arrows + Enter pick an option while the prompt field is empty
   useEffect(() => {
@@ -575,6 +789,22 @@ export default function CraftModal({
     thread.forEach((t, i) => {
       if (t.kind === 'text') add(t.who, <Bubble key={i}>{t.text}</Bubble>);
       else if (t.kind === 'alts') add('mitchy', <Bubble key={i}>{t.intro}</Bubble>);
+      else if (t.kind === 'plan') {
+        if (clar)
+          add(
+            'mitchy',
+            <div key={i} className="cl-wrap">
+              <ClarifyPlan
+                questions={clar.questions}
+                picks={clar.questions.map((_, j) => clar.picks[j] ?? null)}
+                locked={clar.locked}
+                onPick={(q, pick) =>
+                  setClar((c) => (c && !c.locked ? { ...c, picks: c.picks.map((p, j) => (j === q ? pick : p)) } : c))
+                }
+              />
+            </div>,
+          );
+      }
       else if (t.kind === 'concepts')
         add(
           'mitchy',
@@ -636,12 +866,12 @@ export default function CraftModal({
   useLayoutEffect(() => {
     const el = chatRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [chatSize, viewRec, busyLine, adjusting, fb?.vote, fb?.reasons.length, fb?.commentOpen]);
+  }, [chatSize, viewRec, busyLine, adjusting, fb?.vote, fb?.reasons.length, fb?.commentOpen, fb?.rstep, fb?.ownOpen]);
 
   // what leaving now keeps (see leave())
   function leaveText(): string | undefined {
     if (done) return undefined;
-    const last = choices || feedback ? lastResult.current : null;
+    const last = choices || feedback || clarify ? lastResult.current : null;
     if (last && reworking.current)
       return `Mitchy is still reworking it. Your last finished design, ${last.item.name}, goes into your inventory, and your ${ADJUST_PRICE} coins come back.`;
     if (last) return `Your last design, ${last.item.name}, goes into your inventory.`;
@@ -653,6 +883,12 @@ export default function CraftModal({
     ? 'Chat with Mitchy while she works …'
     : adjusting
       ? 'What should change? e.g. make the sail red …'
+      : phase === 'clarifying'
+      ? asked
+        ? 'Pick an answer above, or press Esc to skip'
+        : 'Change an answer above, or press Craft it'
+      : popup && fb && clarify && fb.rstep !== 'done'
+      ? 'Rate it above first'
       : popup && fb && !fb.vote
       ? 'Rate it above first: I like it / Not quite'
       : fb?.step === 'tuning'
@@ -711,7 +947,22 @@ export default function CraftModal({
                 </ChatMessage>
               ))
             )}
-            {fb && popup && fb.step === 'vote' && !viewRec && !adjusting && (
+            {fb && popup && clarify && !viewRec && !adjusting && (
+              <RatingPanel
+                vote={fb.vote}
+                step={fb.rstep}
+                picked={fb.picked}
+                ownOpen={fb.ownOpen}
+                own={fb.own}
+                peers={peers}
+                onVote={(vote) => updFb({ vote, rstep: 'tags', picked: [], ownOpen: false, own: '' })}
+                onPicked={(picked) => updFb({ picked })}
+                onOwnOpen={(ownOpen) => updFb({ ownOpen })}
+                onOwn={(own) => updFb({ own })}
+                onDone={finishRating}
+              />
+            )}
+            {fb && popup && !clarify && fb.step === 'vote' && !viewRec && !adjusting && (
               <FeedbackVote
                 vote={fb.vote}
                 reasons={fb.reasons}
@@ -730,7 +981,7 @@ export default function CraftModal({
                     key={o.label}
                     role="option"
                     aria-selected={i === optSel}
-                    className={'ds-option' + (i === optSel ? ' sel' : '')}
+                    className={'ds-option' + (o.cls ? ' ' + o.cls : '') + (i === optSel ? ' sel' : '')}
                     onMouseEnter={() => setOptSel(i)}
                     onClick={o.go}
                     disabled={o.disabled}
@@ -779,7 +1030,7 @@ export default function CraftModal({
               value={input}
               autoFocus
               maxLength={PROMPT_MAX}
-              disabled={(!!popup && !adjusting) || done}
+              disabled={(!!popup && !adjusting) || done || phase === 'clarifying'}
               placeholder={placeholder}
               aria-label="Describe what you'd like to craft"
               onChange={(e) => setInput(e.target.value.slice(0, PROMPT_MAX))}

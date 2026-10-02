@@ -67,3 +67,25 @@ export function CoinIcon({ className }: P) {
     </svg>
   );
 }
+
+export function KeysIcon({ className }: P) {
+  return (
+    <svg {...base} className={className}>
+      {/* a small keyboard: body, two rows of keys, a space bar */}
+      <rect x="3" y="6.5" width="18" height="11" rx="1.5" />
+      <path d="M6.5 10h1M10 10h1M13.5 10h1M17 10h.5M6.5 13h1M17 13h.5M10 14h4" />
+    </svg>
+  );
+}
+
+export function SlidersIcon({ className }: P) {
+  return (
+    <svg {...base} className={className}>
+      {/* three sliders with their knobs at different settings */}
+      <path d="M4 7h16M4 12h16M4 17h16" />
+      <circle cx="9" cy="7" r="1.8" fill="currentColor" />
+      <circle cx="15" cy="12" r="1.8" fill="currentColor" />
+      <circle cx="7" cy="17" r="1.8" fill="currentColor" />
+    </svg>
+  );
+}

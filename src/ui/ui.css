@@ -1045,8 +1045,15 @@
   font-size: 17px !important;
   cursor: pointer;
 }
+/* usable: the game's "go" green, the same on every live link; disabled:
+   greyed out below */
+.cw3-craft:not(:disabled) {
+  border-color: var(--ds-go);
+  background: var(--ds-go-fill);
+  color: #e6f4dc !important;
+}
 .cw3-craft:hover:not(:disabled) {
-  background: rgba(239, 200, 98, 0.12);
+  background: rgba(127, 176, 105, 0.34);
 }
 .cw3-craft:disabled {
   opacity: 0.45;
@@ -1690,31 +1697,163 @@
   align-items: center;
   margin-top: 8px;
 }
-/* Settings: one column; two (Game + Crafting preferences | Controls) when
-   the crafting preferences are shown (crafting panel 2), so it stays short
-   enough for a laptop screen */
-.ds-panel.ds-settings.two {
-  max-width: min(900px, 94vw);
-  width: min(900px, 94vw);
+/* Settings: Controls and Crafting preferences are pages of their own,
+   opened from the main page; each has a back button next to its title */
+.ds-settings-open .ds-settings-chev {
+  margin-left: auto;
+  color: var(--ds-text-muted);
+  font-size: 20px;
+  line-height: 1;
 }
-.ds-settings.two .ds-settings-cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
+.ds-settings-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ds-line-soft);
 }
-.ds-settings.two .ds-settings-cols > div > .ds-settings-section:first-child {
-  margin-top: 0;
+.ds-settings-head .ds-iconbtn {
+  width: 38px;
+  height: 34px;
+  flex: none;
 }
-@media (max-width: 760px) {
-  .ds-settings.two .ds-settings-cols {
-    grid-template-columns: 1fr;
-  }
+.ds-settings-head .ds-panel-title {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.ds-panel.ds-settings-page.prefs {
+  max-width: min(660px, 94vw);
+  width: min(660px, 94vw);
 }
 .fb-settings-rows {
   display: grid;
   grid-template-columns: 1fr 1fr;
   column-gap: 16px;
 }
+.fb-settings-row {
+  gap: 10px;
+}
 .fb-settings-row select {
-  max-width: 120px;
+  width: 150px;
+  max-width: 55%;
+}
+
+/* ---- crafting panel 1 (the /1 link): pre-clarification + rating ----------
+   (CraftClarify.tsx) */
+.cl-panel {
+  position: relative;
+  width: 520px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 16px 18px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+}
+.cl-skip {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-size: 11px;
+  color: var(--ds-text-muted);
+}
+.cl-title {
+  margin: 0 0 4px;
+  color: var(--ds-text);
+}
+.cl-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  align-items: start;
+  margin-top: 12px;
+}
+.cl-row-label {
+  padding-top: 7px;
+  font-size: 12px;
+  color: var(--ds-text-muted);
+}
+.cl-panel.locked .fb-chip:disabled {
+  opacity: 0.55;
+}
+.cl-panel.locked .fb-chip.on:disabled {
+  opacity: 1;
+}
+.fb-chip.decide {
+  color: var(--ds-text-soft);
+}
+.fb-chip.decide::before,
+.ds-option.decide::before {
+  content: '✦ ';
+  color: var(--ds-coin);
+}
+.ds-option.decide {
+  color: var(--ds-text-soft);
+}
+/* other players' tags (/1): same list, a soft green fill */
+.fb-chip.peer {
+  border-color: rgba(127, 176, 105, 0.45);
+  background: rgba(127, 176, 105, 0.16);
+}
+.fb-chip.peer.on {
+  border-color: var(--ds-coin);
+  background: rgba(242, 181, 60, 0.12);
+}
+/* the rating keeps one size through all its steps, so nothing jumps */
+.fb-vote.rv {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 330px;
+}
+.rv-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.rv-q {
+  margin: 4px 0 12px;
+  color: var(--ds-text);
+}
+.rv-sub,
+.rv-thanks {
+  margin-top: 16px;
+  text-align: center;
+}
+.rv-thanks {
+  color: var(--ds-text);
+}
+.rv-own {
+  text-align: left;
+}
+.fb-tag-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.fb-tag-row input {
+  flex: 1;
+}
+.fb-tag-count {
+  min-width: 38px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--ds-text-muted);
+}
+.rv-done {
+  display: flex;
+  align-items: center;
+  margin-top: auto;
+}
+.rv-done .fb-count {
+  margin: 0 auto 0 0;
+}
+.rv-done .ds-action {
+  margin: 0;
+  padding: 8px 18px;
 }

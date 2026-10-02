@@ -7,3 +7,4 @@ export * from './spriteGen';
 export * from './spriteValidate';
 export * from './spritePipeline';
 export * from './prefs';
+export * from './moods';

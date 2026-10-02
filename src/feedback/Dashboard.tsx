@@ -16,7 +16,8 @@
 // ---------------------------------------------------------------------------
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FitSprite } from '../ui';
-import { FEEDBACK_REASONS, type FeedbackRecord } from './schema';
+import { FEEDBACK_REASONS, POSITIVE_REASONS, type FeedbackRecord } from './schema';
+import { topTags } from '../../functions/api/feedback';
 import { KIND_LABEL, PREF_INFO, PREF_KEYS, isKind } from '../craft/prefs';
 import './dashboard.css';
 
@@ -79,7 +80,7 @@ export default function Dashboard() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const links = useMemo(() => [...new Set((rows ?? []).map((r) => r.link))].sort(), [rows]);
-  const data = useMemo(() => {
+  let data = useMemo(() => {
     const since = range === 'all' ? 0 : Date.now() - Number(range) * DAY;
     return (rows ?? []).filter((r) => r.at >= since && (kind === 'all' || r.kind === kind) && (link === 'all' || r.link === link));
   }, [rows, range, kind, link]);
@@ -104,6 +105,11 @@ export default function Dashboard() {
     );
   }
 
+  // records without a vote are /1 clarifications that never reached a
+  // rating (the craft failed or the player left) — only in the /1 section
+  const all = data;
+  const clar = all.filter((r) => r.clarify);
+  data = all.filter((r) => r.vote);
   const ups = data.filter((r) => r.vote === 'up').length;
   const tuned = data.filter((r) => r.answers && Object.keys(r.answers).length).length;
   return (
@@ -138,8 +144,8 @@ export default function Dashboard() {
           <button onClick={() => void load(pass)} disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}
           </button>
-          <button onClick={() => download('feedback.csv', toCsv(data), 'text/csv')}>CSV</button>
-          <button onClick={() => download('feedback.json', JSON.stringify(data, null, 1), 'application/json')}>JSON</button>
+          <button onClick={() => download('feedback.csv', toCsv(all), 'text/csv')}>CSV</button>
+          <button onClick={() => download('feedback.json', JSON.stringify(all, null, 1), 'application/json')}>JSON</button>
         </div>
       </header>
       {error && <p className="fbd-error">{error}</p>}
@@ -159,6 +165,14 @@ export default function Dashboard() {
           <section className="fbd-grid">
             <Card title="Votes per day" wide>
               <VotesPerDay data={data} />
+            </Card>
+            <Card title="Like rate by link">
+              <Bars
+                rows={Object.entries(group(data, (r) => r.link)).map(([l, rs]) => {
+                  const u = rs.filter((r) => r.vote === 'up').length;
+                  return { label: l || '(none)', value: pct(u, rs.length), max: 100, text: `${pct(u, rs.length)}% of ${rs.length}` };
+                })}
+              />
             </Card>
             <Card title="Like rate by kind">
               <Bars
@@ -181,6 +195,24 @@ export default function Dashboard() {
                   .map((r) => ({ ...r, text: String(r.value) }))}
                 note={`${data.filter((r) => r.vote === 'down').length} “Not quite” ratings; up to 3 reasons each`}
               />
+            </Card>
+            <Card title="Why “I like it” (/1)">
+              <Bars
+                rows={POSITIVE_REASONS.map((reason) => {
+                  const v = data.filter((r) => (r.positive ?? []).includes(reason)).length;
+                  return { label: reason, value: v, text: String(v) };
+                })}
+                note={`${data.filter((r) => r.vote === 'up' && r.clarify).length} “I like it” ratings on /1`}
+              />
+            </Card>
+            <Card title="Player tags (/1)">
+              <Bars
+                rows={topTags(data).map(({ tag, count }) => ({ label: tag, value: count, text: String(count) }))}
+                note="Own tags players wrote, and other players' tags they picked"
+              />
+            </Card>
+            <Card title="Pre-clarification (/1)" wide>
+              <ClarifyStats data={clar} />
             </Card>
             <Card title="How the preference questions were answered" wide>
               <Answers data={data} />
@@ -426,9 +458,45 @@ function RatingsTable({ data }: { data: FeedbackRecord[] }) {
   );
 }
 
+// ---- /1 pre-clarification ----
+function ClarifyStats({ data }: { data: FeedbackRecord[] }) {
+  if (!data.length) return <p className="fbd-muted">No /1 crafts in this range yet.</p>;
+  const asked = data.filter((r) => r.clarify!.questions.length > 0);
+  const answers = asked.flatMap((r) => r.clarify!.questions);
+  const picked = answers.filter((q) => q.pick).length;
+  const n = (f: (r: FeedbackRecord) => boolean) => data.filter(f).length;
+  const rows = [
+    { label: 'Questions asked', value: asked.length },
+    { label: 'Crafted without questions', value: data.length - asked.length },
+    { label: 'Skipped with Esc', value: n((r) => r.clarify!.skipped) },
+    { label: 'Answers picked', value: picked },
+    { label: 'Answers left to Mitchy', value: answers.length - picked },
+    { label: 'Craft failed', value: n((r) => r.clarify!.outcome === 'failed') },
+    { label: 'Left before crafting', value: n((r) => r.clarify!.outcome === 'left') },
+  ];
+  const likeAsked = asked.filter((r) => r.vote);
+  const likeNot = data.filter((r) => r.vote && !r.clarify!.questions.length);
+  const rate = (rs: FeedbackRecord[]) => (rs.length ? `${pct(rs.filter((r) => r.vote === 'up').length, rs.length)}% of ${rs.length}` : '–');
+  return (
+    <Bars
+      rows={rows.map((r) => ({ ...r, text: String(r.value) }))}
+      note={`Like rate with questions: ${rate(likeAsked)} · without: ${rate(likeNot)} · median time answering: ${median(asked.map((r) => r.clarify!.ms)) / 1000}s`}
+    />
+  );
+}
+function median(v: number[]): number {
+  if (!v.length) return 0;
+  const s = [...v].sort((a, b) => a - b);
+  return Math.round(s[Math.floor(s.length / 2)] / 100) * 100;
+}
+
 // ---- export ----
 function toCsv(rows: FeedbackRecord[]): string {
-  const cols = ['at', 'link', 'player', 'name', 'prompt', 'kind', 'adjusted', 'vote', 'reasons', 'comment', ...PREF_KEYS.map((k) => `applied_${k}`), ...PREF_KEYS.map((k) => `answer_${k}`), 'scope'];
+  const cols = [
+    'at', 'link', 'player', 'name', 'prompt', 'kind', 'adjusted', 'vote', 'reasons', 'positive', 'tags', 'comment',
+    ...PREF_KEYS.map((k) => `applied_${k}`), ...PREF_KEYS.map((k) => `answer_${k}`), 'scope',
+    'clarify_questions', 'clarify_answers', 'clarify_skipped', 'clarify_outcome', 'clarify_ms',
+  ];
   const cell = (v: unknown) => {
     const s = v === undefined || v === null ? '' : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -444,10 +512,17 @@ function toCsv(rows: FeedbackRecord[]): string {
       r.adjusted,
       r.vote,
       r.reasons.join('; '),
+      (r.positive ?? []).join('; '),
+      (r.tags ?? []).join('; '),
       r.comment,
       ...PREF_KEYS.map((k) => r.applied[k]),
       ...PREF_KEYS.map((k) => r.answers?.[k]),
       r.scope,
+      r.clarify?.questions.length,
+      r.clarify?.questions.map((q) => `${q.topic}=${q.pick ?? 'You decide'}`).join('; '),
+      r.clarify?.skipped,
+      r.clarify?.outcome,
+      r.clarify?.ms,
     ]
       .map(cell)
       .join(','),

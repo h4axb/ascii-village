@@ -4,6 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { docHash } from './src/editor/docHash';
 import { normalizeFeedback, type FeedbackRecord } from './src/feedback/schema';
+import { tagsByVote } from './functions/api/feedback';
 
 // Dev-only save endpoint for the in-game world editor (src/editor/, press E).
 // The editor never writes on its own: Ctrl+S / Save POSTs everything it edits
@@ -158,6 +159,11 @@ function feedbackDevStorePlugin(): Plugin {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify(data));
         };
+        // public: the tags /1 players wrote (functions/api/feedback.ts topTags)
+        if (req.method === 'GET' && (req.url ?? '').startsWith('/tags')) {
+          load().then((rows) => reply(200, tagsByVote(rows.filter((r) => r.link === '/1' || r.link === '/intro/1'))));
+          return;
+        }
         if (req.method === 'GET') {
           const token = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
           if (token !== (process.env.FEEDBACK_ADMIN_TOKEN || 'dev')) return reply(401, { error: 'wrong password' });

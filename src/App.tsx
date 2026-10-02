@@ -69,9 +69,9 @@ import { describeInteraction, runInteraction } from './interact';
 import type { InteractRef, InteractCtx, InteractActions } from './interact';
 import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOUSE_GARMENT_REGIONS } from './outfit';
 import type { Outfit } from './outfit';
-import { SunIcon, MoonIcon, CoinIcon, SaveIcon } from './icons';
+import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
-import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, type Slot, type Action } from './ui';
+import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, type Slot, type Action } from './ui';
 import { useIntroNarrationTool } from './devIntroNarration';
 import { getMarkerPosition } from './sceneMarkers';
 import { useWorldEditor } from './editor';
@@ -412,7 +412,8 @@ type Modal =
   // equipPick: opened from the hand slot's "Equip" — non-equippable slots are
   // greyed out and a click equips instead of opening details.
   | { t: 'inventory'; equipPick?: boolean }
-  | { t: 'settings' }
+  // page: one of the sub-pages Settings opens (Controls, Crafting preferences)
+  | { t: 'settings'; page?: 'controls' | 'prefs' }
   | { t: 'detail'; item: ItemType }
   | { t: 'detailOwned'; ownedId: string; sel: number }
   | { t: 'dialog'; sel: number }
@@ -480,7 +481,7 @@ export default function App() {
   const [started, setStarted] = useState(false);
   // crafting feedback waiting from an earlier visit goes out now
   useEffect(() => {
-    if (CRAFT_FEEDBACK) flushFeedbackOutbox();
+    if (CRAFT_FEEDBACK || CRAFT_CLARIFY) flushFeedbackOutbox();
   }, []);
   return started ? <Game /> : <Landing onStart={() => setStarted(true)} />;
 }
@@ -607,23 +608,25 @@ function readIntroBMarkers(): {
   };
 }
 
-// Which link opened the game:
+// Which link opened the game (each test link also has an /intro/… version
+// that always plays the intro; the plain one skips it):
 //   /          the save decides whether the intro plays
-//   /0         skips the intro
-//   /intro     always plays the intro
-//   /1         skips the intro; the workshop runs crafting panel 1 (preflight
-//              + concepts, see CraftModal's `choices`)
-//   /intro/1   always plays the intro; crafting panel 1 as on /1
-//   /2         skips the intro; the workshop runs crafting panel 2 (rate
-//              each result, tune future crafts — see CraftFeedback.tsx)
-//   /intro/2   always plays the intro; crafting panel 2 as on /2
+//   /0         the standard workshop            /intro, /intro/0
+//   /1         crafting panel 1, pre-clarification: Mitchy asks 0-2 short
+//              questions before crafting, then each result is rated (see
+//              CraftModal's `clarify`, CraftClarify.tsx)     /intro/1
+//   /2         crafting panel 2, post-reflection: rate each result, tune
+//              future crafts (see CraftFeedback.tsx)          /intro/2
+//   /3         crafting panel 3, alternatives: preflight + concepts (see
+//              CraftModal's `choices`)                       /intro/3
 //   /2/feedback  the feedback dashboard instead of the game (see main.tsx)
 const PATH = window.location.pathname;
-const CRAFT_CHOICES = /^(\/intro)?\/1\/?$/.test(PATH);
+const CRAFT_CLARIFY = /^(\/intro)?\/1\/?$/.test(PATH);
 const CRAFT_FEEDBACK = /^(\/intro)?\/2\/?$/.test(PATH);
-const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[012]\/?$/.test(PATH)
+const CRAFT_CHOICES = /^(\/intro)?\/3\/?$/.test(PATH);
+const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[0-3]\/?$/.test(PATH)
   ? 'skip'
-  : /^\/intro(\/[12])?\/?$/.test(PATH)
+  : /^\/intro(\/[0-3])?\/?$/.test(PATH)
     ? 'force'
     : 'default';
 
@@ -2989,6 +2992,7 @@ function Game() {
         return m.menuOpen ? { ...m, menuOpen: false } : { t: 'houseMenu', sel: m.slot };
       }
       if (m.t === 'pay') return { ...m, help: false };
+      if (m.t === 'settings' && m.page) return { t: 'settings' };
       if (m.t === 'craft') {
         // Leaving the workshop always asks ([F] leave, Esc again = stay)
         return { ...m, confirmClose: !m.confirmClose };
@@ -4508,45 +4512,70 @@ function Game() {
             />
           )}
 
-          {modal.t === 'settings' && (
-            <Panel title="Settings" hint="[Esc] to close" className={CRAFT_FEEDBACK ? 'ds-settings two' : 'ds-settings'}>
-              <div className="ds-settings-cols">
-                <div>
-                  <div className="ds-settings-section">Game</div>
-                  <div className="ds-actions ds-settings-actions">
-                    <button className="ds-action" onClick={saveGameToStorage} disabled={saving}>
-                      <span className="ds-action-icon">
-                        <SaveIcon className="ds-save-icon" />
-                      </span>
-                      <span>Save Game</span>
-                    </button>
-                  </div>
-                  <div className="ds-muted ds-settings-note">writes your progress to this browser</div>
-                  {/* crafting panel 2 only: the preferences it crafts with */}
-                  {CRAFT_FEEDBACK && (
-                    <>
-                      <div className="ds-settings-section">Crafting preferences</div>
-                      <CraftPrefsSettings />
-                    </>
-                  )}
-                </div>
-                <div>
-                  <div className="ds-settings-section">Controls</div>
-                  <div className="ds-controls">
-                    {CONTROLS.map(([what, keys]) => (
-                      <Row
-                        key={what}
-                        label={what}
-                        value={keys.map((k) => (
-                          <kbd key={k} className="ds-kbd">
-                            {k}
-                          </kbd>
-                        ))}
-                      />
-                    ))}
-                  </div>
-                </div>
+          {modal.t === 'settings' && !modal.page && (
+            <Panel title="Settings" hint="[Esc] to close" className="ds-settings">
+              <div className="ds-settings-section">Game</div>
+              <div className="ds-actions ds-settings-actions">
+                <button className="ds-action" onClick={saveGameToStorage} disabled={saving}>
+                  <span className="ds-action-icon">
+                    <SaveIcon className="ds-save-icon" />
+                  </span>
+                  <span>Save Game</span>
+                </button>
               </div>
+              <div className="ds-muted ds-settings-note">writes your progress to this browser</div>
+              <div className="ds-settings-section">More</div>
+              <div className="ds-actions ds-settings-actions">
+                <button className="ds-action ds-settings-open" onClick={() => setModal({ t: 'settings', page: 'controls' })}>
+                  <span className="ds-action-icon">
+                    <KeysIcon className="ds-save-icon" />
+                  </span>
+                  <span>Controls</span>
+                  <span className="ds-settings-chev" aria-hidden>
+                    ›
+                  </span>
+                </button>
+                {/* crafting panel 2 only: the preferences it crafts with */}
+                {CRAFT_FEEDBACK && (
+                  <button className="ds-action ds-settings-open" onClick={() => setModal({ t: 'settings', page: 'prefs' })}>
+                    <span className="ds-action-icon">
+                      <SlidersIcon className="ds-save-icon" />
+                    </span>
+                    <span>Crafting preferences</span>
+                    <span className="ds-settings-chev" aria-hidden>
+                      ›
+                    </span>
+                  </button>
+                )}
+              </div>
+            </Panel>
+          )}
+
+          {modal.t === 'settings' && modal.page && (
+            <Panel hint="[Esc] back" className={'ds-settings ds-settings-page ' + modal.page}>
+              <div className="ds-settings-head">
+                <button className="ds-iconbtn" onClick={() => setModal({ t: 'settings' })} aria-label="back to settings">
+                  <IconBack />
+                </button>
+                <div className="ds-panel-title">{modal.page === 'controls' ? 'Controls' : 'Crafting preferences'}</div>
+              </div>
+              {modal.page === 'controls' ? (
+                <div className="ds-controls">
+                  {CONTROLS.map(([what, keys]) => (
+                    <Row
+                      key={what}
+                      label={what}
+                      value={keys.map((k) => (
+                        <kbd key={k} className="ds-kbd">
+                          {k}
+                        </kbd>
+                      ))}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <CraftPrefsSettings />
+              )}
             </Panel>
           )}
 
@@ -4754,6 +4783,7 @@ function Game() {
               token={modal.token}
               choices={CRAFT_CHOICES}
               feedback={CRAFT_FEEDBACK}
+              clarify={CRAFT_CLARIFY}
               player={{
                 name: playerName || DEFAULT_PLAYER_NAME,
                 look: { sprite: avatarSprite, colors: avatarRecolored.colors, palette: avatarRecolored.palette },

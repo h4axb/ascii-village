@@ -29,7 +29,12 @@ import {
   planAndRender,
   suggestAlternatives,
   analyzeCraft,
+  clarifyCraft,
+  MOOD_PRESETS,
   textureModifierFor,
+  type ClarifyQuestion,
+  type Mood,
+  type SizeClass,
   type CraftPreflight,
   type CraftLog,
   type TextureModifier,
@@ -396,7 +401,10 @@ export async function craftItem(
   ui?: CraftUiHooks,
   // prefs: apply the player's crafting preferences (craft/prefs.ts) — the
   // /2 link; without it everything crafts exactly as before
-  opts: { retry?: boolean; prefs?: boolean } = {},
+  // clarify: the player's answers from the pre-clarification step (the /1
+  // link) — planner guidance plus exact size / finish / mood overrides; with
+  // noAlts a failure offers no alternative ideas
+  opts: { retry?: boolean; prefs?: boolean; clarify?: CraftClarify; noAlts?: boolean } = {},
 ): Promise<CraftResult> {
   // Local content policy runs FIRST and on every path — before any network
   // call, and equally in offline/mock mode. The model-side `sensitive` check
@@ -423,7 +431,7 @@ export async function craftItem(
           : null;
         planPrefs = resolvePrefs(isKind(guess) ? guess : null);
       }
-      const prefsText = opts.prefs ? planPrefsText(planPrefs) : '';
+      const prefsText = [opts.prefs ? planPrefsText(planPrefs) : '', opts.clarify?.guidance ?? ''].filter(Boolean).join('\n\n');
       const temperature = opts.prefs ? temperatureOf(planPrefs) : undefined;
       const plan = await planCraft(prompt, spec.category, chatJSON, {
         model: MODELS.fast,
@@ -471,6 +479,15 @@ export async function craftItem(
         ...(opts.prefs
           ? { multiplier: densityOf(postPrefs), color: postPrefs.color, prefsText, temperature }
           : {}),
+        ...(opts.clarify
+          ? {
+              prefsText,
+              sizeClass: opts.clarify.size,
+              ...(opts.clarify.mood
+                ? { palette: MOOD_PRESETS[opts.clarify.mood].palette, glyphs: MOOD_PRESETS[opts.clarify.mood].glyphs }
+                : {}),
+            }
+          : {}),
       });
       if (log.retried) ui?.onStage?.('retrying');
       if (sprite) sprite.lines.forEach((line, i) => ui?.onLine?.(line, i, log.fallbackLevel as 0 | 1));
@@ -478,6 +495,12 @@ export async function craftItem(
       craftLog.push(log);
       console.info('[craft]', log);
 
+      if (!sprite && opts.noAlts) {
+        return {
+          ok: false,
+          reply: "Hmm, I couldn't get that one to come out right. Maybe change your idea a little and we try again?",
+        };
+      }
       if (!sprite) {
         // BENIGN failure (sensitive/mismatch were filtered above): let Mitchy
         // offer three strategy-diverse alternatives as clickable options.
@@ -526,6 +549,8 @@ export async function craftItem(
       // craftDescribe's own comment on why that tag has to be verbatim.
       item.tags = [...description.tags, `prompt: ${prompt.trim()}`];
       item.textureModifier = textureModifierFor(spec.finish);
+      const finish = opts.clarify?.finish ?? (opts.clarify?.mood ? MOOD_PRESETS[opts.clarify.mood].finish : undefined);
+      if (finish) item.textureModifier = finish;
       return opts.prefs ? { ok: true, item, kind: category, applied } : { ok: true, item };
     } catch (err) {
       console.warn('[craft] pipeline error:', err);
@@ -557,9 +582,23 @@ export async function craftItem(
   return opts.prefs ? { ok: true, item, kind: category, applied: {} } : { ok: true, item };
 }
 
-// The /1 preflight: can this be drawn as asked, or should the player pick a
+// The /3 preflight: can this be drawn as asked, or should the player pick a
 // concept first? Offline it always crafts directly.
 export type { CraftPreflight, CraftConcept } from './craft';
+
+// The /1 pre-clarification: the 0-2 questions worth asking before drawing
+// (craft/spriteGen.ts clarifyCraft). Offline or on a blocked prompt: none.
+export type { ClarifyQuestion, ClarifyOption } from './craft';
+export interface CraftClarify {
+  guidance: string;
+  size?: SizeClass;
+  finish?: TextureModifier;
+  mood?: Mood;
+}
+export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> {
+  if (!llmEnabled || !checkPolicy(prompt).allowed) return [];
+  return clarifyCraft(prompt, chatJSON, { model: MODELS.fast, fallbackModel: MODELS.fastFallback });
+}
 export async function preflightCraft(prompt: string): Promise<CraftPreflight> {
   if (!llmEnabled || !checkPolicy(prompt).allowed) return { needsChoice: false };
   return analyzeCraft(prompt, chatJSON, { model: MODELS.fast, fallbackModel: MODELS.fastFallback });
@@ -625,7 +664,8 @@ export async function mitchyChat(message: string): Promise<string> {
             'You are Mitchy, a cozy, witty shopkeeper CAT in Asciia Bay, a cozy ASCII island-village game. You are ' +
             'currently BUSY crafting an item for the villager and chatting while you work. ' +
             'Reply to what they said in lowercase, one short line under 20 words, playful and a ' +
-            'little sassy, occasionally slipping in a "purr". No emoji, no quotes, no preamble.',
+            'little sassy, occasionally slipping in a "purr". No emoji, no quotes, no preamble. ' +
+            MITCHY_TONE,
         },
         { role: 'user', content: message },
       ],
@@ -637,6 +677,11 @@ export async function mitchyChat(message: string): Promise<string> {
     return fallback;
   }
 }
+
+// Mitchy's writing style: plain, natural sentences — no colons or dashes
+// unless they are truly needed.
+const MITCHY_TONE =
+  'Write natural, flowing sentences. Do not use colons or dashes (":", "-", "–", "—") unless truly necessary.';
 
 export async function getMitchyLine(context = 'a casual idle'): Promise<string> {
   const fallback = MITCHY_FALLBACK[Math.floor(Math.random() * MITCHY_FALLBACK.length)];
@@ -652,7 +697,8 @@ export async function getMitchyLine(context = 'a casual idle'): Promise<string> 
           content:
             'You are Mitchy, a cozy, witty shopkeeper CAT in Asciia Bay, a cozy ASCII island-village game. ' +
             'Speak in lowercase, one short line under 18 words, playful and a little sassy, ' +
-            'occasionally slipping in a "purr". No emoji, no quotes, no preamble.',
+            'occasionally slipping in a "purr". No emoji, no quotes, no preamble. ' +
+            MITCHY_TONE,
         },
         { role: 'user', content: `Say ${context} line to the villager who just walked up.` },
       ],

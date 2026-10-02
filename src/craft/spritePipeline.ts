@@ -24,7 +24,9 @@ import {
 } from './spriteConfig';
 import { planCraft, planRetryGuidance, type VisionJSON } from './spriteGen';
 import { renderRegions } from './glyphRender';
-import { applyColorPref, type PrefValue } from './prefs';
+import { applyColorPref, transformPalette, type PaletteShift, type PrefValue } from './prefs';
+import type { BandGlyphs } from './moods';
+import type { SizeClass } from './spriteConfig';
 import {
   applyRelationAdjustments,
   cropBlankEdges,
@@ -40,7 +42,7 @@ export interface PlanAndRenderDeps {
   chat: VisionJSON;
   model?: string;
   fallbackModel?: string;
-  // false: no automatic re-plan after a failed first plan (the /1 test link)
+  // false: no automatic re-plan after a failed first plan (the /3 test link)
   retry?: boolean;
   // the player's crafting preferences (craft/prefs.ts, the /2 link):
   // multiplier = glyph density (render resolution), color = palette shift,
@@ -49,6 +51,11 @@ export interface PlanAndRenderDeps {
   color?: PrefValue;
   prefsText?: string;
   temperature?: number;
+  // the player's clarification answers (the /1 link): an exact size class,
+  // and a mood's palette shift and glyph sets (craft/moods.ts)
+  sizeClass?: SizeClass;
+  palette?: PaletteShift;
+  glyphs?: BandGlyphs;
 }
 
 export async function planAndRender(
@@ -66,7 +73,7 @@ export async function planAndRender(
   > {
     const check = validateRegionPlan(plan);
     if (!check.ok) return { ok: false, error: check.error };
-    const validated = check.plan;
+    const validated = deps.sizeClass ? { ...check.plan, sizeClass: deps.sizeClass } : check.plan;
     // Canvas size is a pure code decision (Stage 2) — resolveCanvasSize
     // already bakes in RESOLUTION_MULTIPLIER's larger glyph grid (more
     // cells for glyphRender.ts's texture/edge work), compensated afterward
@@ -83,7 +90,7 @@ export async function planAndRender(
       canvas.width,
       canvas.height,
     );
-    const rendered = renderRegions(canvas.width, canvas.height, adjustedRegions, prompt, validated.face);
+    const rendered = renderRegions(canvas.width, canvas.height, adjustedRegions, prompt, validated.face, deps.glyphs);
     const cropped = cropBlankEdges(rendered.lines, rendered.colors);
     const g: GeneratedSprite = {
       name: validated.name || prompt.trim().slice(0, 24),
@@ -98,6 +105,7 @@ export async function planAndRender(
     if (!v.ok) return { ok: false, error: v.error ?? 'render validation failed' };
     sanitizeColors(g);
     if (g.palette && deps.color) g.palette = applyColorPref(g.palette, deps.color);
+    if (g.palette && deps.palette) g.palette = transformPalette(g.palette, deps.palette);
     return { ok: true, sprite: g, warnings: [...check.warnings, ...relationWarnings] };
   }
 

@@ -21,6 +21,8 @@ import {
 } from './spriteConfig';
 import { MATERIALS_HINT } from './materials';
 import { checkPolicy } from './policy';
+import { isMood, MOOD_PRESETS, type Mood } from './moods';
+import type { TextureModifier } from './spec';
 
 // Local vision/JSON message types (kept out of the client to respect the
 // craft/ <-> llm.ts import boundary — llm.ts owns the actual client).
@@ -540,4 +542,117 @@ export async function analyzeCraft(
   } catch {
     return no;
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// PRE-CLARIFICATION (crafting panel 1, the /1 link): before drawing, find the
+// 0-2 decisions in a request that really change how the sprite looks, and
+// ask the player. Only along axes this pipeline can actually show (colour,
+// size, which feature gets the space, shape character, finish, mood); every
+// answer carries a concrete `effect` for the planner, plus exact code
+// overrides (size, finish, mood preset) where one exists. "You decide" is
+// added by the game, never by the model. Fails open: no questions.
+// ---------------------------------------------------------------------------
+
+export interface ClarifyOption {
+  label: string; // shown on the button, 1-3 words
+  effect: string; // the concrete visual instruction for the planner
+  size?: SizeClass;
+  finish?: TextureModifier;
+  mood?: Mood;
+}
+export interface ClarifyQuestion {
+  topic: string; // short name of the decision ("Focus"), shown in the plan panel
+  q: string; // Mitchy's question, one natural sentence
+  options: ClarifyOption[];
+}
+
+const SIZES: SizeClass[] = ['small', 'medium', 'large'];
+const FINISHES: TextureModifier[] = ['shiny', 'neon', 'metallic', 'matte'];
+
+export async function clarifyCraft(
+  prompt: string,
+  chat: VisionJSON,
+  opts: { model?: string; fallbackModel?: string } = {},
+): Promise<ClarifyQuestion[]> {
+  try {
+    const r = await chat<{ questions?: unknown }>(
+      [
+        {
+          role: 'system',
+          content:
+            'You help Mitchy, the cat who runs the crafting workshop in Asciia Bay, a cozy ASCII island game. The ' +
+            'player describes ONE item; it is drawn as a SMALL sprite (about 5-22 character cells wide) from a few ' +
+            'simple shapes with flat colours, so only big decisions show.\n\n' +
+            'Decide whether the request leaves a MEANINGFUL visual decision open, one where different answers ' +
+            'would produce clearly different sprites. If the request is already clear enough, return no questions. ' +
+            'Most specific requests need none; vague ones ("a magical pet", "something for the beach") usually ' +
+            'need one or two.\n\n' +
+            'Only ask about these axes, because only they visibly change the sprite:\n' +
+            '- main colour or palette (e.g. "Sunset warm", "Ocean blue")\n' +
+            '- size (pocket-sized / pet-sized / big); set "size" to small, medium or large\n' +
+            '- which ONE feature gets the space (e.g. "Big wings", "Long tail")\n' +
+            '- shape character (round and soft vs sharp and spiky)\n' +
+            '- finish (glowing, shiny, metallic, plain); set "finish" to neon, shiny, metallic or matte\n' +
+            '- mood; set "mood" to one of cute, mysterious, unusual, cozy, bold\n' +
+            'Never ask about tiny details (faces, patterns, text), behaviour or function, the scene or background, ' +
+            'or anything the player already said.\n\n' +
+            'At most 2 questions. Each "q" is one short natural sentence Mitchy says, friendly and simple, at most ' +
+            '12 words, without colons or dashes and without AI or technical words. Each "topic" names the decision ' +
+            'in 1-3 words ("Focus", "Main colour", "Size"). Give 2 or 3 options; each "label" is 1-3 words and ' +
+            '"effect" is the concrete drawing instruction for that answer (under 25 words, about shapes, colours, ' +
+            'size or the featured part). Do not add a "you decide" option, the game adds it.\n\n' +
+            'Reply with JSON only: {"questions": []} or {"questions": [{"topic": "...", "q": "...", "options": ' +
+            '[{"label": "...", "effect": "...", "size": null, "finish": null, "mood": null}, ...]}]}.',
+        },
+        { role: 'user', content: `The player asked for: "${prompt}".` },
+      ],
+      { model: opts.model, temperature: 0.4, maxTokens: 500, thinking: { type: 'disabled' }, fallbackModel: opts.fallbackModel },
+    );
+    const text = (v: unknown, max: number) =>
+      typeof v === 'string' && v.trim() && v.trim().length <= max && checkPolicy(v).allowed ? v.trim() : null;
+    const questions: ClarifyQuestion[] = [];
+    for (const raw of Array.isArray(r?.questions) ? r.questions.slice(0, 2) : []) {
+      const o = (raw ?? {}) as Record<string, unknown>;
+      const topic = text(o.topic, 24);
+      const q = text(o.q, 90);
+      if (!topic || !q) continue;
+      const options: ClarifyOption[] = [];
+      for (const rawOpt of Array.isArray(o.options) ? o.options.slice(0, 3) : []) {
+        const x = (rawOpt ?? {}) as Record<string, unknown>;
+        const label = text(x.label, 22);
+        const effect = text(x.effect, 200);
+        if (!label || !effect || /^you decide$/i.test(label)) continue;
+        options.push({
+          label,
+          effect,
+          ...(SIZES.includes(x.size as SizeClass) ? { size: x.size as SizeClass } : {}),
+          ...(FINISHES.includes(x.finish as TextureModifier) ? { finish: x.finish as TextureModifier } : {}),
+          ...(isMood(x.mood) ? { mood: x.mood } : {}),
+        });
+      }
+      if (options.length >= 2) questions.push({ topic, q, options });
+    }
+    return questions;
+  } catch {
+    return [];
+  }
+}
+
+// The planner text for the player's answers (null = "You decide").
+export function clarifyGuidance(answers: { topic: string; pick: ClarifyOption | null }[]): string {
+  if (!answers.length) return '';
+  const picked = answers.filter((a) => a.pick);
+  const open = answers.filter((a) => !a.pick).map((a) => a.topic.toLowerCase());
+  const lines = picked.map((a) => {
+    const p = a.pick!;
+    const mood = p.mood ? ` ${MOOD_PRESETS[p.mood].shape}.` : '';
+    return `- ${a.topic}: ${p.label}. ${p.effect}${mood}`;
+  });
+  return (
+    'PLAYER CLARIFIED before crafting (follow these, they come straight from the player):\n' +
+    (lines.length ? lines.join('\n') + '\n' : '') +
+    (open.length ? `The player left ${open.join(' and ')} to you; choose freely and make it look good.` : '')
+  ).trim();
 }

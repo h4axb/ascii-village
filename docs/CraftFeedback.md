@@ -94,7 +94,8 @@ drawn by fixed code, so only these axes visibly change it: main colour,
 size, which feature gets the space, shape character, finish, mood. Tiny
 details, behaviour and the scene are never asked about. Every answer carries
 a concrete `effect` for the planner; size and finish are also applied
-exactly in code, and a mood is a preset (`craft/moods.ts`): a palette shift
+exactly in code, and a mood is one of 8 presets (`craft/moods.ts`: cute,
+mysterious, unusual, cozy, bold, dreamy, fierce, ancient): a palette shift
 and glyph set (exact), a finish (exact) and a shape hint for the planner.
 Measured on one plan: cute is lighter with round glyphs (`°@+:`), mysterious
 clearly darker (average brightness 108 vs 146) with dense glyphs, large is

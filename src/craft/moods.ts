@@ -11,8 +11,8 @@
 import type { TextureModifier } from './spec';
 import type { PaletteShift } from './prefs';
 
-export type Mood = 'cute' | 'mysterious' | 'unusual' | 'cozy' | 'bold';
-export const MOODS: Mood[] = ['cute', 'mysterious', 'unusual', 'cozy', 'bold'];
+export type Mood = 'cute' | 'mysterious' | 'unusual' | 'cozy' | 'bold' | 'dreamy' | 'fierce' | 'ancient';
+export const MOODS: Mood[] = ['cute', 'mysterious', 'unusual', 'cozy', 'bold', 'dreamy', 'fierce', 'ancient'];
 export const isMood = (v: unknown): v is Mood => typeof v === 'string' && (MOODS as string[]).includes(v);
 
 export type BandGlyphs = { lo: string[]; mid: string[]; hi: string[] };
@@ -54,5 +54,23 @@ export const MOOD_PRESETS: Record<Mood, MoodPreset> = {
     glyphs: { lo: [':', '¬', '='], mid: ['+', '†', '‡', '#'], hi: ['&', '%', '#', '@', '§'] },
     finish: 'shiny',
     shape: 'big, strong silhouette with clear contrasting colours and chunky parts',
+  },
+  dreamy: {
+    palette: { light: 0.35, sat: -0.3, towardHue: 255, pull: 0.6 },
+    glyphs: { lo: ['·', '~', ':'], mid: ['~', '=', '°'], hi: ['*', '°', '~', 'o'] },
+    finish: 'shiny',
+    shape: 'soft floating shapes with gentle curves, a light pastel glow and cloud-like edges',
+  },
+  fierce: {
+    palette: { sat: 0.6, light: -0.15, towardHue: 12, pull: 0.65 },
+    glyphs: { lo: [':', '/', '\\'], mid: ['^', 'v', '/', '\\', '+'], hi: ['^', 'v', '#', '§', '‡'] },
+    finish: 'metallic',
+    shape: 'sharp spikes, claws or horns, angular triangles and diamonds, a strong wide stance',
+  },
+  ancient: {
+    palette: { sat: -0.55, light: -0.5, towardHue: 38, pull: 0.55 },
+    glyphs: { lo: ['·', ':', '¬'], mid: ['=', '#', ':'], hi: ['#', '§', '¤', '&'] },
+    finish: 'metallic',
+    shape: 'worn, chunky, blocky shapes like old stone or bronze, with a few cracks or carved marks',
   },
 };

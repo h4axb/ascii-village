@@ -595,7 +595,8 @@ export default function CraftModal({
     if (!res) return;
     const { item } = res;
     lastResult.current = null;
-    flushFb();
+    if (clarify) finishRating(); // (already done; stores any late change)
+    else flushFb();
     onConsume(equip, item); // spend the token; App does NOT close the panel
     const status = equip ? 'Equipped to your hand.' : 'Tucked into your inventory.';
     const turns = thread.map((t) => (t.kind === 'result' && t.item === item ? { ...t, status } : t));
@@ -625,6 +626,7 @@ export default function CraftModal({
   // ---- adjusting a finished design (paid, once) ----
   function startAdjust() {
     if (!popup || adjusted || money < ADJUST_PRICE) return;
+    if (clarify) finishRating();
     setAdjusting(true);
     push({ who: 'mitchy', kind: 'text', text: 'Sure! What should I change? Tell me in a few words.' });
     setTimeout(() => inputRef.current?.focus(), 0);
@@ -947,7 +949,7 @@ export default function CraftModal({
                 </ChatMessage>
               ))
             )}
-            {fb && popup && clarify && !viewRec && !adjusting && (
+            {fb && clarify && (popup || fb.rstep === 'done') && !viewRec && !adjusting && (
               <RatingPanel
                 vote={fb.vote}
                 step={fb.rstep}

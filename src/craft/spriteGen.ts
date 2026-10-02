@@ -595,7 +595,7 @@ export async function clarifyCraft(
             '- which ONE feature gets the space (e.g. "Big wings", "Long tail")\n' +
             '- shape character (round and soft vs sharp and spiky)\n' +
             '- finish (glowing, shiny, metallic, plain); set "finish" to neon, shiny, metallic or matte\n' +
-            '- mood; set "mood" to one of cute, mysterious, unusual, cozy, bold\n' +
+            '- mood; set "mood" to one of cute, mysterious, unusual, cozy, bold, dreamy, fierce, ancient\n' +
             'Never ask about tiny details (faces, patterns, text), behaviour or function, the scene or background, ' +
             'or anything the player already said.\n\n' +
             'At most 2 questions. Each "q" is one short natural sentence Mitchy says, friendly and simple, at most ' +

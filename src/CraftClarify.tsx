@@ -10,6 +10,8 @@
 //                 panel — what did or didn't work (standard tags, other /1
 //                 players' tags, an own tag), then a thank-you. Pure
 //                 feedback: nothing here changes the game (src/feedback/).
+//                 Done (or Esc, or Enter in the own tag) finishes it; the
+//                 workshop's options (equip, inventory, adjust) come after.
 import type { ClarifyQuestion } from './llm';
 import { FEEDBACK_REASONS, POSITIVE_REASONS, TAG_MAX } from './feedback/schema';
 

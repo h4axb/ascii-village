@@ -205,6 +205,9 @@ export interface PaletteShift {
   light?: number;
   sat?: number;
   hue?: number;
+  // pull every colour's hue toward this one (degrees) by `pull` (0..1)
+  towardHue?: number;
+  pull?: number;
 }
 export function transformPalette(palette: Record<string, string>, shift: PaletteShift): Record<string, string> {
   const out: Record<string, string> = {};
@@ -212,12 +215,17 @@ export function transformPalette(palette: Record<string, string>, shift: Palette
   return out;
 }
 
-function shiftHex(hex: string, { light = 0, sat = 0, hue = 0 }: PaletteShift): string {
+function shiftHex(hex: string, { light = 0, sat = 0, hue = 0, towardHue, pull = 0 }: PaletteShift): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return hex;
   const n = parseInt(m[1], 16);
   const [h, s, l] = rgbToHsl((n >> 16) & 255, (n >> 8) & 255, n & 255);
-  const h2 = (((h + hue / 360) % 1) + 1) % 1;
+  let h1 = h + hue / 360;
+  if (towardHue !== undefined && pull) {
+    const d = ((((towardHue / 360 - h1) % 1) + 1.5) % 1) - 0.5; // shortest way round the colour wheel
+    h1 += d * pull;
+  }
+  const h2 = ((h1 % 1) + 1) % 1;
   const s2 = sat >= 0 ? s + (1 - s) * sat * 0.6 : s * (1 + sat * 0.7);
   const l2 = light >= 0 ? l + (0.92 - l) * light * 0.55 : l * (1 + light * 0.5);
   const [r, g, b] = hslToRgb(h2, Math.max(0, Math.min(1, s2)), Math.max(0, Math.min(1, l2)));

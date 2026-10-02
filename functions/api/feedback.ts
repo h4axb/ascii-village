@@ -30,6 +30,9 @@ interface D1Database {
 
 export interface FeedbackEnv {
   FEEDBACK_DB?: D1Database;
+  // the name `wrangler d1 create asciia-feedback` writes into wrangler.jsonc
+  // on its own — accepted too, so either binding name works
+  asciia_feedback?: D1Database;
   FEEDBACK_ADMIN_TOKEN?: string;
   ALLOWED_ORIGINS?: string;
 }
@@ -83,8 +86,8 @@ function sameToken(a: string, b: string): boolean {
 }
 
 export async function handleFeedback(request: Request, env: FeedbackEnv): Promise<Response> {
-  if (!env.FEEDBACK_DB) return json(503, { error: 'feedback storage is not set up (FEEDBACK_DB)' });
-  const db = env.FEEDBACK_DB;
+  const db = env.FEEDBACK_DB ?? env.asciia_feedback;
+  if (!db) return json(503, { error: 'feedback storage is not set up (no FEEDBACK_DB binding in wrangler.jsonc)' });
 
   if (request.method === 'GET' && new URL(request.url).pathname === '/api/feedback/tags') {
     const { results } = await db

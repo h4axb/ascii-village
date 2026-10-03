@@ -31,8 +31,9 @@
 // alternatives. Leaving keeps the last finished design, as above.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import * as S from './sprites';
-import { craftItem, mitchyChat, getMitchyLine, preflightCraft, clarifyPrompt } from './llm';
-import type { ClarifyQuestion, CraftClarify, CraftConcept, OwnedItem, ShopItem } from './llm';
+import { craftItem, mitchyChat, getMitchyLine, preflightCraft, clarifyPrompt, AiServiceError, aiDownOf } from './llm';
+import type { AiDown, ClarifyQuestion, CraftClarify, CraftConcept, OwnedItem, ShopItem } from './llm';
+import { AiDownPopup, AI_RETRY_MS, noteAiDown, clearAiDown } from './AiDownPopup';
 import { clarifyGuidance } from './craft';
 import { ClarifyPlan, RatingPanel, YOU_DECIDE, type RateStep } from './CraftClarify';
 import { FeedbackVote, TuneQuestions } from './CraftFeedback';
@@ -69,7 +70,8 @@ export const ADJUST_PRICE = 12;
 const MITCHY: Speaker = { name: MITCHY_NAME, look: S.MITCHY_FACE_LOOK, solid: {} };
 
 // input → working → (choosing | clarifying →) working → failed | success → folded
-type Phase = 'input' | 'working' | 'choosing' | 'clarifying' | 'failed' | 'success' | 'folded';
+// offline: the AI couldn't be reached; a popup explains and retries
+type Phase = 'input' | 'working' | 'choosing' | 'clarifying' | 'offline' | 'failed' | 'success' | 'folded';
 
 type Result = { item: ShopItem; prompt: string };
 
@@ -233,6 +235,36 @@ export default function CraftModal({
   const clarRef = useRef(clar);
   clarRef.current = clar;
   const [peers, setPeers] = useState<SharedTags>({ up: [], down: [] });
+  // The AI couldn't be reached: a popup says so plainly, tries once more on
+  // its own after AI_RETRY_MS, and after that asks the player to tell the
+  // host. `retry` repeats exactly the step that failed; no token is spent.
+  const [aiDown, setAiDown] = useState<{ info: AiDown; attempt: number; retryAt: number | null; retrying: boolean; retry: () => void } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  function goOffline(info: AiDown, retry: () => void) {
+    setPhase('offline');
+    setStage(null);
+    setPartial([]);
+    setBusyLine(null);
+    const failedBefore = noteAiDown(); // it already failed before a reload: treat it as a repeat
+    setAiDown((a) => {
+      const attempt = a ? a.attempt + 1 : failedBefore ? 2 : 1;
+      return { info, attempt, retryAt: attempt === 1 ? Date.now() + AI_RETRY_MS : null, retrying: false, retry };
+    });
+  }
+  function retryAi() {
+    const a = aiDown;
+    if (!a || a.retrying) return;
+    setAiDown({ ...a, retrying: true, retryAt: null });
+    a.retry();
+  }
+  useEffect(() => {
+    if (!aiDown?.retryAt) return;
+    const t = window.setInterval(() => {
+      setNow(Date.now());
+      if (Date.now() >= aiDown.retryAt!) retryAi();
+    }, 500);
+    return () => window.clearInterval(t);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (clarify) void loadSharedTags().then(setPeers);
   }, [clarify]);
@@ -270,10 +302,12 @@ export default function CraftModal({
     const building = () => getMitchyLine('a "hold on, building your thing right now" busy').then(setBusyLine);
     if (!asking) void building();
 
-    const draw = (cl?: CraftClarify, log?: ClarifyLog) => {
-      if (asking) {
+    // `again`: a retry after the AI couldn't be reached (see goOffline)
+    const draw = (cl?: CraftClarify, log?: ClarifyLog, again = false) => {
+      if (asking || again) {
         setPhase('working');
         setStage(null);
+        setPartial([]);
         setBusyLine(null);
         void building();
       }
@@ -289,7 +323,13 @@ export default function CraftModal({
           },
         },
         { retry: !choices, prefs: feedback, ...(clarify ? { clarify: cl, noAlts: true } : {}) },
-      ).then((r) => finish(r, log));
+      ).then((r) => {
+        if (closed.current) return;
+        if (!r.ok && r.aiDown) return goOffline(r.aiDown, () => draw(cl, log, true));
+        setAiDown(null);
+        clearAiDown();
+        finish(r, log);
+      });
     };
 
     if (choices && !rework && !how.direct) {
@@ -307,23 +347,35 @@ export default function CraftModal({
         push({ who: 'mitchy', kind: 'concepts', concepts: pf.concepts, surprise: pf.surprise });
       });
     } else if (asking) {
-      setStage('thinking');
-      setBusyLine('Ooh, let me think about that for a second.');
-      const t0 = Date.now();
-      void clarifyPrompt(craftPrompt).then((qs) => {
-        if (closed.current) return;
-        if (!qs.length) return draw(undefined, { questions: [], skipped: false, ms: Date.now() - t0, outcome: 'crafted' });
-        setStage(null);
-        setBusyLine(null);
-        setPhase('clarifying');
-        setClar({ prompt: craftPrompt, questions: qs, picks: [], step: 0, t0: Date.now(), locked: false, run: draw });
-        push({
-          who: 'mitchy',
-          kind: 'text',
-          text: `Ooh, before I start I have ${qs.length === 1 ? 'one quick question' : 'two quick questions'} so it turns out the way you imagine.`,
+      const ask = () => {
+        setPhase('working');
+        setStage('thinking');
+        setBusyLine('Ooh, let me think about that for a second.');
+        const t0 = Date.now();
+        void clarifyPrompt(craftPrompt).then((qs) => {
+          if (closed.current) return;
+          setAiDown(null);
+          clearAiDown();
+          if (!qs.length) return draw(undefined, { questions: [], skipped: false, ms: Date.now() - t0, outcome: 'crafted' });
+          setStage(null);
+          setBusyLine(null);
+          setPhase('clarifying');
+          setClar({ prompt: craftPrompt, questions: qs, picks: [], step: 0, t0: Date.now(), locked: false, run: draw });
+          push({
+            who: 'mitchy',
+            kind: 'text',
+            text: `Ooh, before I start I have ${qs.length === 1 ? 'one quick question' : 'two quick questions'} so it turns out the way you imagine.`,
+          });
+          push({ who: 'mitchy', kind: 'text', text: qs[0].q });
+        }).catch((err: unknown) => {
+          if (closed.current) return;
+          goOffline(
+            err instanceof AiServiceError ? aiDownOf(err) : { failure: 'server', status: null, detail: String(err) },
+            ask,
+          );
         });
-        push({ who: 'mitchy', kind: 'text', text: qs[0].q });
-      });
+      };
+      ask();
     } else draw();
 
     function finish(r: Awaited<ReturnType<typeof craftItem>>, log?: ClarifyLog) {
@@ -1052,6 +1104,21 @@ export default function CraftModal({
           </button>
         </div>
       </Frame>
+
+      {/* the AI couldn't be reached: say so, retry, then ask for the host */}
+      {aiDown && !confirmClose && (
+        <div className="cw3-scrim">
+          <AiDownPopup
+            info={aiDown.info}
+            attempt={aiDown.attempt}
+            retryAt={aiDown.retryAt}
+            retrying={aiDown.retrying}
+            now={now}
+            onRetry={retryAi}
+            onLeave={leave}
+          />
+        </div>
+      )}
 
       {/* Leaving always asks. [F] leave · [Esc] stay */}
       {confirmClose && (

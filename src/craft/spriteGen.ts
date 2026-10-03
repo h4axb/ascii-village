@@ -24,6 +24,10 @@ import { checkPolicy } from './policy';
 import { isMood, MOOD_PRESETS, type Mood } from './moods';
 import type { TextureModifier } from './spec';
 
+// llmClient's AiServiceError (the AI couldn't be reached at all), matched by
+// name so craft/ doesn't import the client (the llm.ts boundary below).
+export const isAiServiceError = (e: unknown): boolean => e instanceof Error && e.name === 'AiServiceError';
+
 // Local vision/JSON message types (kept out of the client to respect the
 // craft/ <-> llm.ts import boundary — llm.ts owns the actual client).
 type ContentPart =
@@ -354,8 +358,9 @@ export async function planCraft(
       relations: coerceRelations(r?.relations),
       face: Array.isArray(r?.face) ? (r.face as unknown[]).filter(isFaceMark) : undefined,
     };
-  } catch {
-    return empty; // fail-open on parse/network failure: caller sees regions:[] and routes into the retry/failure path, never crafts silently
+  } catch (err) {
+    if (isAiServiceError(err)) throw err; // the AI is unreachable: the workshop tells the player (CraftModal)
+    return empty; // fail-open on an unusable answer: caller sees regions:[] and routes into the retry/failure path, never crafts silently
   }
 }
 
@@ -552,8 +557,9 @@ export async function analyzeCraft(
 // size, which feature gets the space, shape character, finish, mood); every
 // answer carries a concrete `effect` for the planner, plus exact code
 // overrides (size, finish, mood preset) where one exists. "You decide" is
-// added by the game, never by the model. On failure: no questions (the
-// caller, llm.ts clarifyPrompt, then uses DEFAULT_CLARIFY_QUESTIONS).
+// added by the game, never by the model. An unusable answer gives no
+// questions (llm.ts clarifyPrompt then uses DEFAULT_CLARIFY_QUESTIONS); an
+// unreachable AI throws, and the workshop tells the player.
 // ---------------------------------------------------------------------------
 
 export interface ClarifyOption {
@@ -635,7 +641,8 @@ export async function clarifyCraft(
       if (options.length >= 2) questions.push({ topic, q, options });
     }
     return questions;
-  } catch {
+  } catch (err) {
+    if (isAiServiceError(err)) throw err; // shown to the player, not replaced by fixed questions
     return [];
   }
 }

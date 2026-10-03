@@ -6,7 +6,7 @@
 // Nothing else in the app knows (or may know) which path ran: same async
 // interface either way.
 
-import { llmEnabled, chat, chatJSON, MODELS } from './llmClient';
+import { llmEnabled, chat, chatJSON, MODELS, AiServiceError, type AiFailure } from './llmClient';
 // Build-time-generated static data (produced offline by scripts/build-*.mjs).
 // The shop samples from these; if they're empty, it falls back to ITEM_POOL.
 import catalogData from './data/catalog.json';
@@ -303,7 +303,8 @@ export type CraftResult =
   // `suggestions`: up to 3 alternative craft prompts (shown as clickable
   // buttons). Present only on BENIGN failures — never on category mismatches
   // or blocked (sensitive) input.
-  | { ok: false; reply: string; suggestions?: string[] };
+  // aiDown: the AI service couldn't be reached at all (see AiDown)
+  | { ok: false; reply: string; suggestions?: string[]; aiDown?: AiDown };
 
 // Live-progress hooks the crafting UI can pass into craftItem. Rendering is
 // now local/synchronous (no more image or streaming stages — see the
@@ -555,6 +556,7 @@ export async function craftItem(
       return opts.prefs ? { ok: true, item, kind: category, applied } : { ok: true, item };
     } catch (err) {
       console.warn('[craft] pipeline error:', err);
+      if (err instanceof AiServiceError) return { ok: false, reply: '', aiDown: aiDownOf(err) };
       return {
         ok: false,
         reply: "oops... something went wrong on my workbench. give it another try in a moment?",
@@ -587,6 +589,15 @@ export async function craftItem(
 // concept first? Offline it always crafts directly.
 export type { CraftPreflight, CraftConcept } from './craft';
 
+// The AI service couldn't be reached: what the workshop tells the player.
+export interface AiDown {
+  failure: AiFailure;
+  status: number | null;
+  detail: string; // the service's own message, shown small under the explanation
+}
+export const aiDownOf = (e: AiServiceError): AiDown => ({ failure: e.failure, status: e.status, detail: e.detail });
+export { AiServiceError };
+
 // The /1 pre-clarification: the 1-2 questions asked before drawing
 // (craft/spriteGen.ts clarifyCraft); the fixed DEFAULT_CLARIFY_QUESTIONS
 // when the model gives none or isn't reachable. Blocked prompt: none.
@@ -600,6 +611,8 @@ export interface CraftClarify {
 export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> {
   // a blocked prompt is refused by craftItem right after, without questions
   if (!checkPolicy(prompt).allowed) return [];
+  // an unreachable AI throws AiServiceError (the workshop shows it); only an
+  // answer without usable questions falls back to the fixed ones
   const qs = llmEnabled ? await clarifyCraft(prompt, chatJSON, { model: MODELS.fast, fallbackModel: MODELS.fastFallback }) : [];
   return qs.length ? qs : DEFAULT_CLARIFY_QUESTIONS;
 }

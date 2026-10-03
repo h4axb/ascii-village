@@ -1857,3 +1857,22 @@
   margin: 0;
   padding: 8px 18px;
 }
+
+/* ---- the crafting AI can't be reached (AiDownPopup.tsx) ------------------ */
+.ds-panel.ai-down {
+  max-width: min(520px, 92vw);
+}
+.ai-down-host {
+  color: var(--ds-text);
+  font-weight: 600;
+}
+.ai-down-detail {
+  margin: 14px 0 0;
+  font-size: 11px;
+  opacity: 0.75;
+  color: var(--ds-text-muted);
+  word-break: break-word;
+}
+.ds-actions.ai-down-actions {
+  margin-top: 4px;
+}

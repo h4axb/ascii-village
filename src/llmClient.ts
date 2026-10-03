@@ -94,36 +94,75 @@ interface ChatOptions {
   fallbackModel?: string;
 }
 
+// The AI service couldn't be used at all — no connection, no answer in
+// time, or an error status from it (or from the game's own proxy, e.g. a
+// missing key). Distinct from a model answering with something unusable:
+// the workshop shows this to the player instead of quietly falling back
+// (see CraftModal's "AI unavailable" popup).
+export type AiFailure = 'network' | 'timeout' | 'auth' | 'busy' | 'server' | 'setup';
+export class AiServiceError extends Error {
+  constructor(
+    readonly failure: AiFailure,
+    readonly status: number | null,
+    readonly detail: string,
+  ) {
+    super(`AI service ${failure}${status ? ` (HTTP ${status})` : ''}: ${detail}`);
+    this.name = 'AiServiceError';
+  }
+}
+function failureOf(status: number): AiFailure {
+  if (status === 401 || status === 403) return 'auth';
+  if (status === 429) return 'busy';
+  if (status >= 500) return 'server';
+  return 'setup'; // 400s: the request itself was refused (model not allowed, …)
+}
+
 // One HTTP attempt against a specific model. Throws on any failure.
 async function chatOnce(messages: ChatMessage[], opts: ChatOptions, model: string): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
 
   try {
-    const res = await fetch(`${BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeader(),
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model,
-        messages,
-        // only send temperature when explicitly set — Sonnet 5 rejects
-        // non-default sampling params
-        ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
-        max_tokens: opts.maxTokens ?? 256,
-        ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
-        // Anthropic-only field — guard by the model actually being sent in
-        // THIS attempt (matters when a fallback model swaps providers).
-        ...(opts.thinking && model.startsWith('anthropic/') ? { thinking: opts.thinking } : {}),
-      }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeader(),
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages,
+          // only send temperature when explicitly set — Sonnet 5 rejects
+          // non-default sampling params
+          ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+          max_tokens: opts.maxTokens ?? 256,
+          ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
+          // Anthropic-only field — guard by the model actually being sent in
+          // THIS attempt (matters when a fallback model swaps providers).
+          ...(opts.thinking && model.startsWith('anthropic/') ? { thinking: opts.thinking } : {}),
+        }),
+      });
+    } catch (err) {
+      // fetch only rejects when nothing came back: aborted by our timeout, or no connection
+      if (controller.signal.aborted) throw new AiServiceError('timeout', null, 'no answer within 15 seconds');
+      throw new AiServiceError('network', null, err instanceof Error ? err.message : String(err));
+    }
 
     if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      throw new Error(`LLM HTTP ${res.status}: ${detail.slice(0, 200)}`);
+      const body = await res.text().catch(() => '');
+      let detail = body.slice(0, 200);
+      try {
+        const j = JSON.parse(body) as { error?: unknown };
+        if (typeof j.error === 'string') detail = j.error;
+        else if (j.error && typeof (j.error as { message?: unknown }).message === 'string')
+          detail = (j.error as { message: string }).message;
+      } catch {
+        // not JSON: keep the raw text
+      }
+      throw new AiServiceError(failureOf(res.status), res.status, detail);
     }
 
     const data = await res.json();

@@ -30,6 +30,7 @@ import {
   suggestAlternatives,
   analyzeCraft,
   clarifyCraft,
+  DEFAULT_CLARIFY_QUESTIONS,
   MOOD_PRESETS,
   textureModifierFor,
   type ClarifyQuestion,
@@ -586,8 +587,9 @@ export async function craftItem(
 // concept first? Offline it always crafts directly.
 export type { CraftPreflight, CraftConcept } from './craft';
 
-// The /1 pre-clarification: the 0-2 questions worth asking before drawing
-// (craft/spriteGen.ts clarifyCraft). Offline or on a blocked prompt: none.
+// The /1 pre-clarification: the 1-2 questions asked before drawing
+// (craft/spriteGen.ts clarifyCraft); the fixed DEFAULT_CLARIFY_QUESTIONS
+// when the model gives none or isn't reachable. Blocked prompt: none.
 export type { ClarifyQuestion, ClarifyOption } from './craft';
 export interface CraftClarify {
   guidance: string;
@@ -596,8 +598,10 @@ export interface CraftClarify {
   mood?: Mood;
 }
 export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> {
-  if (!llmEnabled || !checkPolicy(prompt).allowed) return [];
-  return clarifyCraft(prompt, chatJSON, { model: MODELS.fast, fallbackModel: MODELS.fastFallback });
+  // a blocked prompt is refused by craftItem right after, without questions
+  if (!checkPolicy(prompt).allowed) return [];
+  const qs = llmEnabled ? await clarifyCraft(prompt, chatJSON, { model: MODELS.fast, fallbackModel: MODELS.fastFallback }) : [];
+  return qs.length ? qs : DEFAULT_CLARIFY_QUESTIONS;
 }
 export async function preflightCraft(prompt: string): Promise<CraftPreflight> {
   if (!llmEnabled || !checkPolicy(prompt).allowed) return { needsChoice: false };

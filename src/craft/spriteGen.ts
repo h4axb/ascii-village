@@ -547,12 +547,13 @@ export async function analyzeCraft(
 
 // ---------------------------------------------------------------------------
 // PRE-CLARIFICATION (crafting panel 1, the /1 link): before drawing, find the
-// 0-2 decisions in a request that really change how the sprite looks, and
+// 1-2 decisions in a request that really change how the sprite looks, and
 // ask the player. Only along axes this pipeline can actually show (colour,
 // size, which feature gets the space, shape character, finish, mood); every
 // answer carries a concrete `effect` for the planner, plus exact code
 // overrides (size, finish, mood preset) where one exists. "You decide" is
-// added by the game, never by the model. Fails open: no questions.
+// added by the game, never by the model. On failure: no questions (the
+// caller, llm.ts clarifyPrompt, then uses DEFAULT_CLARIFY_QUESTIONS).
 // ---------------------------------------------------------------------------
 
 export interface ClarifyOption {
@@ -585,10 +586,9 @@ export async function clarifyCraft(
             'You help Mitchy, the cat who runs the crafting workshop in Asciia Bay, a cozy ASCII island game. The ' +
             'player describes ONE item; it is drawn as a SMALL sprite (about 5-22 character cells wide) from a few ' +
             'simple shapes with flat colours, so only big decisions show.\n\n' +
-            'Decide whether the request leaves a MEANINGFUL visual decision open, one where different answers ' +
-            'would produce clearly different sprites. If the request is already clear enough, return no questions. ' +
-            'Most specific requests need none; vague ones ("a magical pet", "something for the beach") usually ' +
-            'need one or two.\n\n' +
+            'ALWAYS ask 1 or 2 questions (prefer 2) about the visual decisions that would change this sprite the ' +
+            'most, where different answers produce clearly different sprites. Even a specific request leaves ' +
+            'something open (its colours, its size, its mood, which part to make big); ask about that.\n\n' +
             'Only ask about these axes, because only they visibly change the sprite:\n' +
             '- main colour or palette (e.g. "Sunset warm", "Ocean blue")\n' +
             '- size (pocket-sized / pet-sized / big); set "size" to small, medium or large\n' +
@@ -598,12 +598,12 @@ export async function clarifyCraft(
             '- mood; set "mood" to one of cute, mysterious, unusual, cozy, bold, dreamy, fierce, ancient\n' +
             'Never ask about tiny details (faces, patterns, text), behaviour or function, the scene or background, ' +
             'or anything the player already said.\n\n' +
-            'At most 2 questions. Each "q" is one short natural sentence Mitchy says, friendly and simple, at most ' +
+            '1 or 2 questions, never more. Each "q" is one short natural sentence Mitchy says, friendly and simple, at most ' +
             '12 words, without colons or dashes and without AI or technical words. Each "topic" names the decision ' +
             'in 1-3 words ("Focus", "Main colour", "Size"). Give 2 or 3 options; each "label" is 1-3 words and ' +
             '"effect" is the concrete drawing instruction for that answer (under 25 words, about shapes, colours, ' +
             'size or the featured part). Do not add a "you decide" option, the game adds it.\n\n' +
-            'Reply with JSON only: {"questions": []} or {"questions": [{"topic": "...", "q": "...", "options": ' +
+            'Reply with JSON only: {"questions": [{"topic": "...", "q": "...", "options": ' +
             '[{"label": "...", "effect": "...", "size": null, "finish": null, "mood": null}, ...]}]}.',
         },
         { role: 'user', content: `The player asked for: "${prompt}".` },
@@ -639,6 +639,30 @@ export async function clarifyCraft(
     return [];
   }
 }
+
+// Mitchy always asks on /1 (the variant is the questions): when the model
+// returns none or fails, these two fixed ones are used. Both reach exact
+// code levers (a mood preset, a size class), so every answer shows.
+export const DEFAULT_CLARIFY_QUESTIONS: ClarifyQuestion[] = [
+  {
+    topic: 'Mood',
+    q: 'What kind of feeling should it have?',
+    options: [
+      { label: 'Cute', effect: 'cute and friendly', mood: 'cute' },
+      { label: 'Mysterious', effect: 'dark and mysterious', mood: 'mysterious' },
+      { label: 'Bold', effect: 'bold and striking', mood: 'bold' },
+    ],
+  },
+  {
+    topic: 'Size',
+    q: 'How big should it be?',
+    options: [
+      { label: 'Pocket-sized', effect: 'small and compact', size: 'small' },
+      { label: 'Pet-sized', effect: 'about the size of a person or a large pet', size: 'medium' },
+      { label: 'Big', effect: 'large and impressive', size: 'large' },
+    ],
+  },
+];
 
 // The planner text for the player's answers (null = "You decide").
 export function clarifyGuidance(answers: { topic: string; pick: ClarifyOption | null }[]): string {

@@ -24,7 +24,7 @@
 // exactly what the player gets. There, leaving never throws a finished
 // design away: the last result goes into the inventory.
 //
-// With `clarify` (the /1 test link) a new idea first gets Mitchy's 0-2
+// With `clarify` (the /1 test link) a new idea first gets Mitchy's 1-2
 // questions (one message each, "You decide" always offered), then her plan
 // with every answer changeable; Craft it! commits, Esc skips. Each result is
 // rated in a fixed-size panel (CraftClarify.tsx); failures offer no

@@ -612,7 +612,7 @@ function readIntroBMarkers(): {
 // that always plays the intro; the plain one skips it):
 //   /          the save decides whether the intro plays
 //   /0         the standard workshop            /intro, /intro/0
-//   /1         crafting panel 1, pre-clarification: Mitchy asks 0-2 short
+//   /1         crafting panel 1, pre-clarification: Mitchy asks 1-2 short
 //              questions before crafting, then each result is rated (see
 //              CraftModal's `clarify`, CraftClarify.tsx)     /intro/1
 //   /2         crafting panel 2, post-reflection: rate each result, tune

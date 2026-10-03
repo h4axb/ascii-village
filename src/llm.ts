@@ -7,6 +7,7 @@
 // interface either way.
 
 import { llmEnabled, chat, chatJSON, MODELS, AiServiceError, type AiFailure } from './llmClient';
+import type { DailySaju } from './saju';
 // Build-time-generated static data (produced offline by scripts/build-*.mjs).
 // The shop samples from these; if they're empty, it falls back to ITEM_POOL.
 import catalogData from './data/catalog.json';
@@ -791,15 +792,34 @@ export function mitchySmallTalk(playerName: string): Promise<string> {
   );
 }
 
-// "What do the stars say about my luck today?"
-export function mitchyLuck(playerName: string, day: string): Promise<string> {
+// "What do the stars say about my luck today?" With the player's saju
+// (saju.ts, computed in code; the birth date itself is never sent), the
+// reading follows their day master and today's pillar like a real daily saju;
+// without it, a general horoscope.
+export function mitchyLuck(playerName: string, day: string, saju?: DailySaju | null): Promise<string> {
+  if (!saju)
+    return mitchyTalkLine(
+      `Today is ${day}. The villager ${playerName} asks what the stars say about their luck today. Give a playful, ` +
+        'kind horoscope in two or three short sentences (under 45 words). Name one lucky thing from the island ' +
+        '(a date, flower, stone, fern, cactus or ice flower), one lucky spot (the palm tree, the pond, the garden ' +
+        'or your shop) and a lucky colour. Never gloomy.',
+      pick(LUCK_FALLBACK),
+      120,
+    );
   return mitchyTalkLine(
-    `Today is ${day}. The villager ${playerName} asks what the stars say about their luck today. Give a playful, ` +
-      'kind horoscope in two or three short sentences (under 45 words). Name one lucky thing from the island ' +
-      '(a date, flower, stone, fern, cactus or ice flower), one lucky spot (the palm tree, the pond, the garden ' +
-      'or your shop) and a lucky colour. Never gloomy.',
-    pick(LUCK_FALLBACK),
-    120,
+    `Today is ${day}. Read the villager ${playerName}'s daily saju (Korean Four Pillars) from these facts, which ` +
+      'are already worked out, so do not calculate anything yourself and do not change them.\n' +
+      `Their day master: ${saju.dayMaster}.\n` +
+      `Today's day pillar: ${saju.today}.\n` +
+      `Today's relation to them: ${saju.god.name}, meaning ${saju.god.theme}.\n` +
+      `Their chart is low in ${saju.weak}, so their lucky colour is ${saju.colour} and lucky direction ${saju.direction}.\n` +
+      'In two or three short sentences (under 55 words), tell them what today holds in simple words, mentioning ' +
+      'their element meeting today\'s element once. Add their lucky colour and one lucky thing from the island ' +
+      '(a date, flower, stone, fern, cactus or ice flower). Vague and kind like a real fortune, never gloomy, ' +
+      'no Chinese characters.',
+    `ur ${saju.element} meets today's ${saju.todayElement}, so the stars ` +
+      `say today is about ${saju.god.theme}. ${saju.colour} is ur colour, purr.`,
+    140,
   );
 }
 

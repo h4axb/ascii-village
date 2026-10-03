@@ -1895,3 +1895,50 @@
   color: var(--ds-text-muted);
   letter-spacing: 2px;
 }
+.talk-birth {
+  align-self: flex-end;
+  width: min(360px, 80%);
+  margin-right: 102px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.talk-birth label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ds-text-muted);
+}
+.talk-birth input {
+  font: inherit;
+  font-size: 15px;
+  padding: 10px 12px;
+  color: var(--ds-text);
+  background: rgb(38, 43, 28);
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  color-scheme: dark;
+}
+.talk-birth-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.talk-birth input:focus {
+  outline: none;
+  border-color: var(--ds-line-strong);
+}
+.talk-birth .ds-option:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.talk-birth-note {
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .talk-birth {
+    margin-right: 0;
+    width: 100%;
+  }
+}

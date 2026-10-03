@@ -136,7 +136,7 @@ import CraftModal from './CraftModal';
 import { flushFeedbackOutbox } from './feedback/client';
 import { CraftPrefsSettings } from './CraftFeedback';
 import { LINK } from './link';
-import { MitchyTalk } from './MitchyTalk';
+import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
 
 const INTRO_TEXT =
   "Hey, are u the new villager here? I'm Mitchy and own this shop. in this world u can go around and collect materials and if u give them back to me ill pay u fair.";
@@ -4519,6 +4519,25 @@ function Game() {
                   </button>
                 )}
               </div>
+              {/* Mitchy's saju reading (MitchyTalk.tsx) keeps the birthday in this browser */}
+              {hasBirthDate() && (
+                <>
+                  <div className="ds-settings-section">Mitchy’s star readings</div>
+                  <div className="ds-actions ds-settings-actions">
+                    <button
+                      className="ds-action"
+                      onClick={() => {
+                        forgetBirthDate();
+                        showToast('Mitchy forgot your birthday.');
+                        setModal({ t: 'settings' });
+                      }}
+                    >
+                      <span>Forget my birthday</span>
+                    </button>
+                  </div>
+                  <div className="ds-muted ds-settings-note">she will ask again next time you want a reading</div>
+                </>
+              )}
             </Panel>
           )}
 

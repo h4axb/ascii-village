@@ -21,7 +21,7 @@ import {
 } from './spriteConfig';
 import { MATERIALS_HINT } from './materials';
 import { checkPolicy } from './policy';
-import { isMood, MOOD_PRESETS, type Mood } from './moods';
+import { MOODS, MOOD_PRESETS, type Mood } from './moods';
 import type { TextureModifier } from './spec';
 
 // llmClient's AiServiceError (the AI couldn't be reached at all), matched by
@@ -551,14 +551,15 @@ export async function analyzeCraft(
 
 
 // ---------------------------------------------------------------------------
-// PRE-CLARIFICATION (crafting panel 1, the /1 link): before drawing, find the
-// 1-2 decisions in a request that really change how the sprite looks, and
-// ask the player. Only along axes this pipeline can actually show (colour,
-// size, which feature gets the space, shape character, finish, mood); every
+// PRE-CLARIFICATION (crafting panel 1, the /1 link): before drawing, the
+// player is always asked the mood (MOOD_QUESTION, all eight moods), plus the
+// ONE other decision in the request that most changes how the sprite looks,
+// only along axes this pipeline can actually show (colour, size, which
+// feature gets the space, shape character, finish); every
 // answer carries a concrete `effect` for the planner, plus exact code
 // overrides (size, finish, mood preset) where one exists. "You decide" is
 // added by the game, never by the model. An unusable answer gives no
-// questions (llm.ts clarifyPrompt then uses DEFAULT_CLARIFY_QUESTIONS); an
+// question (llm.ts clarifyPrompt then uses SIZE_QUESTION); an
 // unreachable AI throws, and the workshop tells the player.
 // ---------------------------------------------------------------------------
 
@@ -592,25 +593,25 @@ export async function clarifyCraft(
             'You help Mitchy, the cat who runs the crafting workshop in Asciia Bay, a cozy ASCII island game. The ' +
             'player describes ONE item; it is drawn as a SMALL sprite (about 5-22 character cells wide) from a few ' +
             'simple shapes with flat colours, so only big decisions show.\n\n' +
-            'ALWAYS ask 1 or 2 questions (prefer 2) about the visual decisions that would change this sprite the ' +
-            'most, where different answers produce clearly different sprites. Even a specific request leaves ' +
-            'something open (its colours, its size, its mood, which part to make big); ask about that.\n\n' +
+            'The game always asks the player about the MOOD itself (cute, mysterious, unusual, cozy, bold, dreamy, ' +
+            'fierce, ancient). You ask exactly ONE more question, about the visual decision that would change this ' +
+            'sprite the most, where different answers produce clearly different sprites. Even a specific request ' +
+            'leaves something open (its colours, its size, which part to make big); ask about that.\n\n' +
             'Only ask about these axes, because only they visibly change the sprite:\n' +
             '- main colour or palette (e.g. "Sunset warm", "Ocean blue")\n' +
             '- size (pocket-sized / pet-sized / big); set "size" to small, medium or large\n' +
             '- which ONE feature gets the space (e.g. "Big wings", "Long tail")\n' +
             '- shape character (round and soft vs sharp and spiky)\n' +
             '- finish (glowing, shiny, metallic, plain); set "finish" to neon, shiny, metallic or matte\n' +
-            '- mood; set "mood" to one of cute, mysterious, unusual, cozy, bold, dreamy, fierce, ancient\n' +
-            'Never ask about tiny details (faces, patterns, text), behaviour or function, the scene or background, ' +
-            'or anything the player already said.\n\n' +
-            '1 or 2 questions, never more. Each "q" is one short natural sentence Mitchy says, friendly and simple, at most ' +
-            '12 words, without colons or dashes and without AI or technical words. Each "topic" names the decision ' +
+            'Never ask about the mood or feeling (the game already does), tiny details (faces, patterns, text), ' +
+            'behaviour or function, the scene or background, or anything the player already said.\n\n' +
+            'Exactly 1 question. Its "q" is one short natural sentence Mitchy says, friendly and simple, at most ' +
+            '12 words, without colons or dashes and without AI or technical words. Its "topic" names the decision ' +
             'in 1-3 words ("Focus", "Main colour", "Size"). Give 2 or 3 options; each "label" is 1-3 words and ' +
             '"effect" is the concrete drawing instruction for that answer (under 25 words, about shapes, colours, ' +
             'size or the featured part). Do not add a "you decide" option, the game adds it.\n\n' +
             'Reply with JSON only: {"questions": [{"topic": "...", "q": "...", "options": ' +
-            '[{"label": "...", "effect": "...", "size": null, "finish": null, "mood": null}, ...]}]}.',
+            '[{"label": "...", "effect": "...", "size": null, "finish": null}, ...]}]}.',
         },
         { role: 'user', content: `The player asked for: "${prompt}".` },
       ],
@@ -619,11 +620,11 @@ export async function clarifyCraft(
     const text = (v: unknown, max: number) =>
       typeof v === 'string' && v.trim() && v.trim().length <= max && checkPolicy(v).allowed ? v.trim() : null;
     const questions: ClarifyQuestion[] = [];
-    for (const raw of Array.isArray(r?.questions) ? r.questions.slice(0, 2) : []) {
+    for (const raw of Array.isArray(r?.questions) ? r.questions : []) {
       const o = (raw ?? {}) as Record<string, unknown>;
       const topic = text(o.topic, 24);
       const q = text(o.q, 90);
-      if (!topic || !q) continue;
+      if (!topic || !q || /mood|feel/i.test(topic)) continue; // the mood question is the game's own
       const options: ClarifyOption[] = [];
       for (const rawOpt of Array.isArray(o.options) ? o.options.slice(0, 3) : []) {
         const x = (rawOpt ?? {}) as Record<string, unknown>;
@@ -635,10 +636,12 @@ export async function clarifyCraft(
           effect,
           ...(SIZES.includes(x.size as SizeClass) ? { size: x.size as SizeClass } : {}),
           ...(FINISHES.includes(x.finish as TextureModifier) ? { finish: x.finish as TextureModifier } : {}),
-          ...(isMood(x.mood) ? { mood: x.mood } : {}),
         });
       }
-      if (options.length >= 2) questions.push({ topic, q, options });
+      // a mood question in disguise ("Cute / Mysterious") repeats the game's own
+      const moodish = options.some((x) => (MOODS as string[]).includes(x.label.toLowerCase()));
+      if (options.length >= 2 && !moodish) questions.push({ topic, q, options });
+      if (questions.length) break;
     }
     return questions;
   } catch (err) {
@@ -647,29 +650,34 @@ export async function clarifyCraft(
   }
 }
 
-// Mitchy always asks on /1 (the variant is the questions): when the model
-// returns none or fails, these two fixed ones are used. Both reach exact
-// code levers (a mood preset, a size class), so every answer shows.
-export const DEFAULT_CLARIFY_QUESTIONS: ClarifyQuestion[] = [
-  {
-    topic: 'Mood',
-    q: 'What kind of feeling should it have?',
-    options: [
-      { label: 'Cute', effect: 'cute and friendly', mood: 'cute' },
-      { label: 'Mysterious', effect: 'dark and mysterious', mood: 'mysterious' },
-      { label: 'Bold', effect: 'bold and striking', mood: 'bold' },
-    ],
-  },
-  {
-    topic: 'Size',
-    q: 'How big should it be?',
-    options: [
-      { label: 'Pocket-sized', effect: 'small and compact', size: 'small' },
-      { label: 'Pet-sized', effect: 'about the size of a person or a large pet', size: 'medium' },
-      { label: 'Big', effect: 'large and impressive', size: 'large' },
-    ],
-  },
-];
+// Mitchy always asks on /1 (the variant is the questions). The mood
+// question is always the same, with all eight mood presets (craft/moods.ts),
+// so every player sees the same choice; the model adds ONE question of its own
+// (clarifyCraft), or SIZE_QUESTION when it gives none.
+const MOOD_LABEL: Record<Mood, string> = {
+  cute: 'Cute',
+  mysterious: 'Mysterious',
+  unusual: 'Unusual',
+  cozy: 'Cozy',
+  bold: 'Bold',
+  dreamy: 'Dreamy',
+  fierce: 'Fierce',
+  ancient: 'Ancient',
+};
+export const MOOD_QUESTION: ClarifyQuestion = {
+  topic: 'Mood',
+  q: 'What kind of feeling should it have?',
+  options: MOODS.map((m) => ({ label: MOOD_LABEL[m], effect: `Make it feel ${m}.`, mood: m })),
+};
+export const SIZE_QUESTION: ClarifyQuestion = {
+  topic: 'Size',
+  q: 'How big should it be?',
+  options: [
+    { label: 'Pocket-sized', effect: 'small and compact', size: 'small' },
+    { label: 'Pet-sized', effect: 'about the size of a person or a large pet', size: 'medium' },
+    { label: 'Big', effect: 'large and impressive', size: 'large' },
+  ],
+};
 
 // The planner text for the player's answers (null = "You decide").
 export function clarifyGuidance(answers: { topic: string; pick: ClarifyOption | null }[]): string {
@@ -678,7 +686,7 @@ export function clarifyGuidance(answers: { topic: string; pick: ClarifyOption | 
   const open = answers.filter((a) => !a.pick).map((a) => a.topic.toLowerCase());
   const lines = picked.map((a) => {
     const p = a.pick!;
-    const mood = p.mood ? ` ${MOOD_PRESETS[p.mood].shape}.` : '';
+    const mood = p.mood ? ` Shapes and colours: ${MOOD_PRESETS[p.mood].shape}.` : '';
     return `- ${a.topic}: ${p.label}. ${p.effect}${mood}`;
   });
   return (

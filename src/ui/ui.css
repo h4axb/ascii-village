@@ -913,6 +913,16 @@
   opacity: 0.4;
   cursor: default;
 }
+/* a long answer list (the eight moods): two columns, the last answer
+   ("You decide") across both */
+.cw3-replies.many {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(460px, 70%);
+}
+.cw3-replies.many .ds-option:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
 .cw3-replies .ds-option {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -1099,6 +1109,9 @@
   .cw3-replies {
     margin-right: 0;
     width: 80%;
+  }
+  .cw3-replies.many {
+    width: 100%;
   }
   .cw3-craft {
     padding: 0 16px;

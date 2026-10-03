@@ -68,11 +68,14 @@ reflection afterwards. Code: `CraftModal.tsx` (`clarify`), `CraftClarify.tsx`,
 
 **Flow**
 
-1. The player writes a prompt and presses Craft it!. One small AI call
-   (`clarifyCraft`) picks the 1-2 decisions that would change the sprite the
-   most. Every new craft gets questions; if the AI gives none or isn't
-   reachable, Mitchy asks two fixed ones (mood: cute / mysterious / bold, and
-   size: pocket-sized / pet-sized / big), both applied exactly in code.
+1. The player writes a prompt and presses Craft it!. Every new craft gets
+   two questions. The first is always the mood, with the same eight answers
+   for everyone (cute, mysterious, unusual, cozy, bold, dreamy, fierce,
+   ancient; each a fixed preset, `craft/moods.ts`). The second comes from one
+   small AI call (`clarifyCraft`): the one other decision that would change
+   the sprite the most. If the AI gives none, Mitchy asks the size instead
+   (pocket-sized / pet-sized / big). If the AI can't be reached, a popup
+   says why (`AiDownPopup.tsx`).
 2. Mitchy asks them one chat message each. The
    answers are reply buttons, always with "✦ You decide". The text field is
    locked; there is no free-text back-and-forth.

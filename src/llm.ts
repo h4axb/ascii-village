@@ -30,7 +30,8 @@ import {
   suggestAlternatives,
   analyzeCraft,
   clarifyCraft,
-  DEFAULT_CLARIFY_QUESTIONS,
+  MOOD_QUESTION,
+  SIZE_QUESTION,
   MOOD_PRESETS,
   textureModifierFor,
   type ClarifyQuestion,
@@ -598,9 +599,10 @@ export interface AiDown {
 export const aiDownOf = (e: AiServiceError): AiDown => ({ failure: e.failure, status: e.status, detail: e.detail });
 export { AiServiceError };
 
-// The /1 pre-clarification: the 1-2 questions asked before drawing
-// (craft/spriteGen.ts clarifyCraft); the fixed DEFAULT_CLARIFY_QUESTIONS
-// when the model gives none or isn't reachable. Blocked prompt: none.
+// The /1 pre-clarification, asked before drawing: always the mood question
+// with all eight moods, then ONE question the model picks for this prompt
+// (craft/spriteGen.ts clarifyCraft), or the size question when it gives none.
+// Unreachable AI: throws (the workshop shows it). Blocked prompt: none.
 export type { ClarifyQuestion, ClarifyOption } from './craft';
 export interface CraftClarify {
   guidance: string;
@@ -614,7 +616,7 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> 
   // an unreachable AI throws AiServiceError (the workshop shows it); only an
   // answer without usable questions falls back to the fixed ones
   const qs = llmEnabled ? await clarifyCraft(prompt, chatJSON, { model: MODELS.fast, fallbackModel: MODELS.fastFallback }) : [];
-  return qs.length ? qs : DEFAULT_CLARIFY_QUESTIONS;
+  return [MOOD_QUESTION, qs[0] ?? SIZE_QUESTION];
 }
 export async function preflightCraft(prompt: string): Promise<CraftPreflight> {
   if (!llmEnabled || !checkPolicy(prompt).allowed) return { needsChoice: false };

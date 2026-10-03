@@ -118,6 +118,8 @@ type Turn =
   | { who: 'mitchy'; kind: 'concepts'; concepts: [CraftConcept, CraftConcept]; surprise: string }
   | { who: 'mitchy'; kind: 'plan' }; // (clarify) the plan panel, live from `clar`
 
+// /1: how long a finished craft is shown on its own before the rating
+const RESULT_PAUSE_MS = 1500;
 const CONCEPT_LETTERS = ['A', 'B'] as const;
 
 const STAGE_TEXT: Record<string, string> = {
@@ -228,6 +230,16 @@ export default function CraftModal({
   const [adjusted, setAdjusted] = useState(false); // the one rework is used
   const [optSel, setOptSel] = useState(0);
   const [fb, setFb] = useState<Fb | null>(null);
+  // /1: the finished craft stands alone for a moment before the rating
+  // panel slides in below it, so the player sees the result first
+  const [rateFor, setRateFor] = useState<string | null>(null);
+  const fbId = fb?.id;
+  const rateShown = !!fbId && rateFor === fbId;
+  useEffect(() => {
+    if (!clarify || !fbId) return;
+    const t = window.setTimeout(() => setRateFor(fbId), RESULT_PAUSE_MS);
+    return () => window.clearTimeout(t);
+  }, [fbId]); // eslint-disable-line react-hooks/exhaustive-deps
   const fbRef = useRef(fb);
   fbRef.current = fb;
   const [leaveSel, setLeaveSel] = useState(0);
@@ -922,6 +934,12 @@ export default function CraftModal({
     if (el) el.scrollTop = el.scrollHeight;
   }, [chatSize, viewRec, busyLine, adjusting, fb?.vote, fb?.reasons.length, fb?.commentOpen, fb?.rstep, fb?.ownOpen]);
 
+  // the rating panel just appeared under the result: glide down to it
+  useEffect(() => {
+    const el = chatRef.current;
+    if (clarify && rateShown && el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [rateShown]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // what leaving now keeps (see leave())
   function leaveText(): string | undefined {
     if (done) return undefined;
@@ -1001,7 +1019,7 @@ export default function CraftModal({
                 </ChatMessage>
               ))
             )}
-            {fb && clarify && (popup || fb.rstep === 'done') && !viewRec && !adjusting && (
+            {fb && clarify && (popup || fb.rstep === 'done') && (rateShown || fb.rstep === 'done') && !viewRec && !adjusting && (
               <RatingPanel
                 vote={fb.vote}
                 step={fb.rstep}

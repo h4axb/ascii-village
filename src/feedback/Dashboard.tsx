@@ -477,11 +477,26 @@ function ClarifyStats({ data }: { data: FeedbackRecord[] }) {
   const likeAsked = asked.filter((r) => r.vote);
   const likeNot = data.filter((r) => r.vote && !r.clarify!.questions.length);
   const rate = (rs: FeedbackRecord[]) => (rs.length ? `${pct(rs.filter((r) => r.vote === 'up').length, rs.length)}% of ${rs.length}` : '–');
+  const failures = data
+    .filter((r) => r.clarify!.outcome === 'failed' && r.clarify!.error)
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 5);
   return (
-    <Bars
-      rows={rows.map((r) => ({ ...r, text: String(r.value) }))}
-      note={`Like rate with questions: ${rate(likeAsked)} · without: ${rate(likeNot)} · median time answering: ${median(asked.map((r) => r.clarify!.ms)) / 1000}s`}
-    />
+    <>
+      <Bars
+        rows={rows.map((r) => ({ ...r, text: String(r.value) }))}
+        note={`Like rate with questions: ${rate(likeAsked)} · without: ${rate(likeNot)} · median time answering: ${median(asked.map((r) => r.clarify!.ms)) / 1000}s`}
+      />
+      {failures.length > 0 && (
+        <ul className="fbd-muted">
+          {failures.map((r) => (
+            <li key={r.id}>
+              Failed “{r.prompt}”: {r.clarify!.error}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 function median(v: number[]): number {
@@ -495,7 +510,7 @@ function toCsv(rows: FeedbackRecord[]): string {
   const cols = [
     'at', 'link', 'player', 'name', 'prompt', 'kind', 'adjusted', 'vote', 'reasons', 'positive', 'tags', 'comment',
     ...PREF_KEYS.map((k) => `applied_${k}`), ...PREF_KEYS.map((k) => `answer_${k}`), 'scope',
-    'clarify_questions', 'clarify_answers', 'clarify_skipped', 'clarify_outcome', 'clarify_ms',
+    'clarify_questions', 'clarify_answers', 'clarify_skipped', 'clarify_outcome', 'clarify_ms', 'clarify_error',
   ];
   const cell = (v: unknown) => {
     const s = v === undefined || v === null ? '' : String(v);
@@ -523,6 +538,7 @@ function toCsv(rows: FeedbackRecord[]): string {
       r.clarify?.skipped,
       r.clarify?.outcome,
       r.clarify?.ms,
+      r.clarify?.error,
     ]
       .map(cell)
       .join(','),

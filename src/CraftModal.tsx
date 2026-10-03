@@ -448,7 +448,7 @@ export default function CraftModal({
         push({ who: 'mitchy', kind: 'result', item: rework.item, prompt: rework.prompt });
         setPopup(rework);
       } else {
-        if (clarify && log) sendClarifyOnly(craftPrompt, { ...log, outcome: 'failed' });
+        if (clarify && log) sendClarifyOnly(craftPrompt, { ...log, outcome: 'failed', ...(!r.ok && r.error ? { error: r.error } : {}) });
         setPhase('failed');
         setInput(text.slice(0, PROMPT_MAX)); // pre-fill so they can edit instead of retype
         if (r.suggestions?.length) push({ who: 'mitchy', kind: 'alts', intro: r.reply, options: r.suggestions });

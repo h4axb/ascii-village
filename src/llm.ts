@@ -305,7 +305,8 @@ export type CraftResult =
   // buttons). Present only on BENIGN failures — never on category mismatches
   // or blocked (sensitive) input.
   // aiDown: the AI service couldn't be reached at all (see AiDown)
-  | { ok: false; reply: string; suggestions?: string[]; aiDown?: AiDown };
+  // error: the technical reason a drawing failed (for the /1 feedback log)
+  | { ok: false; reply: string; suggestions?: string[]; aiDown?: AiDown; error?: string };
 
 // Live-progress hooks the crafting UI can pass into craftItem. Rendering is
 // now local/synchronous (no more image or streaming stages — see the
@@ -502,6 +503,7 @@ export async function craftItem(
         return {
           ok: false,
           reply: "Hmm, I couldn't get that one to come out right. Maybe change your idea a little and we try again?",
+          error: error ?? 'generation failed',
         };
       }
       if (!sprite) {

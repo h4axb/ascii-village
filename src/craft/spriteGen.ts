@@ -209,7 +209,8 @@ function coerceRegions(v: unknown): RegionSpec[] {
     const r = v[i];
     if (!r || typeof r !== 'object') continue;
     const region = r as Record<string, unknown>;
-    const bounds = region.bounds as Record<string, unknown> | undefined;
+    // bounds as an object, or (a shape the model sometimes uses) flat on the region
+    const bounds = (region.bounds ?? (region.cx !== undefined ? region : undefined)) as Record<string, unknown> | undefined;
     if (!bounds) continue;
     // id: default to a positional fallback when missing/empty, then
     // de-duplicate repeated ids by suffixing — relation lookups need every
@@ -324,7 +325,7 @@ export async function planCraft(
     name: '', width: 0, height: 0, parts: [], regions: [],
   };
   try {
-    const r = await chat<Record<string, unknown>>(
+    let r = await chat<Record<string, unknown>>(
       [
         { role: 'system', content: opts.prefsText ? `${planPrompt()}\n\n${opts.prefsText}` : planPrompt() },
         { role: 'user', content: `Token category: ${category}. Request: "${prompt}".` },
@@ -341,6 +342,20 @@ export async function planCraft(
       // same worst-case prompt; 1500 gave it comfortable headroom live.
       { model: opts.model, temperature: opts.temperature ?? 0.7, maxTokens: 1500, thinking: { type: 'disabled' }, fallbackModel: opts.fallbackModel },
     );
+    // the plan itself, or (seen from the model) the same plan wrapped one level down
+    const wrapped = !Array.isArray(r?.regions) && ['plan', 'sprite', 'craft', 'item'].map((k) => r?.[k]).find(
+      (v) => v && typeof v === 'object' && Array.isArray((v as Record<string, unknown>).regions),
+    );
+    if (wrapped) r = wrapped as Record<string, unknown>;
+    const regions = coerceRegions(r?.regions);
+    const issue = regions.length
+      ? undefined
+      : !Array.isArray(r?.regions)
+        ? `the reply had no regions list (keys: ${Object.keys(r ?? {}).slice(0, 8).join(', ') || 'none'})`
+        : (r.regions as unknown[]).length
+          ? `none of its ${(r.regions as unknown[]).length} regions had bounds`
+          : 'the reply had an empty regions list';
+    if (issue) console.warn('[craft] unusable plan:', issue, r);
     const adj = r?.sizeAdjust;
     const sizeClass = adjustSizeTier(base, adj === 'smaller' || adj === 'bigger' ? adj : 'default');
     return {
@@ -354,13 +369,16 @@ export async function planCraft(
       width: Number(r?.width) || 0,
       height: Number(r?.height) || 0,
       parts: Array.isArray(r?.parts) ? (r.parts as unknown[]).filter((p): p is string => typeof p === 'string').slice(0, 8) : [],
-      regions: coerceRegions(r?.regions),
+      regions,
+      ...(issue ? { issue } : {}),
       relations: coerceRelations(r?.relations),
       face: Array.isArray(r?.face) ? (r.face as unknown[]).filter(isFaceMark) : undefined,
     };
   } catch (err) {
     if (isAiServiceError(err)) throw err; // the AI is unreachable: the workshop tells the player (CraftModal)
-    return empty; // fail-open on an unusable answer: caller sees regions:[] and routes into the retry/failure path, never crafts silently
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[craft] unreadable plan reply:', msg);
+    return { ...empty, issue: `the reply was not readable JSON (${msg.slice(0, 80)})` }; // fail-open on an unusable answer: caller sees regions:[] and routes into the retry/failure path, never crafts silently
   }
 }
 

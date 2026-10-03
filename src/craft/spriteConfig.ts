@@ -249,6 +249,9 @@ export interface CraftPlan {
   regions: RegionSpec[]; // paint order = array order, later overwrites earlier
   relations?: ShapeRelation[]; // optional attached_to/extends_from/centered_on links between region ids
   face?: FaceMark[];
+  // diagnostics only: why `regions` came back empty (an unreadable reply, no
+  // regions list, regions without bounds), shown in the craft log's error
+  issue?: string;
 }
 
 // The final assembled record: CraftPlan's descriptive fields + the rendered

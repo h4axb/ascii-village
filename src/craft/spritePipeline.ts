@@ -72,7 +72,7 @@ export async function planAndRender(
     { ok: true; sprite: GeneratedSprite; warnings: string[] } | { ok: false; error: string }
   > {
     const check = validateRegionPlan(plan);
-    if (!check.ok) return { ok: false, error: check.error };
+    if (!check.ok) return { ok: false, error: plan.issue ? `${check.error}: ${plan.issue}` : check.error };
     const validated = deps.sizeClass ? { ...check.plan, sizeClass: deps.sizeClass } : check.plan;
     // Canvas size is a pure code decision (Stage 2) — resolveCanvasSize
     // already bakes in RESOLUTION_MULTIPLIER's larger glyph grid (more

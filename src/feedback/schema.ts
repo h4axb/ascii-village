@@ -40,6 +40,7 @@ export interface ClarifyLog {
   skipped: boolean; // Esc before or during the questions
   ms: number; // time spent answering
   outcome: 'crafted' | 'failed' | 'left'; // what followed
+  error?: string; // outcome 'failed': the technical reason the drawing failed
 }
 const PROMPT_MAX = 120;
 
@@ -89,7 +90,14 @@ function clarifyLog(v: unknown): ClarifyLog | null {
   });
   const outcome = c.outcome === 'crafted' || c.outcome === 'failed' || c.outcome === 'left' ? c.outcome : 'crafted';
   const ms = Number(c.ms);
-  return { questions, skipped: c.skipped === true, ms: Number.isFinite(ms) ? Math.max(0, Math.min(3_600_000, Math.round(ms))) : 0, outcome };
+  const error = outcome === 'failed' && typeof c.error === 'string' && c.error ? c.error.slice(0, 200) : undefined;
+  return {
+    questions,
+    skipped: c.skipped === true,
+    ms: Number.isFinite(ms) ? Math.max(0, Math.min(3_600_000, Math.round(ms))) : 0,
+    outcome,
+    ...(error ? { error } : {}),
+  };
 }
 
 function prefs(v: unknown): P {

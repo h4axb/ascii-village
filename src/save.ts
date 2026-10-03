@@ -9,6 +9,7 @@ import type { OwnedItem } from './llm';
 import type { PlantedCrop, Doors } from './farm';
 import type { PlacedItem } from './placement';
 import type { Outfit } from './outfit';
+import { linkKey } from './link';
 
 export interface SaveState {
   version: 1;
@@ -64,7 +65,8 @@ export interface SaveState {
   mitchyPos?: { x: number; y: number };
 }
 
-const KEY = 'ascii-village-save';
+// one save per test link (see link.ts); /0 keeps this name
+const KEY = linkKey('ascii-village-save');
 
 // The apple tree became a date palm, and the item id 'apple' became 'date'.
 // Saves written before that swap still hold 'apple' counts, and the item ids

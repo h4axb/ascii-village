@@ -29,7 +29,6 @@ import {
   getFunFact,
   basePrice,
   getShopStock,
-  getMitchyLine,
   CATEGORIES,
   universalToken,
   TOKENS_PER_DAY,
@@ -136,21 +135,11 @@ import { pondFrame, POND_FRAME_MS } from './pondAnim';
 import CraftModal from './CraftModal';
 import { flushFeedbackOutbox } from './feedback/client';
 import { CraftPrefsSettings } from './CraftFeedback';
+import { LINK } from './link';
+import { MitchyTalk } from './MitchyTalk';
 
 const INTRO_TEXT =
   "Hey, are u the new villager here? I'm Mitchy and own this shop. in this world u can go around and collect materials and if u give them back to me ill pay u fair.";
-
-const TALK_LINES = [
-  'purrr... nice weather today, huh?',
-  'shake the date palm. trust me.',
-  'i buy almost anything. ALMOST.',
-  'being a shopkeeper cat is honest work.',
-  'flowers sell well this season.',
-];
-
-// Mitchy's tip the first time you pick Talk.
-const TOKEN_LINE =
-  'did u already try buying craft tokens with ur hard-earned money? i got a few options. If u want come around!';
 
 // Playable characters. More can be added later; the profile circle in the
 // header always renders the face of the currently selected character.
@@ -417,6 +406,7 @@ type Modal =
   | { t: 'detail'; item: ItemType }
   | { t: 'detailOwned'; ownedId: string; sel: number }
   | { t: 'dialog'; sel: number }
+  | { t: 'talk'; first: boolean }
   | {
       t: 'shop';
       tab: 'sell' | 'buy';
@@ -620,10 +610,11 @@ function readIntroBMarkers(): {
 //   /3         crafting panel 3, alternatives: preflight + concepts (see
 //              CraftModal's `choices`)                       /intro/3
 //   /2/feedback  the feedback dashboard instead of the game (see main.tsx)
+// Each link keeps its own save and craft history (link.ts).
 const PATH = window.location.pathname;
-const CRAFT_CLARIFY = /^(\/intro)?\/1\/?$/.test(PATH);
-const CRAFT_FEEDBACK = /^(\/intro)?\/2\/?$/.test(PATH);
-const CRAFT_CHOICES = /^(\/intro)?\/3\/?$/.test(PATH);
+const CRAFT_CLARIFY = LINK === '1';
+const CRAFT_FEEDBACK = LINK === '2';
+const CRAFT_CHOICES = LINK === '3';
 const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[0-3]\/?$/.test(PATH)
   ? 'skip'
   : /^\/intro(\/[0-3])?\/?$/.test(PATH)
@@ -925,11 +916,9 @@ function Game() {
   const [toast, setToast] = useState<string | null>(null);
   const [wt, setWt] = useState(() => worldTime(timeCfgRef.current));
   const [stock, setStock] = useState<Record<Category, ShopItem[]> | null>(null);
-  const talkTimer = useRef<number | undefined>(undefined);
   const nothingTimer = useRef<number | undefined>(undefined);
   const toastTimer = useRef<number | undefined>(undefined);
-  const talkedRef = useRef(false);
-  const talkSeq = useRef(0); // guards async Mitchy lines against a newer talk
+  const talkedRef = useRef(false); // the first talk with Mitchy plugs the craft tokens (MitchyTalk)
   const craftBusyRef = useRef(false); // true while a craft generation is in flight
   const craftDoneRef = useRef(false); // true once the craft is finished (token spent) → exit is free
 
@@ -2859,27 +2848,6 @@ function Game() {
     setModal((m) => (m && m.t === 'storage' ? { ...m, menuOpen: false } : m));
   }
 
-  function showTalk() {
-    window.clearTimeout(talkTimer.current);
-    // Mitchy plugs the craft tokens the first time (fixed line), then chats —
-    // her chatter is Haiku-generated, shown after a snappy static placeholder.
-    const first = !talkedRef.current;
-    talkedRef.current = true;
-    if (first) {
-      setBubble({ text: TOKEN_LINE, width: 30 });
-      talkTimer.current = window.setTimeout(() => setBubble(null), 7000);
-      return;
-    }
-    setBubble({ text: TALK_LINES[Math.floor(Math.random() * TALK_LINES.length)], width: 24 });
-    talkTimer.current = window.setTimeout(() => setBubble(null), 6000);
-    const turn = ++talkSeq.current;
-    getMitchyLine('a casual idle')
-      .then((line) => {
-        if (talkSeq.current === turn && line) setBubble({ text: line, width: 24 });
-      })
-      .catch(() => {});
-  }
-
   function toggleInventory() {
     if (savingRef.current || cinematic || mapOpen) return;
     setModal((m) => (m === null ? { t: 'inventory' } : m.t === 'inventory' ? null : m));
@@ -2890,8 +2858,11 @@ function Game() {
     if (sel === 1) {
       setModal(FRESH_SHOP);
     } else {
-      setModal(null);
-      showTalk();
+      // Talk opens the chat window (MitchyTalk.tsx); her world speech
+      // bubble would only show blurred behind it
+      setBubble(null);
+      setModal({ t: 'talk', first: !talkedRef.current });
+      talkedRef.current = true;
     }
   }
 
@@ -4592,6 +4563,20 @@ function Game() {
               onSel={(i) => setModal({ t: 'dialog', sel: i })}
               onPick={confirmDialog}
               hint="[↑/↓] select · [Enter] confirm · [Esc] close"
+            />
+          )}
+
+          {modal.t === 'talk' && (
+            <MitchyTalk
+              first={modal.first}
+              player={{
+                name: playerName || DEFAULT_PLAYER_NAME,
+                look: { sprite: avatarSprite, colors: avatarRecolored.colors, palette: avatarRecolored.palette },
+                solid: { eyeRow: 14 },
+                cover: true,
+              }}
+              money={money}
+              onClose={() => setModal(null)}
             />
           )}
 

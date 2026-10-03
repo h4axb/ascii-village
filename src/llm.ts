@@ -732,6 +732,77 @@ export async function getMitchyLine(context = 'a casual idle'): Promise<string> 
   }
 }
 
+// ---------------------------------------------------------------------------
+// Talking to Mitchy (MitchyTalk.tsx): small talk, and today's luck — Mitchy
+// is really into horoscopes. Generated in her voice; static lines when
+// offline or on any error, so the chat never breaks.
+// ---------------------------------------------------------------------------
+
+const MITCHY_PERSONA =
+  'You are Mitchy, a cozy, witty shopkeeper CAT in Asciia Bay, a small ASCII island village where the ' +
+  'villager collects dates from the palm tree, flowers, stones, ferns, cacti and ice flowers and sells them ' +
+  'to you. You also craft items from craft tokens. You are really into horoscopes and the stars. You speak in ' +
+  'lowercase, playful and a little sassy, sometimes say "purr" or write "u" for you. No emoji, no quotes, ' +
+  'no preamble. ';
+
+const SMALL_TALK_FALLBACK = [
+  'purr, pretty good. sold three stones before lunch and napped on the counter twice, so a solid day.',
+  'oh u know, sorting flowers by colour and judging everyone who walks past. busy busy.',
+  'tired but happy. the date palm has been extra generous lately, have u noticed?',
+  'honestly great. the sun hit my counter just right this morning and i did not move for an hour.',
+];
+
+const LUCK_FALLBACK = [
+  'the stars say today is a lucky one for u. stones are ur charm, the pond is ur spot and soft blue is ur colour.',
+  'mercury is doing something sneaky, so take it slow. a fresh date from the palm will turn ur luck around, trust me.',
+  'big flower energy today. pick a few by the garden and wear something sunny yellow, good things follow.',
+  'the moon is cozy tonight, so is ur luck. a little fern brings u coins and green is ur colour, purr.',
+];
+
+const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
+
+async function mitchyTalkLine(task: string, fallback: string, maxTokens: number): Promise<string> {
+  if (!llmEnabled) {
+    await delay(500);
+    return fallback;
+  }
+  try {
+    const line = await chat(
+      [
+        { role: 'system', content: MITCHY_PERSONA + MITCHY_TONE },
+        { role: 'user', content: task },
+      ],
+      { temperature: 1, maxTokens, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
+    );
+    return line?.trim() || fallback;
+  } catch (err) {
+    console.warn('[llm] Mitchy talk fell back to static:', err);
+    return fallback;
+  }
+}
+
+// "Hey Mitchy, how are you doing?"
+export function mitchySmallTalk(playerName: string): Promise<string> {
+  return mitchyTalkLine(
+    `The villager ${playerName} asks how you are doing. Answer in one or two short sentences (under 30 words) ` +
+      'about your day in the shop, warm and a little funny.',
+    pick(SMALL_TALK_FALLBACK),
+    80,
+  );
+}
+
+// "What do the stars say about my luck today?"
+export function mitchyLuck(playerName: string, day: string): Promise<string> {
+  return mitchyTalkLine(
+    `Today is ${day}. The villager ${playerName} asks what the stars say about their luck today. Give a playful, ` +
+      'kind horoscope in two or three short sentences (under 45 words). Name one lucky thing from the island ' +
+      '(a date, flower, stone, fern, cactus or ice flower), one lucky spot (the palm tree, the pond, the garden ' +
+      'or your shop) and a lucky colour. Never gloomy.',
+    pick(LUCK_FALLBACK),
+    120,
+  );
+}
+
 // The value a material's sale price is negotiated around (see getPrice).
 export function basePrice(itemName: string): number {
   return BASE_PRICE[itemName] ?? 1;

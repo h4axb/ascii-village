@@ -1889,3 +1889,9 @@
 .ds-actions.ai-down-actions {
   margin-top: 4px;
 }
+
+/* talking to Mitchy (MitchyTalk.tsx): her "typing" bubble */
+.ds-bubble.talk-typing {
+  color: var(--ds-text-muted);
+  letter-spacing: 2px;
+}

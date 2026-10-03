@@ -4,6 +4,7 @@
 
 import type { TextureModifier } from './craft';
 import { parseItemFunction, type ItemFunction } from './craft/functions';
+import { linkKey } from './link';
 
 // Re-clamping an already-stored record, not gating fresh LLM output — the
 // stored fn already reflects whatever intent gate applied at craft time, so
@@ -33,7 +34,7 @@ export interface CraftRecord {
   chat?: ChatLine[];
 }
 
-const KEY = 'asciia-craft-history';
+const KEY = linkKey('asciia-craft-history'); // per test link, like the save
 const CAP = 60; // keep the last N; the drawer isn't an archive
 
 export function loadHistory(): CraftRecord[] {

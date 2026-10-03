@@ -11,8 +11,9 @@
 // safety net is a spending limit on the provider account.
 //
 // Settings (Cloudflare dashboard → Pages project → Settings → Variables and
-// Secrets). Only LLM_API_KEY is required:
-//   LLM_API_KEY         secret  — provider API key (e.g. Requesty)
+// Secrets). Only the API key is required:
+//   asciia-bay-crafting secret  — provider API key (e.g. Requesty); the old
+//                                 name LLM_API_KEY still works too
 //   LLM_BASE_URL        text    — default https://router.requesty.ai/v1
 //   LLM_ALLOWED_MODELS  text    — comma list, default google/gemini-2.5-flash-lite
 //   LLM_MAX_TOKENS      text    — per-request cap, default 2000
@@ -20,6 +21,7 @@
 //                                 The site's own origin is always allowed.
 
 interface Env {
+  'asciia-bay-crafting'?: string;
   LLM_API_KEY?: string;
   LLM_BASE_URL?: string;
   LLM_ALLOWED_MODELS?: string;
@@ -52,7 +54,8 @@ const fail = (status: number, error: string) =>
   });
 
 export async function onRequestPost({ request, env }: Ctx): Promise<Response> {
-  if (!env.LLM_API_KEY) return fail(500, 'LLM_API_KEY is not configured');
+  const apiKey = env['asciia-bay-crafting'] || env.LLM_API_KEY;
+  if (!apiKey) return fail(500, 'the API key secret (asciia-bay-crafting) is not configured');
 
   // Browsers always send Origin on a POST fetch. Anything else (a missing or
   // foreign origin) is not the game.
@@ -89,7 +92,7 @@ export async function onRequestPost({ request, env }: Ctx): Promise<Response> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${env.LLM_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   });

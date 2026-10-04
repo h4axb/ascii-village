@@ -1880,8 +1880,9 @@ function Game() {
     // Intro Part B's own dialogue box owns Mitchy's introduction on a
     // brand-new session — this proximity greeting is for every OTHER time
     // the player walks up to him (including right after Part B finishes).
-    // Part C's own conversation replaces the old one-line greeting
-    if (cinematic || isPartC(introStageRef.current)) return;
+    // Part C's own conversation replaces the old one-line greeting, and so
+    // does the guided quest flow (src/quest/)
+    if (cinematic || isPartC(introStageRef.current) || questRef.current) return;
     const d = near(catDef, player);
     if (!introShownRef.current && d <= 4) {
       introShownRef.current = true;
@@ -2757,9 +2758,26 @@ function Game() {
     const s = q?.snapshot;
     if (!q || !s) return;
     const token: OwnedItem = { ...universalToken(hourSeed), ownedId: `own-${Date.now()}-quest2` };
-    stepAnimRef.current = { ...stepAnimRef.current, durMs: 0 };
-    playerRef.current = s.player;
-    setPlayer(s.player);
+    // Mitchy waits where she stood for the hand-over (at the shore), and the
+    // player starts right in front of her, ready to craft the boat again
+    const cat = STRUCT_ENTS.find((e) => e.id === 'cat')!;
+    const m = s.mitchyPos ?? { x: cat.x, y: cat.y };
+    const ct = spriteTiles(cat.sprite, cat.scale);
+    const front = { x: Math.round(m.x + ct.wT / 2 - PLAYER_T.wT / 2), y: Math.round(m.y + ct.hT) };
+    let start = s.player;
+    search: for (let r = 0; r <= 4; r++)
+      for (const [dx, dy] of [[0, r], [-r, r], [r, r], [-r, 0], [r, 0], [0, -r]] as const) {
+        const c = { x: front.x + dx, y: front.y + dy };
+        if (!blocked(c.x, c.y, 'cat')) {
+          start = c;
+          break search;
+        }
+      }
+    // a teleport: the walk interpolation starts and ends on the new spot
+    stepAnimRef.current = { fromX: start.x, fromY: start.y, toX: start.x, toY: start.y, t0: performance.now(), durMs: 0 };
+    playerRef.current = start;
+    setPlayer(start);
+    recentre();
     setInv(s.inv);
     setMoney(s.money);
     setStorages(s.storages);

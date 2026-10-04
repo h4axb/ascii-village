@@ -208,8 +208,11 @@ export const LINES = {
     'That should do it. You’ve given me quite enough to think about for one day.',
     'There’s one last short survey outside the game. It should take about five minutes.',
   ],
-  // the boat, once docked: a short ferry between the islands
-  ferry: 'Sail across',
+  // the crafted water vehicle
+  launch: 'Place it on the water.',
+  board: 'Board',
+  landAsk: 'Go ashore here?',
+  landFar: 'get a little closer to the shore first.',
   needFill: 'Your watering tool is empty. Fill it at the pond in the south first.',
 };
 

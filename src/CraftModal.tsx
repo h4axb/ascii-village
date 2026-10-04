@@ -181,6 +181,7 @@ export default function CraftModal({
   feedback = false,
   clarify = false,
   cond,
+  launch,
   money,
   onSpend,
   onConsume,
@@ -196,6 +197,9 @@ export default function CraftModal({
   feedback?: boolean; // the /2 flow: rate each result, tune future crafts (CraftFeedback.tsx), keep the last result on leave
   clarify?: boolean; // the /1 flow: Mitchy's questions before crafting, then rate each result (CraftClarify.tsx), keep the last result on leave
   cond?: 'pre' | 'post'; // the quest user test's active condition, stored with every rating
+  // the quest's water vehicle: an extra first option that takes the item
+  // (into the inventory) and lets App set it on the water
+  launch?: { label: string; go: () => void };
   money: number;
   onSpend: (coins: number) => void; // negative = refund
   onConsume: (equip: boolean, item: ShopItem) => void; // spend token, equip if asked — does NOT close
@@ -780,7 +784,17 @@ export default function CraftModal({
       ? [] // (feedback) rate it first / answering the questions
       : popup
       ? [
-          { label: 'Equip it.', go: () => choose(true) },
+          ...(launch
+            ? [
+                {
+                  label: launch.label,
+                  go: () => {
+                    choose(false);
+                    launch.go();
+                  },
+                },
+              ]
+            : [{ label: 'Equip it.', go: () => choose(true) }]),
           { label: 'Into my inventory.', go: () => choose(false) },
           ...(feedback && fb && fb.step === 'vote'
             ? [{ label: 'Tune future crafts →', go: () => updFb({ step: 'tuning' }) }]

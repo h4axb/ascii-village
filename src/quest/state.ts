@@ -20,9 +20,7 @@ export type QuestSnapshot = Pick<
 >;
 
 export interface QuestBoat {
-  id: string; // the placed item's id
-  docks: [{ x: number; y: number }, { x: number; y: number }]; // [main island, shop island]
-  at: 0 | 1; // which dock it is at now
+  id: string; // the placed item's id; the boat waits on the water where it was left
 }
 
 export interface QuestState {
@@ -33,6 +31,7 @@ export interface QuestState {
   filled?: boolean; // the watering tool holds water
   seedCrop?: string; // the planted seed's crop id
   boat?: QuestBoat;
+  riding?: boolean; // the player is sailing the boat (WASD over water)
   snapshot?: QuestSnapshot;
 }
 

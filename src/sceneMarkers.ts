@@ -49,6 +49,19 @@ export const MARKER_REGISTRY: MarkerCategory[] = [
       },
     ],
   },
+  {
+    id: 'quest',
+    label: 'Quests',
+    groups: [
+      {
+        id: 'boat',
+        label: 'Water vehicle',
+        // where the crafted water vehicle is set on the water (its centre),
+        // for both conditions of the user test (src/quest/)
+        markers: [{ id: 'quest.boatLaunch', label: 'BOAT LAUNCH' }],
+      },
+    ],
+  },
 ];
 
 // Every marker id the registry currently knows about — used both by the

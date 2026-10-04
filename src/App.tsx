@@ -139,7 +139,7 @@ import { CraftPrefsSettings } from './CraftFeedback';
 import { LINK } from './link';
 import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
 import { QUEST_ENABLED, GATHER_TARGET, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, type StepId } from './quest/quests';
-import { seaRoute, shoreToward, pathLength, pointAt, type Pt } from './quest/route';
+import { seaRoute, pathLength, pointAt, type Pt } from './quest/route';
 import { QuestPanel, type QuestView } from './quest/QuestPanel';
 import { QuestComplete, RatingSequence, TestTransition } from './quest/TestScreens';
 import { resetPrefs } from './craft/prefs';
@@ -273,6 +273,9 @@ const TOKEN_FX_MS = 900;
 // the quest flow (src/quest/): how long QUEST COMPLETE stays, boat speed (tiles/s)
 const QUEST_DONE_MS = 2800;
 const QUEST_SAIL_SPEED = 9;
+const MARKER_BOAT_LAUNCH = 'quest.boatLaunch'; // sceneMarkers.ts
+const LAND_REACH = 2.5; // tiles from the boat to a shore click that lands
+const BOAT_SCALE = 1.9; // the quest's water vehicle, compared with an ordinary crafted item
 const SEED_CHANCE = 0.15; // a picked flower drops a seed (1-2 in 10)
 
 const WALK_MS = 170;
@@ -432,6 +435,8 @@ type Modal =
   | { t: 'detailOwned'; ownedId: string; sel: number }
   | { t: 'dialog'; sel: number }
   | { t: 'talk'; first: boolean }
+  // sailing the quest's boat: go ashore at the clicked shore tile?
+  | { t: 'land'; x: number; y: number; sel: number }
   | {
       t: 'shop';
       tab: 'sell' | 'buy';
@@ -1079,6 +1084,7 @@ function Game() {
   const plotRef = useRef(plot);
   plotRef.current = plot;
 
+  const sailingBoatId = quest?.riding ? quest.boat?.id : undefined;
   // ---- derived world: structures + windowed wild spawns − exceptions ----
   const growthWindow = growthWindowOf(wt);
   const ents = useMemo(
@@ -1110,9 +1116,10 @@ function Game() {
       // player-placed decorations — permanent, NOT subject to the growth-window
       // reset dynamicEnts gets (see the useEffect below); this is what makes
       // blocked() treat them as solid "for free," with no changes inside it.
-      ...placedItems.map(placedToEnt),
+      // (the quest's boat travels under the player while it is sailed)
+      ...placedItems.filter((p) => p.id !== sailingBoatId).map(placedToEnt),
     ],
-    [growthWindow, removed, dynamicEnts, structEnts, placedItems, plot, mitchyPos, editorOpen],
+    [growthWindow, removed, dynamicEnts, structEnts, placedItems, plot, mitchyPos, editorOpen, sailingBoatId],
   );
 
   // House-sprite recolor for the wardrobe swap (interact.ts's 'outfit' act +
@@ -1368,7 +1375,7 @@ function Game() {
   // excludeId: skip one entity's collision entirely — used by the push-to-move
   // mechanic to ask "is anything ELSE blocking this tile" without the item
   // being pushed counting as its own obstacle.
-  function blocked(nx: number, ny: number, excludeId?: string): boolean {
+  function blocked(nx: number, ny: number, excludeId?: string, landing = false): boolean {
     if (nx < 0 || ny < 0 || nx + PLAYER_T.wT > MAP_W || ny + PLAYER_T.hT > MAP_H) return true;
     // any entity's SOLID box (buildings are solid throughout; the palm only at
     // its trunk and hanging dates, so you can walk through its crown — see
@@ -1433,6 +1440,16 @@ function Game() {
     }
     // the garden fence blocks movement except through open doors
     if (gardenBlocks(nx, ny, PLAYER_T.wT, PLAYER_T.hT, doorsRef.current, plotRef.current)) return true;
+    // sailing the quest's boat: only open water (landing goes through
+    // questLand, which tests the shore spot with `landing`)
+    if (ridingRef.current && !landing) {
+      for (let ty = ny; ty < ny + PLAYER_T.hT; ty++) {
+        for (let tx = nx; tx < nx + PLAYER_T.wT; tx++) {
+          if (!isWater(tx, ty)) return true;
+        }
+      }
+      return false;
+    }
     // ocean blocks movement unless riding something that floats (a boat)
     const floating = equippedRef.current?.equip?.mode === 'vehicle' && !!equippedRef.current.equip.float;
     if (!floating) {
@@ -2392,7 +2409,8 @@ function Game() {
     const id = objectiveOf(questRef.current)?.id;
     if (id === 'vehicle') {
       const e = item.equip?.mode === 'vehicle' ? item.equip : { mode: 'vehicle' as const, speedMult: 0.8 };
-      return { ...item, equip: { ...e, float: true } };
+      // a boat big enough to carry the player and Mitchy
+      return { ...item, equip: { ...e, float: true }, scale: (item.scale ?? 1) * BOAT_SCALE };
     }
     if (id === 'tool') return { ...item, tool: 'water' };
     if (id === 'companion') return { ...item, equip: { mode: 'pet' } };
@@ -2404,12 +2422,38 @@ function Game() {
   function questCrafted(owned: OwnedItem, equipNow: boolean) {
     const id = objectiveOf(questRef.current)?.id;
     if (id === 'tool') questDone('tool', { waterTool: owned.ownedId, filled: false });
-    if (id === 'vehicle') showToast('now place it on the water: open your inventory and choose Place in world');
+    if (id === 'vehicle') lastCraftedRef.current = owned;
     if (id === 'companion' && equipNow && owned.equip?.mode === 'pet') questDone('companion');
   }
 
-  // A boat placed on the water during the vehicle objective
-  function questBoatPlaced(placed: PlacedItem) {
+  // The crafted water vehicle goes onto the water at the BOAT LAUNCH scene
+  // marker (its centre), the same spot in both conditions; then the trip
+  const lastCraftedRef = useRef<OwnedItem | null>(null);
+  function questLaunch(owned: OwnedItem | null = lastCraftedRef.current) {
+    if (!owned || !isStep(questRef.current, 'vehicle')) return;
+    const { wT, hT } = spriteTiles(owned.sprite, owned.scale, 0);
+    const m = getMarkerPosition(MARKER_BOAT_LAUNCH);
+    let at: Pt | null = m.found ? { x: Math.round(m.x! - wT / 2), y: Math.round(m.y! - hT / 2) } : null;
+    if (!at) {
+      // no marker placed yet: the nearest open water to Mitchy
+      console.warn(`[quest] scene marker "${MARKER_BOAT_LAUNCH}" is not placed; using the nearest water`);
+      const c = mitchyPosRef.current ?? playerRef.current;
+      for (let r = 2; r < 30 && !at; r++)
+        for (let dy = -r; dy <= r && !at; dy++)
+          for (let dx = -r; dx <= r && !at; dx++) {
+            const x = Math.round(c.x + dx);
+            const y = Math.round(c.y + dy);
+            if (waterPlacementFits({ x, y, sprite: owned.sprite, scale: owned.scale, rotation: 0 }, entsRef.current, { x, y }, 99))
+              at = { x, y };
+          }
+    }
+    if (!at) return;
+    const placed = ownedToPlaced(owned, at.x, at.y, 0, `placed-${Date.now()}-boat`);
+    setModal(null);
+    setBag((b) => b.filter((x) => x.ownedId !== owned.ownedId));
+    if (equippedRef.current?.ownedId === owned.ownedId) unequip();
+    setPlacedItems((ps) => [...ps, placed]);
+    placedItemsRef.current = [...placedItemsRef.current, placed];
     void questTravel(placed);
   }
 
@@ -2507,8 +2551,8 @@ function Game() {
     await questSay([q.part === 'q1' ? QL.arrive1 : QL.arrive2]);
     setDialogue(null);
     if (shop) await tweenMitchyTo({ x: stand.x + 5, y: Math.round(shop.y + shopT.hT) }, 3);
-    // the boat stays at the dock and ferries the player from now on
-    const boat: QuestBoat = { id: placed.id, docks: [start, route.dock], at: 1 };
+    // the boat waits at the shore; from now on the player sails it themselves
+    const boat: QuestBoat = { id: placed.id };
     const cur = questRef.current!;
     setQuest(
       cur.part === 'q1'
@@ -2520,25 +2564,102 @@ function Game() {
     questBusyRef.current = false;
   }
 
-  // The docked boat: a short ferry between the main island and the shop's
-  // island, no dialogue. The player walks aboard, sails, and steps ashore.
-  async function questFerry() {
+  // Outside the cinematics the player sails the boat themselves: click it →
+  // Board (a hop on), WASD over the water (blocked() keeps the boat off
+  // land), click the shore close by → "Go ashore here?" → onto the land.
+  const [hopEm, setHopEm] = useState(0); // the player's jump on and off the boat
+  function playerHop(): Promise<void> {
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      const tick = () => {
+        const k = Math.min(1, (performance.now() - t0) / 420);
+        setHopEm(Math.sin(Math.PI * k) * 1.6);
+        if (k < 1) requestAnimationFrame(tick);
+        else {
+          setHopEm(0);
+          resolve();
+        }
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+  const riding = !!quest?.riding && !!quest.boat;
+  const ridingRef = useRef(riding);
+  ridingRef.current = riding;
+  const rideBoat = riding ? placedItems.find((p) => p.id === quest!.boat!.id) ?? null : null;
+  const boatCols = rideBoat ? Math.max(...rideBoat.sprite.map((l) => l.length)) : 0;
+
+  async function questBoard(id: string) {
     const q = questRef.current;
-    const b = q?.boat;
-    if (!q || !b || questBusyRef.current) return;
+    const b = placedItemsRef.current.find((p) => p.id === id);
+    if (!q || !b || q.riding || questBusyRef.current) return;
+    const { wT, hT } = spriteTiles(b.sprite, b.scale, b.rotation);
+    const dist = Math.hypot(b.x + wT / 2 - (player.x + PLAYER_T.wT / 2), b.y + hT / 2 - (player.y + PLAYER_T.hT / 2));
+    if (dist > wT / 2 + 4) {
+      showToast('walk up to the boat first.');
+      setPickupMenuId(null);
+      return;
+    }
     questBusyRef.current = true;
     setPickupMenuId(null);
     setCinematic('quest');
-    const from = b.docks[b.at];
-    const to = b.docks[b.at === 0 ? 1 : 0];
-    const other = nearestIsland(to.x, to.y).isl;
-    const route = seaRoute(from, { x: other.cx, y: other.cy });
-    route.path[route.path.length - 1] = to;
-    await questWalkPlayer({ x: Math.round(from.x + 1), y: Math.round(from.y) }, 8);
-    await questSail(b.id, route.path, QUEST_SAIL_SPEED * 1.4, false);
-    const ashore = shoreToward({ x: other.cx, y: other.cy }, to).land;
-    await questWalkPlayer(ashore, 6);
-    setQuest({ ...questRef.current!, boat: { ...b, at: b.at === 0 ? 1 : 0 } });
+    // jump into the middle of the boat
+    const to = { x: Math.round(b.x + wT / 2 - PLAYER_T.wT / 2), y: Math.round(b.y + hT / 2 - PLAYER_T.hT / 2) };
+    const hop = playerHop();
+    questStepPlayer(to.x, to.y, 380);
+    await hop;
+    setQuest({ ...questRef.current!, riding: true, boat: { id } });
+    setCinematic(null);
+    questBusyRef.current = false;
+  }
+
+  // a click on the world while sailing: the shore within reach asks to land
+  function questShoreClick(clientX: number, clientY: number) {
+    const t = screenToTile(clientX, clientY, fieldRef.current, camRef.current);
+    if (!t || isWater(t.x, t.y)) return;
+    const p = playerRef.current;
+    const dx = Math.max(p.x - t.x, 0, t.x - (p.x + PLAYER_T.wT - 1));
+    const dy = Math.max(p.y - t.y, 0, t.y - (p.y + PLAYER_T.hT - 1));
+    if (Math.hypot(dx, dy) > LAND_REACH) {
+      showToast(QL.landFar);
+      return;
+    }
+    setModal({ t: 'land', x: t.x, y: t.y, sel: 0 });
+  }
+
+  // Go ashore at (x, y): the boat stays on the water right where it is
+  async function questLand(x: number, y: number) {
+    const q = questRef.current;
+    if (!q?.riding || !q.boat) return;
+    setModal(null);
+    // the nearest free spot for the player around the clicked shore tile
+    let spot: Pt | null = null;
+    for (let r = 0; r <= 2 && !spot; r++)
+      for (let oy = -r; oy <= r && !spot; oy++)
+        for (let ox = -r; ox <= r && !spot; ox++) {
+          const nx = x + ox - Math.floor(PLAYER_T.wT / 2);
+          const ny = y + oy - (PLAYER_T.hT - 1);
+          if (!blocked(nx, ny, undefined, true)) spot = { x: nx, y: ny };
+        }
+    if (!spot) {
+      showToast('no room to land there.');
+      return;
+    }
+    questBusyRef.current = true;
+    setCinematic('quest');
+    // the boat stays where the player sat in it
+    const b = placedItemsRef.current.find((p) => p.id === q.boat!.id);
+    if (b) {
+      const { wT, hT } = spriteTiles(b.sprite, b.scale, b.rotation);
+      const p = playerRef.current;
+      const bx = Math.round(p.x + PLAYER_T.wT / 2 - wT / 2);
+      const by = Math.round(p.y + PLAYER_T.hT / 2 - hT / 2);
+      setPlacedItems((ps) => ps.map((it) => (it.id === b.id ? { ...it, x: bx, y: by } : it)));
+    }
+    const hop = playerHop();
+    questStepPlayer(spot.x, spot.y, 380);
+    await hop;
+    setQuest({ ...questRef.current!, riding: false });
     setCinematic(null);
     questBusyRef.current = false;
   }
@@ -2699,7 +2820,14 @@ function Game() {
       shopToken: () =>
         setModal({ ...(FRESH_SHOP as Extract<Modal, { t: 'shop' }>), tab: 'buy', confirm: universalToken(hourSeed) }),
       buy: () => buyConfirm(),
-      ferry: () => questFerry(),
+      board: () => questBoard(questRef.current?.boat?.id ?? ''),
+      launch: () => questLaunch(),
+      land: (x: number, y: number) => questLand(x, y),
+      move: (dx: number, dy: number) => tryMove(dx, dy),
+      shore: (x: number, y: number) => {
+        const p = playerRef.current;
+        return { player: p, water: isWater(x, y) };
+      },
       waterNear: () => {
         // a free water spot within reach, for placing the boat
         for (let r = 2; r < 8; r++)
@@ -3501,6 +3629,14 @@ function Game() {
     if (m.t === 'dialog') {
       return { sel: m.sel, n: dialogOptions.length, upd: (s) => ({ ...m, sel: s }), go: confirmDialog };
     }
+    if (m.t === 'land') {
+      return {
+        sel: m.sel,
+        n: 2,
+        upd: (s) => ({ ...m, sel: s }),
+        go: (s) => (s === 0 ? void questLand(m.x, m.y) : setModal(null)),
+      };
+    }
     if (m.t === 'houseMenu') {
       return {
         sel: m.sel,
@@ -3578,13 +3714,17 @@ function Game() {
     if (owned.kind === 'token') labels.push('Use token');
     else if (owned.equip) labels.push(isEquipped ? 'Unequip' : 'Equip');
     if (canPlant) labels.push('Plant in garden');
-    if (canPlace) labels.push('Place in world');
+    // the quest's water vehicle goes straight onto the water
+    const launchIt = canPlace && !!owned.equip?.float && isStep(questRef.current, 'vehicle');
+    if (launchIt) labels.push(QL.launch);
+    else if (canPlace) labels.push('Place in world');
     return {
       labels,
       pick: (i) => {
         const label = labels[i];
         if (label === 'Plant in garden') return plantOwned(owned);
         if (label === 'Place in world') return startPlacement(owned);
+        if (label === QL.launch) return questLaunch(owned);
         return ownedAction(owned);
       },
     };
@@ -3654,8 +3794,6 @@ function Game() {
     if (equipped?.ownedId === p.owned.ownedId) unequip();
     setPlacing(null);
     showToast(`placed ${p.owned.name}!`);
-    // the quest's water vehicle, launched: on to the shop island
-    if (QUEST_ENABLED && p.owned.equip?.float && isStep(questRef.current, 'vehicle')) questBoatPlaced(placed);
   }
 
   function pickupPlaced(id: string) {
@@ -4291,6 +4429,10 @@ function Game() {
         // double-tap anywhere on the world = recentre on the player (mobile
         // equivalent of Space). Tracked manually rather than via dblclick,
         // which is unreliable on touch.
+        onClick={(e) => {
+          // sailing: a click on the shore close by asks to land
+          if (ridingRef.current && !modalRef.current && !cinematicRef.current) questShoreClick(e.clientX, e.clientY);
+        }}
         onPointerUp={(e) => {
           if (e.pointerType === 'mouse') return; // mouse uses Space
           const now = e.timeStamp || performance.now();
@@ -4680,7 +4822,7 @@ function Game() {
                 );
               })}
 
-              {placedItems.map((p) => (
+              {placedItems.filter((p) => p.id !== sailingBoatId).map((p) => (
                 <PlacedItemView
                   key={p.id}
                   x={p.x}
@@ -4735,8 +4877,8 @@ function Game() {
                       <div className="pick" ref={pickupPopupRef} onClick={(ev) => ev.stopPropagation()}>
                         <div className="pick-name">{p.name}</div>
                         {quest?.boat?.id === p.id ? (
-                          // the quest's boat stays at its dock and ferries
-                          <OptList opts={[QL.ferry]} sel={0} onSel={() => {}} onPick={() => void questFerry()} />
+                          // the quest's boat: climb in and sail it yourself
+                          <OptList opts={[QL.board]} sel={0} onSel={() => {}} onPick={() => void questBoard(p.id)} />
                         ) : (
                           <OptList
                             opts={['Return to Inventory']}
@@ -4812,11 +4954,28 @@ function Game() {
                     only set for the idle portrait (character.face's row 14,
                     verified against docs/character-sprite-parts's eye
                     colour predicate) — the walk frames' crop differs. */}
+                {rideBoat && (
+                  // the quest's boat, carried along under the player while sailing
+                  <ColoredSprite
+                    className="rig-boat"
+                    style={{
+                      left: `${(PLAYER_T.wT * TILE_CH - boatCols * (rideBoat.scale ?? 1)) / 2}ch`,
+                      top: `${PLAYER_T.hT * TILE_LN - rideBoat.sprite.length * (rideBoat.scale ?? 1) * 0.75}em`,
+                      scale: `${rideBoat.scale ?? 1}`,
+                      transformOrigin: '0 0',
+                    }}
+                    sprite={rideBoat.sprite}
+                    colors={rideBoat.colors}
+                    palette={rideBoat.palette}
+                    color={rideBoat.color}
+                    texture={rideBoat.textureModifier}
+                  />
+                )}
                 <SolidSpriteCanvas
                   className="player-sprite"
                   style={{
                     left: `${-playerOffX}ch`,
-                    top: `${-playerOffY}em`,
+                    top: `${-playerOffY - hopEm}em`,
                     scale: `${playerK}`,
                   }}
                   sprite={displaySprite}
@@ -5198,6 +5357,18 @@ function Game() {
             />
           )}
 
+          {modal.t === 'land' && (
+            <ChoicePanel
+              title="Boat"
+              question={QL.landAsk}
+              options={['Yes', 'No']}
+              sel={modal.sel}
+              onSel={(i) => setModal({ ...modal, sel: i })}
+              onPick={(i) => (i === 0 ? void questLand(modal.x, modal.y) : setModal(null))}
+              hint="[↑/↓] select · [Enter] confirm · [Esc] stay on board"
+            />
+          )}
+
           {modal.t === 'talk' && (
             <MitchyTalk
               first={modal.first}
@@ -5402,6 +5573,7 @@ function Game() {
               feedback={questCond ? questCond === 'post' : CRAFT_FEEDBACK}
               clarify={questCond ? questCond === 'pre' : CRAFT_CLARIFY}
               cond={questCond ?? undefined}
+              launch={isStep(quest, 'vehicle') ? { label: QL.launch, go: () => questLaunch() } : undefined}
               player={{
                 name: playerName || DEFAULT_PLAYER_NAME,
                 look: { sprite: avatarSprite, colors: avatarRecolored.colors, palette: avatarRecolored.palette },

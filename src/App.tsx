@@ -4656,7 +4656,9 @@ function Game() {
                     // ground colour. Bridge never had a rectangular
                     // background to begin with — this just stops terrain
                     // showing through its own glyph gaps, same principle.
-                    solidCells={e.kind === 'house' || e.kind === 'bridge' || e.kind === 'cat' || e.kind === 'shop'}
+                    solidCells={
+                      e.kind === 'house' || e.kind === 'bridge' || e.kind === 'cat' || e.kind === 'shop' || e.kind === 'palm'
+                    }
                     onMouseEnter={
                       canInteract(e) ? () => setHovered({ kind: 'entity', id: e.id }) : undefined
                     }

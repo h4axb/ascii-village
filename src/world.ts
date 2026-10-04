@@ -15,7 +15,9 @@ export const TILE_LN = 2; // lines per tile (y)
 export const GROUND_W = MAP_W * TILE_CH;
 export const GROUND_H = MAP_H * TILE_LN;
 
-export type ItemType = 'flower' | 'stone' | 'date' | 'cactus' | 'fern' | 'iceflower';
+// seed: dropped now and then by a flower (plant it, water it once); bloom:
+// what a seed grows into, the crop worth one crafting token
+export type ItemType = 'flower' | 'stone' | 'date' | 'cactus' | 'fern' | 'iceflower' | 'seed' | 'bloom';
 export type EntityKind =
   | ItemType
   | 'palm'

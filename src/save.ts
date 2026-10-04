@@ -10,6 +10,7 @@ import type { PlantedCrop, Doors } from './farm';
 import type { PlacedItem } from './placement';
 import type { Outfit } from './outfit';
 import { linkKey } from './link';
+import { parseQuest, type QuestState } from './quest/state';
 
 export interface SaveState {
   version: 1;
@@ -63,6 +64,8 @@ export interface SaveState {
   // not his original x:35,y:33). Absent = still at the static position —
   // see world.ts's STRUCT_ENTS 'cat' entry / App.tsx's `ents` override.
   mitchyPos?: { x: number; y: number };
+  // The guided quests and user test (quest/), on the links that run them
+  quest?: QuestState;
 }
 
 // one save per test link (see link.ts); /0 keeps this name
@@ -106,10 +109,14 @@ function introPartBDoneToIntroDone(s: SaveState): SaveState {
   return s;
 }
 
+// Item types added later (seed, bloom) start at zero in older saves
+const withNewItems = (r: Counts | undefined): Counts | undefined =>
+  r ? ({ ...{ seed: 0, bloom: 0 }, ...r } as Counts) : r;
+
 function migrate(s: SaveState): SaveState {
   s.doors = doorsToGate(s.doors);
-  s.inv = appleToDate(s.inv) as Counts;
-  if (Array.isArray(s.storages)) s.storages = s.storages.map((st) => appleToDate(st) as Counts);
+  s.inv = withNewItems(appleToDate(s.inv)) as Counts;
+  if (Array.isArray(s.storages)) s.storages = s.storages.map((st) => withNewItems(appleToDate(st)) as Counts);
   // planted crops record which base item they yield
   if (Array.isArray(s.plantedCrops)) {
     for (const c of s.plantedCrops) {
@@ -118,6 +125,7 @@ function migrate(s: SaveState): SaveState {
     }
   }
   s = introPartBDoneToIntroDone(s);
+  s.quest = parseQuest(s.quest);
   return s;
 }
 

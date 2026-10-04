@@ -1942,3 +1942,286 @@
     width: 100%;
   }
 }
+
+/* ---- the quest overlay under the clock (quest/QuestPanel.tsx) ------------ */
+.qp {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  pointer-events: none;
+  margin-left: -20px; /* flush with the screen edge, so the closed card hides fully */
+}
+.qp-card {
+  pointer-events: auto;
+  width: 290px;
+  padding: 14px 16px 15px 22px;
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  border: 1px solid var(--ds-line);
+  border-left: none;
+  border-radius: 0 var(--ds-radius) var(--ds-radius) 0;
+  color: var(--ds-text-soft);
+  text-shadow: none;
+  transform: translateX(-100%);
+  transition: transform 260ms ease;
+  margin-right: -1px;
+}
+.qp.open .qp-card {
+  transform: none;
+}
+.qp:not(.open) .qp-card {
+  visibility: hidden;
+  transition: transform 260ms ease, visibility 0s 260ms;
+}
+.qp-tabs {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  transform: translateX(-290px);
+  transition: transform 260ms ease;
+}
+.qp.open .qp-tabs {
+  transform: none;
+}
+.qp-tab {
+  width: 34px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  border: 1px solid var(--ds-line);
+  border-left: none;
+  border-radius: 0 var(--ds-radius-sm) var(--ds-radius-sm) 0;
+  color: var(--ds-text-soft);
+  cursor: pointer;
+}
+.qp-tab:hover,
+.qp-tab.on {
+  color: var(--ds-name);
+  border-color: var(--ds-line-strong);
+}
+.qp-line {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--ds-name);
+  margin-bottom: 8px;
+}
+.qp-title {
+  font-size: 15px;
+  color: var(--ds-text);
+  margin-bottom: 6px;
+}
+.qp-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ds-text);
+  font-size: 13px;
+}
+.qp-icon {
+  font-size: 15px;
+}
+.qp-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--ds-text);
+}
+.qp-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ds-line-soft);
+  overflow: hidden;
+}
+.qp-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ds-go);
+  transition: width 300ms ease;
+}
+.qp-sub {
+  margin: 9px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ds-text-soft);
+}
+.qp-controls {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ds-text);
+}
+.qp-controls li {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.qp-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.qp-key {
+  min-width: 20px;
+  height: 21px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ds-text);
+  border: 1px solid var(--ds-line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--ds-surface-hi);
+}
+.qp-mouse {
+  color: var(--ds-text);
+}
+
+/* QUEST COMPLETE */
+.quest-done {
+  position: fixed;
+  left: 50%;
+  top: 22%;
+  transform: translate(-50%, -8px);
+  z-index: 1300;
+  min-width: 300px;
+  padding: 20px 34px 22px;
+  text-align: center;
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius);
+  color: var(--ds-text);
+  pointer-events: none;
+  animation: quest-done-in 420ms ease forwards;
+}
+.quest-done-kicker {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--ds-go);
+}
+.quest-done-title {
+  font-size: 20px;
+  letter-spacing: 2px;
+  margin: 8px 0 8px;
+  color: var(--ds-name);
+}
+.quest-done-text {
+  font-size: 13px;
+  color: var(--ds-text-soft);
+}
+@keyframes quest-done-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@media (max-width: 700px) {
+  .qp-card {
+    width: 240px;
+  }
+  .qp-tabs {
+    transform: translateX(-240px);
+  }
+}
+
+/* Mitchy's rating questions (quest/TestScreens.tsx) */
+.rq-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: grid;
+  place-items: center;
+  background: var(--ds-scrim);
+}
+.ds-panel.rq {
+  width: min(460px, 92vw);
+}
+.rq-intro {
+  color: var(--ds-text-soft);
+}
+.rq-count {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--ds-text-muted);
+  margin-top: 4px;
+}
+.rq-q {
+  color: var(--ds-text);
+}
+.rq-scale {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.ds-option.rq-btn {
+  padding: 10px 0;
+  text-align: center;
+}
+.rq-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ds-text-muted);
+  margin-top: 6px;
+}
+.rq-skip {
+  margin-top: 10px;
+}
+.rq-end {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+/* USERTEST_TRANSITION: the black screen between the two conditions */
+.tt {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: #000;
+  display: grid;
+  place-items: center;
+  animation: tt-in 900ms ease;
+}
+.tt-body {
+  width: min(560px, 88vw);
+  text-align: center;
+  color: #deddb6;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.tt-body p {
+  margin: 0 0 14px;
+}
+.tt-btn {
+  margin: 18px auto 0;
+  display: inline-flex;
+}
+@keyframes tt-in {
+  from {
+    opacity: 0;
+  }
+}

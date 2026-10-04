@@ -14,6 +14,7 @@
 // surface): blue = "I like it" / the "less" end of a preference, red = "Not
 // quite" / the "more" end, gray = Keep. Text never wears a series colour.
 // ---------------------------------------------------------------------------
+import { RATING_QUESTIONS } from '../quest/quests';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FitSprite } from '../ui';
 import { FEEDBACK_REASONS, POSITIVE_REASONS, type FeedbackRecord } from './schema';
@@ -213,6 +214,9 @@ export default function Dashboard() {
             </Card>
             <Card title="Pre-clarification (/1)" wide>
               <ClarifyStats data={clar} />
+            </Card>
+            <Card title="User test: rating questions per condition" wide>
+              <RatingCompare data={all.filter((r) => r.rating)} />
             </Card>
             <Card title="How the preference questions were answered" wide>
               <Answers data={data} />
@@ -499,6 +503,40 @@ function ClarifyStats({ data }: { data: FeedbackRecord[] }) {
     </>
   );
 }
+// ---- the quest user test: Mitchy's rating questions, per condition ----
+const COND_LABEL = { pre: 'Pre-clarification', post: 'Post-reflection' } as const;
+function RatingCompare({ data }: { data: FeedbackRecord[] }) {
+  if (!data.length) return <p className="fbd-muted">No rating answers in this range yet.</p>;
+  const ids = RATING_QUESTIONS.map((q) => q.id);
+  const stat = (cond: 'pre' | 'post', id: string) => {
+    const v = data
+      .filter((r) => r.cond === cond)
+      .map((r) => r.rating?.[id])
+      .filter((x): x is number => typeof x === 'number');
+    return v.length ? `${(v.reduce((a, b) => a + b, 0) / v.length).toFixed(2)} (n=${v.length})` : '–';
+  };
+  return (
+    <table className="fbd-table">
+      <thead>
+        <tr>
+          <th>Question (1-5)</th>
+          <th>{COND_LABEL.pre}</th>
+          <th>{COND_LABEL.post}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {ids.map((id, i) => (
+          <tr key={id}>
+            <td>{RATING_QUESTIONS[i].text}</td>
+            <td>{stat('pre', id)}</td>
+            <td>{stat('post', id)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function median(v: number[]): number {
   if (!v.length) return 0;
   const s = [...v].sort((a, b) => a - b);
@@ -510,7 +548,7 @@ function toCsv(rows: FeedbackRecord[]): string {
   const cols = [
     'at', 'link', 'player', 'name', 'prompt', 'kind', 'adjusted', 'vote', 'reasons', 'positive', 'tags', 'comment',
     ...PREF_KEYS.map((k) => `applied_${k}`), ...PREF_KEYS.map((k) => `answer_${k}`), 'scope',
-    'clarify_questions', 'clarify_answers', 'clarify_skipped', 'clarify_outcome', 'clarify_ms', 'clarify_error',
+    'clarify_questions', 'clarify_answers', 'clarify_skipped', 'clarify_outcome', 'clarify_ms', 'clarify_error', 'cond', 'rating',
   ];
   const cell = (v: unknown) => {
     const s = v === undefined || v === null ? '' : String(v);
@@ -539,6 +577,8 @@ function toCsv(rows: FeedbackRecord[]): string {
       r.clarify?.outcome,
       r.clarify?.ms,
       r.clarify?.error,
+      r.cond,
+      r.rating ? JSON.stringify(r.rating) : '',
     ]
       .map(cell)
       .join(','),

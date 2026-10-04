@@ -105,3 +105,28 @@ export function placementFits(
   }
   return true;
 }
+
+// A floating vehicle goes on the WATER instead: every footprint tile is open
+// water (no foam/shore), it doesn't overlap anything, and it lies close to
+// the player (within `reach` tiles of the footprint), so a boat is launched
+// from the shore the player stands on.
+export function waterPlacementFits(
+  candidate: { x: number; y: number; sprite: string[]; scale?: number; rotation: 0 | 1 | 2 | 3 },
+  ents: Ent[],
+  player: { x: number; y: number },
+  reach = 6,
+): boolean {
+  const { wT, hT } = spriteTiles(candidate.sprite, candidate.scale, candidate.rotation);
+  if (candidate.x < 0 || candidate.y < 0 || candidate.x + wT > MAP_W || candidate.y + hT > MAP_H) return false;
+  for (let ty = candidate.y; ty < candidate.y + hT; ty++) {
+    for (let tx = candidate.x; tx < candidate.x + wT; tx++) {
+      if (!isWater(tx, ty)) return false;
+    }
+  }
+  const dx = Math.max(candidate.x - player.x, 0, player.x - (candidate.x + wT - 1));
+  const dy = Math.max(candidate.y - player.y, 0, player.y - (candidate.y + hT - 1));
+  if (Math.hypot(dx, dy) > reach) return false;
+  const cbox = collisionBox(candidate);
+  for (const e of ents) if (tileBoxesOverlap(cbox, collisionBox(e))) return false;
+  return true;
+}

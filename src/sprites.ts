@@ -729,6 +729,10 @@ export const ICEFLOWER = [
   '/ \\',
 ];
 
+// A seed (dropped by wildflowers) and the Sunbloom it grows into
+export const SEED = [' . ', '(o)'];
+export const SUNBLOOM = ['\\|/', '-@-', '/|\\', ' | '];
+
 // Landing banner: "ASCIIA" over "BAY", in the same figlet "standard"
 // letterforms as before. Letters carry their own padding and are simply
 // concatenated (no smushing), so every row of a block is the same length.

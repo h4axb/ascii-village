@@ -407,6 +407,13 @@
       "x": 99,
       "y": 18,
       "scale": 0.5
+    },
+    {
+      "id": "pond-south",
+      "asset": "pond-a",
+      "x": 31,
+      "y": 76,
+      "scale": 0.35
     }
   ],
   "colliders": {

@@ -180,6 +180,7 @@ export default function CraftModal({
   choices = false,
   feedback = false,
   clarify = false,
+  cond,
   money,
   onSpend,
   onConsume,
@@ -194,6 +195,7 @@ export default function CraftModal({
   choices?: boolean; // the /3 flow: preflight + concepts, no auto retry, keep the last result on leave
   feedback?: boolean; // the /2 flow: rate each result, tune future crafts (CraftFeedback.tsx), keep the last result on leave
   clarify?: boolean; // the /1 flow: Mitchy's questions before crafting, then rate each result (CraftClarify.tsx), keep the last result on leave
+  cond?: 'pre' | 'post'; // the quest user test's active condition, stored with every rating
   money: number;
   onSpend: (coins: number) => void; // negative = refund
   onConsume: (equip: boolean, item: ShopItem) => void; // spend token, equip if asked — does NOT close
@@ -518,6 +520,7 @@ export default function CraftModal({
       player: playerId(),
       session: SESSION,
       link: window.location.pathname,
+      ...(cond ? { cond } : {}),
       prompt,
       name: '',
       kind: '',
@@ -600,6 +603,7 @@ export default function CraftModal({
       player: playerId(),
       session: SESSION,
       link: window.location.pathname,
+      ...(cond ? { cond } : {}),
       prompt,
       name: item.name,
       kind: f.kind ?? '',

@@ -67,6 +67,12 @@ export interface FeedbackRecord {
   answers: P | null; // "Tune future crafts" answers (null = not tuned)
   scope: 'kind' | 'all' | 'session' | null;
   sprite: { lines: string[]; colors?: string[]; palette?: Record<string, string> };
+  // The quest user test (src/quest/): which crafting panel was active —
+  // pre-clarification or post-reflection — when this was crafted or rated.
+  cond?: 'pre' | 'post';
+  // Mitchy's rating questions after a condition (one record per condition):
+  // question id → 1-5, or null for a skip
+  rating?: Record<string, number | null>;
 }
 
 const KINDS = new Set(['plant', 'pets', 'clothing', 'vehicle', 'food', 'utensils', '']);
@@ -121,7 +127,16 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
   if (!/^[\w-]{6,64}$/.test(player)) return 'bad player';
   const clarify = clarifyLog(r.clarify);
   const vote = r.vote === 'up' || r.vote === 'down' ? r.vote : null;
-  if (!vote && !clarify) return 'vote must be up or down';
+  const cond = r.cond === 'pre' || r.cond === 'post' ? r.cond : undefined;
+  let rating: Record<string, number | null> | undefined;
+  if (r.rating && typeof r.rating === 'object') {
+    rating = {};
+    for (const [k, v] of Object.entries(r.rating as Record<string, unknown>).slice(0, 20)) {
+      if (!/^[\w-]{1,32}$/.test(k)) continue;
+      rating[k] = typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 5 ? v : null;
+    }
+  }
+  if (!vote && !clarify && !rating) return 'vote must be up or down';
   const kind = str(r.kind, 16);
   const reasons = Array.isArray(r.reasons)
     ? [...new Set(r.reasons.filter((x): x is FeedbackReason => (FEEDBACK_REASONS as readonly unknown[]).includes(x)))].slice(0, 3)
@@ -165,5 +180,7 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
     answers: r.answers ? prefs(r.answers) : null,
     scope,
     sprite: { lines, ...(colors ? { colors } : {}), ...(palette ? { palette } : {}) },
+    ...(cond ? { cond } : {}),
+    ...(rating ? { rating } : {}),
   };
 }

@@ -1109,6 +1109,10 @@ pre {
 .ent.pond {
   color: #6a7078;
 }
+.ent.pond.clickable {
+  pointer-events: auto;
+  cursor: pointer;
+}
 
 /* CRAFTED-ITEM TEXTURE MODIFIERS (see ColoredSprite.tsx's `texture` prop and
    craft/spec.ts's textureModifierFor). 'shiny' needs per-glyph rendering

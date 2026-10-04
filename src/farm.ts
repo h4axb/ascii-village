@@ -210,6 +210,7 @@ export interface PlantedCrop {
   plantedAt: number; // worldTime ms
   lastWateredAt: number;
   stage: CropStage;
+  dormant?: boolean; // a seed waiting for its first watering (seedCrop)
 }
 
 export interface CropStatus {
@@ -297,8 +298,33 @@ export function createCrop(
   };
 }
 
-// Base world items that make sense to plant (stone is excluded).
-export const PLANTABLE_BASE: ItemType[] = ['flower', 'cactus', 'fern', 'date', 'iceflower'];
+// Base world items that make sense to plant (stone, dates and the harvested
+// Sunbloom are excluded).
+export const PLANTABLE_BASE: ItemType[] = ['seed', 'flower', 'cactus', 'fern', 'iceflower'];
+
+// A seed waits (dormant) until its first watering, then grows quickly into a
+// Sunbloom. It is thirsty from the start and never wilts while it waits.
+export const SEED_GROW_MS = 45_000;
+export function seedCrop(slot: number, sprite: string[], wt: number): PlantedCrop {
+  return {
+    id: `crop-${wt}-${slot}-${Math.floor(Math.random() * 1e6)}`,
+    slot,
+    name: 'Sunbloom',
+    sprite,
+    care: {
+      thirst: 'medium',
+      waterEveryMs: 1_000,
+      growMs: SEED_GROW_MS,
+      toleranceMs: 24 * 60 * MIN,
+      hint: 'A fresh seed. Water it once and it grows into a Sunbloom in under a minute.',
+    },
+    harvest: { kind: 'base', it: 'bloom' },
+    plantedAt: Number.MAX_SAFE_INTEGER / 2, // dormant: growth starts at the first watering
+    lastWateredAt: wt - 2_000,
+    stage: 'growing',
+    dormant: true,
+  };
+}
 
 // Is an entity/spawn inside the garden footprint? Used to keep wild spawns out.
 export function inGarden(x: number, y: number, plot: GardenPlot = GARDEN_PLOT): boolean {

@@ -42,6 +42,7 @@ import {
   gardenBlocks,
   inGarden,
   createCrop,
+  seedCrop,
   cropStatus,
   advanceStage,
   slotSprite,
@@ -128,15 +129,31 @@ import {
   HANDOFF_AFTER,
 } from './introPartC';
 import { screenToTile } from './coords';
-import { ownedToPlaced, placedToOwned, placedToEnt, placementFits } from './placement';
+import { ownedToPlaced, placedToOwned, placedToEnt, placementFits, waterPlacementFits } from './placement';
 import type { PlacedItem } from './placement';
 import { palmFrame, bundleLandingX, SHAKE_FRAMES, SHAKE_FRAME_MS, SHAKE_MS } from './palmAnim';
 import { pondFrame, POND_FRAME_MS } from './pondAnim';
 import CraftModal from './CraftModal';
-import { flushFeedbackOutbox } from './feedback/client';
+import { flushFeedbackOutbox, newFeedbackId, playerId, sendFeedback, SESSION } from './feedback/client';
 import { CraftPrefsSettings } from './CraftFeedback';
 import { LINK } from './link';
 import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
+import { QUEST_ENABLED, GATHER_TARGET, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, type StepId } from './quest/quests';
+import { seaRoute, shoreToward, pathLength, pointAt, type Pt } from './quest/route';
+import { QuestPanel, type QuestView } from './quest/QuestPanel';
+import { QuestComplete, RatingSequence, TestTransition } from './quest/TestScreens';
+import { resetPrefs } from './craft/prefs';
+import {
+  advance,
+  condOf,
+  freshQuest,
+  isStep,
+  objectiveOf,
+  questlineOf,
+  type QuestState,
+  type QuestSnapshot,
+  type QuestBoat,
+} from './quest/state';
 
 const INTRO_TEXT =
   "Hey, are u the new villager here? I'm Mitchy and own this shop. in this world u can go around and collect materials and if u give them back to me ill pay u fair.";
@@ -186,6 +203,8 @@ const ITEM_INFO: Record<ItemType, { name: string; desc: string }> = {
   cactus: { name: 'Cactus', desc: 'A prickly little desert survivor.' },
   fern: { name: 'Fern', desc: 'A feathery frond from the deep jungle.' },
   iceflower: { name: 'Ice Flower', desc: 'A frost-hardened bloom from the tundra.' },
+  seed: { name: 'Seed', desc: 'A tiny seed shaken out of a wildflower. Plant it and water it.' },
+  bloom: { name: 'Sunbloom', desc: 'A big golden bloom grown from a seed. Mitchy pays well for these.' },
 };
 
 const ITEM_SPRITES: Record<ItemType, string[]> = {
@@ -195,9 +214,11 @@ const ITEM_SPRITES: Record<ItemType, string[]> = {
   cactus: S.CACTUS,
   fern: S.FERN,
   iceflower: S.ICEFLOWER,
+  seed: S.SEED,
+  bloom: S.SUNBLOOM,
 };
 
-const ITEM_TYPES: ItemType[] = ['flower', 'stone', 'date', 'cactus', 'fern', 'iceflower'];
+const ITEM_TYPES: ItemType[] = ['flower', 'stone', 'date', 'cactus', 'fern', 'iceflower', 'seed', 'bloom'];
 
 // The translated modifiers, in words. The model's own narrative already sits
 // in funcDesc; this is the honest mechanical readout underneath it, so a
@@ -249,6 +270,10 @@ const lastMotion = new WeakMap<HTMLElement, string>();
 
 // Intro Part C: how long the crafting token takes to fly to the player
 const TOKEN_FX_MS = 900;
+// the quest flow (src/quest/): how long QUEST COMPLETE stays, boat speed (tiles/s)
+const QUEST_DONE_MS = 2800;
+const QUEST_SAIL_SPEED = 9;
+const SEED_CHANCE = 0.15; // a picked flower drops a seed (1-2 in 10)
 
 const WALK_MS = 170;
 const DASH_MS = 100;
@@ -442,6 +467,7 @@ type Modal =
 // handlerRef further down), in the order a new player needs them.
 const CONTROLS: [string, string[]][] = [
   ['Move', ['W', 'A', 'S', 'D']],
+  ['Interact / menus', ['Click']],
   ['Dash', ['Shift']],
   ['Interact / yes', ['F']],
   ['Inventory', ['I']],
@@ -471,7 +497,7 @@ export default function App() {
   const [started, setStarted] = useState(false);
   // crafting feedback waiting from an earlier visit goes out now
   useEffect(() => {
-    if (CRAFT_FEEDBACK || CRAFT_CLARIFY) flushFeedbackOutbox();
+    if (CRAFT_FEEDBACK || CRAFT_CLARIFY || QUEST_ENABLED) flushFeedbackOutbox();
   }, []);
   return started ? <Game /> : <Landing onStart={() => setStarted(true)} />;
 }
@@ -780,6 +806,8 @@ function Game() {
   );
   // ---- free-form world placement (see placement.ts) ----
   const [placedItems, setPlacedItems] = useState<PlacedItem[]>(() => saved?.placed ?? []);
+  const placedItemsRef = useRef(placedItems);
+  placedItemsRef.current = placedItems;
   const [placing, setPlacing] = useState<{
     owned: OwnedItem;
     x: number;
@@ -849,7 +877,7 @@ function Game() {
   // dialogue mentions it). Starts already 'introB' (not null-then-flipped-
   // by-an-effect) when Part B is about to run, so there's no frame of
   // normal, ungated gameplay before the mount effect below catches up.
-  const [cinematic, setCinematic] = useState<'introB' | 'introC' | null>(() =>
+  const [cinematic, setCinematic] = useState<'introB' | 'introC' | 'quest' | null>(() =>
     introBMarkersAtMount ? 'introB' : null,
   );
   const cinematicRef = useRef(cinematic);
@@ -900,6 +928,17 @@ function Game() {
     to: { x: number; y: number };
     go: boolean;
   } | null>(null);
+  // ---- the guided quests and user test (quest/), on the links that run them ----
+  // `quest` is saved; the rest is transient presentation state.
+  const [quest, setQuestState] = useState<QuestState | null>(() => (QUEST_ENABLED ? (saved?.quest ?? null) : null));
+  const questRef = useRef(quest);
+  function setQuest(q: QuestState | null) {
+    questRef.current = q;
+    setQuestState(q);
+  }
+  const [questHidden, setQuestHidden] = useState(false); // the panel waits out cinematics and popups
+  const [questComplete, setQuestComplete] = useState<{ title: string; text: string } | null>(null);
+  const questBusyRef = useRef(false); // a quest cinematic is running
   const [mapOpen, setMapOpen] = useState(false);
   const mapOpenRef = useRef(mapOpen);
   mapOpenRef.current = mapOpen;
@@ -1162,6 +1201,7 @@ function Game() {
     introDone,
     introStage,
     mitchyPos: mitchyPos ?? undefined,
+    quest: quest ?? undefined,
   });
 
   // Shared by both explicit save actions below — just the "Saving…" HUD
@@ -2129,7 +2169,8 @@ function Game() {
     // The intro is NOT over: guided exploration begins, and Part C picks up
     // when the player comes back to Mitchy (introDone stays false). A DEV
     // Skip Intro that fast-forwarded through here still ends it outright.
-    if (skipCinematicRef.current) finishIntro();
+    // On the quest links the guided quests take over from here instead.
+    if (skipCinematicRef.current || QUEST_ENABLED) finishIntro();
     else setIntroStage('partC:explore');
 
     setMapHint(true);
@@ -2258,6 +2299,435 @@ function Game() {
     // control simply returns to the player.
     endPartCTalk();
   }
+
+  // ===== Guided quests + the two-condition user test (src/quest/) =====
+  // GAMEPLAY steps complete on the player's own actions (the hooks in
+  // collect/storeItem/consumeCraft/… call questDone). CINEMATIC steps hold
+  // `cinematic = 'quest'` (input locked) and only show the next objective
+  // once they have fully finished. DIALOGUE uses the same DialogueBox as the
+  // intro. The test transition is a full-screen overlay with the game paused.
+  const questCond = QUEST_ENABLED ? condOf(quest?.part ?? 'q1') : null;
+  const questLine = quest ? questlineOf(quest.part) : null;
+  const questObjective = objectiveOf(quest);
+  const [questOpen, setQuestOpen] = useState(true);
+  const [questView, setQuestView] = useState<QuestView>('quest');
+  // the crafted boat waits in the bag until it is placed on the water
+  const questBoatInBag = isStep(quest, 'vehicle') && bag.some((o) => o.kind !== 'token' && o.equip?.float);
+  const questTask = questBoatInBag ? 'Place it on the water' : undefined;
+  const questSub = questBoatInBag
+    ? 'Open your inventory, choose your vehicle and Place in world, then set it on the water near the shore.'
+    : undefined;
+  // the rating questions and the test transition pause the game
+  const questPaused = quest?.part === 'rate1' || quest?.part === 'transition' || quest?.part === 'rate2' || quest?.part === 'end';
+  useEffect(() => {
+    if (questPaused) {
+      setModal(null);
+      setCinematic('quest');
+    } else if (cinematicRef.current === 'quest' && !questBusyRef.current) setCinematic(null);
+  }, [questPaused]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mitchy's menu; "I'm done." only while reporting back
+  const dialogOptions = isStep(quest, 'report') ? ['Talk', 'Open Shop', QL.doneOption] : ['Talk', 'Open Shop'];
+
+  // the next objective, or nothing if `id` isn't the current one
+  function questDone(id: StepId, patch: Partial<QuestState> = {}) {
+    const q = questRef.current;
+    if (!q || !isStep(q, id)) return;
+    const next = advance({ ...q, ...patch });
+    if (next) setQuest(next);
+  }
+
+  async function questSay(lines: string[]) {
+    for (const text of lines) {
+      setDialogue({ speaker: PART_C_SPEAKER, text });
+      await waitForDialogueAdvance();
+    }
+  }
+
+  // Cinematic A: back at Mitchy, she hands over the crafting token
+  async function questHandover() {
+    if (questBusyRef.current) return;
+    questBusyRef.current = true;
+    setModal(null);
+    setBubble(null);
+    setCinematic('quest');
+    const hop = mitchyHop();
+    await questSay(QL.handoverBefore);
+    await hop;
+    setDialogue(null);
+    const token: OwnedItem = { ...universalToken(hourSeed), ownedId: `own-${Date.now()}-quest` };
+    const from = mitchyPosRef.current ?? { x: catDef.x, y: catDef.y };
+    setTokenFx({ sprite: token.sprite, from, to: playerRef.current, go: false });
+    await sleep(40);
+    setTokenFx((f) => (f ? { ...f, go: true } : f));
+    await sleep(TOKEN_FX_MS);
+    setTokenFx(null);
+    setBag((b) => [...b, token]);
+    showToast('you received a Craft Token!');
+    await questSay(QL.handoverAfter);
+    setDialogue(null);
+    // condition 2 starts again from exactly this point (with a fresh token)
+    const s = snapRef.current();
+    const snapshot: QuestSnapshot = {
+      player: s.player,
+      inv: s.inv,
+      money: s.money,
+      storages: s.storages,
+      bag: s.bag.filter((o) => o.ownedId !== token.ownedId),
+      removedIds: s.removedIds,
+      shaken: s.shaken,
+      plantedCrops: s.plantedCrops,
+      placed: s.placed,
+      mitchyPos: s.mitchyPos,
+    };
+    questDone('mitchy', { snapshot });
+    setCinematic(null);
+    questBusyRef.current = false;
+  }
+
+  // The crafted item, made to fit the objective it was crafted for: crafting
+  // stays permissive (whatever the player describes counts), only how it
+  // behaves is set.
+  function questCraftFit(item: ShopItem): ShopItem {
+    const id = objectiveOf(questRef.current)?.id;
+    if (id === 'vehicle') {
+      const e = item.equip?.mode === 'vehicle' ? item.equip : { mode: 'vehicle' as const, speedMult: 0.8 };
+      return { ...item, equip: { ...e, float: true } };
+    }
+    if (id === 'tool') return { ...item, tool: 'water' };
+    if (id === 'companion') return { ...item, equip: { mode: 'pet' } };
+    return item;
+  }
+
+  // after a quest craft: the tool step is done at once; the vehicle waits for
+  // its placement on the water, the companion for being equipped
+  function questCrafted(owned: OwnedItem, equipNow: boolean) {
+    const id = objectiveOf(questRef.current)?.id;
+    if (id === 'tool') questDone('tool', { waterTool: owned.ownedId, filled: false });
+    if (id === 'vehicle') showToast('now place it on the water: open your inventory and choose Place in world');
+    if (id === 'companion' && equipNow && owned.equip?.mode === 'pet') questDone('companion');
+  }
+
+  // A boat placed on the water during the vehicle objective
+  function questBoatPlaced(placed: PlacedItem) {
+    void questTravel(placed);
+  }
+
+  // Moves the player one tile at a time during a cinematic (no collision),
+  // with the same eased step the walk uses
+  function questStepPlayer(x: number, y: number, durMs: number) {
+    const p = playerRef.current;
+    if (p.x === x && p.y === y) return;
+    const now = performance.now();
+    stepAnimRef.current = { fromX: p.x, fromY: p.y, toX: x, toY: y, t0: now, durMs };
+    playerRef.current = { x, y };
+    setPlayer({ x, y });
+  }
+
+  // Everyone along `path` at `speed` tiles/s: the boat at the point, the
+  // player and Mitchy riding on it
+  function questSail(boatId: string, path: Pt[], speed: number, withMitchy: boolean): Promise<void> {
+    // riders sit in the boat: everything is drawn from its top edge, so the
+    // player shares the boat's top row at its left, Mitchy at its right
+    const boat = placedItemsRef.current.find((p) => p.id === boatId);
+    const { wT } = boat ? spriteTiles(boat.sprite, boat.scale, boat.rotation) : { wT: 4 };
+    const ride = { x: 0, y: 0 };
+    return new Promise((resolve) => {
+      const total = pathLength(path);
+      const t0 = performance.now();
+      const tick = () => {
+        const d = Math.min(total, ((performance.now() - t0) / 1000) * speed);
+        const at = pointAt(path, d);
+        setPlacedItems((ps) => ps.map((p) => (p.id === boatId ? { ...p, x: at.x, y: at.y } : p)));
+        questStepPlayer(Math.round(at.x + ride.x), Math.round(at.y + ride.y), 1000 / speed + 25);
+        if (withMitchy) {
+          const m = { x: at.x + Math.max(1.5, wT - 1.5), y: at.y + ride.y };
+          mitchyPosRef.current = m;
+          setMitchyPos(m);
+        }
+        if (d >= total) return resolve();
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+
+  async function questWalkPlayer(to: Pt, tilesPerSec = 6) {
+    let p = playerRef.current;
+    const ms = 1000 / tilesPerSec;
+    while (p.x !== to.x || p.y !== to.y) {
+      const nx = p.x + Math.sign(to.x - p.x);
+      const ny = p.y + Math.sign(to.y - p.y);
+      questStepPlayer(nx, ny, ms + 25);
+      await sleep(ms);
+      p = playerRef.current;
+    }
+  }
+
+  // Cinematics B and C: board, sail to the shop island, walk up to the shop,
+  // Mitchy's line, she heads for the door. Identical for both conditions
+  // apart from her (equally long) line.
+  async function questTravel(placed: PlacedItem) {
+    if (questBusyRef.current) return;
+    questBusyRef.current = true;
+    const q = questRef.current!;
+    setModal(null);
+    setCinematic('quest');
+    setQuestHidden(true);
+    if (q.part === 'q1') {
+      setQuestComplete(QUESTLINE_1.done);
+      await sleep(QUEST_DONE_MS);
+      setQuestComplete(null);
+    }
+    unequip();
+    const shop = entsRef.current.find((e) => e.kind === 'shop');
+    const shopT = shop ? spriteTiles(shop.sprite, shop.scale) : { wT: 8, hT: 6 };
+    const shopAt = shop ? { x: shop.x + shopT.wT / 2, y: shop.y + shopT.hT / 2 } : { x: 105, y: 22 };
+    const start = { x: placed.x, y: placed.y };
+    const route = seaRoute(start, shopAt);
+    // board: Mitchy and the player step onto the boat
+    const board = { x: Math.round(start.x + 1), y: Math.round(start.y) };
+    await Promise.all([tweenMitchyTo({ x: start.x + 3, y: start.y }, 6), questWalkPlayer(board, 8)]);
+    await sleep(300);
+    await questSail(placed.id, route.path, QUEST_SAIL_SPEED, true);
+    // disembark and walk up to the shop
+    const stand = shop
+      ? { x: Math.round(shop.x + shopT.wT / 2) - 3, y: Math.round(shop.y + shopT.hT) + 1 }
+      : route.land;
+    await Promise.all([
+      (async () => {
+        await tweenMitchyTo(route.land, 5);
+        await tweenMitchyTo({ x: stand.x + 4, y: stand.y }, 4);
+      })(),
+      (async () => {
+        await questWalkPlayer(route.land, 6);
+        await questWalkPlayer(stand, 5);
+      })(),
+    ]);
+    await questSay([q.part === 'q1' ? QL.arrive1 : QL.arrive2]);
+    setDialogue(null);
+    if (shop) await tweenMitchyTo({ x: stand.x + 5, y: Math.round(shop.y + shopT.hT) }, 3);
+    // the boat stays at the dock and ferries the player from now on
+    const boat: QuestBoat = { id: placed.id, docks: [start, route.dock], at: 1 };
+    const cur = questRef.current!;
+    setQuest(
+      cur.part === 'q1'
+        ? { ...cur, part: 'q2', step: 0, boat }
+        : { ...(advance(cur) ?? cur), boat },
+    );
+    setCinematic(null);
+    setQuestHidden(false);
+    questBusyRef.current = false;
+  }
+
+  // The docked boat: a short ferry between the main island and the shop's
+  // island, no dialogue. The player walks aboard, sails, and steps ashore.
+  async function questFerry() {
+    const q = questRef.current;
+    const b = q?.boat;
+    if (!q || !b || questBusyRef.current) return;
+    questBusyRef.current = true;
+    setPickupMenuId(null);
+    setCinematic('quest');
+    const from = b.docks[b.at];
+    const to = b.docks[b.at === 0 ? 1 : 0];
+    const other = nearestIsland(to.x, to.y).isl;
+    const route = seaRoute(from, { x: other.cx, y: other.cy });
+    route.path[route.path.length - 1] = to;
+    await questWalkPlayer({ x: Math.round(from.x + 1), y: Math.round(from.y) }, 8);
+    await questSail(b.id, route.path, QUEST_SAIL_SPEED * 1.4, false);
+    const ashore = shoreToward({ x: other.cx, y: other.cy }, to).land;
+    await questWalkPlayer(ashore, 6);
+    setQuest({ ...questRef.current!, boat: { ...b, at: b.at === 0 ? 1 : 0 } });
+    setCinematic(null);
+    questBusyRef.current = false;
+  }
+
+  // The pond: fills the watering tool
+  function questPondClick() {
+    const q = questRef.current;
+    if (!q) return;
+    const tool = q.waterTool && bag.find((o) => o.ownedId === q.waterTool);
+    if (!tool) {
+      showToast('a calm little pond. you could fill a watering tool here.');
+      return;
+    }
+    const pond = ents.find((e) => e.kind === 'pond');
+    if (pond && near(pond, player) > 14) {
+      showToast('walk up to the pond first.');
+      return;
+    }
+    if (q.filled) {
+      showToast('your watering tool is already full.');
+      return;
+    }
+    setQuest({ ...q, filled: true });
+    showToast(`filled ${tool.name} with pond water!`);
+    questDone('fill', { filled: true });
+  }
+
+  // "I'm done." while reporting back: Mitchy's line, QUEST COMPLETE, then the
+  // rating questions. One after the other, never at the same time.
+  async function questReportDone() {
+    if (questBusyRef.current) return;
+    questBusyRef.current = true;
+    setModal(null);
+    setBubble(null);
+    setCinematic('quest');
+    await questSay([QL.doneReply]);
+    setDialogue(null);
+    const q = questRef.current!;
+    setQuestHidden(true);
+    setQuestComplete(questlineOf(q.part)!.done);
+    await sleep(QUEST_DONE_MS);
+    setQuestComplete(null);
+    setQuest({ ...q, part: q.part === 'q2' ? 'rate1' : 'rate2', step: 0 });
+    setQuestHidden(false);
+    setCinematic(null);
+    questBusyRef.current = false;
+  }
+
+  // One rating record per condition, updated after every answer
+  const ratingRef = useRef<{ id: string; answers: Record<string, number | null> } | null>(null);
+  function questRate(qid: string, value: number | null) {
+    const q = questRef.current;
+    const cond = q ? condOf(q.part) : null;
+    if (!cond) return;
+    if (!ratingRef.current) ratingRef.current = { id: newFeedbackId(), answers: {} };
+    const r = ratingRef.current;
+    r.answers[qid] = value;
+    sendFeedback({
+      v: 1,
+      id: r.id,
+      at: Date.now(),
+      player: playerId(),
+      session: SESSION,
+      link: window.location.pathname,
+      prompt: '',
+      name: '',
+      kind: '',
+      adjusted: false,
+      vote: null,
+      reasons: [],
+      positive: [],
+      tags: [],
+      clarify: null,
+      comment: '',
+      applied: {},
+      answers: null,
+      scope: null,
+      sprite: { lines: [] },
+      cond,
+      rating: { ...r.answers },
+    });
+  }
+
+  // Continue → the black test-transition screen
+  function questToTransition() {
+    ratingRef.current = null;
+    setQuest({ ...questRef.current!, part: 'transition', step: 0 });
+  }
+
+  // Begin second part: the controlled starting state of condition 2, right
+  // before crafting the water vehicle (no intro, no early tutorial, no
+  // hand-over), with one crafting token and nothing carried over.
+  function questBeginSecond() {
+    const q = questRef.current;
+    const s = q?.snapshot;
+    if (!q || !s) return;
+    const token: OwnedItem = { ...universalToken(hourSeed), ownedId: `own-${Date.now()}-quest2` };
+    stepAnimRef.current = { ...stepAnimRef.current, durMs: 0 };
+    playerRef.current = s.player;
+    setPlayer(s.player);
+    setInv(s.inv);
+    setMoney(s.money);
+    setStorages(s.storages);
+    setBag([...s.bag, token]);
+    setRemoved(new Set(s.removedIds));
+    setShaken(new Set(s.shaken));
+    setCrops(s.plantedCrops);
+    setPlacedItems(s.placed ?? []);
+    mitchyPosRef.current = s.mitchyPos ?? null;
+    setMitchyPos(s.mitchyPos ?? null);
+    setEquipped(null);
+    setPetPos(null);
+    setTokenBuys({ day: daySeedOf(wt), n: 0 });
+    resetPrefs(); // the post-reflection panel's preferences start empty
+    setModal(null);
+    setPickupMenuId(null);
+    setQuest({ part: 'c2', step: 0, gathered: q.gathered, snapshot: s });
+  }
+
+  // DEV-only test hooks for the quest flow (an automated run can't walk
+  // the island): each one calls the same function a click would.
+  const questTestRef = useRef<Record<string, (...a: never[]) => unknown>>({});
+  if (import.meta.env.DEV) {
+    questTestRef.current = {
+      state: () => ({ quest: questRef.current, inv, money, bag: bag.map((o) => `${o.name}|${o.kind}|${o.ownedId}`), cinematic, crops: crops.map((c) => `${c.name}:${c.stage}${c.dormant ? ':dormant' : ''}`), player, mitchyPos, equipped: equipped?.name ?? null, placed: placedItems.map((p) => `${p.name}@${p.x.toFixed(1)},${p.y.toFixed(1)}`) }),
+      collect: () => {
+        const e = ents.find((x) => !removed.has(x.id) && (COLLECT_AS[x.kind] || ITEM_TYPES.includes(x.kind as ItemType)));
+        if (e) collect(e);
+        return e?.kind;
+      },
+      store: () => {
+        const it = ITEM_TYPES.find((t) => inv[t] > 0);
+        if (it) storeItem(0, it);
+      },
+      talk: () => interactActions.openDialog(),
+      teleport: (x: number, y: number) => {
+        playerRef.current = { x, y };
+        setPlayer({ x, y });
+      },
+      place: (ownedId: string) => {
+        const o = bag.find((b) => b.ownedId === ownedId);
+        if (o) startPlacement(o);
+      },
+      ghost: (x: number, y: number) => setPlacing((g) => (g ? { ...g, x, y } : g)),
+      pond: () => questPondClick(),
+      plantSeed: () => plantBase('seed'),
+      equip: (ownedId: string) => {
+        const o = bag.find((b) => b.ownedId === ownedId);
+        if (o) equipOwned(o);
+      },
+      water: () => waterCrops(),
+      harvest: () => {
+        const c = crops.find((x) => x.id === questRef.current?.seedCrop);
+        if (c) harvestCrop(c.slot);
+      },
+      shopSell: (it: ItemType) => setModal({ ...(FRESH_SHOP as Extract<Modal, { t: 'shop' }>), pick: it, amount: 1 }),
+      sell: () => sellPick(),
+      shopToken: () =>
+        setModal({ ...(FRESH_SHOP as Extract<Modal, { t: 'shop' }>), tab: 'buy', confirm: universalToken(hourSeed) }),
+      buy: () => buyConfirm(),
+      ferry: () => questFerry(),
+      waterNear: () => {
+        // a free water spot within reach, for placing the boat
+        for (let r = 2; r < 8; r++)
+          for (let dy = -r; dy <= r; dy++)
+            for (let dx = -r; dx <= r; dx++) {
+              const x = player.x + dx;
+              const y = player.y + dy;
+              const o = bag.find((b) => b.equip?.float);
+              if (o && waterPlacementFits({ x, y, sprite: o.sprite, scale: o.scale, rotation: 0 }, ents, player)) return { x, y };
+            }
+        return null;
+      },
+    };
+  }
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    (window as unknown as { __qt?: () => unknown }).__qt = () => questTestRef.current;
+  }, []);
+
+  // the quest starts as soon as the intro has finished
+  useEffect(() => {
+    if (QUEST_ENABLED && introDone && !questRef.current) setQuest(freshQuest());
+  }, [introDone]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a user test shouldn't depend on remembering to save: every quest step
+  // is written straight away
+  useEffect(() => {
+    if (QUEST_ENABLED && quest) writeSave(snapRef.current());
+  }, [quest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Kicks off once IntroA (stages 1-14) has finished AND we're still "not
   // done" — on mount for a brand-new save (once introAActive flips false,
@@ -2531,9 +3001,17 @@ function Game() {
 
   // is the ghost's current spot a legal placement? drives both the tint and
   // whether Enter is allowed to commit.
+  // On the quest links a floating vehicle is launched on the water instead
+  const placingOnWater = !!placing && QUEST_ENABLED && !!placing.owned.equip?.float;
   const placingValid = useMemo(
     () =>
-      placing
+      placing && placingOnWater
+        ? waterPlacementFits(
+            { x: placing.x, y: placing.y, sprite: placing.owned.sprite, scale: placing.owned.scale, rotation: placing.rotation },
+            ents,
+            player,
+          )
+        : placing
         ? placementFits(
             { x: placing.x, y: placing.y, sprite: placing.owned.sprite, scale: placing.owned.scale, rotation: placing.rotation },
             ents,
@@ -2541,7 +3019,7 @@ function Game() {
             plot,
           )
         : false,
-    [placing, ents, plot],
+    [placing, placingOnWater, ents, plot, player],
   );
   const placingValidRef = useRef(placingValid);
   placingValidRef.current = placingValid;
@@ -2709,6 +3187,25 @@ function Game() {
     setRemoved((s) => new Set(s).add(e.id));
     const item = COLLECT_AS[e.kind] ?? (e.kind as ItemType);
     setInv((v) => ({ ...v, [item]: v[item] + 1 }));
+    // a flower now and then drops a seed (and always does while the
+    // planting quest needs one and the player has none)
+    if (item === 'flower') {
+      const q = questRef.current;
+      const line = q && questlineOf(q.part);
+      const plantAt = line ? line.steps.findIndex((o) => o.id === 'plant') : -1;
+      const needSeed =
+        !!q && plantAt >= 0 && q.step <= plantAt && invRef.current.seed <= 0 && !crops.some((c) => c.dormant);
+      if (needSeed || Math.random() < SEED_CHANCE) {
+        setInv((v) => ({ ...v, seed: v.seed + 1 }));
+        showToast('a seed fell out of the flower!');
+      }
+    }
+    const q = questRef.current;
+    if (q && isStep(q, 'gather')) {
+      const gathered = q.gathered + 1;
+      if (gathered >= GATHER_TARGET) questDone('gather', { gathered });
+      else setQuest({ ...q, gathered });
+    }
   }
 
   function showNothing(id: string, text = 'oh nothing...', ms = 1600) {
@@ -2810,7 +3307,9 @@ function Game() {
     openDialog: () =>
       introStageRef.current === 'partC:explore' || introStageRef.current === 'partC:payment'
         ? void talkToMitchyPartC()
-        : setModal({ t: 'dialog', sel: 0 }),
+        : isStep(questRef.current, 'mitchy')
+          ? void questHandover()
+          : setModal({ t: 'dialog', sel: 0 }),
     // the shop building skips Mitchy's dialog and opens the shop directly
     openShop: () => setModal(FRESH_SHOP),
     openHouseMenu: () => setModal({ t: 'houseMenu', sel: 0 }),
@@ -2834,6 +3333,7 @@ function Game() {
     if (inv[item] <= 0) return;
     setInv((v) => ({ ...v, [item]: v[item] - 1 }));
     setStorages((ss) => ss.map((s, i) => (i === slot ? { ...s, [item]: s[item] + 1 } : s)));
+    questDone('store');
   }
 
   function takeItem(slot: number, item: ItemType) {
@@ -2855,6 +3355,10 @@ function Game() {
 
   // ---- dialog / shop actions ----
   function confirmDialog(sel: number) {
+    if (sel === 2 && isStep(questRef.current, 'report')) {
+      void questReportDone();
+      return;
+    }
     if (sel === 1) {
       setModal(FRESH_SHOP);
     } else {
@@ -2871,7 +3375,7 @@ function Game() {
     const m = modal;
     if (!m || m.t !== 'shop' || !m.confirm) return;
     const it = m.confirm;
-    if (it.kind === 'token' && tokensLeftToday <= 0) {
+    if (it.kind === 'token' && tokensLeftToday <= 0 && !QUEST_ENABLED) {
       setModal({ ...m, limited: true });
       return;
     }
@@ -2902,6 +3406,7 @@ function Game() {
     if (owned.equip.mode === 'vehicle' && owned.equip.float) {
       showToast('you can sail onto the water now!');
     }
+    if (owned.equip.mode === 'pet') questDone('companion');
   }
 
   function unequip() {
@@ -2913,8 +3418,10 @@ function Game() {
   // close the modal — the workshop stays open on its folded/"done" screen, and
   // the player closes it themselves. (equip here mirrors equipOwned WITHOUT the
   // setModal(null), so the modal survives.)
-  function consumeCraft(tokenId: string, item: ShopItem, equip: boolean) {
+  function consumeCraft(tokenId: string, crafted: ShopItem, equip: boolean) {
+    const item = questCraftFit(crafted);
     const owned: OwnedItem = { ...item, ownedId: `own-${Date.now()}` };
+    questCrafted(owned, equip);
     setBag((b) => [...b.filter((x) => x.ownedId !== tokenId), owned]);
     if (equip && owned.equip) {
       if (owned.equip.mode === 'pet') setPetPos({ x: Math.max(0, player.x - 2), y: player.y });
@@ -2992,7 +3499,7 @@ function Game() {
     m: Exclude<Modal, null>,
   ): { sel: number; n: number; upd: (sel: number) => Modal; go: (sel: number) => void } | null {
     if (m.t === 'dialog') {
-      return { sel: m.sel, n: 2, upd: (s) => ({ ...m, sel: s }), go: confirmDialog };
+      return { sel: m.sel, n: dialogOptions.length, upd: (s) => ({ ...m, sel: s }), go: confirmDialog };
     }
     if (m.t === 'houseMenu') {
       return {
@@ -3098,12 +3605,14 @@ function Game() {
       return;
     }
     setInv((v) => ({ ...v, [it]: v[it] - 1 }));
-    setCrops((cs) => [
-      ...cs,
-      createCrop(slot, ITEM_INFO[it].name, ITEM_SPRITES[it], 'plant', { kind: 'base', it }, wt),
-    ]);
+    const crop =
+      it === 'seed'
+        ? seedCrop(slot, ITEM_SPRITES.bloom, wt)
+        : createCrop(slot, ITEM_INFO[it].name, ITEM_SPRITES[it], 'plant', { kind: 'base', it }, wt);
+    setCrops((cs) => [...cs, crop]);
     setModal(null);
     showToast(`planted a ${ITEM_INFO[it].name.toLowerCase()}!`);
+    if (it === 'seed') questDone('plant', { seedCrop: crop.id });
   }
 
   function plantOwned(o: OwnedItem) {
@@ -3145,6 +3654,8 @@ function Game() {
     if (equipped?.ownedId === p.owned.ownedId) unequip();
     setPlacing(null);
     showToast(`placed ${p.owned.name}!`);
+    // the quest's water vehicle, launched: on to the shop island
+    if (QUEST_ENABLED && p.owned.equip?.float && isStep(questRef.current, 'vehicle')) questBoatPlaced(placed);
   }
 
   function pickupPlaced(id: string) {
@@ -3163,13 +3674,25 @@ function Game() {
   // The watering itself, with no tool check — shared by the player's can and
   // by a placed item's water_area action (which has no equipment to check).
   function soakCrops(ids: Set<string>) {
-    setCrops((cs) => cs.map((c) => (ids.has(c.id) ? { ...c, lastWateredAt: wt } : c)));
+    setCrops((cs) =>
+      cs.map((c) =>
+        ids.has(c.id)
+          ? // a dormant seed starts growing now
+            { ...c, lastWateredAt: wt, ...(c.dormant ? { dormant: false, plantedAt: wt, care: { ...c.care, waterEveryMs: 10 * 60_000 } } : {}) }
+          : c,
+      ),
+    );
   }
 
   // Water crops (all growing ones, or just the given slot). Needs the can.
   function waterCrops(slot?: number) {
     if (equipped?.tool !== 'water') {
       showToast('equip your watering can first!');
+      return;
+    }
+    const q = questRef.current;
+    if (q && q.waterTool === equipped.ownedId && !q.filled) {
+      showToast(QL.needFill);
       return;
     }
     const targets = crops.filter(
@@ -3181,6 +3704,7 @@ function Game() {
     }
     soakCrops(new Set(targets.map((c) => c.id)));
     showToast(`splash! watered ${targets.length} plant${targets.length > 1 ? 's' : ''}.`);
+    if (q?.seedCrop && targets.some((c) => c.id === q.seedCrop)) questDone('water');
   }
 
   // The harvest itself, with no UI side effects — shared by the player's own
@@ -3195,7 +3719,8 @@ function Game() {
     setCrops((cs) => cs.filter((x) => x.slot !== slot));
     if (c.harvest.kind === 'base') {
       const it = c.harvest.it;
-      const n = 2 + bonus;
+      // a seed grows into ONE Sunbloom (20 coins, one crafting token)
+      const n = (it === 'bloom' ? 1 : 2) + bonus;
       setInv((v) => ({ ...v, [it]: v[it] + n }));
       return `${n} ${ITEM_INFO[it].name.toLowerCase()}`;
     }
@@ -3211,8 +3736,13 @@ function Game() {
   }
 
   function harvestCrop(slot: number) {
+    const seed = crops.find((c) => c.slot === slot)?.id === questRef.current?.seedCrop;
     const yielded = reapCrop(slot);
     if (!yielded) return;
+    if (seed) {
+      questDone('harvest');
+      window.setTimeout(() => showToast('a Sunbloom sells for 20 coins at the shop, just enough for a crafting token!'), 1800);
+    }
     showToast(`harvested ${yielded}!`);
     setModal(null);
   }
@@ -3597,6 +4127,34 @@ function Game() {
             )}
             <span className="hud-clock-time">{timeStr}</span>
           </div>
+          {questObjective && questLine && !questHidden && !cinematic && (
+            <QuestPanel
+              line={questLine.title}
+              objective={questObjective}
+              task={questTask}
+              sub={questSub}
+              progress={questObjective.target ? { n: quest!.gathered, of: questObjective.target } : undefined}
+              open={questOpen}
+              view={questView}
+              controls={CONTROLS}
+              onToggle={() => {
+                if (questView === 'quest') setQuestOpen((o) => !o);
+                else {
+                  setQuestView('quest');
+                  setQuestOpen(true);
+                }
+              }}
+              onControls={() => {
+                if (questView === 'controls' && questOpen) {
+                  setQuestView('quest');
+                } else {
+                  setQuestView('controls');
+                  setQuestOpen(true);
+                  questDone('controls');
+                }
+              }}
+            />
+          )}
         </div>
 
         {saving && (
@@ -3946,6 +4504,7 @@ function Game() {
                   <PondLayer
                     key={e.id}
                     ent={e}
+                    onClick={quest && !cinematic ? questPondClick : undefined}
                     charW={dims.charW}
                     lineH={dims.lineH}
                     res={dims.scale * zoom * (window.devicePixelRatio || 1)}
@@ -4173,12 +4732,17 @@ function Game() {
                     >
                       <div className="pick" ref={pickupPopupRef} onClick={(ev) => ev.stopPropagation()}>
                         <div className="pick-name">{p.name}</div>
-                        <OptList
-                          opts={['Return to Inventory']}
-                          sel={0}
-                          onSel={() => {}}
-                          onPick={() => pickupPlaced(p.id)}
-                        />
+                        {quest?.boat?.id === p.id ? (
+                          // the quest's boat stays at its dock and ferries
+                          <OptList opts={[QL.ferry]} sel={0} onSel={() => {}} onPick={() => void questFerry()} />
+                        ) : (
+                          <OptList
+                            opts={['Return to Inventory']}
+                            sel={0}
+                            onSel={() => {}}
+                            onPick={() => pickupPlaced(p.id)}
+                          />
+                        )}
                       </div>
                     </div>
                   );
@@ -4409,6 +4973,47 @@ function Game() {
           locked={autoAdvanceMode}
         />
       )}
+      {questComplete && <QuestComplete title={questComplete.title} text={questComplete.text} />}
+      {(quest?.part === 'rate1' || quest?.part === 'rate2' || quest?.part === 'end') && (
+        <RatingSequence
+          key={quest.part === 'rate1' ? 'rate1' : 'rate2'}
+          intro={QL.ratingIntro}
+          onAnswer={(rq, v) => questRate(rq.id, v)}
+          end={
+            quest.part === 'rate1' ? (
+              <div className="rq-end">
+                <button
+                  className="ds-action go"
+                  onClick={questToTransition}
+                  title="Continue to the next part of the user test."
+                >
+                  <span>Continue</span>
+                </button>
+              </div>
+            ) : (
+              <div className="rq-end">
+                {QL.end.map((t) => (
+                  <p key={t} className="ds-panel-text">
+                    {t}
+                  </p>
+                ))}
+                <button
+                  className="ds-action go"
+                  onClick={() => {
+                    if (FINAL_SURVEY_URL) window.open(FINAL_SURVEY_URL, '_blank', 'noopener');
+                    else console.warn('[quest] FINAL_SURVEY_URL is not set (src/quest/quests.ts)');
+                    setQuest({ ...questRef.current!, part: 'end' });
+                  }}
+                >
+                  <span>Open final survey</span>
+                </button>
+                {quest.part === 'end' && <p className="ds-muted">Thank you for playing. You can close this tab now.</p>}
+              </div>
+            )
+          }
+        />
+      )}
+      {quest?.part === 'transition' && <TestTransition onBegin={questBeginSecond} />}
       {nameEntryOpen && (
         <NameEntryPanel onSubmit={(n) => nameEntryResolveRef.current?.(n)} locked={autoAdvanceMode} />
       )}
@@ -4497,7 +5102,13 @@ function Game() {
               <div className="ds-muted ds-settings-note">writes your progress to this browser</div>
               <div className="ds-settings-section">More</div>
               <div className="ds-actions ds-settings-actions">
-                <button className="ds-action ds-settings-open" onClick={() => setModal({ t: 'settings', page: 'controls' })}>
+                <button
+                  className="ds-action ds-settings-open"
+                  onClick={() => {
+                    setModal({ t: 'settings', page: 'controls' });
+                    questDone('controls');
+                  }}
+                >
                   <span className="ds-action-icon">
                     <KeysIcon className="ds-save-icon" />
                   </span>
@@ -4577,7 +5188,7 @@ function Game() {
                   <FitSprite look={S.MITCHY_FACE_LOOK} solid={{}} fill={0.92} maxScale={3} />
                 </div>
               }
-              options={['Talk', 'Open Shop']}
+              options={dialogOptions}
               sel={modal.sel}
               onSel={(i) => setModal({ t: 'dialog', sel: i })}
               onPick={confirmDialog}
@@ -4783,11 +5394,12 @@ function Game() {
 
           {modal.t === 'craft' && (
             <CraftModal
-              key={modal.token.ownedId}
+              key={`${modal.token.ownedId}-${questCond ?? ''}`}
               token={modal.token}
               choices={CRAFT_CHOICES}
-              feedback={CRAFT_FEEDBACK}
-              clarify={CRAFT_CLARIFY}
+              feedback={questCond ? questCond === 'post' : CRAFT_FEEDBACK}
+              clarify={questCond ? questCond === 'pre' : CRAFT_CLARIFY}
+              cond={questCond ?? undefined}
               player={{
                 name: playerName || DEFAULT_PLAYER_NAME,
                 look: { sprite: avatarSprite, colors: avatarRecolored.colors, palette: avatarRecolored.palette },
@@ -5623,7 +6235,19 @@ function EntSprite({
 // measured as the single biggest frame cost in the game. Same frames, same
 // colours as ColoredSprite's solidCells path: each occupied cell gets its
 // palette colour on a background darkened by 55%.
-function PondLayer({ ent, charW, lineH, res }: { ent: Ent; charW: number; lineH: number; res: number }) {
+function PondLayer({
+  ent,
+  charW,
+  lineH,
+  res,
+  onClick,
+}: {
+  ent: Ent;
+  charW: number;
+  lineH: number;
+  res: number;
+  onClick?: () => void; // the quest's "fill your watering tool"
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [t, setT] = useState(0);
   useEffect(() => {
@@ -5674,7 +6298,16 @@ function PondLayer({ ent, charW, lineH, res }: { ent: Ent; charW: number; lineH:
   return (
     <canvas
       ref={ref}
-      className="ent pond"
+      className={'ent pond' + (onClick ? ' clickable' : '')}
+      onClick={
+        onClick
+          ? (ev) => {
+              ev.stopPropagation();
+              onClick();
+            }
+          : undefined
+      }
+      title={onClick ? 'Pond' : undefined}
       style={{
         left: `${ent.x * TILE_CH - ((1 - k) * cw) / 2}ch`,
         top: `${ent.y * TILE_LN - (1 - k) * rows}em`,

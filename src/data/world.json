@@ -2,44 +2,52 @@
   "version": 2,
   "moved": {
     "palm2": {
-      "x": 12,
-      "y": 31
+      "x": 18,
+      "y": 64
     },
     "palm1": {
-      "x": 22,
-      "y": 37
+      "x": 12,
+      "y": 34
     },
     "palm5": {
-      "x": 19,
-      "y": 59
+      "x": 21,
+      "y": 44
     },
     "palm3": {
-      "x": 29,
-      "y": 69
+      "x": 30,
+      "y": 65
     },
     "house": {
-      "x": 50.85,
+      "x": 46.85,
       "y": 13
     },
     "garden-bed": {
-      "x": 35,
-      "y": 14
+      "x": 28,
+      "y": 17
     },
     "shop": {
-      "x": 61,
-      "y": 38
+      "x": 102,
+      "y": 12
     },
     "palm4": {
       "x": 8,
       "y": 46
     },
     "flowerplus6": {
-      "x": 31,
-      "y": 43
+      "x": 37,
+      "y": 38
     },
     "cat": {
-      "x": 54,
-      "y": 35
+      "x": 63,
+      "y": 43
+    },
+    "grasshalm5": {
+      "x": 33,
+      "y": 46
+    },
+    "flowerplus2": {
+      "x": 36,
+      "y": 38
     }
   },
   "removed": [
@@ -301,6 +309,104 @@
       "x": 91,
       "y": 14,
       "scale": 1
+    },
+    {
+      "id": "flowerplus-13",
+      "asset": "flowerplus",
+      "x": 34,
+      "y": 54,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-14",
+      "asset": "flowerplus",
+      "x": 45,
+      "y": 46,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-15",
+      "asset": "flowerplus",
+      "x": 53,
+      "y": 49,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-16",
+      "asset": "flowerplus",
+      "x": 54,
+      "y": 50,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-17",
+      "asset": "flowerplus",
+      "x": 53,
+      "y": 50,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-18",
+      "asset": "flowerplus",
+      "x": 54,
+      "y": 49,
+      "scale": 0.5
+    },
+    {
+      "id": "grasshalm-26",
+      "asset": "grasshalm",
+      "x": 64,
+      "y": 49,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-27",
+      "asset": "grasshalm",
+      "x": 51,
+      "y": 49,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-28",
+      "asset": "grasshalm",
+      "x": 49,
+      "y": 49,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-29",
+      "asset": "grasshalm",
+      "x": 49,
+      "y": 48,
+      "scale": 0.2
+    },
+    {
+      "id": "flowerplus-19",
+      "asset": "flowerplus",
+      "x": 97,
+      "y": 25,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-20",
+      "asset": "flowerplus",
+      "x": 98,
+      "y": 25,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-21",
+      "asset": "flowerplus",
+      "x": 104,
+      "y": 28,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-22",
+      "asset": "flowerplus",
+      "x": 99,
+      "y": 18,
+      "scale": 0.5
     }
   ],
   "colliders": {

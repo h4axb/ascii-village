@@ -178,7 +178,8 @@ export function planPrompt(): string {
 
     'Optionally, "face": a short list of {"x","y","glyph"} placing literal cute dot-face glyphs on top of ' +
       `everything else, glyph one of: ${FACE_SET.join(' ')} — use this for a creature/pet\'s expression, ` +
-      'omit entirely for non-creature items.',
+      'omit entirely for non-creature items. x and y are 0..1 across the whole sprite, like the region ' +
+      'bounds (e.g. eyes on a head at cx 0.3, cy 0.4 sit around x 0.27 and 0.33, y 0.38).',
 
     'Reply with JSON only, this exact shape:\n' +
       '{"fit": true|false, "tokenHint": "plant|pets|clothing|vehicle|food|utensils|none", ' +

@@ -428,11 +428,18 @@ export function renderRegions(
 
   // Face overlay: overwrite the GLYPH only, on top of whatever shading
   // already landed there — colour underneath is left alone.
+  // Positions are 0..1 across the sprite, like every region's bounds (what
+  // the planner is asked for); larger values are read as cells. Either way
+  // they end up whole cells inside the grid — a fractional index used to
+  // crash the whole craft (grid[0.6] is undefined).
   if (face) {
+    const cell = (v: number, n: number) => Math.round(v <= 1 ? v * (n - 1) : v);
     for (const f of face) {
-      if (f.x < 0 || f.x >= w || f.y < 0 || f.y >= h) continue;
-      const existing = grid[f.y][f.x];
-      grid[f.y][f.x] = existing
+      const x = cell(f.x, w);
+      const y = cell(f.y, h);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x >= w || y < 0 || y >= h) continue;
+      const existing = grid[y][x];
+      grid[y][x] = existing
         ? { ...existing, glyph: f.glyph }
         : { mode: 'feature', rgb: [255, 255, 255], material: '#ffffff', glyph: f.glyph };
     }

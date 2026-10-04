@@ -210,7 +210,8 @@ export const LINES = {
   ],
   // the crafted water vehicle
   launch: 'Place it on the water.',
-  board: 'Board',
+  board: 'Sail',
+  stow: 'Put back in inventory',
   landAsk: 'Go ashore here?',
   landFar: 'get a little closer to the shore first.',
   needFill: 'Your watering tool is empty. Fill it at the pond in the south first.',

@@ -274,7 +274,8 @@ const TOKEN_FX_MS = 900;
 const QUEST_DONE_MS = 2800;
 const QUEST_SAIL_SPEED = 9;
 const MARKER_BOAT_LAUNCH = 'quest.boatLaunch'; // sceneMarkers.ts
-const LAND_REACH = 2.5; // tiles from the boat to a shore click that lands
+const LAND_REACH = 2.5;
+const BOARD_REACH = 3; // tiles from the player to the boat's edge to climb in // tiles from the boat to a shore click that lands
 const BOAT_SCALE = 1.9; // the quest's water vehicle, compared with an ordinary crafted item
 const SEED_CHANCE = 0.15; // a picked flower drops a seed (1-2 in 10)
 
@@ -2590,13 +2591,54 @@ function Game() {
   const rideBoat = riding ? placedItems.find((p) => p.id === quest!.boat!.id) ?? null : null;
   const boatCols = rideBoat ? Math.max(...rideBoat.sprite.map((l) => l.length)) : 0;
 
+  // Put back in inventory: the boat leaves the water
+  function questStowBoat(id: string) {
+    const q = questRef.current;
+    if (!q || q.riding) return;
+    pickupPlaced(id);
+    setQuest({ ...q, boat: undefined });
+  }
+
+  // Place it on the water (outside the boat objective): the nearest open
+  // water within reach of the player, and it's the sailing boat again
+  function questDropBoat(owned: OwnedItem) {
+    const q = questRef.current;
+    if (!q) return;
+    const p = playerRef.current;
+    let at: Pt | null = null;
+    for (let r = 1; r <= 10 && !at; r++)
+      for (let dy = -r; dy <= r && !at; dy++)
+        for (let dx = -r; dx <= r && !at; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // the ring at distance r
+          const x = p.x + dx;
+          const y = p.y + dy;
+          const me = { ...p, w: PLAYER_T.wT, h: PLAYER_T.hT };
+          if (waterPlacementFits({ x, y, sprite: owned.sprite, scale: owned.scale, rotation: 0 }, entsRef.current, me, BOARD_REACH))
+            at = { x, y };
+        }
+    if (!at) {
+      setModal(null);
+      showToast('walk up to the shore to put it on the water.');
+      return;
+    }
+    const placed = ownedToPlaced(owned, at.x, at.y, 0, `placed-${Date.now()}-boat`);
+    setBag((b) => b.filter((x) => x.ownedId !== owned.ownedId));
+    if (equippedRef.current?.ownedId === owned.ownedId) unequip();
+    setPlacedItems((ps) => [...ps, placed]);
+    setModal(null);
+    setQuest({ ...q, boat: { id: placed.id } });
+    showToast(`${owned.name} is on the water.`);
+  }
+
   async function questBoard(id: string) {
     const q = questRef.current;
     const b = placedItemsRef.current.find((p) => p.id === id);
     if (!q || !b || q.riding || questBusyRef.current) return;
     const { wT, hT } = spriteTiles(b.sprite, b.scale, b.rotation);
-    const dist = Math.hypot(b.x + wT / 2 - (player.x + PLAYER_T.wT / 2), b.y + hT / 2 - (player.y + PLAYER_T.hT / 2));
-    if (dist > wT / 2 + 4) {
+    // from the player's footprint to the boat's nearest edge
+    const gx = Math.max(b.x - (player.x + PLAYER_T.wT - 1), 0, player.x - (b.x + wT - 1));
+    const gy = Math.max(b.y - (player.y + PLAYER_T.hT - 1), 0, player.y - (b.y + hT - 1));
+    if (Math.hypot(gx, gy) > BOARD_REACH) {
       showToast('walk up to the boat first.');
       setPickupMenuId(null);
       return;
@@ -3733,7 +3775,7 @@ function Game() {
     else if (owned.equip) labels.push(isEquipped ? 'Unequip' : 'Equip');
     if (canPlant) labels.push('Plant in garden');
     // the quest's water vehicle goes straight onto the water
-    const launchIt = canPlace && !!owned.equip?.float && isStep(questRef.current, 'vehicle');
+    const launchIt = canPlace && !!owned.equip?.float && !!questRef.current;
     if (launchIt) labels.push(QL.launch);
     else if (canPlace) labels.push('Place in world');
     return {
@@ -3742,7 +3784,7 @@ function Game() {
         const label = labels[i];
         if (label === 'Plant in garden') return plantOwned(owned);
         if (label === 'Place in world') return startPlacement(owned);
-        if (label === QL.launch) return questLaunch(owned);
+        if (label === QL.launch) return isStep(questRef.current, 'vehicle') ? questLaunch(owned) : questDropBoat(owned);
         return ownedAction(owned);
       },
     };
@@ -4895,8 +4937,13 @@ function Game() {
                       <div className="pick" ref={pickupPopupRef} onClick={(ev) => ev.stopPropagation()}>
                         <div className="pick-name">{p.name}</div>
                         {quest?.boat?.id === p.id ? (
-                          // the quest's boat: climb in and sail it yourself
-                          <OptList opts={[QL.board]} sel={0} onSel={() => {}} onPick={() => void questBoard(p.id)} />
+                          // the quest's boat: climb in and sail it, or take it back
+                          <OptList
+                            opts={[QL.board, QL.stow]}
+                            sel={0}
+                            onSel={() => {}}
+                            onPick={(i) => (i === 0 ? void questBoard(p.id) : questStowBoat(p.id))}
+                          />
                         ) : (
                           <OptList
                             opts={['Return to Inventory']}

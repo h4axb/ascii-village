@@ -113,7 +113,8 @@ export function placementFits(
 export function waterPlacementFits(
   candidate: { x: number; y: number; sprite: string[]; scale?: number; rotation: 0 | 1 | 2 | 3 },
   ents: Ent[],
-  player: { x: number; y: number },
+  // the player's footprint (w/h tiles; 1x1 when omitted)
+  player: { x: number; y: number; w?: number; h?: number },
   reach = 6,
 ): boolean {
   const { wT, hT } = spriteTiles(candidate.sprite, candidate.scale, candidate.rotation);
@@ -123,8 +124,10 @@ export function waterPlacementFits(
       if (!isWater(tx, ty)) return false;
     }
   }
-  const dx = Math.max(candidate.x - player.x, 0, player.x - (candidate.x + wT - 1));
-  const dy = Math.max(candidate.y - player.y, 0, player.y - (candidate.y + hT - 1));
+  const px1 = player.x + (player.w ?? 1) - 1;
+  const py1 = player.y + (player.h ?? 1) - 1;
+  const dx = Math.max(candidate.x - px1, 0, player.x - (candidate.x + wT - 1));
+  const dy = Math.max(candidate.y - py1, 0, player.y - (candidate.y + hT - 1));
   if (Math.hypot(dx, dy) > reach) return false;
   const cbox = collisionBox(candidate);
   for (const e of ents) if (tileBoxesOverlap(cbox, collisionBox(e))) return false;

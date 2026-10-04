@@ -4974,6 +4974,7 @@ function Game() {
                   colors={equipped.colors}
                   palette={equipped.palette}
                   texture={equipped.textureModifier}
+                  solidCells
                 />
               )}
 
@@ -5034,6 +5035,7 @@ function Game() {
                     palette={rideBoat.palette}
                     color={rideBoat.color}
                     texture={rideBoat.textureModifier}
+                    solidCells
                   />
                 )}
                 <SolidSpriteCanvas
@@ -5061,6 +5063,7 @@ function Game() {
                     palette={equipped.palette}
                     color={equipped.color}
                     texture={equipped.textureModifier}
+                    solidCells
                   />
                 )}
 
@@ -5077,6 +5080,7 @@ function Game() {
                     palette={equipped.palette}
                     color={equipped.color}
                     texture={equipped.textureModifier}
+                    solidCells
                   />
                 )}
               </div>
@@ -6413,6 +6417,8 @@ function PlacedItemView({
         // ghost stays a plain valid/invalid tint — a shiny/neon/metallic
         // effect would fight the red/green readability the ghost exists for.
         texture={ghost ? undefined : texture}
+        // crafted items read as solid objects, like the buildings and palms
+        solidCells={!ghost}
         onClick={onClick}
       />
       {chargeFrac != null && (

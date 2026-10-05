@@ -136,6 +136,14 @@ export function isWater(tx: number, ty: number): boolean {
   return islandNd(tx, ty) > 1;
 }
 
+// Water that also LOOKS like water: past the drawn sand band (the beach is
+// drawn wider than it plays, see VISUAL TERRAIN below). Boats keep to this,
+// so a boat never sits on the sand.
+export function isOpenWater(tx: number, ty: number): boolean {
+  return islandNd(tx, ty) > OPEN_WATER_ND;
+}
+const OPEN_WATER_ND = 1.13; // = COAST.outerSandEnd
+
 // big region anchors — all on the MAIN island only
 const VILLAGE = { x: 32, y: 30, r: 12 }; // home meadow, kept friendly
 const VOLCANO = { x: 40, y: 54, r: 13 }; // central lava fields

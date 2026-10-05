@@ -376,6 +376,9 @@ export interface TerrainField {
   kind: Uint8Array;
   glyph: Uint8Array;
   color: Uint32Array; // 0xRRGGBB
+  /** 1 where every colour block under the cell is water: water glyphs and
+   *  sparkles only go there, so none ever lands on a sand-coloured block */
+  overWater: Uint8Array;
 }
 
 const pack = (r: number, g: number, b: number) =>
@@ -524,6 +527,7 @@ export function terrainField(): TerrainField {
   const bgW = GROUND_W;
   const bgH = Math.round(GROUND_H * CELL_ASPECT);
   const bg = new Uint8ClampedArray(bgW * bgH * 4);
+  const blockWater = new Uint8Array(bgW * bgH);
   for (let by = 0; by < bgH; by++) {
     const fy = ((by + 0.5) / bgH) * (GROUND_H / TILE_LN);
     for (let bx = 0; bx < bgW; bx++) {
@@ -531,6 +535,7 @@ export function terrainField(): TerrainField {
       const h3 = hash2(bx * 0.377 + 19, by * 1.27 + 41);
       sample(fx, fy, (h3 - 0.5) * 0.012);
       const v = (h3 - 0.5) * 10;
+      blockWater[by * bgW + bx] = out.kind === KIND_WATER ? 1 : 0;
       const k4 = (by * bgW + bx) * 4;
       bg[k4] = out.r + v;
       bg[k4 + 1] = out.g + v;
@@ -538,7 +543,30 @@ export function terrainField(): TerrainField {
       bg[k4 + 3] = 255;
     }
   }
-  FIELD = { bg, bgW, bgH, ndv, kind, glyph, color };
+  // A cell is ~1.67 blocks tall: it may straddle the sand/water edge of the
+  // colour layer even when its own centre is water. Such cells keep no water
+  // glyph (it would sit on sand, very visible zoomed in or far out).
+  const overWater = new Uint8Array(GROUND_W * GROUND_H);
+  for (let y = 0; y < GROUND_H; y++) {
+    const by0 = Math.floor(y * CELL_ASPECT);
+    const by1 = Math.min(bgH - 1, Math.ceil((y + 1) * CELL_ASPECT) - 1);
+    for (let x = 0; x < GROUND_W; x++) {
+      const i = y * GROUND_W + x;
+      if (kind[i] !== KIND_WATER) continue;
+      let ok = 1;
+      for (let by = by0; by <= by1 && ok; by++) {
+        for (let bx = Math.max(0, x - 1); bx <= Math.min(bgW - 1, x + 1); bx++) {
+          if (!blockWater[by * bgW + bx]) {
+            ok = 0;
+            break;
+          }
+        }
+      }
+      overWater[i] = ok;
+      if (!ok) glyph[i] = 0;
+    }
+  }
+  FIELD = { bg, bgW, bgH, ndv, kind, glyph, color, overWater };
   return FIELD;
 }
 
@@ -569,6 +597,7 @@ export function forEachCaustic(
     for (let x = Math.max(0, x0); x < Math.min(GROUND_W, x1); x++) {
       const ndv = f.ndv[y * GROUND_W + x];
       if (ndv < 1.12) continue; // keep the shallows calm, foam lives there
+      if (!f.overWater[y * GROUND_W + x]) continue; // never over a sand-coloured block
       if (f.kind[y * GROUND_W + x] === KIND_ROCK) continue;
       const nx = x * cellX;
       const v = vnoise(nx + dx, ny + dy, 11) * 0.65 + vnoise(nx * 1.7 + dx * 1.445, ny * 1.7 + dy * 1.445, 23) * 0.55;
@@ -642,7 +671,9 @@ export function forEachFoam(
     const fy = y / TILE_LN;
     const finger = (vnoise(fx * 0.3 + p * 1.2, fy * 0.3, 55) - 0.5) * 0.014;
     const d = f.ndv[i] - (wl + finger) + (hash2(x, y) - 0.5) * 0.004;
-    if (d >= 0) {
+    // the bubbles stay on water cells; up the sand the wave only leaves its
+    // darker wet sheen (no glyphs on the shore)
+    if (d >= 0 && f.kind[i] === KIND_WATER) {
       if (d < 0.007) {
         // the crest: a soft line of small bubbles, not bold letters
         const h = hash2(x * 1.3, y * 2.6);

@@ -8,6 +8,7 @@ import {
   GROUND_W,
   GROUND_H,
   isWater,
+  isOpenWater,
   STRUCT_ENTS,
   wildSpawns,
   PLAYER_SPAWN,
@@ -139,7 +140,7 @@ import { CraftPrefsSettings } from './CraftFeedback';
 import { LINK } from './link';
 import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
 import { QUEST_ENABLED, GATHER_TARGET, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, type StepId } from './quest/quests';
-import { seaRoute, pathLength, pointAt, type Pt } from './quest/route';
+import { boatReachable, boatRoute, seaRoute, pathLength, pointAt, type Pt } from './quest/route';
 import { QuestPanel, type QuestView } from './quest/QuestPanel';
 import { QuestComplete, RatingSequence, TestTransition } from './quest/TestScreens';
 import { resetPrefs } from './craft/prefs';
@@ -276,7 +277,10 @@ const QUEST_SAIL_SPEED = 9;
 const MARKER_BOAT_LAUNCH = 'quest.boatLaunch'; // sceneMarkers.ts
 const LAND_REACH = 2.5;
 const BOARD_REACH = 3; // tiles from the player to the boat's edge to climb in // tiles from the boat to a shore click that lands
-const BOAT_SCALE = 1.9; // the quest's water vehicle, compared with an ordinary crafted item
+const BOAT_SCALE = 1.9;
+// cinematic walking speeds (tiles/s): a calm stroll, slower than the player's own walk
+const WALK_SPEED_MITCHY = 2.6;
+const WALK_SPEED_PLAYER = 3; // the quest's water vehicle, compared with an ordinary crafted item
 const SEED_CHANCE = 0.15; // a picked flower drops a seed (1-2 in 10)
 
 const WALK_MS = 170;
@@ -457,7 +461,7 @@ type Modal =
   | { t: 'craft'; token: OwnedItem; confirmClose?: boolean }
   | { t: 'houseMenu'; sel: number }
   | { t: 'storage'; slot: number; sel: number; menuOpen: boolean }
-  | { t: 'crop'; slot: number }
+  | { t: 'crop'; slot: number; sel?: number }
   // Universal click-to-interact confirm (see interact.ts) — replaces the old
   // proximity `[F]` dispatch for every collectible/palm/cat/shop/house/
   // laundry/crop/garden-door interaction.
@@ -589,17 +593,18 @@ function Landing({ onStart }: { onStart: () => void }) {
 
       {confirmNewGame && (
         <div className="overlay" onClick={() => setConfirmNewGame(false)}>
-          <div className="panel detail-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="panel-title">Start a new game?</div>
-            <p className="detail-desc">
+          {/* the UI design system's confirm card (src/ui) */}
+          <div className="ds-panel" role="dialog" aria-label="Start a new game?" onClick={(e) => e.stopPropagation()}>
+            <div className="ds-panel-title">Start a new game?</div>
+            <p className="ds-panel-text">
               Your current saved game will be deleted and you will start again from the beginning.
             </p>
-            <div className="landing-confirm-row">
-              <button className="btn btn-secondary" onClick={() => setConfirmNewGame(false)}>
-                Cancel
+            <div className="ds-actions">
+              <button className="ds-action go" onClick={handleStartNewGame}>
+                <span>Start New Game</span>
               </button>
-              <button className="btn btn-primary" onClick={handleStartNewGame}>
-                Start New Game
+              <button className="ds-action" onClick={() => setConfirmNewGame(false)}>
+                <span>Cancel</span>
               </button>
             </div>
           </div>
@@ -1444,9 +1449,12 @@ function Game() {
     // sailing the quest's boat: only open water (landing goes through
     // questLand, which tests the shore spot with `landing`)
     if (ridingRef.current && !landing) {
-      for (let ty = ny; ty < ny + PLAYER_T.hT; ty++) {
-        for (let tx = nx; tx < nx + PLAYER_T.wT; tx++) {
-          if (!isWater(tx, ty)) return true;
+      // the WHOLE boat (centred under the player) stays on open water, never
+      // over the drawn sand
+      const box = sailingBoatBox(nx, ny) ?? { x0: nx, y0: ny, x1: nx + PLAYER_T.wT - 1, y1: ny + PLAYER_T.hT - 1 };
+      for (let ty = box.y0; ty <= box.y1; ty++) {
+        for (let tx = box.x0; tx <= box.x1; tx++) {
+          if (!isOpenWater(tx, ty)) return true;
         }
       }
       return false;
@@ -2370,6 +2378,7 @@ function Game() {
     setModal(null);
     setBubble(null);
     setCinematic('quest');
+    await letterboxIn();
     const hop = mitchyHop();
     await questSay(QL.handoverBefore);
     await hop;
@@ -2399,6 +2408,7 @@ function Game() {
       placed: s.placed,
       mitchyPos: s.mitchyPos,
     };
+    await letterboxOut();
     questDone('mitchy', { snapshot });
     setCinematic(null);
     questBusyRef.current = false;
@@ -2435,20 +2445,24 @@ function Game() {
     if (!owned || !isStep(questRef.current, 'vehicle')) return;
     const { wT, hT } = spriteTiles(owned.sprite, owned.scale, 0);
     const m = getMarkerPosition(MARKER_BOAT_LAUNCH);
-    let at: Pt | null = m.found ? { x: Math.round(m.x! - wT / 2), y: Math.round(m.y! - hT / 2) } : null;
-    if (!at) {
-      // no marker placed yet: the nearest open water to Mitchy
-      console.warn(`[quest] scene marker "${MARKER_BOAT_LAUNCH}" is not placed; using the nearest water`);
-      const c = mitchyPosRef.current ?? playerRef.current;
-      for (let r = 2; r < 30 && !at; r++)
-        for (let dy = -r; dy <= r && !at; dy++)
-          for (let dx = -r; dx <= r && !at; dx++) {
-            const x = Math.round(c.x + dx);
-            const y = Math.round(c.y + dy);
-            if (waterPlacementFits({ x, y, sprite: owned.sprite, scale: owned.scale, rotation: 0 }, entsRef.current, { x, y }, 99))
-              at = { x, y };
-          }
-    }
+    if (!m.found) console.warn(`[quest] scene marker "${MARKER_BOAT_LAUNCH}" is not placed; using the water nearest Mitchy`);
+    const c = m.found ? { x: m.x!, y: m.y! } : (mitchyPosRef.current ?? playerRef.current);
+    // the free spot of open water nearest the marker (or Mitchy), ring by
+    // ring, from which the boat can also sail all the way to the shop island
+    const probe = ownedToPlaced(owned, Math.round(c.x - wT / 2), Math.round(c.y - hT / 2), 0, 'probe');
+    const reach = boatReachable(questShopRoute(probe, false).goal, wT, hT, (x, y) => boatFloats(probe, x, y));
+    let at: Pt | null = null;
+    const x0 = Math.round(c.x - wT / 2);
+    const y0 = Math.round(c.y - hT / 2);
+    for (let r = 0; r <= 80 && !at; r++)
+      for (let dy = -r; dy <= r && !at; dy++)
+        for (let dx = -r; dx <= r && !at; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = x0 + dx;
+          const y = y0 + dy;
+          if (reach(x, y) && waterPlacementFits({ x, y, sprite: owned.sprite, scale: owned.scale, rotation: 0 }, entsRef.current, { x, y }, 999))
+            at = { x, y };
+        }
     if (!at) return;
     const placed = ownedToPlaced(owned, at.x, at.y, 0, `placed-${Date.now()}-boat`);
     setModal(null);
@@ -2513,6 +2527,93 @@ function Game() {
   // Cinematics B and C: board, sail to the shop island, walk up to the shop,
   // Mitchy's line, she heads for the door. Identical for both conditions
   // apart from her (equally long) line.
+  // Every quest cinematic runs between the same letterbox bars as the intro
+  // (sliding in and out); the quest panel and the profile corner hide meanwhile.
+  async function letterboxIn() {
+    setLetterboxOpen(true); // mounted off-screen…
+    setLetterboxVisible(true);
+    await sleep(40);
+    setLetterboxOpen(false); // …then slid in
+    await sleep(LETTERBOX_TRANSITION_MS);
+  }
+  async function letterboxOut() {
+    setLetterboxOpen(true);
+    await sleep(LETTERBOX_TRANSITION_MS);
+    setLetterboxVisible(false);
+    setLetterboxOpen(false);
+  }
+
+  // A jump: a hop arc while moving to `to` (Mitchy / the player)
+  async function mitchyJumpTo(to: Pt) {
+    const from = mitchyPosRef.current ?? to;
+    const dist = Math.hypot(to.x - from.x, to.y - from.y);
+    await Promise.all([mitchyHop(), tweenMitchyTo(to, Math.max(1, dist / (MITCHY_JUMP_MS / 1000)))]);
+  }
+  async function playerJumpTo(to: Pt) {
+    const hop = playerHop();
+    questStepPlayer(Math.round(to.x), Math.round(to.y), 420);
+    await hop;
+  }
+
+  // The boat's tile box when its top-left is at (x, y)
+  function boatBox(b: PlacedItem, x = b.x, y = b.y) {
+    const { wT, hT } = spriteTiles(b.sprite, b.scale, b.rotation);
+    return { x0: Math.round(x), y0: Math.round(y), x1: Math.round(x) + wT - 1, y1: Math.round(y) + hT - 1, wT, hT };
+  }
+  // Is every tile of the boat over open water (never on the drawn sand)?
+  function boatFloats(b: PlacedItem, x: number, y: number) {
+    const bb = boatBox(b, x, y);
+    for (let ty = bb.y0; ty <= bb.y1; ty++)
+      for (let tx = bb.x0; tx <= bb.x1; tx++) if (!isOpenWater(tx, ty)) return false;
+    return true;
+  }
+  // The nearest spot to `near` where the whole boat floats
+  function boatSpotNear(b: PlacedItem, near: Pt): Pt {
+    for (let r = 0; r <= 16; r++)
+      for (let dy = -r; dy <= r; dy++)
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const c = { x: Math.round(near.x) + dx, y: Math.round(near.y) + dy };
+          if (boatFloats(b, c.x, c.y)) return c;
+        }
+    return near;
+  }
+  // The point of the boat's box nearest to `toward` — where someone stands to
+  // step off toward it — as a top-left for a footprint `w`×`h`
+  function boatEdgeToward(b: PlacedItem, toward: Pt, w: number, h: number): Pt {
+    const bb = boatBox(b);
+    const cx = Math.max(bb.x0, Math.min(bb.x1, toward.x));
+    const cy = Math.max(bb.y0, Math.min(bb.y1, toward.y));
+    return { x: Math.round(cx - w / 2), y: Math.round(cy - h / 2) };
+  }
+
+  // The trip from where boat `b` lies to the shop island: the ring around the
+  // home island as the fallback, and wherever possible a route on which every
+  // tile of the boat stays on open water the whole way. The route is for the
+  // boat's centre (so all of it stays off the land); the boat itself is drawn
+  // from its top-left corner, so the path is in top-left spots.
+  function questShopRoute(b: PlacedItem, warn = true) {
+    const shop = entsRef.current.find((e) => e.kind === 'shop');
+    const shopT = shop ? spriteTiles(shop.sprite, shop.scale) : { wT: 8, hT: 6 };
+    const shopAt = shop ? { x: shop.x + shopT.wT / 2, y: shop.y + shopT.hT / 2 } : { x: 105, y: 22 };
+    const pb = boatBox(b);
+    const half = { x: pb.wT / 2, y: pb.hT / 2 };
+    const route = seaRoute({ x: b.x + half.x, y: b.y + half.y }, shopAt, Math.max(half.x, half.y));
+    route.path = route.path.map((pt) => ({ x: pt.x - half.x, y: pt.y - half.y }));
+    route.path[0] = { x: b.x, y: b.y };
+    // the boat stops where all of it floats, right off the shop island's shore
+    const goal = boatSpotNear(b, { x: route.dock.x - half.x, y: route.dock.y - half.y });
+    route.path[route.path.length - 1] = goal;
+    const sure = boatRoute(route.path[0], goal, pb.wT, pb.hT, (x, y) => boatFloats(b, x, y));
+    if (sure) route.path = sure;
+    else if (warn) console.warn('[quest] no all-water route for the boat; sailing the ring', route.path[0], goal);
+    return { ...route, goal };
+  }
+
+  // Cinematics B and C: board, sail to the shop island, Mitchy jumps ashore
+  // first, then the player; Mitchy walks ahead to the shop (on the player's
+  // right) and the player follows; Mitchy's line. Identical for both
+  // conditions apart from her (equally long) line.
   async function questTravel(placed: PlacedItem) {
     if (questBusyRef.current) return;
     questBusyRef.current = true;
@@ -2526,33 +2627,46 @@ function Game() {
       setQuestComplete(null);
     }
     unequip();
+    await letterboxIn();
+    const route = questShopRoute(placed);
     const shop = entsRef.current.find((e) => e.kind === 'shop');
     const shopT = shop ? spriteTiles(shop.sprite, shop.scale) : { wT: 8, hT: 6 };
-    const shopAt = shop ? { x: shop.x + shopT.wT / 2, y: shop.y + shopT.hT / 2 } : { x: 105, y: 22 };
-    const start = { x: placed.x, y: placed.y };
-    const route = seaRoute(start, shopAt);
-    // board: Mitchy and the player step onto the boat
-    const board = { x: Math.round(start.x + 1), y: Math.round(start.y) };
-    await Promise.all([tweenMitchyTo({ x: start.x + 3, y: start.y }, 6), questWalkPlayer(board, 8)]);
+    const cat = entsRef.current.find((e) => e.id === 'cat');
+    const catT = cat ? spriteTiles(cat.sprite, cat.scale) : { wT: 4, hT: 4 };
+    // board: both walk to the boat's edge and jump in, Mitchy first
+    const startB = boatBox(placed);
+    const playerSeat = { x: startB.x0, y: startB.y0 };
+    const mitchySeat = { x: startB.x0 + Math.max(1.5, startB.wT - 1.5), y: startB.y0 };
+    const onShore = { x: Math.round(playerRef.current.x), y: Math.round(playerRef.current.y) };
+    await tweenMitchyTo(boatEdgeToward(placed, mitchyPosRef.current ?? onShore, catT.wT, catT.hT), WALK_SPEED_MITCHY);
+    await mitchyJumpTo(mitchySeat);
+    await questWalkPlayer(boatEdgeToward(placed, onShore, PLAYER_T.wT, PLAYER_T.hT), WALK_SPEED_PLAYER);
+    await playerJumpTo(playerSeat);
     await sleep(300);
     await questSail(placed.id, route.path, QUEST_SAIL_SPEED, true);
-    // disembark and walk up to the shop
+    // disembark: each walks to the boat's edge toward the land and jumps off,
+    // Mitchy first
+    const boatNow = placedItemsRef.current.find((p) => p.id === placed.id) ?? placed;
+    const landM = { x: route.land.x + 2, y: route.land.y };
+    await tweenMitchyTo(boatEdgeToward(boatNow, landM, catT.wT, catT.hT), WALK_SPEED_MITCHY);
+    await mitchyJumpTo(landM);
+    await questWalkPlayer(boatEdgeToward(boatNow, route.land, PLAYER_T.wT, PLAYER_T.hT), WALK_SPEED_PLAYER);
+    await playerJumpTo(route.land);
+    // up to the shop: Mitchy ahead on the right, the player following
     const stand = shop
       ? { x: Math.round(shop.x + shopT.wT / 2) - 3, y: Math.round(shop.y + shopT.hT) + 1 }
       : route.land;
     await Promise.all([
+      tweenMitchyTo({ x: stand.x + 4, y: stand.y }, WALK_SPEED_MITCHY),
       (async () => {
-        await tweenMitchyTo(route.land, 5);
-        await tweenMitchyTo({ x: stand.x + 4, y: stand.y }, 4);
-      })(),
-      (async () => {
-        await questWalkPlayer(route.land, 6);
-        await questWalkPlayer(stand, 5);
+        await sleep(600);
+        await questWalkPlayer(stand, WALK_SPEED_PLAYER);
       })(),
     ]);
     await questSay([q.part === 'q1' ? QL.arrive1 : QL.arrive2]);
     setDialogue(null);
-    if (shop) await tweenMitchyTo({ x: stand.x + 5, y: Math.round(shop.y + shopT.hT) }, 3);
+    if (shop) await tweenMitchyTo({ x: stand.x + 5, y: Math.round(shop.y + shopT.hT) }, WALK_SPEED_MITCHY);
+    await letterboxOut();
     // the boat waits at the shore; from now on the player sails it themselves
     const boat: QuestBoat = { id: placed.id };
     const cur = questRef.current!;
@@ -2589,7 +2703,7 @@ function Game() {
   const ridingRef = useRef(riding);
   ridingRef.current = riding;
   const rideBoat = riding ? placedItems.find((p) => p.id === quest!.boat!.id) ?? null : null;
-  const boatCols = rideBoat ? Math.max(...rideBoat.sprite.map((l) => l.length)) : 0;
+  const rideBoatT = rideBoat ? spriteTiles(rideBoat.sprite, rideBoat.scale, rideBoat.rotation) : { wT: 0, hT: 0 };
 
   // Put back in inventory: the boat leaves the water
   function questStowBoat(id: string) {
@@ -2646,23 +2760,34 @@ function Game() {
     questBusyRef.current = true;
     setPickupMenuId(null);
     setCinematic('quest');
-    // jump into the middle of the boat
+    // jump into the middle of the boat (where it carries the player)
     const to = { x: Math.round(b.x + wT / 2 - PLAYER_T.wT / 2), y: Math.round(b.y + hT / 2 - PLAYER_T.hT / 2) };
-    const hop = playerHop();
-    questStepPlayer(to.x, to.y, 380);
-    await hop;
+    await playerJumpTo(to);
     setQuest({ ...questRef.current!, riding: true, boat: { id } });
     setCinematic(null);
     questBusyRef.current = false;
   }
 
-  // a click on the world while sailing: the shore within reach asks to land
+  // While sailing, the boat sits centred under the player: its tile box for
+  // a player at (px, py)
+  function sailingBoatBox(px: number, py: number) {
+    const b = placedItemsRef.current.find((it) => it.id === questRef.current?.boat?.id);
+    if (!b) return null;
+    const { wT, hT } = spriteTiles(b.sprite, b.scale, b.rotation);
+    const x0 = Math.round(px + PLAYER_T.wT / 2 - wT / 2);
+    const y0 = Math.round(py + PLAYER_T.hT / 2 - hT / 2);
+    return { b, x0, y0, x1: x0 + wT - 1, y1: y0 + hT - 1 };
+  }
+
+  // a click on the world while sailing: the shore (sand included) within
+  // reach of the boat asks to land
   function questShoreClick(clientX: number, clientY: number) {
     const t = screenToTile(clientX, clientY, fieldRef.current, camRef.current);
-    if (!t || isWater(t.x, t.y)) return;
+    if (!t || isOpenWater(t.x, t.y)) return;
     const p = playerRef.current;
-    const dx = Math.max(p.x - t.x, 0, t.x - (p.x + PLAYER_T.wT - 1));
-    const dy = Math.max(p.y - t.y, 0, t.y - (p.y + PLAYER_T.hT - 1));
+    const box = sailingBoatBox(p.x, p.y) ?? { x0: p.x, y0: p.y, x1: p.x + PLAYER_T.wT - 1, y1: p.y + PLAYER_T.hT - 1 };
+    const dx = Math.max(box.x0 - t.x, 0, t.x - box.x1);
+    const dy = Math.max(box.y0 - t.y, 0, t.y - box.y1);
     if (Math.hypot(dx, dy) > LAND_REACH) {
       showToast(QL.landFar);
       return;
@@ -2670,16 +2795,18 @@ function Game() {
     setModal({ t: 'land', x: t.x, y: t.y, sel: 0 });
   }
 
-  // Go ashore at (x, y): the boat stays on the water right where it is
+  // Go ashore at (x, y): the player walks to the boat's edge facing the
+  // shore and jumps off; the boat stays on the water where it is
   async function questLand(x: number, y: number) {
     const q = questRef.current;
     if (!q?.riding || !q.boat) return;
     setModal(null);
-    // the nearest free spot for the player around the clicked shore tile
+    // the nearest free land spot for the player around the clicked tile
     let spot: Pt | null = null;
-    for (let r = 0; r <= 2 && !spot; r++)
+    for (let r = 0; r <= 4 && !spot; r++)
       for (let oy = -r; oy <= r && !spot; oy++)
         for (let ox = -r; ox <= r && !spot; ox++) {
+          if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
           const nx = x + ox - Math.floor(PLAYER_T.wT / 2);
           const ny = y + oy - (PLAYER_T.hT - 1);
           if (!blocked(nx, ny, undefined, true)) spot = { x: nx, y: ny };
@@ -2690,19 +2817,18 @@ function Game() {
     }
     questBusyRef.current = true;
     setCinematic('quest');
-    // the boat stays where the player sat in it
-    const b = placedItemsRef.current.find((p) => p.id === q.boat!.id);
-    if (b) {
-      const { wT, hT } = spriteTiles(b.sprite, b.scale, b.rotation);
-      const p = playerRef.current;
-      const bx = Math.round(p.x + PLAYER_T.wT / 2 - wT / 2);
-      const by = Math.round(p.y + PLAYER_T.hT / 2 - hT / 2);
-      setPlacedItems((ps) => ps.map((it) => (it.id === b.id ? { ...it, x: bx, y: by } : it)));
+    // the boat stays where it carried the player
+    const p = playerRef.current;
+    const box = sailingBoatBox(p.x, p.y);
+    let boat: PlacedItem | null = null;
+    if (box) {
+      boat = { ...box.b, x: box.x0, y: box.y0 };
+      setPlacedItems((ps) => ps.map((it) => (it.id === boat!.id ? boat! : it)));
+      placedItemsRef.current = placedItemsRef.current.map((it) => (it.id === boat!.id ? boat! : it));
     }
-    const hop = playerHop();
-    questStepPlayer(spot.x, spot.y, 380);
-    await hop;
     setQuest({ ...questRef.current!, riding: false });
+    if (boat) await questWalkPlayer(boatEdgeToward(boat, spot, PLAYER_T.wT, PLAYER_T.hT), WALK_SPEED_PLAYER);
+    await playerJumpTo(spot);
     setCinematic(null);
     questBusyRef.current = false;
   }
@@ -2738,8 +2864,10 @@ function Game() {
     setModal(null);
     setBubble(null);
     setCinematic('quest');
+    await letterboxIn();
     await questSay([QL.doneReply]);
     setDialogue(null);
+    await letterboxOut();
     const q = questRef.current!;
     setQuestHidden(true);
     setQuestComplete(questlineOf(q.part)!.done);
@@ -2786,20 +2914,19 @@ function Game() {
     });
   }
 
-  // Continue → the black test-transition screen
+  // Continue → the black test-transition screen (Mitchy and the player are
+  // moved to their second-part spots underneath it)
   function questToTransition() {
     ratingRef.current = null;
-    setQuest({ ...questRef.current!, part: 'transition', step: 0 });
+    const q = questRef.current!;
+    setQuest({ ...q, part: 'transition', step: 0, riding: false });
+    if (q.snapshot) window.setTimeout(() => questPlaceForSecond(q.snapshot!), 300);
   }
 
-  // Begin second part: the controlled starting state of condition 2, right
-  // before crafting the water vehicle (no intro, no early tutorial, no
-  // hand-over), with one crafting token and nothing carried over.
-  function questBeginSecond() {
-    const q = questRef.current;
-    const s = q?.snapshot;
-    if (!q || !s) return;
-    const token: OwnedItem = { ...universalToken(hourSeed), ownedId: `own-${Date.now()}-quest2` };
+  // Condition 2's starting spot: Mitchy where she stood for the hand-over (at
+  // the shore), the player right in front of her. Done as soon as the black
+  // transition screen covers the world, so nothing visibly jumps.
+  function questPlaceForSecond(s: QuestSnapshot) {
     // Mitchy waits where she stood for the hand-over (at the shore), and the
     // player starts right in front of her, ready to craft the boat again
     const cat = STRUCT_ENTS.find((e) => e.id === 'cat')!;
@@ -2820,6 +2947,20 @@ function Game() {
     playerRef.current = start;
     setPlayer(start);
     recentre();
+    mitchyPosRef.current = s.mitchyPos ?? null;
+    setMitchyPos(s.mitchyPos ?? null);
+  }
+
+
+  // Begin second part: the controlled starting state of condition 2, right
+  // before crafting the water vehicle (no intro, no early tutorial, no
+  // hand-over), with one crafting token and nothing carried over.
+  function questBeginSecond() {
+    const q = questRef.current;
+    const s = q?.snapshot;
+    if (!q || !s) return;
+    const token: OwnedItem = { ...universalToken(hourSeed), ownedId: `own-${Date.now()}-quest2` };
+    questPlaceForSecond(s);
     setInv(s.inv);
     setMoney(s.money);
     setStorages(s.storages);
@@ -2880,8 +3021,9 @@ function Game() {
       shopToken: () =>
         setModal({ ...(FRESH_SHOP as Extract<Modal, { t: 'shop' }>), tab: 'buy', confirm: universalToken(hourSeed) }),
       buy: () => buyConfirm(),
+      openModal: (m: Modal) => setModal(m),
       board: () => questBoard(questRef.current?.boat?.id ?? ''),
-      launch: () => questLaunch(),
+      launch: (id?: string) => questLaunch(id ? (bag.find((x) => x.ownedId === id) ?? null) : lastCraftedRef.current),
       land: (x: number, y: number) => questLand(x, y),
       move: (dx: number, dy: number) => tryMove(dx, dy),
       shore: (x: number, y: number) => {
@@ -3221,10 +3363,18 @@ function Game() {
   // The final clamp is per-SLOT and deliberately applied after aggregation:
   // stacking ten -0.5 items would otherwise multiply out to ~0.001x grow time.
   // Capping the total is what makes "place more stuff" stop paying off.
+  // Keyed on the items that have a function only, never a floating vehicle
+  // (it sits on the water, away from the beds): a boat sailing (moved every
+  // frame) must not re-run the crop update below on every frame
+  const affectsBeds = (p: PlacedItem) => !!p.fn && !p.equip?.float;
+  const fnItemsKey = placedItems
+    .filter(affectsBeds)
+    .map((p) => `${p.id}@${p.x},${p.y},${p.scale ?? 1},${p.rotation}`)
+    .join('|');
   const slotEffects = useMemo<SlotEffect[]>(() => {
     const acc = plot.slots.map(() => ({ growMult: 1, toleranceMult: 1, yieldBonus: 0 }));
     for (const p of placedItems) {
-      if (!p.fn) continue;
+      if (!affectsBeds(p) || !p.fn) continue;
       const m = p.fn.modifiers;
       const { wT, hT } = spriteTiles(p.sprite, p.scale, p.rotation);
       for (let i = 0; i < plot.slots.length; i++) {
@@ -3239,7 +3389,7 @@ function Game() {
       toleranceMult: Math.min(8, Math.max(1, e.toleranceMult)),
       yieldBonus: Math.min(5, e.yieldBonus),
     }));
-  }, [placedItems, plot]);
+  }, [fnItemsKey, plot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fxFor = (slot: number): SlotEffect => slotEffects[slot] ?? NO_EFFECT;
 
@@ -3530,6 +3680,19 @@ function Game() {
     setInv((v) => ({ ...v, [item]: v[item] + 1 }));
   }
 
+  function storageActAll(slot: number, entry: StorEntry) {
+    const n = entry.where === 'inv' ? inv[entry.item] : storages[slot][entry.item];
+    if (n <= 0) return;
+    if (entry.where === 'inv') {
+      setInv((v) => ({ ...v, [entry.item]: 0 }));
+      setStorages((ss) => ss.map((st, i) => (i === slot ? { ...st, [entry.item]: st[entry.item] + n } : st)));
+      questDone('store');
+    } else {
+      setStorages((ss) => ss.map((st, i) => (i === slot ? { ...st, [entry.item]: 0 } : st)));
+      setInv((v) => ({ ...v, [entry.item]: v[entry.item] + n }));
+    }
+  }
+
   function storageAct(slot: number, entry: StorEntry) {
     if (entry.where === 'inv') storeItem(slot, entry.item);
     else takeItem(slot, entry.item);
@@ -3688,6 +3851,11 @@ function Game() {
   ): { sel: number; n: number; upd: (sel: number) => Modal; go: (sel: number) => void } | null {
     if (m.t === 'dialog') {
       return { sel: m.sel, n: dialogOptions.length, upd: (s) => ({ ...m, sel: s }), go: confirmDialog };
+    }
+    if (m.t === 'crop') {
+      const c = crops.find((x) => x.slot === m.slot);
+      if (!c) return null;
+      return { sel: m.sel ?? 0, n: cropOptions(c).length, upd: (s) => ({ ...m, sel: s }), go: (s) => cropPick(c, s) };
     }
     if (m.t === 'land') {
       return {
@@ -3945,6 +4113,20 @@ function Game() {
     setModal(null);
   }
 
+  // A plant's choices: its one action (water / harvest / clear), then Return
+  function cropOptions(c: PlantedCrop): string[] {
+    return [c.stage === 'ready' ? 'Harvest' : c.stage === 'failed' ? 'Clear slot' : 'Water', 'Return'];
+  }
+  function cropPick(c: PlantedCrop, i: number) {
+    if (i === 1) return setModal(null);
+    if (c.stage === 'ready') harvestCrop(c.slot);
+    else if (c.stage === 'failed') clearCrop(c.slot);
+    else {
+      waterCrops(c.slot);
+      setModal(null);
+    }
+  }
+
   function clearCrop(slot: number) {
     setCrops((cs) => cs.filter((x) => x.slot !== slot));
     setModal(null);
@@ -4024,8 +4206,7 @@ function Game() {
         } else if (ev.key === 'Enter') {
           ev.preventDefault();
           if (n === 0) return;
-          if (!modal.menuOpen) setModal({ ...modal, sel, menuOpen: true });
-          else storageAct(modal.slot, list[sel]);
+          storageAct(modal.slot, list[sel]);
         }
         return;
       }
@@ -4137,7 +4318,8 @@ function Game() {
   // grid, so it's rescaled below to match PLAYER's on-screen height rather
   // than reusing PLAYER_SCALE as-is — otherwise the character would visibly
   // grow or shrink the instant you start/stop walking.
-  const cycle = walkDir ? WALK_CYCLES[walkDir] : null;
+  // sailing the boat: the player stands still in it, no walk cycle
+  const cycle = walkDir && !(quest?.riding && quest.boat) ? WALK_CYCLES[walkDir] : null;
   const walkAnim = cycle
     ? { frame: cycle.frames[walkFrame], palette: cycle.palette, padTop: cycle.padTop }
     : null;
@@ -4362,7 +4544,7 @@ function Game() {
           </div>
         )}
 
-        <div className="hud-bl">
+        <div className="hud-bl" style={letterboxVisible ? { visibility: 'hidden' } : undefined}>
           <div className="hud-avatar-wrap">
             <button
               className="hud-avatar"
@@ -4662,7 +4844,8 @@ function Game() {
                         : undefined
                     }
                     onClick={
-                      c ? () => setModal({ t: 'interact', ref: { kind: 'crop', slot: i }, sel: 1 }) : undefined
+                      // straight to the plant's own choices (no yes/no confirm first)
+                      c ? () => setModal({ t: 'crop', slot: i, sel: 0 }) : undefined
                     }
                   >
                     {spr.join('\n')}
@@ -5025,8 +5208,10 @@ function Game() {
                   <ColoredSprite
                     className="rig-boat"
                     style={{
-                      left: `${(PLAYER_T.wT * TILE_CH - boatCols * (rideBoat.scale ?? 1)) / 2}ch`,
-                      top: `${PLAYER_T.hT * TILE_LN - rideBoat.sprite.length * (rideBoat.scale ?? 1) * 0.75}em`,
+                      // the same tile box blocked() keeps on open water
+                      // (sailingBoatBox): centred on the player
+                      left: `${(Math.round(PLAYER_T.wT / 2 - rideBoatT.wT / 2)) * TILE_CH}ch`,
+                      top: `${(Math.round(PLAYER_T.hT / 2 - rideBoatT.hT / 2)) * TILE_LN}em`,
                       scale: `${rideBoat.scale ?? 1}`,
                       transformOrigin: '0 0',
                     }}
@@ -5471,15 +5656,13 @@ function Game() {
               slot={modal.slot}
               storage={storages[modal.slot]}
               inv={inv}
+              money={money}
               sel={modal.sel}
-              menuOpen={modal.menuOpen}
-              onSelect={(i, open) =>
-                setModal((m) => (m && m.t === 'storage' ? { ...m, sel: i, menuOpen: open } : m))
-              }
-              onCloseMenu={() =>
-                setModal((m) => (m && m.t === 'storage' ? { ...m, menuOpen: false } : m))
-              }
+              onSelect={(i) => setModal((m) => (m && m.t === 'storage' ? { ...m, sel: i, menuOpen: false } : m))}
               onAct={(entry) => storageAct(modal.slot, entry)}
+              onActAll={(entry) => storageActAll(modal.slot, entry)}
+              onBack={() => setModal({ t: 'houseMenu', sel: modal.slot })}
+              onClose={() => setModal(null)}
             />
           )}
 
@@ -5672,49 +5855,32 @@ function Game() {
               if (!c) return null;
               const st = cropStatus(c, wt, fxFor(c.slot));
               const mins = (ms: number) => Math.max(0, Math.ceil(ms / 60000));
+              const status =
+                c.stage === 'ready'
+                  ? 'Fully grown and ready to harvest!'
+                  : c.stage === 'failed'
+                    ? 'It withered from thirst. Clear the slot to replant.'
+                    : c.dormant
+                      ? 'A freshly planted seed. Water it to make it grow.'
+                      : `${Math.round(st.progress * 100)}% grown, matures in about ${mins(st.msToMature)} min. ` +
+                        (st.thirsty
+                          ? `Thirsty! Water it within ${mins(st.msToFail)} min.`
+                          : `Watered, next in about ${mins(st.msToDue)} min.`);
               return (
-                <div className="panel detail-panel">
-                  <div className="panel-title">{c.name}</div>
-                  <pre className="detail-sprite">{slotSprite(c, wt, fxFor(c.slot)).join('\n')}</pre>
-                  <p className="detail-fact">* {c.care.hint}</p>
-                  <div className="crop-status">
-                    {c.stage === 'ready' ? (
-                      <span className="ok">Fully grown — ready to harvest!</span>
-                    ) : c.stage === 'failed' ? (
-                      <span className="bad">It withered from thirst. Clear the slot to replant.</span>
-                    ) : (
-                      <>
-                        <div>growth: {Math.round(st.progress * 100)}% &#183; matures in ~{mins(st.msToMature)} min</div>
-                        <div className={st.thirsty ? 'bad' : 'ok'}>
-                          {st.thirsty
-                            ? `thirsty! water within ~${mins(st.msToFail)} min or it wilts`
-                            : `watered &#183; next water in ~${mins(st.msToDue)} min`}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <OptList
-                    opts={
-                      c.stage === 'ready'
-                        ? ['Harvest', 'Back']
-                        : c.stage === 'failed'
-                          ? ['Clear slot', 'Back']
-                          : ['Water', 'Back']
-                    }
-                    sel={0}
-                    onSel={() => {}}
-                    onPick={(i) => {
-                      if (i === 1) {
-                        setModal(null);
-                        return;
-                      }
-                      if (c.stage === 'ready') harvestCrop(c.slot);
-                      else if (c.stage === 'failed') clearCrop(c.slot);
-                      else waterCrops(c.slot);
-                    }}
-                  />
-                  <div className="hint">[Esc] close &#183; walk up to each plant to tend it</div>
-                </div>
+                <ChoicePanel
+                  title={c.name}
+                  art={
+                    <div className="ds-portrait-box ds-panel-face">
+                      <FitSprite look={{ sprite: slotSprite(c, wt, fxFor(c.slot)) }} fill={0.8} maxScale={3} />
+                    </div>
+                  }
+                  question={status}
+                  options={cropOptions(c)}
+                  sel={modal.sel ?? 0}
+                  onSel={(i) => setModal({ ...modal, sel: i })}
+                  onPick={(i) => cropPick(c, i)}
+                  hint="[↑/↓] select · [Enter] confirm · [Esc] return"
+                />
               );
             })()}
         </div>
@@ -5871,13 +6037,24 @@ function ShopSheet({
             </div>
             <div className="ds-shop-actions">
               <div className="ds-shop-amount" role="group" aria-label="Amount to sell">
-                <button disabled={!item || n <= 1} onClick={() => onAmount(n - 1)} aria-label="fewer">
+                {/* back from 1 wraps round to everything you have */}
+                <button
+                  disabled={!item || inv[item] <= 1}
+                  onClick={() => item && onAmount(n <= 1 ? inv[item] : n - 1)}
+                  aria-label={n <= 1 ? 'all' : 'fewer'}
+                  title={n <= 1 ? 'All of them' : undefined}
+                >
                   <svg viewBox="0 0 12 14" width="12" height="14" aria-hidden>
                     <path d="M11 1L2 7l9 6z" fill="currentColor" />
                   </svg>
                 </button>
                 <span aria-live="polite">{n}</span>
-                <button disabled={!item || n >= inv[item]} onClick={() => onAmount(n + 1)} aria-label="more">
+                {/* …and forward from everything wraps back to 1 */}
+                <button
+                  disabled={!item || inv[item] <= 1}
+                  onClick={() => item && onAmount(n >= inv[item] ? 1 : n + 1)}
+                  aria-label={n >= (item ? inv[item] : 0) ? 'one' : 'more'}
+                >
                   <svg viewBox="0 0 12 14" width="12" height="14" aria-hidden>
                     <path d="M1 1l9 6-9 6z" fill="currentColor" />
                   </svg>
@@ -6189,161 +6366,81 @@ function useFunFact(item: ItemType | null): string | null {
   return fact;
 }
 
-// Storage modal: the chest's contents on top, the player's inventory below.
-// Items can be moved by keyboard (arrows + enter), by clicking (option
-// popup), or by dragging an inventory item onto the chest grid.
+// Storage (UI design system, like the Inventory): the chest's contents and
+// the player's inventory as two slot grids, the selected item on the right
+// with its move actions. Arrows + Enter move the selection and act.
 function StoragePanel({
   slot,
   storage,
   inv,
+  money,
   sel,
-  menuOpen,
   onSelect,
-  onCloseMenu,
   onAct,
+  onActAll,
+  onBack,
+  onClose,
 }: {
   slot: number;
   storage: Record<ItemType, number>;
   inv: Record<ItemType, number>;
+  money: number;
   sel: number;
-  menuOpen: boolean;
-  onSelect: (i: number, open: boolean) => void;
-  onCloseMenu: () => void;
+  onSelect: (i: number) => void;
   onAct: (entry: StorEntry) => void;
+  onActAll: (entry: StorEntry) => void;
+  onBack: () => void;
+  onClose: () => void;
 }) {
   const list = storageList(storage, inv);
   const effSel = Math.min(sel, Math.max(0, list.length - 1));
-  const storeItems = list.filter((e) => e.where === 'store');
-  const invItems = list.filter((e) => e.where === 'inv');
-
-  const [drag, setDrag] = useState<{
-    item: ItemType;
-    sx: number;
-    sy: number;
-    x: number;
-    y: number;
-    active: boolean;
-  } | null>(null);
-  const dragRef = useRef(drag);
-  dragRef.current = drag;
-  const storeGridRef = useRef<HTMLDivElement>(null);
-  const suppressClick = useRef(false);
-
-  useEffect(() => {
-    if (!drag) return;
-    const move = (e: PointerEvent) => {
-      setDrag((d) => {
-        if (!d) return d;
-        const active = d.active || Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 8;
-        return { ...d, x: e.clientX, y: e.clientY, active };
-      });
-    };
-    const up = (e: PointerEvent) => {
-      const d = dragRef.current;
-      setDrag(null);
-      if (!d || !d.active) return;
-      suppressClick.current = true;
-      window.setTimeout(() => {
-        suppressClick.current = false;
-      }, 150);
-      const r = storeGridRef.current?.getBoundingClientRect();
-      if (
-        r &&
-        e.clientX >= r.left &&
-        e.clientX <= r.right &&
-        e.clientY >= r.top &&
-        e.clientY <= r.bottom
-      ) {
-        onAct({ where: 'inv', item: d.item });
-      }
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    return () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-  }, [drag !== null]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function renderGrid(
-    where: 'store' | 'inv',
-    counts: Record<ItemType, number>,
-    slots: number,
-    offset: number,
-    items: StorEntry[],
-  ) {
-    return (
-      <div
-        className={'inv-grid' + (where === 'store' && drag?.active ? ' drop' : '')}
-        ref={where === 'store' ? storeGridRef : undefined}
-      >
-        {Array.from({ length: slots }, (_, i) => {
-          const entry = items[i];
-          const gi = offset + i;
-          const isSel = entry && list.length > 0 && gi === effSel;
-          return (
-            <div
-              key={i}
-              className={'slot' + (entry ? ' filled' : '') + (isSel ? ' sel' : '')}
-              onPointerDown={
-                entry && where === 'inv'
-                  ? (ev) => setDrag({ item: entry.item, sx: ev.clientX, sy: ev.clientY, x: ev.clientX, y: ev.clientY, active: false })
-                  : undefined
-              }
-              onClick={
-                entry
-                  ? (ev) => {
-                      ev.stopPropagation();
-                      if (suppressClick.current) {
-                        suppressClick.current = false;
-                        return;
-                      }
-                      onSelect(gi, true);
-                    }
-                  : undefined
-              }
-            >
-              {entry && (
-                <>
-                  <pre className="mini">{ITEM_SPRITES[entry.item].join('\n')}</pre>
-                  <span className="count">x{counts[entry.item]}</span>
-                  {isSel && <span className="sel-arrow">&#9656;</span>}
-                  {isSel && menuOpen && (
-                    <div className="pick" onClick={(ev) => ev.stopPropagation()}>
-                      <OptList
-                        opts={[where === 'inv' ? 'Store' : 'Put back to inventory']}
-                        sel={0}
-                        onSel={() => {}}
-                        onPick={() => onAct(entry)}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
+  const entry = list.length ? list[effSel] : null;
+  const toSlot = (e: StorEntry, i: number): Slot => ({
+    key: `${e.where}:${e.item}`,
+    look: { sprite: ITEM_SPRITES[e.item] },
+    count: e.where === 'store' ? storage[e.item] : inv[e.item],
+    label: `${ITEM_INFO[e.item].name}${e.where === 'store' ? ' in storage' : ''}`,
+    ...({ index: i } as object),
+  });
+  const storeSlots = list.map((e, i) => [e, i] as const).filter(([e]) => e.where === 'store');
+  const invSlots = list.map((e, i) => [e, i] as const).filter(([e]) => e.where === 'inv');
+  const pick = (key: string) => {
+    const i = list.findIndex((e) => `${e.where}:${e.item}` === key);
+    if (i >= 0) onSelect(i);
+  };
+  const selKey = entry ? `${entry.where}:${entry.item}` : null;
+  const n = entry ? (entry.where === 'store' ? storage[entry.item] : inv[entry.item]) : 0;
   return (
-    <div className="panel storage-panel" onClick={onCloseMenu}>
-      <div className="panel-title">Storage {slot + 1}</div>
-      <div className="sec-label">storage</div>
-      {renderGrid('store', storage, 8, 0, storeItems)}
-      <div className="sec-label">your inventory</div>
-      {renderGrid('inv', inv, 16, storeItems.length, invItems)}
-      {drag?.active && (
-        <pre className="drag-ghost" style={{ left: drag.x, top: drag.y }}>
-          {ITEM_SPRITES[drag.item].join('\n')}
-        </pre>
-      )}
-      <div className="hint">
-        [&#8593;/&#8595;] select &#183; [Enter] options &#183; drag items into storage &#183; [Esc]
-        back
-      </div>
-    </div>
+    <Sheet label={`Storage ${slot + 1}`} onBack={onBack} onClose={onClose} money={money} footer="[↑/↓] select · [Enter] move one · [Esc] back">
+      <Split>
+        <div className="ds-storage-cols">
+          <div className="ds-sec-label">Storage {slot + 1}</div>
+          <SlotGrid slots={storeSlots.map(([e, i]) => toSlot(e, i))} selected={selKey} onSelect={(s) => pick(s.key)} minSlots={10} />
+          <div className="ds-sec-label">Your inventory</div>
+          <SlotGrid slots={invSlots.map(([e, i]) => toSlot(e, i))} selected={selKey} onSelect={(s) => pick(s.key)} minSlots={10} />
+        </div>
+        {entry ? (
+          <DetailPanel
+            look={{ sprite: ITEM_SPRITES[entry.item] }}
+            title={ITEM_INFO[entry.item].name}
+            stats={[
+              { icon: <IconBag size={18} />, value: inv[entry.item], label: 'in your inventory' },
+              { icon: <IconSprout size={18} />, value: storage[entry.item], label: 'in this storage' },
+            ]}
+            actions={[
+              { label: entry.where === 'inv' ? 'Store one' : 'Take one', onClick: () => onAct(entry), variant: 'go' },
+              ...(n > 1
+                ? [{ label: entry.where === 'inv' ? `Store all (${n})` : `Take all (${n})`, onClick: () => onActAll(entry) }]
+                : []),
+            ]}
+          >
+            <p>{ITEM_INFO[entry.item].desc}</p>
+          </DetailPanel>
+        ) : (
+          <DetailPanel empty="Nothing to store yet. Gather something first." />
+        )}
+      </Split>
+    </Sheet>
   );
 }
 

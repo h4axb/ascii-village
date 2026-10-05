@@ -5,6 +5,7 @@
 // arbitrary (x,y) + rotation + real collision, unlike crop planting.
 
 import {
+  isOpenWater,
   type Ent,
   MAP_W,
   MAP_H,
@@ -121,7 +122,7 @@ export function waterPlacementFits(
   if (candidate.x < 0 || candidate.y < 0 || candidate.x + wT > MAP_W || candidate.y + hT > MAP_H) return false;
   for (let ty = candidate.y; ty < candidate.y + hT; ty++) {
     for (let tx = candidate.x; tx < candidate.x + wT; tx++) {
-      if (!isWater(tx, ty)) return false;
+      if (!isOpenWater(tx, ty)) return false;
     }
   }
   const px1 = player.x + (player.w ?? 1) - 1;

@@ -794,12 +794,14 @@ export default function CraftModal({
                   },
                 },
               ]
-            : [{ label: 'Equip it.', go: () => choose(true) }]),
-          { label: 'Into my inventory.', go: () => choose(false) },
+            : [
+                { label: 'Equip it.', go: () => choose(true) },
+                { label: 'Into my inventory.', go: () => choose(false) },
+              ]),
           ...(feedback && fb && fb.step === 'vote'
             ? [{ label: 'Tune future crafts →', go: () => updFb({ step: 'tuning' }) }]
             : []),
-          ...(adjusted
+          ...(adjusted || launch
             ? []
             : [
                 {

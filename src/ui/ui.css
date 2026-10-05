@@ -2225,3 +2225,50 @@
     opacity: 0;
   }
 }
+
+/* Storage (App.tsx StoragePanel): two slot grids stacked */
+.ds-storage-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ds-storage-cols .ds-grid {
+  max-height: calc(var(--ds-slot) * 0.82 * 2 + var(--ds-gap) + 6px);
+}
+.ds-sec-label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+  margin-top: 4px;
+}
+
+/* Scrollbars inside the design system's panels (shop grids, inventory,
+   chats): thin, the panel's own line colour on a clear track, instead of
+   the browser's white default */
+.ds-sheet,
+.ds-sheet *,
+.ds-panel,
+.ds-panel *,
+.qp-card {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-line-strong) transparent;
+}
+.ds-sheet ::-webkit-scrollbar,
+.ds-panel ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.ds-sheet ::-webkit-scrollbar-track,
+.ds-panel ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ds-sheet ::-webkit-scrollbar-thumb,
+.ds-panel ::-webkit-scrollbar-thumb {
+  background: var(--ds-line);
+  border-radius: 4px;
+}
+.ds-sheet ::-webkit-scrollbar-thumb:hover,
+.ds-panel ::-webkit-scrollbar-thumb:hover {
+  background: var(--ds-line-strong);
+}

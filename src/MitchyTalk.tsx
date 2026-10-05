@@ -5,13 +5,12 @@
 // / mitchyLuck). One luck reading per day: asking again repeats it.
 //
 // The luck reading is a daily saju (saju.ts): the first time, Mitchy asks for
-// the player's birthday. It stays in this browser (per link) and only the
-// worked-out pillars reach the AI. "Rather not say" keeps a general horoscope.
+// the player's birthday. It stays in this browser (shared by every link, so
+// it is asked only once) and only the worked-out pillars reach the AI. "Rather not say" keeps a general horoscope.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as S from './sprites';
 import { mitchyLuck, mitchySmallTalk } from './llm';
 import { MITCHY_NAME } from './introPartB';
-import { linkKey } from './link';
 import { dailySaju } from './saju';
 import { Bubble, ChatMessage, Frame, Sheet, type Speaker } from './ui';
 
@@ -27,8 +26,12 @@ const GREETINGS = [
   'welcome back! wanna chat a little?',
 ];
 
-const LUCK_KEY = linkKey('asciia-mitchy-luck');
-const BIRTH_KEY = linkKey('asciia-birthdate'); // "YYYY-MM-DD", or "none" = rather not say
+// The birthday and today's reading are about the player, not one game: every
+// link shares them, so it is asked only once in this browser
+const LUCK_KEY = 'asciia-mitchy-luck';
+const BIRTH_KEY = 'asciia-birthdate'; // "YYYY-MM-DD", or "none" = rather not say
+// birthdays given before they were shared were kept per link (/1, /2, /3)
+const OLD_BIRTH_KEYS = ['1', '2', '3'].map((l) => `${BIRTH_KEY}-${l}`);
 const ymd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const today = () => ymd(new Date()); // the player's own calendar day
@@ -48,6 +51,13 @@ function write(key: string, v: string | null) {
     // storage blocked: she just asks again next time
   }
 }
+function readBirth(): string | null {
+  const v = read(BIRTH_KEY);
+  if (v) return v;
+  const old = OLD_BIRTH_KEYS.map(read).find((x) => x);
+  if (old) write(BIRTH_KEY, old);
+  return old ?? null;
+}
 // today's reading, if it was made for the same birthday answer
 function storedLuck(birth: string): string | null {
   try {
@@ -60,9 +70,9 @@ function storedLuck(birth: string): string | null {
 const storeLuck = (birth: string, text: string) => write(LUCK_KEY, JSON.stringify({ day: today(), birth, text }));
 
 // Settings → "Forget my birthday"
-export const hasBirthDate = () => !!read(BIRTH_KEY);
+export const hasBirthDate = () => !!readBirth();
 export function forgetBirthDate() {
-  write(BIRTH_KEY, null);
+  for (const k of [BIRTH_KEY, ...OLD_BIRTH_KEYS]) write(k, null);
   write(LUCK_KEY, null);
 }
 
@@ -116,7 +126,7 @@ export function MitchyTalk({
     });
   }
   function luck() {
-    const answer = read(BIRTH_KEY);
+    const answer = readBirth();
     if (answer) return ask(LUCK_Q, () => readStars(answer));
     // first time: she needs the birthday for a real saju reading
     setLines((l) => [

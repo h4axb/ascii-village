@@ -2243,6 +2243,77 @@
   margin-top: 4px;
 }
 
+/* A placed item's small menu, under the item in the world */
+.ds-pick {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  margin-top: 6px;
+}
+.ds-pick .ds-panel {
+  width: auto;
+  min-width: 220px;
+  max-width: none;
+  padding: 14px 16px;
+  white-space: nowrap;
+}
+.ds-pick .ds-panel-title {
+  font-size: 15px;
+}
+.ds-pick .ds-options {
+  padding-left: 0; /* clicked, not arrow-selected */
+}
+.ds-pick .ds-option:hover {
+  border-color: var(--ds-line-strong);
+  background: var(--ds-surface-hi);
+}
+
+/* The shop's Buy side: a heading row, the category tabs, the stock grid */
+.ds-buy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.ds-buy-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.ds-buy-head .ds-sec-label {
+  margin-top: 0;
+}
+/* a row of small tab buttons (pill shaped, like .ds-chip) */
+.ds-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ds-tab {
+  padding: 4px 12px;
+  border: 1px solid var(--ds-line-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ds-text-soft);
+  font: inherit;
+  font-size: 12px;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+.ds-tab:hover {
+  border-color: var(--ds-line);
+  color: var(--ds-text);
+}
+.ds-tab.on {
+  border-color: var(--ds-line-strong);
+  background: var(--ds-surface-hi);
+  color: var(--ds-select);
+}
+
 /* Scrollbars inside the design system's panels (shop grids, inventory,
    chats): thin, the panel's own line colour on a clear track, instead of
    the browser's white default */

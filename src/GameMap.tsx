@@ -19,6 +19,7 @@ import { ColoredSprite, darken } from './ColoredSprite';
 import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, STRUCT_ENTS, PLAYER_T, MITCHY_T, grassKeepOut, footprint } from './world';
 import type { Ent } from './world';
 import { terrainField, GLYPHS, KIND_WATER } from './terrain';
+import { IconClose } from './ui';
 
 export interface MapCharacterEntry {
   id: string;
@@ -337,11 +338,13 @@ export default function GameMap({
 
   return (
     <div className="game-map-overlay" onClick={onClose}>
-      <div className="panel game-map-panel" onClick={(e) => e.stopPropagation()}>
-        <div className="panel-title">Map</div>
-        <button className="panel-close" onClick={onClose} aria-label="close map">
-          &#215;
-        </button>
+      <div className="ds-panel game-map-panel" role="dialog" aria-label="Map" onClick={(e) => e.stopPropagation()}>
+        <div className="game-map-head">
+          <div className="ds-panel-title">Map</div>
+          <button className="ds-iconbtn" onClick={onClose} aria-label="close map">
+            <IconClose />
+          </button>
+        </div>
         <div className="game-map-viewport" ref={vpRef}>
           <div className="game-map-world" ref={worldRef} style={{ width: mapW, height: mapH }}>
             <canvas ref={canvasRef} className="game-map-canvas" />
@@ -397,7 +400,7 @@ export default function GameMap({
             </div>
           </div>
         </div>
-        <div className="hint">[WASD] move the map · [M] or [Esc] to close</div>
+        <div className="ds-panel-hint">[WASD] move the map · [M] or [Esc] to close</div>
       </div>
     </div>
   );

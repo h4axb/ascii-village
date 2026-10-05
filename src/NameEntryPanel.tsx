@@ -1,6 +1,6 @@
 // Small name-entry panel shown once, mid Intro Part B (after Mitchy asks
-// "What's your name?"). Reuses .panel/.btn-* — no isolated hardcoded colours,
-// so it follows any future --ui-* retheme for free.
+// "What's your name?"). A design-system panel (src/ui): the same surface,
+// field and option button as the birthday question in MitchyTalk.
 import { useEffect, useState } from 'react';
 import { AUTO_ADVANCE_MS, DEFAULT_PLAYER_NAME } from './introPartB';
 
@@ -29,8 +29,8 @@ export default function NameEntryPanel({
 
   return (
     <div className="introb-dialogue-wrap">
-      <div className="panel dialog-panel introb-name-entry">
-        <div className="panel-title">What's your name?</div>
+      <div className="ds-panel introb-name-entry" role="dialog" aria-label="What's your name?">
+        <div className="ds-panel-title">What's your name?</div>
         <input
           autoFocus
           disabled={locked}
@@ -43,10 +43,12 @@ export default function NameEntryPanel({
             if (e.key === 'Enter') submit();
           }}
         />
-        <button className="btn btn-primary introb-name-submit" disabled={locked} onClick={submit}>
-          Confirm
-        </button>
-        <div className="hint">
+        <div className="ds-options">
+          <button className="ds-option introb-name-submit" disabled={locked} onClick={submit}>
+            Confirm
+          </button>
+        </div>
+        <div className="ds-panel-hint">
           {locked ? `continuing automatically as "${DEFAULT_PLAYER_NAME}"…` : `leave blank for "${DEFAULT_PLAYER_NAME}"`}
         </div>
       </div>

@@ -1443,7 +1443,9 @@ function Game() {
       // drawn below them. Testing the whole body would stop you a body-height
       // short of the brink instead of at it. 'shop': the same, against its
       // drawn glyphs (S.SHOP_SOLID), so you can walk up to the storefront and
-      // the empty space around it never blocks.
+      // the empty space around it never blocks. 'boulder' (the editor's
+      // stones): the same — feet against the stone's drawn glyphs, so you
+      // walk right up to it and pass behind it.
       // 'cat': Mitchy collides like the player does — feet against feet, so
       // you can pass in front of or behind him (depth sorting draws the
       // right one on top) but never stand on the spot where he stands.
@@ -1453,7 +1455,7 @@ function Game() {
         continue;
       }
       const tbox =
-        e.kind === 'house' || e.kind === 'cliff' || e.kind === 'shop'
+        e.kind === 'house' || e.kind === 'cliff' || e.kind === 'shop' || e.kind === 'boulder'
           ? { x0: pbox.x0, x1: pbox.x1, y0: feetY, y1: feetY }
           : pbox;
       const ox0 = Math.max(tbox.x0, cbox.x0), ox1 = Math.min(tbox.x1, cbox.x1);
@@ -5085,6 +5087,7 @@ function Game() {
                       e.kind === 'bridge' ||
                       e.kind === 'cat' ||
                       e.kind === 'shop' ||
+                      e.kind === 'palm' ||
                       e.kind === 'boulder'
                     }
                     onMouseEnter={

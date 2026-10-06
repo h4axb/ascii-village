@@ -112,6 +112,9 @@ export const SWATCH_GROUPS: { title: string; swatches: [string, string][] }[] = 
     swatches: [
       ['flower.petal', 'flower petals'],
       ['flower.centre', 'flower centre'],
+      ['flower.whitePetal', 'white flower petals'],
+      ['flower.purplePetal', 'purple flower petals'],
+      ['flower.orangePetal', 'orange flower petals'],
       ['grassTuft.tip', 'grass tuft tips'],
       ['grassTuft.base', 'grass tuft base'],
     ],

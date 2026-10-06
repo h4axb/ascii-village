@@ -53,6 +53,9 @@
         "palm.stem": "#7d5c2c",
         "flower.petal": "#d98fa0",
         "flower.centre": "#e8c66f",
+        "flower.whitePetal": "#ece4d2",
+        "flower.purplePetal": "#a98bc0",
+        "flower.orangePetal": "#e39a5c",
         "grassTuft.tip": "#f0f8b4",
         "grassTuft.base": "#a9c25a"
       }

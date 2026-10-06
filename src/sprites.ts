@@ -408,6 +408,11 @@ export const FLOWER_PLUS_COLORS = [
 // colours: the theme's flower.petal (a) and flower.centre (b) — see
 // themeSprites() below
 export const FLOWER_PLUS_PALETTE: Record<string, string> = {};
+// the same flower in other colours (editor assets): the theme's
+// flower.whitePetal / purplePetal / orangePetal, same centre
+export const FLOWER_PLUS_WHITE_PALETTE: Record<string, string> = {};
+export const FLOWER_PLUS_PURPLE_PALETTE: Record<string, string> = {};
+export const FLOWER_PLUS_ORANGE_PALETTE: Record<string, string> = {};
 
 // ---------------------------------------------------------------------------
 // GRASS HALM — a pair of grass blades, each drawn as a diagonal run of leaf
@@ -804,6 +809,14 @@ function themeSprites() {
   for (const [k, sw] of Object.entries(PALM_SWATCH)) if (k in PALM_PALETTE) PALM_PALETTE[k] = themeColor(sw);
   FLOWER_PLUS_PALETTE.a = themeColor('flower.petal');
   FLOWER_PLUS_PALETTE.b = themeColor('flower.centre');
+  for (const [pal, petal] of [
+    [FLOWER_PLUS_WHITE_PALETTE, 'flower.whitePetal'],
+    [FLOWER_PLUS_PURPLE_PALETTE, 'flower.purplePetal'],
+    [FLOWER_PLUS_ORANGE_PALETTE, 'flower.orangePetal'],
+  ] as const) {
+    pal.a = themeColor(petal);
+    pal.b = themeColor('flower.centre');
+  }
   for (const [k, lvl] of Object.entries(GRASS_HALM_LEVEL)) GRASS_HALM_PALETTE[k] = themeMix('grassTuft.tip', 'grassTuft.base', lvl / 6);
 }
 themeSprites();

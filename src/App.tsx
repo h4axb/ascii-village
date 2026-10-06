@@ -5067,7 +5067,12 @@ function Game() {
                     // background to begin with — this just stops terrain
                     // showing through its own glyph gaps, same principle.
                     solidCells={
-                      e.kind === 'house' || e.kind === 'bridge' || e.kind === 'cat' || e.kind === 'shop' || e.kind === 'palm'
+                      e.kind === 'house' ||
+                      e.kind === 'bridge' ||
+                      e.kind === 'cat' ||
+                      e.kind === 'shop' ||
+                      e.kind === 'palm' ||
+                      e.kind === 'boulder'
                     }
                     onMouseEnter={
                       canInteract(e) ? () => setHovered({ kind: 'entity', id: e.id }) : undefined

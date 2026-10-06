@@ -52,6 +52,7 @@ export type EditorTab = 'objects' | 'assets' | 'markers' | 'colliders' | 'intro'
 // behaviour tied to their own art, so they aren't offered.)
 export const PLACEABLE_KINDS: { kind: EntityKind; label: string }[] = [
   { kind: 'decor', label: 'decor — just drawn' },
+  { kind: 'boulder', label: 'boulder — drawn solid (rocks)' },
   { kind: 'grasshalm', label: 'ground — drawn under everything' },
   { kind: 'cliff', label: 'landscape — drawn under everything, even ground' },
   { kind: 'bridge', label: 'bridge — drawn over water' },

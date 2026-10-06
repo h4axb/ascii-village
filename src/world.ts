@@ -50,6 +50,10 @@ export type EntityKind =
   // A new asset placed with the world editor that hasn't been given a kind
   // of its own (see src/assets.ts): drawn in its own colours, no behaviour.
   | 'decor'
+  // A big rock placed with the world editor (the stone sheet): drawn like
+  // decor but with an opaque backing per cell, so it reads as solid stone
+  // instead of glyphs floating over the grass.
+  | 'boulder'
   | 'placed'; // a player-placed decoration/furniture entity (see placement.ts)
 
 // ---------------------------------------------------------------------------

@@ -2,13 +2,51 @@
 + project: 
 + ui/ux focus: test how the ui affects players user experience + does a design decrease the frustration
 
+## Dealine
++ Game
+Playtesting: 12.10.2026-15.11.2026
+Auswertung: 16.11.-20.11.2026
+Umsetzung: 23.11.-30.11.2026
+
++ Abgaben
+Geplante Portfolio-Bestandteile:
+– Spielbarer Web-Prototyp (Deployment auf Cloudflare)
+– GitHub-Repository mit vollständiger Versionshistorie
+– LLM-basierter ASCII-Sprite-Generator
+* – UI-Komponentenbibliothek des Spiels 
+* – Lo-Fi- und Hi-Fi-Wireframes inklusive der finalen Screens der Crafting-Flows in zwei
+Varianten
+* – Style Guide für das ASCII-Interface
+– Auswertung und Dokumentation des Nutzertests
+* – 1–2-minütiges Gameplay-Video inklusive Spielsimulation
+* – 5–7 Making-of-Fotos aus dem Designprozess und den Test-Sessions
+* – Textbasierte Dokumentation des Gesamtprojekts
+
+Kolloqium
+
+Portfolio (End Nov-Dez)
+
+30% final polished UI
+40% process / iterations / flows
+20% research / testing evidence
+10% technical/system context
+
+Personas?
+– BA Case Study
+– Portfolio Site
+– TG3 Case Study
+– CV + Letter
+
+
 ## Link
 regular: https://asciia-bay-2.app-testing.workers.dev/
 no intro: https://asciia-bay-2.app-testing.workers.dev/0
 always intro: https://asciia-bay-2.app-testing.workers.dev/intro
 
-crafting panel 1: https://asciia-bay-2.app-testing.workers.dev/1
-crafting panel 1 + intro: https://asciia-bay-2.app-testing.workers.dev/intro/1
+crafting panel A (clarfication)/B (post-reflec): https://asciia-bay-2.app-testing.workers.dev/1
+crafting panel AB + intro: https://asciia-bay-2.app-testing.workers.dev/intro/1
+crafting panel B (post-reflec)/ A (clarfication)
+crafting panel BA + intro: https://asciia-bay-2.app-testing.workers.dev/intro/2
 
 ## Project structure
 + rendering: vite, water+static assets on canvas

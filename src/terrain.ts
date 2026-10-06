@@ -79,35 +79,35 @@ type RGB = [number, number, number];
 const hex = (h: string): RGB => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
 // ---- palette (all tunables in one place) ----------------------------------
-// One muted, sun-washed scene palette (sampled from the art-direction
-// reference): grey-olive ground, mustard glyph texture on the foliage, warm
-// cream sand, desaturated teal water with cream dot glyphs.
+// Sampled from the reference close-up: dark olive ground, yellow-olive glyph
+// texture on the foliage, cream sand; the water is a muted, desaturated teal
+// (grey-green shallows) with cream dot glyphs.
 
 export const TERRAIN_PALETTE = {
-  grass: hex('#5a654a'),
-  grassLight: hex('#636b4c'),
-  grassDark: hex('#515a42'),
-  rimGrass: hex('#4c5440'), // ground darkening toward the bushes
-  bushDark: hex('#363e2c'),
-  bushMid: hex('#58613f'),
-  bushLight: hex('#626846'),
-  foliageGlyph: hex('#b8a663'), // the yellow-olive x o * ¤ texture on bushes
-  foliageGlyphDark: hex('#808150'),
-  fringeGlyph: hex('#cdb979'), // yellow toward the sand edge of the rim
-  sandGlyph: hex('#c09c62'), // warm grain on the sand
-  sand: hex('#ecca94'),
-  sandOuter: hex('#efd7a8'),
-  wetSand: hex('#d2d1b3'),
+  grass: hex('#56643c'),
+  grassLight: hex('#617043'),
+  grassDark: hex('#4c5935'),
+  rimGrass: hex('#46542f'), // ground darkening toward the bushes
+  bushDark: hex('#2f3c24'),
+  bushMid: hex('#55663a'),
+  bushLight: hex('#5d6b39'),
+  foliageGlyph: hex('#c4b058'), // the yellow-olive x o * ¤ texture on bushes
+  foliageGlyphDark: hex('#8a8f44'),
+  fringeGlyph: hex('#dcc26c'), // yellow toward the sand edge of the rim
+  sandGlyph: hex('#c49a52'), // warm grain on the sand
+  sand: hex('#eac48c'),
+  sandOuter: hex('#efd8a8'),
+  wetSand: hex('#e9e0c0'),
   shallow1: hex('#a9b9a2'),
   shallow2: hex('#80a39b'),
   water: hex('#64939a'),
   deep: hex('#578691'),
   deepest: hex('#4d7a87'),
   waterGlyph: hex('#d6e2d6'),
-  rock: hex('#8e948a'),
-  rockDark: hex('#6e7770'),
-  rockGlyph: hex('#dcddcf'),
-  grassGlyph: hex('#9aa36a'), // light-green grass texture
+  rock: hex('#8d9896'),
+  rockDark: hex('#6d7c7e'),
+  rockGlyph: hex('#dfe4dc'),
+  grassGlyph: hex('#a6ba68'), // light-green grass texture
   stone: hex('#8e8f80'),
   stoneLight: hex('#b3b3a2'),
 };

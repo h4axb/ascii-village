@@ -30,12 +30,12 @@ const CURTAINLIT = ['g', 'h', 'i'];
 
 // key -> hex, lifted from the reference stylesheet's :root block
 export const PALETTE = {
-  a: '#d9c88a', b: '#b3a465', c: '#7d7448', // crown fronds, lit -> shadow (mustard, the scene palette)
-  d: '#97704a', e: '#6f5136', f: '#4f3a28', // dead-frond curtain, shadow band
-  g: '#c9a06a', h: '#b08455', i: '#8a6340', // dead-frond curtain, sunlit band
-  j: '#d4c39a', k: '#b09b74', l: '#857152', // trunk, lit -> shade
-  m: '#c9a650', n: '#e0cf8e', // dates, and their lit faces
-  p: '#cdb468', // bunch stems
+  a: '#a8b894', b: '#7a8f6a', c: '#4f6247', // crown fronds, lit -> shadow
+  d: '#a86a38', e: '#7d4a26', f: '#5a3419', // dead-frond curtain, shadow band
+  g: '#e0a05a', h: '#c9803c', i: '#9a5f2a', // dead-frond curtain, sunlit band
+  j: '#d9c08f', k: '#b89a68', l: '#8a7048', // trunk, lit -> shade
+  m: '#f5b731', n: '#ffe07a', // dates, and their lit faces
+  p: '#e8c451', // bunch stems
 };
 
 

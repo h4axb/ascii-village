@@ -40,7 +40,7 @@ The other links are unchanged.
 All in `src/quest/quests.ts`:
 - **Texts:** objectives, Mitchy's lines, the transition text.
 - **`RATING_QUESTIONS`:** placeholder wording. Keep the `id`s stable once testing starts. Both conditions always get the same questions on the same 1-5 scale.
-- **`FINAL_SURVEY_URL`:** empty until the survey link is pasted in.
+- **`FINAL_SURVEY_URL`:** the Tally survey (`https://tally.so/r/7R8900`), opened with `?order=…&test_id=…`.
 
 ## How it is built
 

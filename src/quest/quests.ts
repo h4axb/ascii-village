@@ -26,8 +26,9 @@ export const ORDERS: Partial<Record<string, [Cond, Cond]>> = {
 export const QUEST_ORDER: [Cond, Cond] | null = ORDERS[LINK] ?? null;
 export const QUEST_ENABLED = QUEST_ORDER !== null;
 
-// The external survey opened at the very end. Paste the link here.
-export const FINAL_SURVEY_URL = '';
+// The external survey opened at the very end (Tally), with ?order=…&test_id=…
+// added for the run (quest/session.ts surveyUrl)
+export const FINAL_SURVEY_URL = 'https://tally.so/r/7R8900';
 
 export type StepId =
   | 'controls'

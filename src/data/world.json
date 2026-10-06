@@ -402,6 +402,27 @@
       "x": 31,
       "y": 76,
       "scale": 0.35
+    },
+    {
+      "id": "stone-4-1",
+      "asset": "stone-4",
+      "x": 26,
+      "y": 30,
+      "scale": 0.26
+    },
+    {
+      "id": "stone-3-1",
+      "asset": "stone-3",
+      "x": 17,
+      "y": 29,
+      "scale": 0.26
+    },
+    {
+      "id": "stone-5-1",
+      "asset": "stone-5",
+      "x": 27,
+      "y": 40,
+      "scale": 0.26
     }
   ],
   "colliders": {

@@ -83,9 +83,11 @@ export function locksOf(id: string): Locks {
 }
 
 // Objects the editor lists and can select: not the house's invisible
-// hotspots and stair blockers, which follow the house.
+// hotspots and stair blockers, which follow the house, and not Mitchy — the
+// editor changes the world, never the characters (she stays where the game
+// has her; see App.tsx's ents).
 export function isEditable(e: Ent): boolean {
-  return e.kind !== 'hotspot' && e.kind !== 'blocker';
+  return e.kind !== 'hotspot' && e.kind !== 'blocker' && e.kind !== 'cat';
 }
 
 export interface EditorStatus {

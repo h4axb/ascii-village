@@ -1133,9 +1133,9 @@ function Game() {
         // Mitchy's live position (Intro Part B's entrance/exit tweens, then
         // his post-cinematic resting spot) overrides his saved spot — see
         // mitchyPos's own comment above for why null means "leave him where
-        // he was". Not while the editor is open: there he stands where the
-        // saved layout puts him, which is what you'd be moving.
-        e.id === 'cat' && mitchyPos && !editorOpen ? { ...e, x: mitchyPos.x, y: mitchyPos.y } : e,
+        // he was". The world editor leaves him there too: it changes the
+        // world, never the characters.
+        e.id === 'cat' && mitchyPos ? { ...e, x: mitchyPos.x, y: mitchyPos.y } : e,
       ),
       // wild spawns skip the garden footprint so nothing sprouts inside the
       // fence — measured against where the bed actually is, so a dragged plot
@@ -1150,7 +1150,7 @@ function Game() {
       // (the quest's boat travels under the player while it is sailed)
       ...placedItems.filter((p) => p.id !== sailingBoatId).map(placedToEnt),
     ],
-    [growthWindow, removed, dynamicEnts, structEnts, placedItems, plot, mitchyPos, editorOpen, sailingBoatId],
+    [growthWindow, removed, dynamicEnts, structEnts, placedItems, plot, mitchyPos, sailingBoatId],
   );
 
   // House-sprite recolor for the wardrobe swap (interact.ts's 'outfit' act +
@@ -5085,7 +5085,6 @@ function Game() {
                       e.kind === 'bridge' ||
                       e.kind === 'cat' ||
                       e.kind === 'shop' ||
-                      e.kind === 'palm' ||
                       e.kind === 'boulder'
                     }
                     onMouseEnter={

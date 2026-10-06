@@ -1,6 +1,8 @@
 + repository: git/ascii-village
 + project: 
 + ui/ux focus: test how the ui affects players user experience + does a design decrease the frustration
++ survey platform: tally (https://tally.so/r/7R8900); every run saves players id tag & design variant
++ usertesting methods: Likerts scale, direct comparative preference, UEQ-S
 
 ## Dealine
 + Game
@@ -38,7 +40,7 @@ Personas?
 – CV + Letter
 
 
-## Link
+## Prototype Links
 regular: https://asciia-bay-2.app-testing.workers.dev/
 no intro: https://asciia-bay-2.app-testing.workers.dev/0
 always intro: https://asciia-bay-2.app-testing.workers.dev/intro
@@ -47,6 +49,7 @@ crafting panel A (clarfication)/B (post-reflec): https://asciia-bay-2.app-testin
 crafting panel AB + intro: https://asciia-bay-2.app-testing.workers.dev/intro/1
 crafting panel B (post-reflec)/ A (clarfication)
 crafting panel BA + intro: https://asciia-bay-2.app-testing.workers.dev/intro/2
+crafting panel alternatives: 
 
 ## Project structure
 + rendering: vite, water+static assets on canvas

@@ -405,8 +405,8 @@ export const FLOWER_PLUS_COLORS = [
   '..aa..',
 ];
 export const FLOWER_PLUS_PALETTE: Record<string, string> = {
-  a: '#F47F9D', // petals, pink
-  b: '#FFD166', // centre '@', yellow
+  a: '#D88E8E', // petals, dusty pink
+  b: '#E2C27A', // centre '@', soft gold
 };
 
 // ---------------------------------------------------------------------------
@@ -434,16 +434,16 @@ export const GRASS_HALM_COLORS = [
   '.....rs..tu...v..',
 ];
 
-// Light, slightly yellow greens from the ground's own grass-glyph family
-// (terrain.ts grassGlyph #a6ba68), tips brightest, so the tufts stand out
-// on the olive ground instead of fading into it.
+// Light olive-creams from the ground's own grass-glyph family (terrain.ts
+// grassGlyph), tips brightest, so the tufts stand out on the olive ground
+// instead of fading into it.
 export const GRASS_HALM_PALETTE: Record<string, string> = {
-  a: '#f0f8b4', b: '#e6f2a2', c: '#f0f8b4', d: '#e6f2a2',
-  e: '#dbeb92', f: '#e6f2a2', g: '#dbeb92', h: '#cfe182',
-  i: '#dbeb92', j: '#cfe182', k: '#cfe182', l: '#c3d874',
-  m: '#cfe182', n: '#c3d874', o: '#c3d874', p: '#b6cd66',
-  q: '#c3d874', r: '#b6cd66', s: '#b6cd66', t: '#a9c25a',
-  u: '#b6cd66', v: '#a9c25a',
+  a: '#d8d6a9', b: '#cfcf9d', c: '#d8d6a9', d: '#cfcf9d',
+  e: '#c4c592', f: '#cfcf9d', g: '#c4c592', h: '#b8ba85',
+  i: '#c4c592', j: '#b8ba85', k: '#b8ba85', l: '#adb07b',
+  m: '#b8ba85', n: '#adb07b', o: '#adb07b', p: '#a1a56f',
+  q: '#adb07b', r: '#a1a56f', s: '#a1a56f', t: '#959a65',
+  u: '#a1a56f', v: '#959a65',
 };
 
 // ---------------------------------------------------------------------------

@@ -294,7 +294,7 @@ export default function TerrainCanvas(props: Props) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       if ((x1 - x0) * (y1 - y0) <= MAX_CAUSTIC_CELLS) {
-        ctx.fillStyle = '#e8f7f1';
+        ctx.fillStyle = '#e3e6d6';
         forEachCaustic(s.tick, x0, y0, x1, y1, (x, y, tier, g) => {
           ctx.globalAlpha = CAUSTIC_ALPHA[tier];
           ctx.fillText(g, (x + 0.5) * charW, (y + 0.5) * lineH);
@@ -308,7 +308,7 @@ export default function TerrainCanvas(props: Props) {
           ctx.fillText(y % 2 ? ',' : '.', (x + 0.5) * charW, (y + 0.5) * lineH);
         } else {
           ctx.globalAlpha = a;
-          ctx.fillStyle = '#eef4ea';
+          ctx.fillStyle = '#ebe6d2';
           ctx.fillText(g, (x + 0.5) * charW, (y + 0.5) * lineH);
         }
       });

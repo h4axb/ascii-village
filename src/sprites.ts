@@ -13,6 +13,7 @@ import shopData from './data/shop.json';
 import gardenBedData from './data/gardenBed.json';
 import cliffData from './data/cliff.json';
 import pondData from './data/pond-a.json';
+import { onThemeChange, themeColor, themeMix } from './theme';
 import type { PalmAnim } from './palmAnim';
 import type { PondAnim } from './pondAnim';
 
@@ -404,10 +405,9 @@ export const FLOWER_PLUS_COLORS = [
   'aabbaa',
   '..aa..',
 ];
-export const FLOWER_PLUS_PALETTE: Record<string, string> = {
-  a: '#F47F9D', // petals, pink
-  b: '#FFD166', // centre '@', yellow
-};
+// colours: the theme's flower.petal (a) and flower.centre (b) — see
+// themeSprites() below
+export const FLOWER_PLUS_PALETTE: Record<string, string> = {};
 
 // ---------------------------------------------------------------------------
 // GRASS HALM — a pair of grass blades, each drawn as a diagonal run of leaf
@@ -434,17 +434,15 @@ export const GRASS_HALM_COLORS = [
   '.....rs..tu...v..',
 ];
 
-// Light, slightly yellow greens from the ground's own grass-glyph family
-// (terrain.ts grassGlyph #a6ba68), tips brightest, so the tufts stand out
-// on the olive ground instead of fading into it.
-export const GRASS_HALM_PALETTE: Record<string, string> = {
-  a: '#f0f8b4', b: '#e6f2a2', c: '#f0f8b4', d: '#e6f2a2',
-  e: '#dbeb92', f: '#e6f2a2', g: '#dbeb92', h: '#cfe182',
-  i: '#dbeb92', j: '#cfe182', k: '#cfe182', l: '#c3d874',
-  m: '#cfe182', n: '#c3d874', o: '#c3d874', p: '#b6cd66',
-  q: '#c3d874', r: '#b6cd66', s: '#b6cd66', t: '#a9c25a',
-  u: '#b6cd66', v: '#a9c25a',
+// Light, slightly yellow greens, tips brightest, so the tufts stand out on
+// the olive ground instead of fading into it.
+// how far each key sits from the tip (0) to the base (6) of the blade;
+// the colours run between the theme's grassTuft.tip and grassTuft.base
+const GRASS_HALM_LEVEL: Record<string, number> = {
+  a: 0, b: 1, c: 0, d: 1, e: 2, f: 1, g: 2, h: 3, i: 2, j: 3, k: 3,
+  l: 4, m: 3, n: 4, o: 4, p: 5, q: 4, r: 5, s: 5, t: 6, u: 5, v: 6,
 };
+export const GRASS_HALM_PALETTE: Record<string, string> = {};
 
 // ---------------------------------------------------------------------------
 // GLYPH STYLE — depth from a DENSITY RAMP, not from more outline.
@@ -783,3 +781,30 @@ export function makeBubble(text: string, width = 26): string {
 export const MITCHY_LOOK = { sprite: MITCHY, colors: MITCHY_COLORS, palette: MITCHY_PALETTE };
 export const MITCHY_FACE_LOOK = { sprite: MITCHY_FACE, colors: MITCHY_FACE_COLORS, palette: MITCHY_PALETTE };
 export const MITCHY_HAPPY_LOOK = { sprite: MITCHY_HAPPY.sprite, colors: MITCHY_HAPPY.colors, palette: MITCHY_BLINK_PALETTE };
+
+// ---------------------------------------------------------------------------
+// THEMED NATURE COLOURS — the palm (and its dates), the collectable flower and
+// the grass tuft take their colours from the environment theme (src/theme.ts),
+// filled into the palette objects above and refilled in place whenever the
+// world editor's Theme tab changes the theme. (palm.json keeps the generator's
+// own colours; these override them.)
+const PALM_SWATCH: Record<string, string> = {
+  a: 'palm.frondLit',
+  b: 'palm.frond',
+  d: 'palm.curtain',
+  g: 'palm.curtainLit',
+  j: 'palm.trunkLit',
+  k: 'palm.trunk',
+  l: 'palm.trunkShade',
+  m: 'palm.date',
+  n: 'palm.dateLit',
+  p: 'palm.stem',
+};
+function themeSprites() {
+  for (const [k, sw] of Object.entries(PALM_SWATCH)) if (k in PALM_PALETTE) PALM_PALETTE[k] = themeColor(sw);
+  FLOWER_PLUS_PALETTE.a = themeColor('flower.petal');
+  FLOWER_PLUS_PALETTE.b = themeColor('flower.centre');
+  for (const [k, lvl] of Object.entries(GRASS_HALM_LEVEL)) GRASS_HALM_PALETTE[k] = themeMix('grassTuft.tip', 'grassTuft.base', lvl / 6);
+}
+themeSprites();
+onThemeChange(themeSprites);

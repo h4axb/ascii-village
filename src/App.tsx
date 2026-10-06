@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import * as S from './sprites';
 import {
   TILE_CH,
@@ -73,6 +73,7 @@ import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
 import startMeadowUrl from './assets/start-meadow.webp';
+import { onThemeChange, themeRevision } from './theme';
 import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, IconClose, type Slot, type Action } from './ui';
 import { useIntroNarrationTool } from './devIntroNarration';
 import { getMarkerPosition } from './sceneMarkers';
@@ -1072,6 +1073,19 @@ function Game() {
 
   // dev-only: the world editor (press E; see src/editor/ and docs/Editor.md).
   // In a production build this is a stub whose structEnts is STRUCT_ENTS.
+  // The environment theme (src/theme.ts): bumped live by the editor's Theme
+  // tab. Sprites take a fresh copy of their (refilled) palette per revision —
+  // ColoredSprite only redraws when the palette object changes — and the
+  // terrain repaints.
+  const themeRev = useSyncExternalStore(onThemeChange, themeRevision);
+  const themedPalettes = useMemo(() => new WeakMap<Record<string, string>, Record<string, string>>(), [themeRev]); // eslint-disable-line react-hooks/exhaustive-deps
+  const themedPalette = (p: Record<string, string> | undefined) => {
+    if (!p || themeRev === 0) return p;
+    let c = themedPalettes.get(p);
+    if (!c) themedPalettes.set(p, (c = { ...p }));
+    return c;
+  };
+
   const editor = useWorldEditor({
     fieldRef,
     camRef,
@@ -4773,7 +4787,7 @@ function Game() {
                 }}
               >
               <TerrainCanvas
-                structKey={editor.structKey}
+                structKey={editor.structKey * 100000 + themeRev}
                 camX={camX}
                 camY={camY}
                 viewW={viewW}
@@ -5046,7 +5060,7 @@ function Game() {
                             ? houseRecolored.colors
                             : e.colors
                     }
-                    palette={e.kind === 'house' && houseRecolored ? houseRecolored.palette : e.palette}
+                    palette={e.kind === 'house' && houseRecolored ? houseRecolored.palette : themedPalette(e.palette)}
                     // the flower's '█' petals are ambiguous-width — pin each
                     // to one cell, same fix as the waterfall tile's glyphs.
                     // The house and the cliff use the same density-ramp glyphs

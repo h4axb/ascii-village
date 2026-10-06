@@ -23,6 +23,7 @@ import {
   CAUSTIC_ALPHA,
   SHORE_PHASES,
 } from './terrain';
+import { themeColor } from './theme';
 
 const TW = 64; // tile width, chars
 const TH = 32; // tile height, lines
@@ -294,7 +295,7 @@ export default function TerrainCanvas(props: Props) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       if ((x1 - x0) * (y1 - y0) <= MAX_CAUSTIC_CELLS) {
-        ctx.fillStyle = '#e3e6d6';
+        ctx.fillStyle = themeColor('water.sparkle');
         forEachCaustic(s.tick, x0, y0, x1, y1, (x, y, tier, g) => {
           ctx.globalAlpha = CAUSTIC_ALPHA[tier];
           ctx.fillText(g, (x + 0.5) * charW, (y + 0.5) * lineH);
@@ -304,11 +305,11 @@ export default function TerrainCanvas(props: Props) {
       forEachFoam(phase, x0, y0, x1, y1, (x, y, g, a, wet) => {
         if (wet > 0) {
           ctx.globalAlpha = Math.min(1, wet * 4);
-          ctx.fillStyle = '#9c8c62';
+          ctx.fillStyle = themeColor('sand.wetGrain');
           ctx.fillText(y % 2 ? ',' : '.', (x + 0.5) * charW, (y + 0.5) * lineH);
         } else {
           ctx.globalAlpha = a;
-          ctx.fillStyle = '#ebe6d2';
+          ctx.fillStyle = themeColor('water.foam');
           ctx.fillText(g, (x + 0.5) * charW, (y + 0.5) * lineH);
         }
       });

@@ -3347,7 +3347,7 @@ pre {
   border: 1px solid var(--ds-line);
   border-radius: var(--ds-radius-sm);
   overflow: hidden;
-  background: #45707c;
+  background: #45707c; /* overridden inline: the theme's water.mapBackdrop */
 }
 
 .game-map-world {
@@ -4163,6 +4163,50 @@ pre {
   font-weight: 600;
   margin-bottom: 4px;
 }
+/* the Theme tab (src/editor/ThemeTab.tsx) */
+.wed-theme summary.wed-group-name {
+  cursor: pointer;
+}
+.wed-theme-reset {
+  margin-left: 8px;
+  font-weight: 400;
+}
+.wed-theme-slider,
+.wed-theme-swatch {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;
+}
+.wed-theme-slider {
+  grid-template-columns: 80px 1fr 40px;
+}
+.wed-theme-slider input[type='range'] {
+  padding: 0;
+}
+.wed-theme-swatch {
+  grid-template-columns: 30px 1fr 16px 70px;
+}
+.wed-panel .wed-theme input[type='color'] {
+  width: 30px;
+  height: 18px;
+  padding: 0 1px;
+  cursor: pointer;
+}
+.wed-theme-chip {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid #3d4350;
+}
+.wed-theme-hex {
+  font-family: monospace;
+}
+.wed-theme-foot {
+  margin-top: 8px;
+  align-items: center;
+}
+
 .wed-marker-group {
   margin: 2px 0 6px 6px;
 }

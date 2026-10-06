@@ -136,6 +136,44 @@ function introNarrationSavePlugin(): Plugin {
   };
 }
 
+// Dev-only save endpoint for the world editor's Theme tab: writes
+// src/data/theme.json (the environment colours, the grade and the presets,
+// see src/theme.ts). Not hot-reloaded on write, so the editing session stays.
+function themeSavePlugin(): Plugin {
+  const filePath = path.resolve(__dirname, 'src/data/theme.json');
+  return {
+    name: 'theme-save',
+    handleHotUpdate(ctx) {
+      if (ctx.file === filePath) return [];
+    },
+    configureServer(server) {
+      server.middlewares.use('/__dev/save-theme', (req, res, next) => {
+        if (req.method !== 'POST') return next();
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', () => {
+          (async () => {
+            try {
+              const parsed = JSON.parse(body);
+              if (!parsed || typeof parsed.active !== 'string' || typeof parsed.presets !== 'object') {
+                throw new Error('expected { active, presets }');
+              }
+              await writeFile(filePath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
+              res.statusCode = 204;
+              res.end();
+            } catch (err) {
+              res.statusCode = 400;
+              res.end(String(err));
+            }
+          })();
+        });
+      });
+    },
+  };
+}
+
 // Dev-only stand-in for the Worker's /api/feedback (functions/api/feedback.ts),
 // so crafting panel 2's feedback and the /2/feedback dashboard work under
 // `pnpm dev` without Cloudflare: records go to .feedback-dev.json (not
@@ -193,7 +231,7 @@ function feedbackDevStorePlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), worldEditorSavePlugin(), introNarrationSavePlugin(), feedbackDevStorePlugin()],
+  plugins: [react(), worldEditorSavePlugin(), introNarrationSavePlugin(), themeSavePlugin(), feedbackDevStorePlugin()],
   server: {
     // Pinned so a dev server never silently drifts onto a different port
     // (Vite's default is to auto-increment on conflict) — localStorage is

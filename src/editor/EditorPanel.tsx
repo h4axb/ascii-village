@@ -8,18 +8,20 @@ import { ColoredSprite } from '../ColoredSprite';
 import { MARKER_REGISTRY } from '../sceneMarkers';
 import { DevImageTab } from '../DevImageTab';
 import { DevIntroTab } from '../DevIntroTab';
+import { ThemeTab } from './ThemeTab';
 import type { IntroNarrationTool } from '../devIntroNarration';
 import type { Ent, EntityKind } from '../world';
 import type { AssetDef } from '../assets';
 import { PLACEABLE_KINDS, locksOf, isEditable } from './useWorldEditor';
 import type { WorldEditor, EditorTab } from './useWorldEditor';
 
-const TABS: { id: EditorTab | 'image'; label: string }[] = [
+const TABS: { id: EditorTab | 'image' | 'theme'; label: string }[] = [
   { id: 'objects', label: 'Objects' },
   { id: 'assets', label: 'Assets' },
   { id: 'markers', label: 'Markers' },
   { id: 'colliders', label: 'Colliders' },
   { id: 'intro', label: 'Intro' },
+  { id: 'theme', label: 'Theme' },
 ];
 
 // thumbnails: shrink a sprite to fit a 64x44 box (6.6 x 11 px per cell at
@@ -405,13 +407,13 @@ export function EditorPanel({
   introTool: IntroNarrationTool;
   onFocus(id: string): void;
 }) {
-  const [tab, setTab] = useState<EditorTab | 'image'>(ed.tab);
+  const [tab, setTab] = useState<EditorTab | 'image' | 'theme'>(ed.tab);
   const [collapsed, setCollapsed] = useState(false);
   if (!ed.open) return null;
   const selEnt = ed.selected && !ed.selected.startsWith('marker:') ? (ed.structEnts.find((e) => e.id === ed.selected) ?? null) : null;
-  const pick = (t: EditorTab | 'image') => {
+  const pick = (t: EditorTab | 'image' | 'theme') => {
     setTab(t);
-    if (t !== 'image') ed.setTab(t);
+    if (t !== 'image' && t !== 'theme') ed.setTab(t);
   };
   return (
     <div className={'wed-panel' + (collapsed ? ' collapsed' : '')}>
@@ -465,6 +467,7 @@ export function EditorPanel({
             {tab === 'markers' && <MarkersTab ed={ed} onFocus={onFocus} />}
             {tab === 'colliders' && <CollidersTab ed={ed} sel={selEnt} />}
             {tab === 'intro' && <DevIntroTab tool={introTool} />}
+            {tab === 'theme' && <ThemeTab />}
           </div>
           <div className="wed-keys">
             click select · drag move (Shift: ¼ tile) · empty drag / WASD pan · arrows nudge · R rotate · +/− or Alt+wheel

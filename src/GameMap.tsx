@@ -20,6 +20,7 @@ import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, STRUCT_ENTS, PLAYER_T, MITCHY_T, 
 import type { Ent } from './world';
 import { terrainField, GLYPHS, KIND_WATER } from './terrain';
 import { IconClose } from './ui';
+import { themeColor } from './theme';
 
 export interface MapCharacterEntry {
   id: string;
@@ -345,7 +346,7 @@ export default function GameMap({
             <IconClose />
           </button>
         </div>
-        <div className="game-map-viewport" ref={vpRef}>
+        <div className="game-map-viewport" ref={vpRef} style={{ background: themeColor('water.mapBackdrop') }}>
           <div className="game-map-world" ref={worldRef} style={{ width: mapW, height: mapH }}>
             <canvas ref={canvasRef} className="game-map-canvas" />
             {landmarks.house && (

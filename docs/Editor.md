@@ -50,6 +50,7 @@ a message instead of overwriting it: reload to get the new version.
   its own (orange), saved in `world.json` as `blockedTiles`. Blocking tiles
   stop the player's feet, like the buildings do.
 - **Intro** — the intro narration editor (it has its own save button).
+- **Theme** — the environment colours (grass, sand, water, palms, flowers) and a colour grade, live, with presets; its own save button. See docs/Theme.md.
 
 The inspector (shown when something is selected) edits x, y, scale and
 rotation; for placed objects also their kind, and for new assets the

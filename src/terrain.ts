@@ -34,6 +34,7 @@ import {
   OCEAN_CFG,
 } from './world';
 import { RAMP_DEFAULT } from './craft/materials';
+import { onThemeChange, themeRgb } from './theme';
 
 // ---- tiny math helpers ----------------------------------------------------
 
@@ -76,41 +77,50 @@ const smooth = (e0: number, e1: number, v: number) => {
 };
 
 type RGB = [number, number, number];
-const hex = (h: string): RGB => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
-// ---- palette (all tunables in one place) ----------------------------------
-// Sampled from the reference close-up: dark olive ground, yellow-olive glyph
-// texture on the foliage, cream sand; the water is a muted, desaturated teal
-// (grey-green shallows) with cream dot glyphs.
+// ---- palette -----------------------------------------------------------------
+// The colours come from the environment theme (src/theme.ts, src/data/
+// theme.json), graded: this maps each terrain role to its theme swatch.
+const TERRAIN_SWATCH = {
+  grass: 'grass.base',
+  grassLight: 'grass.light',
+  grassDark: 'grass.dark',
+  rimGrass: 'grass.rim',
+  bushDark: 'bush.dark',
+  bushMid: 'bush.mid',
+  bushLight: 'bush.light',
+  foliageGlyph: 'bush.glyph',
+  foliageGlyphDark: 'bush.glyphDark',
+  fringeGlyph: 'bush.fringeGlyph',
+  sandGlyph: 'sand.glyph',
+  sand: 'sand.base',
+  sandOuter: 'sand.outer',
+  wetSand: 'sand.wet',
+  shallow1: 'water.shallow',
+  shallow2: 'water.shallow2',
+  water: 'water.base',
+  deep: 'water.deep',
+  deepest: 'water.deepest',
+  waterGlyph: 'water.glyph',
+  rock: 'rock.base',
+  rockDark: 'rock.dark',
+  rockGlyph: 'rock.glyph',
+  grassGlyph: 'grass.glyph',
+  stone: 'stone.base',
+  stoneLight: 'stone.light',
+} as const;
+type TerrainRole = keyof typeof TERRAIN_SWATCH;
 
-export const TERRAIN_PALETTE = {
-  grass: hex('#56643c'),
-  grassLight: hex('#617043'),
-  grassDark: hex('#4c5935'),
-  rimGrass: hex('#46542f'), // ground darkening toward the bushes
-  bushDark: hex('#2f3c24'),
-  bushMid: hex('#55663a'),
-  bushLight: hex('#5d6b39'),
-  foliageGlyph: hex('#c4b058'), // the yellow-olive x o * ¤ texture on bushes
-  foliageGlyphDark: hex('#8a8f44'),
-  fringeGlyph: hex('#dcc26c'), // yellow toward the sand edge of the rim
-  sandGlyph: hex('#c49a52'), // warm grain on the sand
-  sand: hex('#eac48c'),
-  sandOuter: hex('#efd8a8'),
-  wetSand: hex('#e9e0c0'),
-  shallow1: hex('#a9b9a2'),
-  shallow2: hex('#80a39b'),
-  water: hex('#64939a'),
-  deep: hex('#578691'),
-  deepest: hex('#4d7a87'),
-  waterGlyph: hex('#d6e2d6'),
-  rock: hex('#8d9896'),
-  rockDark: hex('#6d7c7e'),
-  rockGlyph: hex('#dfe4dc'),
-  grassGlyph: hex('#a6ba68'), // light-green grass texture
-  stone: hex('#8e8f80'),
-  stoneLight: hex('#b3b3a2'),
-};
+export const TERRAIN_PALETTE = {} as Record<TerrainRole, RGB>;
+function loadTerrainPalette() {
+  // in place: the colour stops below hold these very arrays
+  for (const k of Object.keys(TERRAIN_SWATCH) as TerrainRole[]) {
+    const c = themeRgb(TERRAIN_SWATCH[k]);
+    if (TERRAIN_PALETTE[k]) TERRAIN_PALETTE[k].splice(0, 3, ...c);
+    else TERRAIN_PALETTE[k] = c;
+  }
+}
+loadTerrainPalette();
 const P = TERRAIN_PALETTE;
 
 // Colour stops along the VISUAL coast distance (ndv): <1 land, >1 sea. Each
@@ -397,6 +407,12 @@ export function resetTerrainStructs(): void {
   BUSHES = null;
   FIELD = null;
 }
+
+// A theme change (the world editor's Theme tab): new colours, same shapes
+onThemeChange(() => {
+  loadTerrainPalette();
+  FIELD = null;
+});
 
 // a character cell's height / width (14px line / 8.4px char, see App.tsx)
 const CELL_ASPECT = 14 / 8.4;

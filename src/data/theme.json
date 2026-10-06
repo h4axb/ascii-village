@@ -1,0 +1,61 @@
+{
+  "active": "default",
+  "presets": {
+    "default": {
+      "grade": {
+        "saturation": 1,
+        "brightness": 1,
+        "contrast": 1,
+        "warmth": 0,
+        "tint": "#c8a878",
+        "tintAmount": 0
+      },
+      "swatches": {
+        "grass.base": "#56643c",
+        "grass.light": "#617043",
+        "grass.dark": "#4c5935",
+        "grass.rim": "#46542f",
+        "grass.glyph": "#a6ba68",
+        "bush.dark": "#2f3c24",
+        "bush.mid": "#55663a",
+        "bush.light": "#5d6b39",
+        "bush.glyph": "#c4b058",
+        "bush.glyphDark": "#8a8f44",
+        "bush.fringeGlyph": "#dcc26c",
+        "sand.base": "#eac48c",
+        "sand.outer": "#efd8a8",
+        "sand.wet": "#e9e0c0",
+        "sand.glyph": "#c49a52",
+        "sand.wetGrain": "#9c8c62",
+        "water.shallow": "#a9b9a2",
+        "water.shallow2": "#80a39b",
+        "water.base": "#64939a",
+        "water.deep": "#578691",
+        "water.deepest": "#4d7a87",
+        "water.glyph": "#d6e2d6",
+        "water.sparkle": "#e3e6d6",
+        "water.foam": "#ebe6d2",
+        "water.mapBackdrop": "#45707c",
+        "rock.base": "#8d9896",
+        "rock.dark": "#6d7c7e",
+        "rock.glyph": "#dfe4dc",
+        "stone.base": "#8e8f80",
+        "stone.light": "#b3b3a2",
+        "palm.frondLit": "#a8b894",
+        "palm.frond": "#7a8f6a",
+        "palm.curtain": "#a86a38",
+        "palm.curtainLit": "#e0a05a",
+        "palm.trunkLit": "#d9c08f",
+        "palm.trunk": "#b89a68",
+        "palm.trunkShade": "#8a7048",
+        "palm.date": "#f5b731",
+        "palm.dateLit": "#ffe07a",
+        "palm.stem": "#e8c451",
+        "flower.petal": "#f47f9d",
+        "flower.centre": "#ffd166",
+        "grassTuft.tip": "#f0f8b4",
+        "grassTuft.base": "#a9c25a"
+      }
+    }
+  }
+}

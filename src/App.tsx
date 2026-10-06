@@ -72,6 +72,7 @@ import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOU
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
+import startMeadowUrl from './assets/start-meadow.webp';
 import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, IconClose, type Slot, type Action } from './ui';
 import { useIntroNarrationTool } from './devIntroNarration';
 import { getMarkerPosition } from './sceneMarkers';
@@ -273,6 +274,7 @@ const lastMotion = new WeakMap<HTMLElement, string>();
 const TOKEN_FX_MS = 900;
 // the quest flow (src/quest/): how long QUEST COMPLETE stays, boat speed (tiles/s)
 const QUEST_DONE_MS = 2800;
+const SAVE_SCREEN_MS = 1600; // the black saving screen stays at least this long
 const QUEST_SAIL_SPEED = 9;
 const MARKER_BOAT_LAUNCH = 'quest.boatLaunch'; // sceneMarkers.ts
 const LAND_REACH = 2.5;
@@ -560,7 +562,8 @@ function Landing({ onStart }: { onStart: () => void }) {
   }
 
   return (
-    <div className="landing">
+    // the background is a real shot of the island's meadow (src/assets)
+    <div className="landing" style={{ backgroundImage: `url(${startMeadowUrl})` }}>
       <pre className="title">{S.TITLE.join('\n')}</pre>
       <div className="subtitle">a tiny monochrome bay</div>
       {/* design-system buttons (src/ui): the primary action in green */}
@@ -953,6 +956,8 @@ function Game() {
     questRef.current = q;
     setQuestState(q);
   }
+  // the black "saving your progress" screen between the two parts
+  const [saveScreen, setSaveScreen] = useState<'saving' | 'saved' | null>(null);
   const [questHidden, setQuestHidden] = useState(false); // the panel waits out cinematics and popups
   const [questComplete, setQuestComplete] = useState<{ title: string; text: string } | null>(null);
   const questBusyRef = useRef(false); // a quest cinematic is running
@@ -2922,11 +2927,24 @@ function Game() {
 
   // Continue → the black test-transition screen (Mitchy and the player are
   // moved to their second-part spots underneath it)
-  function questToTransition() {
+  // A black "saving" screen comes first: underneath it the world is set up
+  // for the second part and that state is saved on this device, then the
+  // transition screen shows.
+  async function questToTransition() {
+    if (saveScreen) return;
     ratingRef.current = null;
     const q = questRef.current!;
+    const t0 = performance.now();
+    setSaveScreen('saving');
+    await sleep(300); // the screen is black before anything moves
     setQuest({ ...q, part: 'transition', step: 0, riding: false });
-    if (q.snapshot) window.setTimeout(() => questPlaceForSecond(q.snapshot!), 300);
+    if (q.snapshot) questPlaceForSecond(q.snapshot);
+    await sleep(120); // let the new state render, so the save holds it
+    writeSave(snapRef.current());
+    await sleep(Math.max(0, SAVE_SCREEN_MS - (performance.now() - t0)));
+    setSaveScreen('saved');
+    await sleep(700);
+    setSaveScreen(null);
   }
 
   // Condition 2's starting spot: Mitchy where she stood for the hand-over (at
@@ -5435,6 +5453,17 @@ function Game() {
         />
       )}
       {quest?.part === 'transition' && <TestTransition onBegin={questBeginSecond} />}
+      {saveScreen && (
+        <div className="save-screen" role="status" aria-live="polite">
+          {saveScreen === 'saving' ? (
+            <p>
+              Saving your progress<span className="save-screen-dots" aria-hidden />
+            </p>
+          ) : (
+            <p>Progress saved on this device.</p>
+          )}
+        </div>
+      )}
       {nameEntryOpen && (
         <NameEntryPanel onSubmit={(n) => nameEntryResolveRef.current?.(n)} locked={autoAdvanceMode} />
       )}

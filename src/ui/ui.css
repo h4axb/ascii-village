@@ -2197,6 +2197,35 @@
 }
 
 /* USERTEST_TRANSITION: the black screen between the two conditions */
+/* the black "saving your progress" screen before the transition screen */
+.save-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1450;
+  background: #000;
+  display: grid;
+  place-items: center;
+  color: var(--ds-text-soft);
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+.save-screen p {
+  margin: 0;
+}
+.save-screen-dots::after {
+  content: '';
+  display: inline-block;
+  width: 1.5em;
+  text-align: left;
+  animation: save-dots 1.2s steps(4, end) infinite;
+}
+@keyframes save-dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}
+
 .tt {
   position: fixed;
   inset: 0;

@@ -86,18 +86,25 @@ pre {
   justify-content: center;
   gap: 28px;
   padding: 16px;
+  /* the meadow shot (set inline from src/assets/start-meadow.webp) */
+  background-color: #4f6436;
+  background-size: cover;
+  background-position: center;
 }
 
 .title {
-  color: #fff;
+  color: #f4f1d4;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
   line-height: 1.1;
   white-space: pre;
-  font-size: clamp(6px, 2.1vw, 15px);
+  font-weight: 600;
+  font-size: clamp(6px, 2.3vw, 18px);
   text-align: left;
 }
 
 .subtitle {
-  color: #777;
+  color: var(--ds-text-soft);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
   letter-spacing: 3px;
   font-size: 13px;
 }
@@ -112,6 +119,17 @@ pre {
 .landing-actions .ds-action {
   justify-content: center;
   color: var(--ds-text);
+  /* solid over the meadow: no grass glyphs showing through */
+  background: rgb(31, 36, 23);
+}
+.landing-actions .ds-action:hover:not(:disabled) {
+  background: rgb(43, 49, 33);
+}
+.landing-actions .ds-action.go:not(:disabled) {
+  background: rgb(36, 54, 29);
+}
+.landing-actions .ds-action.go:hover:not(:disabled) {
+  background: rgb(46, 69, 37);
 }
 
 .landing-actions .start {

@@ -64,7 +64,7 @@ import {
   HOUR_MS,
 } from './time';
 import type { TimeConfig } from './time';
-import { loadSave, writeSave, parseSave, downloadSaveFile, deleteSave } from './save';
+import { loadSave, writeSave, writeSaveForLink, parseSave, downloadSaveFile, deleteSave } from './save';
 import type { SaveState } from './save';
 import { describeInteraction, runInteraction } from './interact';
 import type { InteractRef, InteractCtx, InteractActions } from './interact';
@@ -74,7 +74,7 @@ import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
 import startMeadowUrl from './assets/start-meadow.webp';
 import { onThemeChange, themeRevision } from './theme';
-import { requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
+import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
 import { groundBare } from './ground';
 import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, IconClose, type Slot, type Action } from './ui';
 import { useIntroNarrationTool } from './devIntroNarration';
@@ -538,6 +538,15 @@ function Landing({ onStart }: { onStart: () => void }) {
       const parsed = parseSave(String(reader.result));
       if (!parsed) {
         setError('Not a valid save file.');
+        return;
+      }
+      // a user-test run continues on the link of its design order: a "BA"
+      // save uploaded on /1 moves to /2 (and the other way round)
+      const target = parsed.testSession ? linkOfOrder(parsed.testSession.order) : null;
+      if (target && target !== LINK) {
+        writeSaveForLink(target, parsed);
+        const intro = window.location.pathname.startsWith('/intro') ? '/intro' : '';
+        window.location.assign(`${intro}/${target}`);
         return;
       }
       writeSave(parsed);

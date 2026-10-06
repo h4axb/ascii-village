@@ -9,7 +9,7 @@ import type { OwnedItem } from './llm';
 import type { PlantedCrop, Doors } from './farm';
 import type { PlacedItem } from './placement';
 import type { Outfit } from './outfit';
-import { linkKey } from './link';
+import { linkKey, linkKeyFor, type Link } from './link';
 import { parseQuest, type QuestState } from './quest/state';
 import { parseTestSession, type TestSession } from './quest/session';
 
@@ -163,6 +163,15 @@ export function writeSave(s: SaveState) {
     localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
     // storage full/blocked — the game keeps running, just without autosave
+  }
+}
+
+// Another link's save (Upload Save of a run that belongs to that link)
+export function writeSaveForLink(link: Link, s: SaveState) {
+  try {
+    localStorage.setItem(linkKeyFor('ascii-village-save', link), JSON.stringify(s));
+  } catch {
+    // storage full/blocked
   }
 }
 

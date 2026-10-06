@@ -11,13 +11,22 @@
 // the database is set up, the run gets a local id instead ("L-" + 5 letters)
 // so it still has one. Every feedback record is tagged with it
 // (feedback/client.ts), and the final survey opens with it in the URL.
-import { LINK } from '../link';
-import { QUEST_ORDER } from './quests';
+import { LINK, type Link } from '../link';
+import { ORDERS, QUEST_ORDER } from './quests';
 
 export type DesignOrder = 'AB' | 'BA';
 export interface TestSession {
   participantId: string;
   order: DesignOrder;
+}
+
+// The link that runs a design order: an uploaded save keeps playing in the
+// order it started with ("BA" → /2, "AB" → /1)
+export function linkOfOrder(order: DesignOrder): Link | null {
+  for (const [link, o] of Object.entries(ORDERS)) {
+    if (o && (o[0] === 'pre' ? 'AB' : 'BA') === order) return link as Link;
+  }
+  return null;
 }
 
 // this link's order ("AB" when the pre-clarification design comes first)

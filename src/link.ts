@@ -11,3 +11,5 @@ const m = /^(?:\/intro)?\/([0-3])\/?$/.exec(window.location.pathname);
 export const LINK: Link = (m?.[1] as Link | undefined) ?? '0';
 
 export const linkKey = (base: string) => (LINK === '0' ? base : `${base}-${LINK}`);
+// the key `base` has on another link (an uploaded save that belongs there)
+export const linkKeyFor = (base: string, link: Link) => (link === '0' ? base : `${base}-${link}`);

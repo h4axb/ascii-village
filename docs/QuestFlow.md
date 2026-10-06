@@ -91,6 +91,10 @@ All in `src/quest/quests.ts`:
 - Settings shows it as "Test ID P001 · order AB".
 - Offline, the run gets a local ID instead (`L-` and 5 letters).
 
+**Uploading a save**
+- A run continues on the link of its order.
+- A `BA` save uploaded on `/1` is stored as the `/2` save, and the game switches to `/2` (`/intro/1` → `/intro/2`). The same works the other way round.
+
 **Where it goes**
 - **Feedback records:** every craft and rating record carries `participant` and `order`, and both are in the dashboard's CSV.
 - **Survey:** **Open final survey** opens `FINAL_SURVEY_URL` with `?order=AB&test_id=P001` added (`surveyUrl` in `src/quest/session.ts`).

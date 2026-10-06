@@ -19,7 +19,7 @@ export type Cond = 'pre' | 'post'; // pre-clarification (CraftClarify) / post-re
 
 // Which link runs the quest flow, and in which order the conditions come.
 // /2 runs the reversed order.
-const ORDERS: Partial<Record<string, [Cond, Cond]>> = {
+export const ORDERS: Partial<Record<string, [Cond, Cond]>> = {
   '1': ['pre', 'post'], // order "AB"
   '2': ['post', 'pre'], // order "BA"
 };

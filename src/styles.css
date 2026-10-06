@@ -1073,7 +1073,7 @@ pre {
      matters for cells without their own palette entry (most of these sprites
      paint every cell from a real generated/hand-picked palette already —
      this is purely the fallback for whatever's left uncoloured). */
-  color: #9BB86B;
+  color: #8dae59;
 }
 
 /* The grass tufts are drawn at GRASS_SCALE (1/5 size), where thin 'o'

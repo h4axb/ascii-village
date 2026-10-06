@@ -4163,6 +4163,24 @@ pre {
   font-weight: 600;
   margin-bottom: 4px;
 }
+/* the Ground tab (src/editor/GroundTab.tsx) */
+.wed-ground-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0 8px;
+}
+/* the brush outline on the map while the Ground tab is open */
+.wed-brush {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  z-index: 50;
+}
+
 /* the Theme tab (src/editor/ThemeTab.tsx) */
 .wed-theme summary.wed-group-name {
   cursor: pointer;

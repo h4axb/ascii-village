@@ -83,6 +83,23 @@ export const SWATCH_GROUPS: { title: string; swatches: [string, string][] }[] = 
     ],
   },
   {
+    title: 'Ground paint',
+    swatches: [
+      ['ground.dirt', 'dirt'],
+      ['ground.dirtRim', 'dirt edge'],
+      ['ground.dirtPebble', 'dirt pebbles'],
+      ['ground.meadow', 'meadow'],
+      ['ground.meadowGlyph', 'meadow grass'],
+      ['ground.meadowFlower', 'meadow flowers'],
+      ['ground.stone', 'stone ground'],
+      ['ground.stoneRim', 'stone ground edge'],
+      ['ground.stoneGlyph', 'stone ground glyphs'],
+      ['ground.slab', 'stepping stones'],
+      ['ground.slabRim', 'stepping stone edge'],
+      ['ground.slabGlyph', 'stepping stone glyphs'],
+    ],
+  },
+  {
     title: 'Rocks',
     swatches: [
       ['rock.base', 'rock'],

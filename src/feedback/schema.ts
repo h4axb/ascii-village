@@ -70,6 +70,9 @@ export interface FeedbackRecord {
   // The quest user test (src/quest/): which crafting panel was active —
   // pre-clarification or post-reflection — when this was crafted or rated.
   cond?: 'pre' | 'post';
+  // the user test's participant id ("P001") and design order (quest/session.ts)
+  participant?: string;
+  order?: 'AB' | 'BA';
   // Mitchy's rating questions after a condition (one record per condition):
   // question id → 1-5, or null for a skip
   rating?: Record<string, number | null>;
@@ -128,6 +131,8 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
   const clarify = clarifyLog(r.clarify);
   const vote = r.vote === 'up' || r.vote === 'down' ? r.vote : null;
   const cond = r.cond === 'pre' || r.cond === 'post' ? r.cond : undefined;
+  const participant = typeof r.participant === 'string' && /^(P\d{1,6}|L-[A-Z0-9]{5})$/.test(r.participant) ? r.participant : undefined;
+  const order = r.order === 'AB' || r.order === 'BA' ? r.order : undefined;
   let rating: Record<string, number | null> | undefined;
   if (r.rating && typeof r.rating === 'object') {
     rating = {};
@@ -181,6 +186,8 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
     scope,
     sprite: { lines, ...(colors ? { colors } : {}), ...(palette ? { palette } : {}) },
     ...(cond ? { cond } : {}),
+    ...(participant ? { participant } : {}),
+    ...(order ? { order } : {}),
     ...(rating ? { rating } : {}),
   };
 }

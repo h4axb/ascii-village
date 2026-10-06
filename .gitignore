@@ -19,3 +19,4 @@ Sep_Implementation
 July_Ideation
 # TypeScript incremental build cache (tsc -b)
 *.tsbuildinfo
+.participants-dev.json

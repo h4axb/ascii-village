@@ -11,6 +11,7 @@ import type { PlacedItem } from './placement';
 import type { Outfit } from './outfit';
 import { linkKey } from './link';
 import { parseQuest, type QuestState } from './quest/state';
+import { parseTestSession, type TestSession } from './quest/session';
 
 export interface SaveState {
   version: 1;
@@ -66,6 +67,9 @@ export interface SaveState {
   mitchyPos?: { x: number; y: number };
   // The guided quests and user test (quest/), on the links that run them
   quest?: QuestState;
+  // The user test's participant id and design order for this run
+  // (quest/session.ts); a new run (New Game) gets a new one
+  testSession?: TestSession;
 }
 
 // one save per test link (see link.ts); /0 keeps this name
@@ -126,6 +130,7 @@ function migrate(s: SaveState): SaveState {
   }
   s = introPartBDoneToIntroDone(s);
   s.quest = parseQuest(s.quest);
+  s.testSession = parseTestSession(s.testSession);
   return s;
 }
 

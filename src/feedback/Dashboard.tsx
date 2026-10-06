@@ -549,6 +549,7 @@ function toCsv(rows: FeedbackRecord[]): string {
     'at', 'link', 'player', 'name', 'prompt', 'kind', 'adjusted', 'vote', 'reasons', 'positive', 'tags', 'comment',
     ...PREF_KEYS.map((k) => `applied_${k}`), ...PREF_KEYS.map((k) => `answer_${k}`), 'scope',
     'clarify_questions', 'clarify_answers', 'clarify_skipped', 'clarify_outcome', 'clarify_ms', 'clarify_error', 'cond', 'rating',
+    'participant', 'order',
   ];
   const cell = (v: unknown) => {
     const s = v === undefined || v === null ? '' : String(v);
@@ -579,6 +580,8 @@ function toCsv(rows: FeedbackRecord[]): string {
       r.clarify?.error,
       r.cond,
       r.rating ? JSON.stringify(r.rating) : '',
+      r.participant,
+      r.order,
     ]
       .map(cell)
       .join(','),

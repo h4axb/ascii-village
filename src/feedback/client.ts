@@ -4,6 +4,7 @@
 // storage not set up yet, offline — waits in a small outbox in this browser
 // and goes out with the next successful send or page load.
 import type { FeedbackRecord } from './schema';
+import { currentTestSession } from '../quest/session';
 
 const PLAYER_KEY = 'asciia-player-id';
 const OUTBOX_KEY = 'asciia-feedback-outbox';
@@ -82,6 +83,9 @@ async function flush() {
 
 // Store (or update — same id) one record. Never throws.
 export async function sendFeedback(rec: FeedbackRecord): Promise<void> {
+  // the user test's participant id and design order, when this run has one
+  const ts = currentTestSession();
+  if (ts && !rec.participant) rec = { ...rec, participant: ts.participantId, order: ts.order };
   // a newer version of the same record replaces a queued one
   const queued = readOutbox().filter((r) => r.id !== rec.id);
   if (await post(rec)) {

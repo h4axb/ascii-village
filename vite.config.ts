@@ -5,6 +5,7 @@ import path from 'node:path';
 import { docHash } from './src/editor/docHash';
 import { normalizeFeedback, type FeedbackRecord } from './src/feedback/schema';
 import { tagsByVote } from './functions/api/feedback';
+import { orderOfLink, participantIdOf } from './functions/api/participant';
 
 // Dev-only save endpoint for the in-game world editor (src/editor/, press E).
 // The editor never writes on its own: Ctrl+S / Save POSTs everything it edits
@@ -136,18 +137,18 @@ function introNarrationSavePlugin(): Plugin {
   };
 }
 
-// Dev-only save endpoint for the world editor's Theme tab: writes
-// src/data/theme.json (the environment colours, the grade and the presets,
-// see src/theme.ts). Not hot-reloaded on write, so the editing session stays.
-function themeSavePlugin(): Plugin {
-  const filePath = path.resolve(__dirname, 'src/data/theme.json');
+// Dev-only save endpoints for the world editor's Theme and Ground tabs: each
+// writes one data file (src/theme.ts / src/ground.ts read them). Not
+// hot-reloaded on write, so the editing session stays.
+function jsonSavePlugin(name: string, route: string, file: string, valid: (v: unknown) => boolean): Plugin {
+  const filePath = path.resolve(__dirname, file);
   return {
-    name: 'theme-save',
+    name,
     handleHotUpdate(ctx) {
       if (ctx.file === filePath) return [];
     },
     configureServer(server) {
-      server.middlewares.use('/__dev/save-theme', (req, res, next) => {
+      server.middlewares.use(route, (req, res, next) => {
         if (req.method !== 'POST') return next();
         let body = '';
         req.on('data', (chunk) => {
@@ -157,9 +158,7 @@ function themeSavePlugin(): Plugin {
           (async () => {
             try {
               const parsed = JSON.parse(body);
-              if (!parsed || typeof parsed.active !== 'string' || typeof parsed.presets !== 'object') {
-                throw new Error('expected { active, presets }');
-              }
+              if (!valid(parsed)) throw new Error(`not a valid ${file}`);
               await writeFile(filePath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
               res.statusCode = 204;
               res.end();
@@ -173,6 +172,16 @@ function themeSavePlugin(): Plugin {
     },
   };
 }
+const themeSavePlugin = () =>
+  jsonSavePlugin('theme-save', '/__dev/save-theme', 'src/data/theme.json', (v) => {
+    const d = v as { active?: unknown; presets?: unknown };
+    return !!d && typeof d.active === 'string' && typeof d.presets === 'object';
+  });
+const groundSavePlugin = () =>
+  jsonSavePlugin('ground-save', '/__dev/save-ground', 'src/data/ground.json', (v) => {
+    const d = v as { cells?: unknown; stones?: unknown };
+    return !!d && typeof d.cells === 'string' && Array.isArray(d.stones);
+  });
 
 // Dev-only stand-in for the Worker's /api/feedback (functions/api/feedback.ts),
 // so crafting panel 2's feedback and the /2/feedback dashboard work under
@@ -230,8 +239,46 @@ function feedbackDevStorePlugin(): Plugin {
   };
 }
 
+// Dev-only stand-in for the Worker's /api/participant (functions/api/
+// participant.ts): the user test's participant ids under `pnpm dev`, counted
+// in .participants-dev.json (not committed).
+function participantDevPlugin(): Plugin {
+  const file = path.resolve(__dirname, '.participants-dev.json');
+  return {
+    name: 'participant-dev',
+    configureServer(server) {
+      server.middlewares.use('/api/participant', (req, res, next) => {
+        if (req.method !== 'POST') return next();
+        let body = '';
+        req.on('data', (c) => (body += c));
+        req.on('end', async () => {
+          let link = '/1';
+          try {
+            const b = JSON.parse(body) as { link?: string };
+            if (typeof b.link === 'string') link = b.link;
+          } catch {
+            // the /1 order
+          }
+          let rows: { n: number; at: number; link: string; order: string }[] = [];
+          try {
+            rows = JSON.parse(await readFile(file, 'utf-8'));
+          } catch {
+            rows = [];
+          }
+          const order = orderOfLink(link);
+          const n = rows.length + 1;
+          rows.push({ n, at: Date.now(), link, order });
+          await writeFile(file, JSON.stringify(rows, null, 1));
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ participantId: participantIdOf(n), order }));
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), worldEditorSavePlugin(), introNarrationSavePlugin(), themeSavePlugin(), feedbackDevStorePlugin()],
+  plugins: [react(), worldEditorSavePlugin(), introNarrationSavePlugin(), themeSavePlugin(), groundSavePlugin(), feedbackDevStorePlugin(), participantDevPlugin()],
   server: {
     // Pinned so a dev server never silently drifts onto a different port
     // (Vite's default is to auto-increment on conflict) — localStorage is

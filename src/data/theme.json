@@ -57,7 +57,19 @@
         "flower.purplePetal": "#a98bc0",
         "flower.orangePetal": "#e39a5c",
         "grassTuft.tip": "#f0f8b4",
-        "grassTuft.base": "#a9c25a"
+        "grassTuft.base": "#a9c25a",
+        "ground.dirt": "#b08d5f",
+        "ground.dirtRim": "#8e7048",
+        "ground.dirtPebble": "#dcc8a0",
+        "ground.meadow": "#a6ba73",
+        "ground.meadowGlyph": "#c4d18f",
+        "ground.meadowFlower": "#f3edd4",
+        "ground.stone": "#a9a798",
+        "ground.stoneRim": "#8a897d",
+        "ground.stoneGlyph": "#d6d4c6",
+        "ground.slab": "#c6c3b5",
+        "ground.slabRim": "#94928a",
+        "ground.slabGlyph": "#e6e3d6"
       }
     }
   }

@@ -20,6 +20,7 @@ import {
   KIND_WATER,
   forEachCaustic,
   forEachFoam,
+  onTerrainRegion,
   CAUSTIC_ALPHA,
   SHORE_PHASES,
 } from './terrain';
@@ -109,6 +110,38 @@ export default function TerrainCanvas(props: Props) {
     return () => c?.removeEventListener('contextrestored', paintBg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // a ground-paint stroke (terrain.ts onTerrainRegion): repaint that part of
+  // the colour layer and redraw the glyph tiles it touches
+  useEffect(
+    () =>
+      onTerrainRegion((x0, y0, x1, y1) => {
+        const c = bgRef.current;
+        const ctx = c?.getContext('2d');
+        const f = terrainField();
+        if (c && ctx && c.width === f.bgW) {
+          const by0 = Math.max(0, Math.floor((y0 * f.bgH) / GROUND_H) - 2);
+          const by1 = Math.min(f.bgH - 1, Math.ceil(((y1 + 1) * f.bgH) / GROUND_H) + 2);
+          const w = x1 - x0 + 1;
+          const h = by1 - by0 + 1;
+          const img = ctx.createImageData(w, h);
+          for (let r = 0; r < h; r++) {
+            const from = ((by0 + r) * f.bgW + x0) * 4;
+            img.data.set(f.bg.subarray(from, from + w * 4), r * w * 4);
+          }
+          ctx.putImageData(img, x0, by0);
+        }
+        const s = st.current;
+        for (const [ti, t] of s.tiles) {
+          const tx = (ti % TILES_X) * TW;
+          const ty = ((ti / TILES_X) | 0) * TH;
+          if (tx <= x1 && tx + TW > x0 && ty <= y1 && ty + TH > y0) t.res = -1;
+        }
+        schedule();
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   // font of the world text, so canvas glyphs match the DOM sprites
   useEffect(() => {

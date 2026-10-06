@@ -28,6 +28,7 @@ const OFF: WorldEditor = {
   disarm: noop,
   ghost: null,
   cursor: null,
+  pointerAt: null,
   showIds: false,
   setShowIds: noop,
   showColliders: false,

@@ -18,10 +18,10 @@ import { LINK } from '../link';
 export type Cond = 'pre' | 'post'; // pre-clarification (CraftClarify) / post-reflection (CraftFeedback)
 
 // Which link runs the quest flow, and in which order the conditions come.
-// /2 gets the reversed order once the user switches it on.
+// /2 runs the reversed order.
 const ORDERS: Partial<Record<string, [Cond, Cond]>> = {
-  '1': ['pre', 'post'],
-  // '2': ['post', 'pre'],
+  '1': ['pre', 'post'], // order "AB"
+  '2': ['post', 'pre'], // order "BA"
 };
 export const QUEST_ORDER: [Cond, Cond] | null = ORDERS[LINK] ?? null;
 export const QUEST_ENABLED = QUEST_ORDER !== null;

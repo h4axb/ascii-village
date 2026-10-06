@@ -39,13 +39,14 @@ import type { Ent, EntityKind, WorldDoc, WorldPose, WorldAdded } from '../world'
 import { RAW_ASSETS, FIXED_ASSETS, ASSET_META, assetOf } from '../assets';
 import type { AssetDef, AssetMeta } from '../assets';
 import { resetTerrainStructs } from '../terrain';
+import { beginStroke, endStroke, strokeTo } from '../ground';
 import markerData from '../data/sceneMarkers.json';
 import { ALL_MARKER_IDS } from '../sceneMarkers';
 import type { MarkerPositions } from '../sceneMarkers';
 import type { CamSnapshot } from '../coords';
 import { docHash } from './docHash';
 
-export type EditorTab = 'objects' | 'assets' | 'markers' | 'colliders' | 'intro';
+export type EditorTab = 'objects' | 'assets' | 'markers' | 'colliders' | 'intro' | 'ground';
 
 // The kinds a placed asset can be given in the inspector, with what each
 // one does in the game. (Built-in kinds like 'palm' or 'pond' carry
@@ -132,6 +133,8 @@ export interface WorldEditor {
   disarm(): void;
   ghost: EditorGhost | null;
   cursor: { x: number; y: number } | null;
+  // the exact pointer position on the map (ch / em), for the ground brush
+  pointerAt: { wx: number; wy: number } | null;
   showIds: boolean;
   setShowIds(v: boolean): void;
   showColliders: boolean;
@@ -322,7 +325,8 @@ type Drag =
   | { type: 'object'; id: string; startX: number; startY: number; wx0: number; wy0: number; moved: boolean }
   | { type: 'marker'; id: string; moved: boolean }
   | { type: 'pan'; px0: number; py0: number; pan0: { x: number; y: number } }
-  | { type: 'paint'; solid: boolean; done: Set<string> };
+  | { type: 'paint'; solid: boolean; done: Set<string> }
+  | { type: 'ground' };
 
 export function useWorldEditor(opts: {
   fieldRef: React.RefObject<HTMLElement | null>;
@@ -920,6 +924,12 @@ export function useWorldEditor(opts: {
         setArmed(null);
         return;
       }
+      // Ground tab: drag paints with the brush (ground.ts)
+      if (tab === 'ground') {
+        beginStroke(w.wx, w.wy);
+        dragRef.current = { type: 'ground' };
+        return;
+      }
       // Colliders tab: every click toggles the tile under it
       if (tab === 'colliders') {
         const { wall, objects } = blockersAt(tx, ty);
@@ -948,7 +958,9 @@ export function useWorldEditor(opts: {
       if (!w) return;
       const tx = Math.floor(w.wx / TILE_CH);
       const ty = Math.floor(w.wy / TILE_LN);
-      setCursor((c) => (c && c.x === tx && c.y === ty && armed?.type !== 'asset' ? c : { x: tx, y: ty, wx: w.wx, wy: w.wy }));
+      setCursor((c) =>
+        c && c.x === tx && c.y === ty && armed?.type !== 'asset' && tab !== 'ground' ? c : { x: tx, y: ty, wx: w.wx, wy: w.wy },
+      );
       const d = dragRef.current;
       if (!d) return;
       if (d.type === 'pan') {
@@ -972,6 +984,8 @@ export function useWorldEditor(opts: {
         if (p && p.x === tx && p.y === ty) return;
         setMarker(d.id, { x: tx, y: ty }, !d.moved);
         d.moved = true;
+      } else if (d.type === 'ground') {
+        strokeTo(w.wx, w.wy);
       } else if (d.type === 'paint') {
         // a drag keeps doing what its first tile did (adding or clearing)
         const key = `${tx},${ty}`;
@@ -983,6 +997,10 @@ export function useWorldEditor(opts: {
     onPointerUp() {
       const d = dragRef.current;
       dragRef.current = null;
+      if (d?.type === 'ground') {
+        endStroke();
+        return;
+      }
       if (d && d.type !== 'pan') {
         // the layout settled: let the terrain catch up
         setLiveStructEnts(structRef.current);
@@ -1024,6 +1042,7 @@ export function useWorldEditor(opts: {
     disarm: () => setArmed(null),
     ghost,
     cursor: cursor ? { x: cursor.x, y: cursor.y } : null,
+    pointerAt: cursor ? { wx: cursor.wx, wy: cursor.wy } : null,
     showIds,
     setShowIds,
     showColliders,

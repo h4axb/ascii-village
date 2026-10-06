@@ -4,6 +4,7 @@
 // Function if the project is ever deployed to Pages instead.
 import { onRequestPost } from '../functions/api/chat/completions';
 import { handleFeedback, type FeedbackEnv } from '../functions/api/feedback';
+import { handleParticipant } from '../functions/api/participant';
 
 interface Env extends FeedbackEnv {
   ASSETS: { fetch: (request: Request) => Promise<Response> };
@@ -26,6 +27,8 @@ export default {
     }
     // crafting feedback (crafting panel 2) — see functions/api/feedback.ts
     if (pathname === '/api/feedback' || pathname === '/api/feedback/tags') return handleFeedback(request, env);
+    // the user test's participant ids — see functions/api/participant.ts
+    if (pathname === '/api/participant') return handleParticipant(request, env);
     return env.ASSETS.fetch(request);
   },
 };

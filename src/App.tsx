@@ -74,6 +74,8 @@ import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
 import startMeadowUrl from './assets/start-meadow.webp';
 import { onThemeChange, themeRevision } from './theme';
+import { requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
+import { groundBare } from './ground';
 import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, IconClose, type Slot, type Action } from './ui';
 import { useIntroNarrationTool } from './devIntroNarration';
 import { getMarkerPosition } from './sceneMarkers';
@@ -952,6 +954,10 @@ function Game() {
   // ---- the guided quests and user test (quest/), on the links that run them ----
   // `quest` is saved; the rest is transient presentation state.
   const [quest, setQuestState] = useState<QuestState | null>(() => (QUEST_ENABLED ? (saved?.quest ?? null) : null));
+  // the user test's participant id + design order for this run (quest/session.ts)
+  const [testSession, setTestSession] = useState<TestSession | null>(() =>
+    QUEST_ENABLED ? (saved?.testSession ?? null) : null,
+  );
   const questRef = useRef(quest);
   function setQuest(q: QuestState | null) {
     questRef.current = q;
@@ -1141,7 +1147,8 @@ function Game() {
       // fence — measured against where the bed actually is, so a dragged plot
       // doesn't end up with flora growing through it
       ...wildSpawns(growthWindow, plot.rect).filter(
-        (e) => !removed.has(e.id) && !inGarden(e.x, e.y, plot),
+        // nothing grows on painted dirt, stone ground or stepping stones
+        (e) => !removed.has(e.id) && !inGarden(e.x, e.y, plot) && !groundBare(e.x, e.y),
       ),
       ...dynamicEnts.filter((e) => !removed.has(e.id)),
       // player-placed decorations — permanent, NOT subject to the growth-window
@@ -1240,6 +1247,7 @@ function Game() {
     introStage,
     mitchyPos: mitchyPos ?? undefined,
     quest: quest ?? undefined,
+    testSession: testSession ?? undefined,
   });
 
   // Shared by both explicit save actions below — just the "Saving…" HUD
@@ -3098,6 +3106,19 @@ function Game() {
   useEffect(() => {
     if (QUEST_ENABLED && quest) writeSave(snapRef.current());
   }, [quest]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A run gets its participant id when its quests start (a new player, or
+  // after New Game); it stays in the save, so a reload keeps it. Feedback
+  // records are tagged with it (feedback/client.ts).
+  const sessionAskedRef = useRef(false);
+  useEffect(() => {
+    if (!QUEST_ENABLED || !quest || testSession || sessionAskedRef.current) return;
+    sessionAskedRef.current = true;
+    void requestTestSession().then((s) => setTestSession(s));
+  }, [quest, testSession]);
+  useEffect(() => {
+    setCurrentTestSession(testSession);
+    if (QUEST_ENABLED && testSession && questRef.current) writeSave(snapRef.current());
+  }, [testSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Kicks off once IntroA (stages 1-14) has finished AND we're still "not
   // done" — on mount for a brand-new save (once introAActive flips false,
@@ -5460,7 +5481,8 @@ function Game() {
                 <button
                   className="ds-action go"
                   onClick={() => {
-                    if (FINAL_SURVEY_URL) window.open(FINAL_SURVEY_URL, '_blank', 'noopener');
+                    // the survey knows who answers and in which order they played
+                    if (FINAL_SURVEY_URL) window.open(surveyUrl(FINAL_SURVEY_URL, testSession), '_blank', 'noopener');
                     else console.warn('[quest] FINAL_SURVEY_URL is not set (src/quest/quests.ts)');
                     setQuest({ ...questRef.current!, part: 'end' });
                   }}
@@ -5601,6 +5623,12 @@ function Game() {
                   </button>
                 )}
               </div>
+              {/* the user test's id for this run (quest/session.ts) */}
+              {testSession && (
+                <div className="ds-muted ds-settings-note">
+                  Test ID {testSession.participantId} · order {testSession.order}
+                </div>
+              )}
               {/* Mitchy's saju reading (MitchyTalk.tsx) keeps the birthday in this browser */}
               {hasBirthDate() && (
                 <>

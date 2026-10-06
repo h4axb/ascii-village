@@ -9,6 +9,7 @@ import { MARKER_REGISTRY } from '../sceneMarkers';
 import { DevImageTab } from '../DevImageTab';
 import { DevIntroTab } from '../DevIntroTab';
 import { ThemeTab } from './ThemeTab';
+import { GroundTab } from './GroundTab';
 import type { IntroNarrationTool } from '../devIntroNarration';
 import type { Ent, EntityKind } from '../world';
 import type { AssetDef } from '../assets';
@@ -21,6 +22,7 @@ const TABS: { id: EditorTab | 'image' | 'theme'; label: string }[] = [
   { id: 'markers', label: 'Markers' },
   { id: 'colliders', label: 'Colliders' },
   { id: 'intro', label: 'Intro' },
+  { id: 'ground', label: 'Ground' },
   { id: 'theme', label: 'Theme' },
 ];
 
@@ -467,6 +469,7 @@ export function EditorPanel({
             {tab === 'markers' && <MarkersTab ed={ed} onFocus={onFocus} />}
             {tab === 'colliders' && <CollidersTab ed={ed} sel={selEnt} />}
             {tab === 'intro' && <DevIntroTab tool={introTool} />}
+            {tab === 'ground' && <GroundTab />}
             {tab === 'theme' && <ThemeTab />}
           </div>
           <div className="wed-keys">

@@ -45,3 +45,31 @@ Saving is dev-server only (`/__dev/save-theme` in `vite.config.ts`). A build sim
 - **Adding a swatch:**
   1. add it to `SWATCH_GROUPS` and to the preset in `theme.json`;
   2. read it with `themeColor()` wherever the colour is used.
+
+## Ground paint
+
+The world editor's **Ground** tab paints onto the island's land:
+
+| Tool | What it does |
+|---|---|
+| Dirt | Bare earth with pebbles; grass creeps in at the edge. |
+| Meadow | Lighter grass with tiny cream flowers. |
+| Stone | Stony ground with a few pebbles. |
+| Stepping stones | Drag to lay flat, irregular stones along a path. |
+| Erase | Back to grass; also lifts stepping stones. |
+
+**Brush settings:**
+- **size**, also used as the stone size for stepping stones;
+- **softness:** soft edges fray into the grass;
+- **strength:** low strength gives patchy, worn ground.
+
+**Saving:** each stroke has undo and redo. **save ground** writes `src/data/ground.json`.
+
+**Colours** are the Theme tab's "Ground paint" swatches.
+
+**Wild plants** don't grow on dirt, stone ground or stepping stones.
+
+**Code:**
+- `src/ground.ts` holds the data and the brush.
+- `src/terrain.ts` (`paintGround`) draws it.
+- A stroke repaints only the cells under it.

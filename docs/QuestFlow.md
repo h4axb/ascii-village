@@ -4,8 +4,8 @@ On `/1` (and `/intro/1`), the game runs a guided quest flow after the intro, the
 
 | Link | Condition 1 | Condition 2 |
 |---|---|---|
-| `/1` | pre-clarification | post-reflection |
-| `/2` | prepared as post-reflection, then pre-clarification; switched off until enabled | |
+| `/1` | pre-clarification (A) | post-reflection (B): order `AB` |
+| `/2` | post-reflection (B) | pre-clarification (A): order `BA` |
 
 The other links are unchanged.
 
@@ -77,3 +77,21 @@ All in `src/quest/quests.ts`:
 - The dashboard (`/2/feedback`) shows the average per question for each condition. The CSV has `cond` and `rating` columns.
 
 **DEV-only test hooks:** `window.__qt()` (App.tsx), used by automated runs.
+
+## Participants and the survey link
+
+**Getting an ID**
+- A new run asks the server for the next participant ID: `P001`, `P002`, … counted across every device.
+- A new run is a new player on `/1`, `/2`, `/intro/1` or `/intro/2`, or **New Game**.
+- The server is `POST /api/participant` (`functions/api/participant.ts`, same D1 database as the feedback). Its table creates itself on first use.
+- Under `pnpm dev`, a stand-in counts in `.participants-dev.json`.
+
+**Keeping it**
+- The run keeps `{participantId, order}` in its save (`testSession`), so a reload keeps the same ID.
+- Settings shows it as "Test ID P001 · order AB".
+- Offline, the run gets a local ID instead (`L-` and 5 letters).
+
+**Where it goes**
+- **Feedback records:** every craft and rating record carries `participant` and `order`, and both are in the dashboard's CSV.
+- **Survey:** **Open final survey** opens `FINAL_SURVEY_URL` with `?order=AB&test_id=P001` added (`surveyUrl` in `src/quest/session.ts`).
+

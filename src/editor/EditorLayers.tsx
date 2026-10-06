@@ -7,6 +7,7 @@ import { MARKER_REGISTRY } from '../sceneMarkers';
 import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint } from '../world';
 import type { Ent } from '../world';
 import { isEditable } from './useWorldEditor';
+import { brushRadiusCells } from '../ground';
 import type { WorldEditor } from './useWorldEditor';
 
 const MARKER_LABELS = new Map(
@@ -52,6 +53,19 @@ export function EditorWorldLayers({ ed, ents }: { ed: WorldEditor; ents: Ent[] }
   return (
     <>
       <div className="dev-tile-grid" style={{ width: `${GROUND_W}ch`, height: `${GROUND_H}em` }} />
+
+      {/* the Ground tab's brush */}
+      {ed.tab === 'ground' && ed.pointerAt && (
+        <div
+          className="wed-brush"
+          style={{
+            left: `${ed.pointerAt.wx}ch`,
+            top: `${ed.pointerAt.wy}em`,
+            width: `${brushRadiusCells().rx * 2}ch`,
+            height: `${brushRadiusCells().ry * 2}em`,
+          }}
+        />
+      )}
 
       {/* every collider: in the Colliders tab, or with "show every collider" */}
       {(ed.showColliders || ed.tab === 'colliders') && (

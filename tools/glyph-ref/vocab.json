@@ -1,0 +1,15 @@
+{
+  "_note": "Categories the Glyph Generator offers, the game category a craft of it becomes, and the part names auto-marking may use. Edit freely: new categories and parts show up in the tool and the crafting library on reload.",
+  "categories": {
+    "boat": { "gameCategory": "vehicle", "parts": ["hull", "deck", "cabin", "mast", "sail", "flag", "railing", "cannon", "oar", "window", "rudder"] },
+    "cart": { "gameCategory": "vehicle", "parts": ["body", "wheel", "seat", "handle", "roof", "lamp"] },
+    "watering-can": { "gameCategory": "utensils", "parts": ["body", "spout", "handle", "rose", "lid"] },
+    "tool": { "gameCategory": "utensils", "parts": ["handle", "head", "binding", "blade"] },
+    "pet": { "gameCategory": "pets", "parts": ["body", "head", "ears", "eyes", "nose", "tail", "legs", "wings", "accessory"] },
+    "plant": { "gameCategory": "plant", "parts": ["pot", "stem", "leaves", "flower", "fruit", "soil"] },
+    "hat": { "gameCategory": "clothing", "parts": ["crown", "brim", "band", "feather"] },
+    "food": { "gameCategory": "food", "parts": ["base", "filling", "topping", "plate"] },
+    "decoration": { "gameCategory": "utensils", "parts": ["main", "accent"], "tags": ["flag", "gem", "flower", "star", "ribbon", "lantern", "skull", "shell", "bell", "heart", "crown", "feather"] },
+    "prop": { "gameCategory": "utensils", "parts": ["main", "top", "base", "detail"] }
+  }
+}

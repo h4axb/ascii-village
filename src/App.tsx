@@ -5343,7 +5343,14 @@ function Game() {
                 {equipped?.equip?.mode === 'vehicle' && (
                   <ColoredSprite
                     className="rig-gear"
-                    style={{ left: '-1ch', top: '2em' }}
+                    style={{
+                      left: '-1ch',
+                      top: '2em',
+                      // crafts from the reference library (craft/refCraft.ts)
+                      // are fine-grained grids drawn at their own small scale;
+                      // the older shape crafts keep their look
+                      ...(equipped.scale && equipped.scale < 0.4 ? { scale: `${equipped.scale}`, transformOrigin: '0 0' } : {}),
+                    }}
                     sprite={equipped.sprite}
                     colors={equipped.colors}
                     palette={equipped.palette}

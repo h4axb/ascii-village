@@ -1,8 +1,9 @@
 // ---------------------------------------------------------------------------
 // THE BAKER: a picture (RGBA pixels) -> a grid of glyph cells, no LLM.
 //
-// Pure: no DOM, so the tool page and any later script can share it. The glyph
-// bitmaps it matches against come from glyphAtlas.ts (rendered in the game's
+// Pure: no DOM. Shared by the Glyph Generator (tools/glyph-ref/) and the
+// in-game crafting from references (src/craft/refCraft.ts). The glyph
+// bitmaps it matches against come from atlas.ts (rendered in the game's
 // font), passed in.
 //
 // Why not just "average colour -> brightness -> ramp glyph" (what the first
@@ -89,6 +90,9 @@ export interface Baked {
   rows: number;
   cells: (Cell | null)[]; // row-major
   signs: number;
+  // where the grid sits on the source image (pixels): cell (c, r) covers
+  // x0 + c*cw .. x0 + (c+1)*cw, y0 + r*ch .. — to map cells back to marks
+  box: { x0: number; y0: number; cw: number; ch: number };
 }
 
 // ---- colour helpers ---------------------------------------------------------
@@ -353,7 +357,7 @@ export function medianCut(colors: RGB[], n: number): (c: RGB) => RGB {
 export function bake(img: Img, o: BakeOptions, shapes: GlyphShape[]): Baked {
   const m = objectMask(img, o);
   const box = bbox(m, img.w, img.h);
-  if (!box) return { cols: 0, rows: 0, cells: [], signs: 0 };
+  if (!box) return { cols: 0, rows: 0, cells: [], signs: 0, box: { x0: 0, y0: 0, cw: 1, ch: 1 } };
   const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
   const { cols, rows } = gridFor(bw, bh, box.n / (bw * bh), o);
   const cw = bw / cols, chh = bh / rows;
@@ -448,7 +452,7 @@ export function bake(img: Img, o: BakeOptions, shapes: GlyphShape[]): Baked {
     }
     return { ch, rgb: tone(graded[i]!) };
   });
-  return { cols, rows, cells, signs: cells.filter(Boolean).length };
+  return { cols, rows, cells, signs: cells.filter(Boolean).length, box: { x0: box.x0, y0: box.y0, cw, ch: chh } };
 }
 
 // Auto zones: the drawn cells clustered by colour into `k` groups (k-means on

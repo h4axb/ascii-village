@@ -76,6 +76,10 @@ export interface FeedbackRecord {
   // Mitchy's rating questions after a condition (one record per condition):
   // question id → 1-5, or null for a skip
   rating?: Record<string, number | null>;
+  // crafting from the reference library (craft/refCraft.ts): how a craft was
+  // built when the library fell short — 'planner' = no reference body fit,
+  // `miss` = words it could not place. Records with this carry no vote.
+  ref?: { via: 'match' | 'model' | 'planner'; body: string; miss: string[] };
 }
 
 const KINDS = new Set(['plant', 'pets', 'clothing', 'vehicle', 'food', 'utensils', '']);
@@ -141,7 +145,17 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
       rating[k] = typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 5 ? v : null;
     }
   }
-  if (!vote && !clarify && !rating) return 'vote must be up or down';
+  let ref: FeedbackRecord['ref'];
+  if (r.ref && typeof r.ref === 'object') {
+    const x = r.ref as Record<string, unknown>;
+    if (x.via === 'match' || x.via === 'model' || x.via === 'planner')
+      ref = {
+        via: x.via,
+        body: str(x.body, 64),
+        miss: Array.isArray(x.miss) ? x.miss.filter((w): w is string => typeof w === 'string').slice(0, 12).map((w) => w.slice(0, 24)) : [],
+      };
+  }
+  if (!vote && !clarify && !rating && !ref) return 'vote must be up or down';
   const kind = str(r.kind, 16);
   const reasons = Array.isArray(r.reasons)
     ? [...new Set(r.reasons.filter((x): x is FeedbackReason => (FEEDBACK_REASONS as readonly unknown[]).includes(x)))].slice(0, 3)
@@ -189,5 +203,6 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
     ...(participant ? { participant } : {}),
     ...(order ? { order } : {}),
     ...(rating ? { rating } : {}),
+    ...(ref ? { ref } : {}),
   };
 }

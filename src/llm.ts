@@ -50,6 +50,20 @@ import {
   type ItemFunction,
 } from './craft/functions';
 import { checkPolicy } from './craft/policy';
+import {
+  REF_CRAFT_ON,
+  hasRefBodies,
+  matchRefs,
+  refPrompt,
+  refCatalogue,
+  parseRefChoice,
+  choiceToMatch,
+  buildFromMatch,
+  refDescription,
+  gameCategoryOf,
+  logRefCraft,
+  type RefMatch,
+} from './craft/refCraft';
 
 // Structured log, one record per generation. Kept in memory + echoed to the
 // console; read it for playtest analysis.
@@ -420,6 +434,14 @@ export async function craftItem(
   const policy = checkPolicy(prompt);
   if (!policy.allowed) return { ok: false, reply: policy.reason! };
 
+  // From the reference library first (craft/refCraft.ts): 0 calls when the
+  // matcher can place every word, 1 small call otherwise. Nothing in the
+  // library fits -> the shape planner below, as before.
+  if (REF_CRAFT_ON && hasRefBodies()) {
+    const r = await craftWithRefs(prompt, ui, opts);
+    if (r) return r;
+  }
+
   if (llmEnabled) {
     const spec = parseSpec(prompt);
     try {
@@ -588,6 +610,70 @@ export async function craftItem(
   item.desc = description.description;
   item.tags = [...description.tags, `prompt: ${prompt.trim()}`];
   item.textureModifier = textureModifierFor(offlineSpec.finish);
+  return opts.prefs ? { ok: true, item, kind: category, applied: {} } : { ok: true, item };
+}
+
+// A craft from the reference library: the matcher's recipe, or the model's
+// when the words need it (unknown details, a name, an invented function).
+// null = the library can't express it: the caller uses the shape planner.
+async function craftWithRefs(
+  prompt: string,
+  ui: CraftUiHooks | undefined,
+  opts: { prefs?: boolean; clarify?: CraftClarify },
+): Promise<CraftResult | null> {
+  let m: RefMatch & { details?: Parameters<typeof buildFromMatch>[0]['details']; mirror?: boolean } = matchRefs(prompt);
+  let text: { description: string; tags: string[]; fn: ItemFunction; name?: string } | null = null;
+  let via: 'match' | 'model' = 'match';
+  if (m.needsModel && llmEnabled) {
+    try {
+      const raw = await chatJSON<Record<string, unknown>>(
+        [
+          { role: 'system', content: refPrompt() },
+          { role: 'user', content: `Library: ${refCatalogue(m)}\n\nThe player asked for: "${prompt}"` },
+        ],
+        { temperature: 0.5, maxTokens: 900, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
+      );
+      const c = parseRefChoice(raw);
+      const chosen = c ? choiceToMatch(c, m) : null;
+      if (!chosen) {
+        logRefCraft(prompt, 'planner', null, m.leftover);
+        return null;
+      }
+      m = chosen;
+      via = 'model';
+      if (c?.description) text = { description: c.description, tags: c.tags ?? [], fn: c.fn!, name: c.name };
+    } catch (err) {
+      console.warn('[craft] reference call failed:', err);
+      if (!m.body) return null;
+    }
+  }
+  if (!m.body) {
+    logRefCraft(prompt, 'planner', null, m.leftover);
+    return null;
+  }
+  ui?.onStage?.('drawing');
+  const sp = await buildFromMatch(m, opts.clarify?.size);
+  sp.lines.forEach((line, i) => ui?.onLine?.(line, i, 0));
+  logRefCraft(prompt, via, m.body.id, m.leftover);
+  const category = gameCategoryOf(m.body);
+  const t = text ?? refDescription(m);
+  // no model text: the words before "with", without a leading article
+  const head = prompt.trim().split(/\s+(?:with|and|that|which)\s+/i)[0].replace(/^(a|an|the|my)\s+/i, '');
+  const short = head.length <= 24 ? head : head.slice(0, 24).replace(/\s+\S*$/, '');
+  const name = text?.name || short.replace(/^\w/, (ch) => ch.toUpperCase()) || m.body.title;
+  const item = buildCraftedItem(category, name, prompt, { funcDesc: t.fn.narrative });
+  item.fn = t.fn;
+  item.sprite = sp.lines;
+  item.palette = sp.palette;
+  item.colors = sp.colors;
+  item.scale = sp.scale;
+  item.desc = t.description;
+  item.tags = [...t.tags, `prompt: ${prompt.trim()}`];
+  const spec = parseSpec(prompt);
+  item.textureModifier = textureModifierFor(spec.finish);
+  const finish = opts.clarify?.finish ?? (opts.clarify?.mood ? MOOD_PRESETS[opts.clarify.mood].finish : undefined);
+  if (finish) item.textureModifier = finish;
+  console.info('[craft] from references', { body: m.body.id, via, signs: sp.signs, swaps: m.swaps.map((x) => x.ref.id), decorations: m.decorations.map((x) => x.ref.id) });
   return opts.prefs ? { ok: true, item, kind: category, applied: {} } : { ok: true, item };
 }
 

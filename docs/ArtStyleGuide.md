@@ -280,6 +280,8 @@ design the mask for how the *space* should feel to walk through.
 
 ## 11. LLM-crafted items — a third authoring technique (deliberately divergent)
 
+> **Since the reference library:** on `/0` and `/3`, crafting first builds items from marked pixel-art references (`src/craft/refCraft.ts`, made with the Glyph Generator; see `docs/GlyphRefMaker.md`). The shape planner below is the fallback, used when no reference fits. The quest test links `/1` and `/2` use only the shape planner.
+
 The in-game crafting feature (`src/craft/spriteGen.ts`, `spriteValidate.ts`,
 `spritePipeline.ts`) is a third technique alongside hand-transcription and
 generate-and-bake (§3): a small/fast LLM generates a fresh sprite live from

@@ -218,6 +218,9 @@ export default function Dashboard() {
             <Card title="User test: rating questions per condition" wide>
               <RatingCompare data={all.filter((r) => r.rating)} />
             </Card>
+            <Card title="Crafting library: missing references" wide>
+              <MissingRefs data={all.filter((r) => r.ref)} />
+            </Card>
             <Card title="How the preference questions were answered" wide>
               <Answers data={data} />
             </Card>
@@ -534,6 +537,37 @@ function RatingCompare({ data }: { data: FeedbackRecord[] }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+// ---- crafting from the reference library: what it could not build ----
+// Words from crafts that fell back to the shape planner (no reference body
+// fit) and words the matcher could not place: the next references to make.
+function MissingRefs({ data }: { data: FeedbackRecord[] }) {
+  if (!data.length) return <p className="fbd-muted">Nothing missing yet (or no crafts from the library in this range).</p>;
+  const planner = data.filter((r) => r.ref?.via === 'planner');
+  const count = new Map<string, number>();
+  for (const r of planner)
+    for (const w of new Set(r.prompt.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter((x) => x.length > 2)))
+      count.set(w, (count.get(w) ?? 0) + 1);
+  const unplaced = new Map<string, number>();
+  for (const r of data) for (const w of r.ref?.miss ?? []) unplaced.set(w, (unplaced.get(w) ?? 0) + 1);
+  const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+  return (
+    <div className="fbd-grid">
+      <div>
+        <Bars
+          rows={top(count).map(([w, n]) => ({ label: w, value: n, text: String(n) }))}
+          note={`${planner.length} crafts with no fitting reference body (drawn from shapes instead): their most common words`}
+        />
+      </div>
+      <div>
+        <Bars
+          rows={top(unplaced).map(([w, n]) => ({ label: w, value: n, text: String(n) }))}
+          note="Words the library could not place (details or parts it has no picture of)"
+        />
+      </div>
+    </div>
   );
 }
 

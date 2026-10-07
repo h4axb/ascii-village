@@ -26,6 +26,8 @@ The house, shop, Mitchy, the pond, the player, crafted items and the UI keep the
   - warmth (−1 cool … +1 warm);
   - a tint colour and how strongly to pull toward it.
 
+- **characters:** player saturation and Mitchy saturation (1 = as drawn, 0 = grey, up to 2). They keep their own colours otherwise; the grade never touches them.
+
 For trying a mood, start with the grade sliders and adjust single swatches afterwards. To try something without losing the current look, use **+ new**: it copies the current preset.
 
 ## Workflow

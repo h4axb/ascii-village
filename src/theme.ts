@@ -29,7 +29,11 @@ export interface Grade {
 export interface ThemePreset {
   grade: Grade;
   swatches: Record<string, string>;
+  // the characters keep their own colours (the grade never touches them);
+  // only how saturated they are can be tuned (1 = as drawn)
+  characters?: { player: number; mitchy: number };
 }
+export type Character = 'player' | 'mitchy';
 export interface ThemeDoc {
   active: string;
   presets: Record<string, ThemePreset>;
@@ -154,12 +158,17 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 let doc: ThemeDoc = clone(SAVED);
 let cur: ThemePreset = presetOf(doc, doc.active);
 let rev = 0;
+queueMicrotask(() => applyCharacters());
 const cache = new Map<string, string>();
 const listeners = new Set<() => void>();
 
 function presetOf(d: ThemeDoc, name: string): ThemePreset {
   const p = d.presets[name] ?? d.presets[Object.keys(d.presets)[0]];
-  return { grade: { ...NEUTRAL_GRADE, ...p.grade }, swatches: { ...SAVED.presets[SAVED.active]?.swatches, ...p.swatches } };
+  return {
+    grade: { ...NEUTRAL_GRADE, ...p.grade },
+    swatches: { ...SAVED.presets[SAVED.active]?.swatches, ...p.swatches },
+    characters: { player: 1, mitchy: 1, ...p.characters },
+  };
 }
 
 // ---- colour maths ---------------------------------------------------------
@@ -241,9 +250,19 @@ export function onThemeEdit(fn: () => void): () => void {
   editListeners.add(fn);
   return () => editListeners.delete(fn);
 }
+// Player / Mitchy saturation: CSS variables the world's sprites read
+// (styles.css .player-sprite and .ent.cat), so a change shows at once
+function applyCharacters() {
+  const c = cur.characters ?? { player: 1, mitchy: 1 };
+  const root = document.documentElement.style;
+  root.setProperty('--player-sat', String(c.player));
+  root.setProperty('--mitchy-sat', String(c.mitchy));
+}
+
 function changed() {
   cache.clear();
   rev += 1;
+  applyCharacters();
   for (const fn of [...editListeners]) fn();
   if (timer !== null) return;
   const wait = Math.max(0, EMIT_MS - (performance.now() - lastEmit));
@@ -257,6 +276,11 @@ export const activePresetName = (): string => doc.active;
 
 export function setSwatch(name: string, hex: string) {
   cur.swatches[name] = hex;
+  doc.presets[doc.active] = cur;
+  changed();
+}
+export function setCharacterSaturation(who: Character, v: number) {
+  cur.characters = { player: 1, mitchy: 1, ...cur.characters, [who]: v };
   doc.presets[doc.active] = cur;
   changed();
 }

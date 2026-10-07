@@ -753,35 +753,6 @@ export const TITLE = [
   '|____/ /_/   \\_\\  |_|  ',
 ];
 
-// Builds an ASCII speech bubble with a tail pointing down-left, in the style:
-// .--------------------.
-// |    hello there!    |
-// '--.  .--------------'
-//    | /
-//    |/
-export function makeBubble(text: string, width = 26): string {
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let cur = '';
-  for (const w of words) {
-    if (cur && (cur + ' ' + w).length > width) {
-      lines.push(cur);
-      cur = w;
-    } else {
-      cur = cur ? cur + ' ' + w : w;
-    }
-  }
-  if (cur) lines.push(cur);
-  const inner = Math.max(8, ...lines.map((l) => l.length));
-  const out: string[] = [];
-  out.push('.' + '-'.repeat(inner + 2) + '.');
-  for (const l of lines) out.push('| ' + l.padEnd(inner) + ' |');
-  out.push("'--.  ." + '-'.repeat(inner - 4) + "'");
-  out.push('   | /');
-  out.push('   |/');
-  return out.join('\n');
-}
-
 // Ready-made looks (sprite + colours + palette) for Mitchy's portraits.
 export const MITCHY_LOOK = { sprite: MITCHY, colors: MITCHY_COLORS, palette: MITCHY_PALETTE };
 export const MITCHY_FACE_LOOK = { sprite: MITCHY_FACE, colors: MITCHY_FACE_COLORS, palette: MITCHY_PALETTE };

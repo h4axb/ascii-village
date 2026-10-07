@@ -17,6 +17,7 @@ import {
   onThemeEdit,
   revertTheme,
   selectPreset,
+  setCharacterSaturation,
   setGrade,
   setSwatch,
   themeColor,
@@ -128,6 +129,38 @@ export function ThemeTab() {
           <input type="color" value={g.tint} onChange={(ev) => setGrade({ tint: ev.target.value })} />
           <span className="wed-dim">{g.tint}</span>
         </label>
+      </div>
+
+      <div className="wed-group">
+        <div className="wed-group-name">
+          Characters
+          <button
+            className="wed-theme-reset"
+            onClick={() => {
+              setCharacterSaturation('player', 1);
+              setCharacterSaturation('mitchy', 1);
+            }}
+          >
+            reset
+          </button>
+        </div>
+        {(['player', 'mitchy'] as const).map((who) => {
+          const v = preset.characters?.[who] ?? 1;
+          return (
+            <label key={who} className="wed-theme-slider">
+              <span>{who === 'player' ? 'player saturation' : 'Mitchy saturation'}</span>
+              <input
+                type="range"
+                min={0}
+                max={2}
+                step={0.01}
+                value={v}
+                onChange={(ev) => setCharacterSaturation(who, Number(ev.target.value))}
+              />
+              <span className="wed-dim">{v.toFixed(2)}</span>
+            </label>
+          );
+        })}
       </div>
 
       {SWATCH_GROUPS.map((grp) => (

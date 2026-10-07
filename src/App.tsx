@@ -4326,15 +4326,14 @@ function Game() {
   // ---- world-layer bubble/popup positions ----
   let bubbleEl = null;
   if (bubble) {
-    const str = S.makeBubble(bubble.text, bubble.width);
-    const lines = str.split('\n');
-    const w = Math.max(...lines.map((l) => l.length));
+    // a plain rounded box above Mitchy's head, the same light surface as the
+    // world's hover labels (.fpop), the text wrapped inside it
+    const w = Math.min(bubble.width, bubble.text.length) + 2;
     const left = Math.max(0, Math.min(catDef.x * TILE_CH - 3, GROUND_W - w));
-    const top = Math.max(0, catDef.y * TILE_LN - lines.length);
     bubbleEl = (
-      <pre className="bubble" style={{ left: `${left}ch`, top: `${top}em` }}>
-        {str}
-      </pre>
+      <div className="bubble" style={{ left: `${left}ch`, top: `${Math.max(0, catDef.y * TILE_LN)}em`, maxWidth: `${bubble.width + 2}ch` }}>
+        {bubble.text}
+      </div>
     );
   }
 

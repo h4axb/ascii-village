@@ -1051,6 +1051,8 @@ pre {
    day/night themed categories: he keeps his own colour around the clock. */
 .ent.cat {
   color: #e9dcc1;
+  /* the Theme tab's Mitchy saturation (src/theme.ts) */
+  filter: saturate(var(--mitchy-sat, 1));
 }
 
 /* PLANT category — trees, flowers, ferns, cacti, ice-flowers share one colour.
@@ -1314,6 +1316,8 @@ pre {
 
 .player-sprite {
   color: #fff;
+  /* the Theme tab's player saturation (src/theme.ts) */
+  filter: saturate(var(--player-sat, 1));
   /* pivot the PLAYER_SCALE shrink on the feet, not the sprite's centre —
      same reasoning as the base .ent rule, and the App.tsx offX/offY math
      that keeps this pivot lined up with the player's actual tile position. */
@@ -1432,11 +1436,20 @@ pre {
   white-space: normal;
 }
 
+/* Mitchy's speech bubble: a plain rounded box above his head, the same light
+   surface and dark text as the hover labels (.fpop) */
 .bubble {
   position: absolute;
-  color: #fff;
   z-index: 600;
-  background: rgba(10, 10, 10, 0.92);
+  transform: translateY(calc(-100% - 0.4em));
+  width: max-content;
+  padding: 0.45em 0.9ch;
+  border-radius: 0.5em;
+  background: #e8e8e8;
+  color: #0a0a0a;
+  white-space: normal;
+  line-height: 1.35;
+  overflow-wrap: break-word;
 }
 
 /* ---------- modals ---------- */
@@ -4197,7 +4210,7 @@ pre {
   margin: 2px 0;
 }
 .wed-theme-slider {
-  grid-template-columns: 80px 1fr 40px;
+  grid-template-columns: 112px 1fr 40px;
 }
 .wed-theme-slider input[type='range'] {
   padding: 0;

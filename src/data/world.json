@@ -10,12 +10,12 @@
       "y": 34
     },
     "palm5": {
-      "x": 21,
-      "y": 44
+      "x": 20,
+      "y": 42
     },
     "palm3": {
-      "x": 30,
-      "y": 65
+      "x": 26,
+      "y": 59
     },
     "house": {
       "x": 46.85,
@@ -48,6 +48,38 @@
     "flowerplus2": {
       "x": 36,
       "y": 38
+    },
+    "flowerplus1": {
+      "x": 40,
+      "y": 41
+    },
+    "grasshalm2": {
+      "x": 48,
+      "y": 38
+    },
+    "grasshalm7": {
+      "x": 55,
+      "y": 24
+    },
+    "grasshalm8": {
+      "x": 48,
+      "y": 41
+    },
+    "flowerplus5": {
+      "x": 52,
+      "y": 42
+    },
+    "flowerplus3": {
+      "x": 41,
+      "y": 38
+    },
+    "grasshalm6": {
+      "x": 40,
+      "y": 39
+    },
+    "flowerplus7": {
+      "x": 33,
+      "y": 40
     }
   },
   "removed": [
@@ -82,7 +114,7 @@
       "id": "grasshalm-5",
       "asset": "grasshalm",
       "x": 45,
-      "y": 27
+      "y": 18
     },
     {
       "id": "grasshalm-6",
@@ -255,20 +287,20 @@
     {
       "id": "flowerplus-10",
       "asset": "flowerplus",
-      "x": 42,
-      "y": 42
+      "x": 41,
+      "y": 40
     },
     {
       "id": "flowerplus-11",
       "asset": "flowerplus",
-      "x": 42,
-      "y": 43
+      "x": 41,
+      "y": 41
     },
     {
       "id": "flowerplus-12",
       "asset": "flowerplus",
-      "x": 41,
-      "y": 43
+      "x": 38,
+      "y": 52
     },
     {
       "id": "grasshalm-25",
@@ -308,36 +340,36 @@
     {
       "id": "flowerplus-14",
       "asset": "flowerplus",
-      "x": 45,
-      "y": 46,
+      "x": 50,
+      "y": 40,
       "scale": 0.5
     },
     {
       "id": "flowerplus-15",
       "asset": "flowerplus",
-      "x": 53,
-      "y": 49,
+      "x": 52,
+      "y": 54,
       "scale": 0.5
     },
     {
       "id": "flowerplus-16",
       "asset": "flowerplus",
-      "x": 54,
-      "y": 50,
+      "x": 53,
+      "y": 53,
       "scale": 0.5
     },
     {
       "id": "flowerplus-17",
       "asset": "flowerplus",
-      "x": 53,
-      "y": 50,
+      "x": 52,
+      "y": 53,
       "scale": 0.5
     },
     {
       "id": "flowerplus-18",
       "asset": "flowerplus",
-      "x": 54,
-      "y": 49,
+      "x": 53,
+      "y": 54,
       "scale": 0.5
     },
     {
@@ -397,18 +429,11 @@
       "scale": 0.5
     },
     {
-      "id": "pond-south",
-      "asset": "pond-a",
-      "x": 31,
-      "y": 76,
-      "scale": 0.35
-    },
-    {
       "id": "stone-4-1",
       "asset": "stone-4",
-      "x": 26,
-      "y": 30,
-      "scale": 0.26
+      "x": 50,
+      "y": 36,
+      "scale": 0.1
     },
     {
       "id": "stone-3-1",
@@ -420,9 +445,149 @@
     {
       "id": "stone-5-1",
       "asset": "stone-5",
-      "x": 27,
+      "x": 26,
+      "y": 36,
+      "scale": 0.2
+    },
+    {
+      "id": "palm-4",
+      "asset": "palm",
+      "x": 63,
+      "y": 24,
+      "scale": 1
+    },
+    {
+      "id": "bush-simple-1",
+      "asset": "bush-simple",
+      "x": 35,
       "y": 40,
-      "scale": 0.26
+      "scale": 0.3
+    },
+    {
+      "id": "bush-simple-2",
+      "asset": "bush-simple",
+      "x": 56,
+      "y": 21,
+      "scale": 0.3
+    },
+    {
+      "id": "bush-simple-3",
+      "asset": "bush-simple",
+      "x": 48,
+      "y": 73,
+      "scale": 0.3
+    },
+    {
+      "id": "bush-simple-4",
+      "asset": "bush-simple",
+      "x": 50,
+      "y": 31,
+      "scale": 0.3
+    },
+    {
+      "id": "bush-simple-5",
+      "asset": "bush-simple",
+      "x": 34,
+      "y": 12,
+      "scale": 0.3
+    },
+    {
+      "id": "stone-2-1",
+      "asset": "stone-2",
+      "x": 48,
+      "y": 35,
+      "scale": 0.08
+    },
+    {
+      "id": "pond-simple-1",
+      "asset": "pond-simple",
+      "x": 37,
+      "y": 73,
+      "scale": 0.53
+    },
+    {
+      "id": "bush-simple-6",
+      "asset": "bush-simple",
+      "x": 34,
+      "y": 71,
+      "scale": 0.3
+    },
+    {
+      "id": "flowerplus-orange-1",
+      "asset": "flowerplus-orange",
+      "x": 52,
+      "y": 78,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-orange-2",
+      "asset": "flowerplus-orange",
+      "x": 53,
+      "y": 78,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-orange-3",
+      "asset": "flowerplus-orange",
+      "x": 52,
+      "y": 77,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-white-1",
+      "asset": "flowerplus-white",
+      "x": 56,
+      "y": 81,
+      "scale": 0.5
+    },
+    {
+      "id": "grasshalm-30",
+      "asset": "grasshalm",
+      "x": 52,
+      "y": 75,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-31",
+      "asset": "grasshalm",
+      "x": 30,
+      "y": 76,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-32",
+      "asset": "grasshalm",
+      "x": 30,
+      "y": 80,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-33",
+      "asset": "grasshalm",
+      "x": 30,
+      "y": 79,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-34",
+      "asset": "grasshalm",
+      "x": 50,
+      "y": 81,
+      "scale": 0.2
+    },
+    {
+      "id": "flowerplus-purple-1",
+      "asset": "flowerplus-purple",
+      "x": 28,
+      "y": 81,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-purple-2",
+      "asset": "flowerplus-purple",
+      "x": 27,
+      "y": 80,
+      "scale": 0.5
     }
   ],
   "colliders": {
@@ -531,5 +696,6 @@
     "93,23",
     "95,23",
     "96,23"
-  ]
+  ],
+  "mitchyLook": "mitchy-cat8"
 }

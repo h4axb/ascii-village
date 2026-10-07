@@ -10,5 +10,9 @@
   "intro.partB.mitchyExit": {
     "x": 73,
     "y": 53
+  },
+  "quest.boatLaunch": {
+    "x": 82,
+    "y": 53
   }
 }

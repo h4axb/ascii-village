@@ -4,6 +4,7 @@
 // App.tsx owns the flow and stores the answers.
 import { useState } from 'react';
 import * as S from '../sprites';
+import { useMitchyLook } from '../useMitchyLook';
 import { FitSprite, Panel } from '../ui';
 import { RATING_QUESTIONS, RATING_SCALE, TRANSITION_TEXT, type RatingQuestion } from './quests';
 
@@ -17,11 +18,14 @@ export function QuestComplete({ title, text }: { title: string; text: string }) 
   );
 }
 
-const MitchyFace = () => (
-  <div className="ds-portrait-box ds-panel-face">
-    <FitSprite look={S.MITCHY_FACE_LOOK} solid={{}} fill={0.92} maxScale={3} />
-  </div>
-);
+function MitchyFace() {
+  useMitchyLook();
+  return (
+    <div className="ds-portrait-box ds-panel-face">
+      <FitSprite look={S.MITCHY_FACE_LOOK} solid={{}} fill={0.92} maxScale={3} />
+    </div>
+  );
+}
 
 // One question at a time: 1-5 or Skip. `onAnswer` gets null for a skip.
 // After the last one the `end` content shows (Continue / the survey).

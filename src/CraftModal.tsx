@@ -30,6 +30,7 @@
 // rated in a fixed-size panel (CraftClarify.tsx); failures offer no
 // alternatives. Leaving keeps the last finished design, as above.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useMitchyLook } from './useMitchyLook';
 import * as S from './sprites';
 import { craftItem, mitchyChat, getMitchyLine, preflightCraft, clarifyPrompt, AiServiceError, aiDownOf } from './llm';
 import type { AiDown, ClarifyQuestion, CraftClarify, CraftConcept, OwnedItem, ShopItem } from './llm';
@@ -67,7 +68,8 @@ export const PROMPT_MAX = 80;
 // Mitchy crafts it again. Once per token; refunded if the rework fails.
 export const ADJUST_PRICE = 12;
 
-const MITCHY: Speaker = { name: MITCHY_NAME, look: S.MITCHY_FACE_LOOK, solid: {} };
+// his portrait follows his current look (the world editor can swap it)
+const mitchySpeaker = (): Speaker => ({ name: MITCHY_NAME, look: S.MITCHY_FACE_LOOK, solid: {} });
 
 // input → working → (choosing | clarifying →) working → failed | success → folded
 // offline: the AI couldn't be reached; a popup explains and retries
@@ -209,6 +211,8 @@ export default function CraftModal({
   onBusyChange: (busy: boolean) => void;
   onDoneChange: (done: boolean) => void;
 }) {
+  useMitchyLook();
+  const mitchy = mitchySpeaker();
   void token;
   const [phase, setPhase] = useState<Phase>('input');
   const [thread, setThread] = useState<Turn[]>([
@@ -1034,7 +1038,7 @@ export default function CraftModal({
               />
             ) : (
               groups.map((g, i) => (
-                <ChatMessage key={i} who={g.who === 'me' ? player : MITCHY} side={g.who === 'me' ? 'right' : 'left'}>
+                <ChatMessage key={i} who={g.who === 'me' ? player : mitchy} side={g.who === 'me' ? 'right' : 'left'}>
                   {g.bubbles}
                 </ChatMessage>
               ))

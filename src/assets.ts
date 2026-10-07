@@ -36,6 +36,9 @@ export interface AssetDef {
   interactable: boolean;
   group: 'Buildings' | 'Nature' | 'Items' | 'Water' | 'New';
   file?: string; // src/data/assets/<file> for file assets
+  // kind 'cat' only: a look for Mitchy, never placed on its own (see
+  // applyMitchyLook in world.ts); the rows of his head, for portraits
+  headRows?: number;
 }
 
 export interface AssetMeta {
@@ -81,6 +84,7 @@ interface AssetFile extends AssetMeta {
   colors?: string[];
   palette?: Record<string, string>;
   solid?: string[];
+  headRows?: number;
 }
 const FILES = import.meta.glob<{ default: AssetFile }>('./data/assets/*.json', { eager: true });
 
@@ -104,6 +108,7 @@ function fileAssets(): AssetDef[] {
       scale: d.scale ?? 1,
       interactable: d.interactable ?? false,
       file,
+      headRows: d.headRows,
     });
   }
   return out;

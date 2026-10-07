@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useMitchyLook } from './useMitchyLook';
 import * as S from './sprites';
 import {
   TILE_CH,
@@ -1093,6 +1094,8 @@ function Game() {
   // ColoredSprite only redraws when the palette object changes — and the
   // terrain repaints.
   const themeRev = useSyncExternalStore(onThemeChange, themeRevision);
+  // Mitchy's look (the editor can swap it): his portraits re-render with it
+  const mitchyRev = useMitchyLook();
   const themedPalettes = useMemo(() => new WeakMap<Record<string, string>, Record<string, string>>(), [themeRev]); // eslint-disable-line react-hooks/exhaustive-deps
   const themedPalette = (p: Record<string, string> | undefined) => {
     if (!p || themeRev === 0) return p;
@@ -4558,7 +4561,8 @@ function Game() {
         ringColor: 'var(--ui-petal-core)',
       },
     ],
-    [playerName, avatarSprite, avatarRecolored, catDef],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mitchyRev: his look changed
+    [playerName, avatarSprite, avatarRecolored, catDef, mitchyRev],
   );
 
   return (
@@ -6639,8 +6643,10 @@ function PlacedItemView({
 // Same props as ColoredSprite, so the entity map needs no other change;
 // anything else (or a sprite without colour data) stays a ColoredSprite.
 // 'cat': Mitchy is drawn like the player — solid per-cell backing plus the
-// player's outline ring (every other canvas kind has no ring).
-const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop']);
+// player's outline ring (every other canvas kind has no ring). 'boulder': the
+// editor's solid assets (stones, bushes, the glyph ponds) — hundreds of cells
+// each, so a canvas too.
+const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder']);
 function EntSprite({
   kind,
   charW,

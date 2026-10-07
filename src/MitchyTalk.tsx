@@ -13,8 +13,10 @@ import { mitchyLuck, mitchySmallTalk } from './llm';
 import { MITCHY_NAME } from './introPartB';
 import { dailySaju } from './saju';
 import { Bubble, ChatMessage, Frame, Sheet, type Speaker } from './ui';
+import { useMitchyLook } from './useMitchyLook';
 
-const MITCHY: Speaker = { name: MITCHY_NAME, look: S.MITCHY_FACE_LOOK, solid: {} };
+// his portrait follows his current look (the world editor can swap it)
+const mitchySpeaker = (): Speaker => ({ name: MITCHY_NAME, look: S.MITCHY_FACE_LOOK, solid: {} });
 
 // the first talk ever plugs the craft tokens; after that, a greeting
 const TOKEN_LINE =
@@ -92,6 +94,8 @@ export function MitchyTalk({
   first: boolean; // the player's first talk with her: the craft-token tip
   onClose: () => void;
 }) {
+  useMitchyLook();
+  const mitchy = mitchySpeaker();
   const [lines, setLines] = useState<Line[]>(() => [
     { who: 'mitchy', text: first ? TOKEN_LINE : GREETINGS[Math.floor(Math.random() * GREETINGS.length)] },
   ]);
@@ -203,7 +207,7 @@ export function MitchyTalk({
         <div className="cw3-body">
           <div className="cw3-chat" ref={chatRef}>
             {groups.map((g, i) => (
-              <ChatMessage key={i} who={g.who === 'me' ? player : MITCHY} side={g.who === 'me' ? 'right' : 'left'}>
+              <ChatMessage key={i} who={g.who === 'me' ? player : mitchy} side={g.who === 'me' ? 'right' : 'left'}>
                 {g.texts.map((t, j) => (
                   <Bubble key={j} className={t === '…' ? 'talk-typing' : undefined}>
                     {t}

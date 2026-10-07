@@ -43,6 +43,8 @@ const OFF: WorldEditor = {
   setMeta: noop,
   resetCollider: noop,
   clearBlockedTiles: noop,
+  mitchyLook: WORLD_DOC.mitchyLook ?? 'mitchy',
+  setMitchyLook: noop,
   undo: noop,
   redo: noop,
   canUndo: false,

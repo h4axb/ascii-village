@@ -12,7 +12,7 @@ import { ThemeTab } from './ThemeTab';
 import { GroundTab } from './GroundTab';
 import type { IntroNarrationTool } from '../devIntroNarration';
 import type { Ent, EntityKind } from '../world';
-import type { AssetDef } from '../assets';
+import { FIXED_ASSETS, type AssetDef } from '../assets';
 import { PLACEABLE_KINDS, locksOf, isEditable } from './useWorldEditor';
 import type { WorldEditor, EditorTab } from './useWorldEditor';
 
@@ -268,10 +268,15 @@ function AssetsTab({ ed }: { ed: WorldEditor }) {
     const m = new Map<string, AssetDef[]>();
     for (const a of ed.assets) {
       if (q && !a.slug.includes(q.toLowerCase()) && !a.label.toLowerCase().includes(q.toLowerCase())) continue;
+      if (a.kind === 'cat') continue; // a look for Mitchy, listed apart below
       m.set(a.group, [...(m.get(a.group) ?? []), a]);
     }
     return [...m];
   }, [ed.assets, q]);
+  const looks = useMemo(
+    () => [FIXED_ASSETS.find((a) => a.slug === 'mitchy')!, ...ed.assets.filter((a) => a.kind === 'cat')],
+    [ed.assets],
+  );
   return (
     <div>
       <div className="wed-hint">
@@ -279,6 +284,26 @@ function AssetsTab({ ed }: { ed: WorldEditor }) {
         <code>src/data/assets/</code> show up here under <b>New</b> after a reload.
       </div>
       <input className="wed-search" placeholder="filter assets…" value={q} onChange={(ev) => setQ(ev.target.value)} />
+      <div className="wed-group">
+        <div className="wed-group-name">Mitchy's look</div>
+        <div className="wed-hint">
+          There is only one Mitchy: click a look to give it to him, in the world, his chat portrait, the map and the menus.
+          Saved with the world. Files of kind <code>cat</code> in <code>src/data/assets/</code> show up here.
+        </div>
+        <div className="wed-assets">
+          {looks.map((a) => (
+            <button
+              key={a.slug}
+              className={'wed-asset' + (ed.mitchyLook === a.slug ? ' on' : '')}
+              title={a.slug === 'mitchy' ? "Mitchy's original look" : `${a.slug} · Mitchy's look`}
+              onClick={() => ed.setMitchyLook(a.slug)}
+            >
+              <Thumb a={a} />
+              <span>{a.slug === 'mitchy' ? 'Original' : a.label.replace(/^Mitchy:\s*/, '')}</span>
+            </button>
+          ))}
+        </div>
+      </div>
       {groups.map(([group, list]) => (
         <div key={group} className="wed-group">
           <div className="wed-group-name">{group}</div>

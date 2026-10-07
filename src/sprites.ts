@@ -255,12 +255,19 @@ export const WALK_RIGHT_PAD_TOP: number = (walkRightData as { padTop?: number })
 // per-cell backing and outline (SolidSpriteCanvas). MITCHY_FACE is the head
 // crop for portraits (map, menus), like the player's `face`.
 // ---------------------------------------------------------------------------
-export const MITCHY: string[] = mitchyData.sprite;
-export const MITCHY_COLORS: string[] = mitchyData.colors;
-export const MITCHY_PALETTE: Record<string, string> = mitchyData.palette;
-const MITCHY_HEAD_ROWS = 29; // rows 0-28: ears to glasses and chin, above the collar line
-export const MITCHY_FACE: string[] = MITCHY.slice(0, MITCHY_HEAD_ROWS);
-export const MITCHY_FACE_COLORS: string[] = MITCHY_COLORS.slice(0, MITCHY_HEAD_ROWS);
+//
+// His LOOK can be swapped: the world editor's Assets tab makes any asset of
+// kind 'cat' (src/data/assets/*.json) his art (world.json `mitchyLook`, see
+// applyMitchyLook in world.ts). The bindings below are `let` and reassigned
+// by setMitchyArt, so every importer reads the current look; components
+// re-render through useMitchyLook().
+// The original art, as shipped
+export const MITCHY_ORIGINAL = { sprite: mitchyData.sprite as string[], colors: mitchyData.colors as string[], palette: mitchyData.palette as Record<string, string>, headRows: 29 }; // rows 0-28: ears to glasses and chin, above the collar line
+export let MITCHY: string[] = MITCHY_ORIGINAL.sprite;
+export let MITCHY_COLORS: string[] = MITCHY_ORIGINAL.colors;
+export let MITCHY_PALETTE: Record<string, string> = MITCHY_ORIGINAL.palette;
+export let MITCHY_FACE: string[] = MITCHY.slice(0, MITCHY_ORIGINAL.headRows);
+export let MITCHY_FACE_COLORS: string[] = MITCHY_COLORS.slice(0, MITCHY_ORIGINAL.headRows);
 
 // His happy slow-blink (shown when a sale closes): the eye cells (the yellow
 // iris, the pupils and the highlight) turn into fur, with a '^' across the
@@ -754,8 +761,36 @@ export const TITLE = [
 ];
 
 // Ready-made looks (sprite + colours + palette) for Mitchy's portraits.
-export const MITCHY_LOOK = { sprite: MITCHY, colors: MITCHY_COLORS, palette: MITCHY_PALETTE };
-export const MITCHY_FACE_LOOK = { sprite: MITCHY_FACE, colors: MITCHY_FACE_COLORS, palette: MITCHY_PALETTE };
+export let MITCHY_LOOK = { sprite: MITCHY, colors: MITCHY_COLORS, palette: MITCHY_PALETTE };
+export let MITCHY_FACE_LOOK = { sprite: MITCHY_FACE, colors: MITCHY_FACE_COLORS, palette: MITCHY_PALETTE };
+
+// Swap Mitchy's art (world.ts applyMitchyLook). headRows: how many rows from
+// the top make his portrait crop (the head).
+export interface MitchyArt {
+  sprite: string[];
+  colors: string[];
+  palette: Record<string, string>;
+  headRows: number;
+}
+let mitchyRev = 0;
+const mitchyListeners = new Set<() => void>();
+export function setMitchyArt(a: MitchyArt) {
+  if (a.sprite === MITCHY && a.colors === MITCHY_COLORS && a.palette === MITCHY_PALETTE) return;
+  MITCHY = a.sprite;
+  MITCHY_COLORS = a.colors;
+  MITCHY_PALETTE = a.palette;
+  MITCHY_FACE = a.sprite.slice(0, a.headRows);
+  MITCHY_FACE_COLORS = a.colors.slice(0, a.headRows);
+  MITCHY_LOOK = { sprite: MITCHY, colors: MITCHY_COLORS, palette: MITCHY_PALETTE };
+  MITCHY_FACE_LOOK = { sprite: MITCHY_FACE, colors: MITCHY_FACE_COLORS, palette: MITCHY_PALETTE };
+  mitchyRev += 1;
+  for (const fn of [...mitchyListeners]) fn();
+}
+export function onMitchyLook(fn: () => void): () => void {
+  mitchyListeners.add(fn);
+  return () => mitchyListeners.delete(fn);
+}
+export const mitchyRevision = () => mitchyRev;
 export const MITCHY_HAPPY_LOOK = { sprite: MITCHY_HAPPY.sprite, colors: MITCHY_HAPPY.colors, palette: MITCHY_BLINK_PALETTE };
 
 // ---------------------------------------------------------------------------

@@ -295,10 +295,12 @@ function houseSlice(rawColStart: number, rawColEnd: number, rawRowStart: number,
 // at their own larger font-size.
 export const PLAYER_SCALE = 0.15;
 export const PLAYER_T = spriteTiles(S.PLAYER, PLAYER_SCALE);
-// His art has 47 rows (the player's 22): scaled so he stays the same 4.2
-// lines tall as his earlier 28-row sprite at the player's scale.
-export const MITCHY_SCALE = (PLAYER_SCALE * 28) / 47;
-export const MITCHY_T = spriteTiles(S.MITCHY, MITCHY_SCALE);
+// Scaled so he stays the same 4.2 lines tall as his earlier 28-row sprite at
+// the player's scale, whatever the resolution of his art (the original has 47
+// rows, the player 22). Both follow his current look (applyMitchyLook).
+export const mitchyScaleFor = (rows: number) => (PLAYER_SCALE * 28) / rows;
+export let MITCHY_SCALE = mitchyScaleFor(S.MITCHY.length);
+export let MITCHY_T = spriteTiles(S.MITCHY, MITCHY_SCALE);
 
 // An entity's footprint is the bottom row of tiles it covers. Used for
 // interaction distance (near) and dropped-fruit placement.
@@ -832,9 +834,37 @@ export interface WorldDoc {
   // editor's Colliders tab — an invisible wall, independent of any object.
   // Like the buildings, they stop the player's feet.
   blockedTiles?: string[];
+  // Mitchy's look: the slug of an asset of kind 'cat' (src/data/assets/),
+  // chosen in the editor's Assets tab. Absent = his original art ('mitchy').
+  mitchyLook?: string;
 }
 
 export const WORLD_DOC: WorldDoc = worldDocData as unknown as WorldDoc;
+
+// ---- Mitchy's look ----
+// One Mitchy, many possible looks: the world's cat entity, his portraits
+// (chat panels, map, menus) and his map marker all draw the chosen art.
+export interface MitchyLook {
+  slug: string; // 'mitchy' = the original
+  art: S.MitchyArt;
+  scale: number;
+}
+export function mitchyLookOf(slug: string | undefined): MitchyLook {
+  const def = slug && slug !== 'mitchy' ? assetOf(slug) : undefined;
+  if (def && def.kind === 'cat' && def.colors && def.palette) {
+    const art = { sprite: def.sprite, colors: def.colors, palette: def.palette, headRows: def.headRows ?? Math.ceil(def.sprite.length * 0.6) };
+    return { slug: def.slug, art, scale: mitchyScaleFor(def.sprite.length) };
+  }
+  return { slug: 'mitchy', art: S.MITCHY_ORIGINAL, scale: mitchyScaleFor(S.MITCHY_ORIGINAL.sprite.length) };
+}
+// Make `slug` his look everywhere (the game at load; the editor live)
+export function applyMitchyLook(slug: string | undefined): void {
+  const look = mitchyLookOf(slug);
+  MITCHY_SCALE = look.scale;
+  MITCHY_T = spriteTiles(look.art.sprite, look.scale);
+  S.setMitchyArt(look.art);
+}
+applyMitchyLook(WORLD_DOC.mitchyLook);
 
 // The built-in objects, with the registry slug each one draws.
 export const BASE_ENTS: readonly Ent[] = STRUCT_ENTS_BASE.map((e) =>
@@ -863,9 +893,14 @@ export function buildStructEnts(doc: WorldDoc): Ent[] {
   for (const base of BASE_ENTS) {
     if (removed.has(base.id)) continue;
     let e: Ent = base;
+    if (base.id === 'cat') {
+      // his chosen look (keeps any moved pose; the scale follows the art)
+      const look = mitchyLookOf(doc.mitchyLook);
+      e = { ...e, asset: look.slug, sprite: look.art.sprite, colors: look.art.colors, palette: look.art.palette, scale: look.scale };
+    }
     const own = doc.moved[base.id];
     if (own) {
-      e = { ...e, ...own };
+      e = { ...e, ...own, ...(base.id === 'cat' ? { scale: e.scale } : {}) };
     } else if (house && BASE_HOUSE && base.id.startsWith('house-')) {
       // The house's clickable hotspots and stair blockers are pinned to its
       // picture: they follow its move and scale.

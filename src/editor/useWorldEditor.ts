@@ -34,6 +34,7 @@ import {
   collisionBox,
   setLiveStructEnts,
   fitMask,
+  applyMitchyLook,
 } from '../world';
 import type { Ent, EntityKind, WorldDoc, WorldPose, WorldAdded } from '../world';
 import { RAW_ASSETS, FIXED_ASSETS, ASSET_META, assetOf } from '../assets';
@@ -150,6 +151,9 @@ export interface WorldEditor {
   setMeta(slug: string, patch: AssetMeta): void;
   resetCollider(slug: string): void;
   clearBlockedTiles(): void; // remove every painted map tile
+  // Mitchy's look: an asset of kind 'cat' ('mitchy' = his original art)
+  mitchyLook: string;
+  setMitchyLook(slug: string): void;
 
   undo(): void;
   redo(): void;
@@ -417,6 +421,11 @@ export function useWorldEditor(opts: {
     const t = window.setTimeout(() => setStatus(null), 3500);
     return () => window.clearTimeout(t);
   }, [status]);
+
+  // Mitchy's look follows the edited doc at once (and back on undo / discard),
+  // in the world and in every portrait of him
+  const lookSlug = state.doc.mitchyLook;
+  useEffect(() => applyMitchyLook(lookSlug), [lookSlug]);
 
   // ---- editing: every change goes through commit() ----
   const commit = useCallback((fn: (s: Snapshot) => Snapshot, record = true) => {
@@ -1057,6 +1066,12 @@ export function useWorldEditor(opts: {
     setMeta,
     resetCollider,
     clearBlockedTiles,
+    mitchyLook: state.doc.mitchyLook ?? 'mitchy',
+    setMitchyLook: (slug) =>
+      updateDoc((d) => {
+        if (slug === 'mitchy') delete d.mitchyLook;
+        else d.mitchyLook = slug;
+      }),
     undo,
     redo,
     canUndo: undoStack.length > 0,

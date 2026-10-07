@@ -75,9 +75,30 @@ it's in the **Assets** tab under **New**. `scripts/svg-glyph-to-asset.mjs` and
 the "make an asset from an image" section of the Assets tab both produce these
 files. See `docs/AssetTranscriptionWorkflow.md`.
 
-Kinds a placed asset can have: decor (just drawn), ground (drawn under
-everything, like grass), landscape (like the cliff), bridge (drawn over
-water), or one of the collectables. Anything with new behaviour needs code.
+Kinds a placed asset can have:
+- **decor:** just drawn;
+- **boulder:** drawn solid, with an opaque backing per cell, on one canvas; the player's feet stop at its drawn cells. Used for the stones, bushes and glyph ponds.
+- **ground:** drawn under everything, like grass;
+- **landscape:** like the cliff;
+- **bridge:** drawn over water;
+- one of the collectables.
+
+Anything with new behaviour needs code.
+
+## Mitchy's look
+
+There is only one Mitchy, but his art can be swapped:
+
+1. Give an asset file `"kind": "cat"` (and `"headRows"`: how many rows from the top make his portrait).
+2. In the **Assets** tab, under **Mitchy's look**, click a look (**Original** is his first art).
+
+The look changes at once everywhere he is drawn:
+- in the world;
+- the chat and menu portraits;
+- the rating screens;
+- the map.
+
+He keeps his height: the scale follows the art's row count. A look is never placed on its own. The choice is saved with the world (`mitchyLook` in `world.json`). An asset of kind `cat` gets its own painted collider, like any other.
 
 ## Where it lives
 

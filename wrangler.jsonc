@@ -30,7 +30,7 @@
 	},
   "d1_databases": [
     {
-      "binding": "asciia_feedback",
+      "binding": "FEEDBACK_DB",
       "database_name": "asciia-feedback",
       "database_id": "72bd1cbb-1ff4-44e0-849f-1ba7c3bd5e6d"
     }

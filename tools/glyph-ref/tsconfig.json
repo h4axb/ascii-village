@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "noEmit": true, "types": ["vite/client"] },
+  "include": ["."],
+  "exclude": ["vite.config.ts", "refs"]
+}

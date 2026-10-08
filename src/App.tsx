@@ -88,6 +88,8 @@ import type { DialogueLine } from './DialogueBox';
 import NameEntryPanel from './NameEntryPanel';
 import Letterbox from './Letterbox';
 import IntroA, { type IntroAHandle } from './IntroA';
+import IntroCinematic from './cinematic/IntroCinematic';
+import { SHOT_LIST } from './cinematic/config';
 import GameMap from './GameMap';
 import type { MapCharacterEntry } from './GameMap';
 import {
@@ -674,9 +676,20 @@ const PATH = window.location.pathname;
 const CRAFT_CLARIFY = LINK === '1';
 const CRAFT_FEEDBACK = LINK === '2';
 const CRAFT_CHOICES = LINK === '3';
+// /cinematic plays the new intro cinematic (src/cinematic/) instead of the
+// laptop/MYLL prologue, then the same wake-up scene; for testing it on its
+// own. ?shot=<id> (or ?t=<ms>) starts it at a shot, see SHOT_LIST.
+const INTRO_CINEMATIC = /^\/cinematic\/?$/.test(PATH);
+const CINEMATIC_START = (() => {
+  if (!INTRO_CINEMATIC) return 0;
+  const q = new URLSearchParams(window.location.search);
+  const t = Number(q.get('t'));
+  if (Number.isFinite(t) && t > 0) return t;
+  return SHOT_LIST.find((x) => x.id === q.get('shot'))?.at ?? 0;
+})();
 const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[0-3]\/?$/.test(PATH)
   ? 'skip'
-  : /^\/intro(\/[0-3])?\/?$/.test(PATH)
+  : /^\/intro(\/[0-3])?\/?$/.test(PATH) || INTRO_CINEMATIC
     ? 'force'
     : 'default';
 
@@ -731,6 +744,8 @@ function Game() {
   // false once IntroA calls its onComplete.
   const [introAActive, setIntroAActive] = useState(introPending);
   const introARef = useRef<IntroAHandle>(null);
+  // the intro cinematic (/cinematic) just ended with the island in view
+  const portalHandoffRef = useRef(false);
   const timeCfgRef = useRef<TimeConfig>(
     saved
       ? { anchor: saved.anchor, anchorReal: saved.anchorReal, timeScale: saved.timeScale }
@@ -915,7 +930,8 @@ function Game() {
   );
   const cinematicRef = useRef(cinematic);
   cinematicRef.current = cinematic;
-  const [blackout, setBlackout] = useState(() => !!introBMarkersAtMount); // full-screen black cover
+  // full-screen black cover (not on /cinematic: its portal opens onto the island)
+  const [blackout, setBlackout] = useState(() => !!introBMarkersAtMount && !INTRO_CINEMATIC);
   const [letterboxVisible, setLetterboxVisible] = useState(false);
   const [letterboxOpen, setLetterboxOpen] = useState(false); // bars sliding away (the very end only)
   const [dialogue, setDialogue] = useState<DialogueLine | null>(null);
@@ -949,7 +965,9 @@ function Game() {
     // his ordinary STRUCT_ENTS spot for the one frame before the mount
     // effect below (hidden behind the synchronous `blackout` cover either
     // way) computes a fresh off-camera entrance start.
-    introBMarkersAtMount ? null : (saved?.mitchyPos ?? null),
+    // (/cinematic: the island shows behind the portal before the wake-up
+    // scene starts, so he waits out of sight at his exit spot meanwhile)
+    introBMarkersAtMount ? (INTRO_CINEMATIC ? introBMarkersAtMount.mitchyExit : null) : (saved?.mitchyPos ?? null),
   );
   const mitchyPosRef = useRef(mitchyPos);
   mitchyPosRef.current = mitchyPos;
@@ -2150,9 +2168,13 @@ function Game() {
     mitchyStart: { x: number; y: number };
     mitchyExit: { x: number; y: number };
   }) {
+    // after the intro cinematic's portal the island is already in view: no
+    // black screen to wake up from (the wake line plays over the world)
+    const fromPortal = portalHandoffRef.current;
+    portalHandoffRef.current = false;
     setCinematic('introB');
-    setBlackout(true);
-    setLetterboxVisible(false);
+    setBlackout(!fromPortal);
+    setLetterboxVisible(fromPortal);
     setLetterboxOpen(false);
     setMapHint(false);
 
@@ -5415,7 +5437,20 @@ function Game() {
           onComplete -> setIntroAActive(false)) there is no visible seam:
           black hands off to black, one frame apart, same as the retired
           prototype's own reveal-while-already-black handoff. */}
-      {introAActive && <IntroA ref={introARef} onComplete={() => setIntroAActive(false)} />}
+      {introAActive &&
+        (INTRO_CINEMATIC ? (
+          <IntroCinematic
+            ref={introARef}
+            devTimeline={import.meta.env.DEV}
+            startAt={CINEMATIC_START}
+            onComplete={() => {
+              portalHandoffRef.current = true;
+              setIntroAActive(false);
+            }}
+          />
+        ) : (
+          <IntroA ref={introARef} onComplete={() => setIntroAActive(false)} />
+        ))}
       {/* Mounted for the cinematic's whole run (not just while `blackout` is
           true) so the opacity:1->0 transition below actually gets to play
           instead of the div vanishing the instant blackout flips false. */}

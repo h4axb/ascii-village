@@ -1,0 +1,330 @@
+/* The intro cinematic (src/cinematic/IntroCinematic.tsx). The clock sets
+   transforms, opacities and the --vars below on every frame. */
+.cin-root {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: hidden;
+  background: #000;
+  user-select: none;
+}
+.cin-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+.cin-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* the cold light of the screen spilling into the room */
+.cin-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(48% 52% at 50% 46%, rgba(90, 150, 255, 0.32), rgba(40, 80, 200, 0.1) 55%, transparent 75%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.cin-black {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+}
+.cin-screen {
+  position: absolute;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+}
+/* the screen dims and cools as the rejections pile up */
+.cin-tint {
+  position: absolute;
+  inset: 0;
+  background: #0b1a3a;
+  opacity: 0.06;
+}
+.cin-flash {
+  position: absolute;
+  inset: 0;
+  background: #dfe9ff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---- email windows ---- */
+.cin-win {
+  position: absolute;
+  opacity: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #23272f;
+  will-change: transform, opacity;
+}
+.cin-win-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  background: #f5f6f8;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 10px 28px rgba(0, 0, 20, 0.45);
+  opacity: var(--frame, 1);
+}
+.cin-win-dim {
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  background: #0a1430;
+  opacity: var(--dim, 0);
+  pointer-events: none;
+}
+.cin-win-in {
+  position: relative;
+  padding: 0 14px 10px;
+}
+.cin-win.final .cin-fade {
+  opacity: var(--fade, 1);
+}
+.cin-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  margin: 0 -14px 8px;
+  padding: 0 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 10px;
+  color: #6b7280;
+}
+.cin-titlebar i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cfd3da;
+}
+.cin-titlebar span {
+  margin-left: 6px;
+}
+.cin-from {
+  font-size: 10.5px;
+  color: #4b5563;
+}
+.cin-from span {
+  display: inline-block;
+  min-width: 34px;
+  color: #9aa1ab;
+}
+.cin-subject {
+  margin: 2px 0 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.cin-text p {
+  margin: 0 0 6px;
+}
+.cin-sign {
+  color: #4b5563;
+}
+.cin-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.cin-actions span {
+  padding: 2px 9px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  font-size: 9.5px;
+  color: #4b5563;
+}
+.cin-em {
+  color: inherit;
+  background: rgba(255, 196, 64, calc(var(--em, 0) * 0.45));
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* the application-portal look: darker, more compact */
+.cin-portal {
+  color: #d5d9e2;
+  font-size: 10.5px;
+}
+.cin-portal .cin-win-bg {
+  background: #2a2f3c;
+  border-color: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+.cin-portal .cin-titlebar {
+  background: #3a4153;
+  color: #aab2c4;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+}
+.cin-portal .cin-titlebar i {
+  display: none;
+}
+.cin-portal .cin-from,
+.cin-portal .cin-sign,
+.cin-portal .cin-actions span {
+  color: #9aa3b5;
+}
+.cin-portal .cin-actions span {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* the notification look of the stacked windows */
+.cin-stacked .cin-win-bg {
+  background: #e9ecf1;
+  border-radius: 5px;
+}
+.cin-stacked .cin-titlebar {
+  background: #d8dde6;
+  border-radius: 5px 5px 0 0;
+}
+
+/* the last email: a little larger, the phrases that survive */
+.cin-win.final {
+  font-size: 12px;
+}
+.cin-win.final .cin-win-bg {
+  box-shadow: 0 16px 40px rgba(0, 0, 20, 0.6);
+}
+.cin-win.final .cin-subject {
+  font-size: 16px;
+}
+.cin-kw {
+  position: relative;
+  color: var(--kw, #23272f);
+}
+.cin-ch {
+  display: inline-block;
+}
+.cin-dots {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  white-space: nowrap;
+  opacity: var(--dots, 0);
+}
+
+/* ---- the portal ---- */
+.cin-void {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  display: none;
+}
+.cin-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+}
+.cin-clone,
+.cin-filler {
+  position: absolute;
+  left: 0;
+  top: 0;
+  text-align: center;
+  white-space: pre;
+  will-change: transform, opacity;
+}
+.cin-clone {
+  color: #e9eef6;
+}
+.cin-clone.glyph {
+  text-shadow: 0 0 8px rgba(110, 230, 210, 0.55);
+}
+.cin-filler {
+  color: #86e6d8;
+  opacity: 0;
+  text-shadow: 0 0 6px rgba(110, 230, 210, 0.45);
+}
+.cin-portal-glow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  transform-origin: 50% 50%;
+  background: radial-gradient(circle, rgba(70, 210, 190, 0.38), rgba(40, 150, 170, 0.12) 55%, transparent 72%);
+  opacity: 0;
+}
+
+/* ---- dev timeline (localhost) ---- */
+.cin-dev {
+  position: absolute;
+  left: 12px;
+  right: 110px; /* clear of the Skip Intro button */
+  bottom: 12px;
+  z-index: 3;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(18, 18, 26, 0.88);
+  border: 1px solid #3d3d4d;
+  color: #e4e6f0;
+  font: 11px ui-monospace, Menlo, Consolas, monospace;
+}
+.cin-dev.closed {
+  display: none;
+}
+.cin-dev-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cin-dev button,
+.cin-dev select,
+.cin-dev-open {
+  font: inherit;
+  color: #e4e6f0;
+  background: #2a2a38;
+  border: 1px solid #3d3d4d;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.cin-dev button:hover {
+  border-color: #6a6ac0;
+}
+.cin-dev-time {
+  min-width: 46px;
+  opacity: 0.8;
+}
+.cin-dev-scrub {
+  flex: 1;
+  min-width: 160px;
+}
+.cin-dev label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  opacity: 0.85;
+}
+.cin-dev-shots {
+  display: flex;
+  gap: 3px;
+  margin-top: 6px;
+}
+.cin-dev-shots button {
+  flex-basis: 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 3px 4px;
+}
+.cin-dev-shots button.on {
+  background: #3d3d5c;
+  border-color: #6a6ac0;
+}
+.cin-dev-open {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  opacity: 0.7;
+}

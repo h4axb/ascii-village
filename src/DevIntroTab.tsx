@@ -21,6 +21,7 @@ import type { IntroNarrationTool } from './devIntroNarration';
 import type { IntroStageId } from './introNarrationData';
 import IntroA, { type IntroAHandle } from './IntroA';
 import IntroNarration from './IntroNarration';
+import { SHOT_LIST } from './cinematic/config';
 
 // Which /intro/*.png files a stage's own IntroA.tsx section actually shows —
 // hand-mapped once here since the runtime doesn't key its <img> tags by
@@ -70,6 +71,18 @@ export function DevIntroTab({ tool }: { tool: IntroNarrationTool }) {
 
   return (
     <div className="dev-intro-tab" style={{ fontSize: 11 }}>
+      {/* the new intro cinematic (src/cinematic/) plays on its own route,
+          with its own shot timeline; open it at any shot */}
+      <div style={{ border: '1px solid #3d3d4d', borderRadius: 4, padding: 6, marginBottom: 8 }}>
+        <div style={{ opacity: 0.7, marginBottom: 4 }}>new intro cinematic (/cinematic, opens in a new tab)</div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {SHOT_LIST.map((s) => (
+            <button key={s.id} style={btn} onClick={() => window.open(`/cinematic?shot=${s.id}`, '_blank')} title={`start at ${(s.at / 1000).toFixed(1)}s`}>
+              ▶ {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
         {tool.stages.map((s, i) => (
           <button

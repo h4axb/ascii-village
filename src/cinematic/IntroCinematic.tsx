@@ -551,17 +551,10 @@ export default forwardRef<
     const bgK = span(t, [T.fall, T.fall + 1500]);
     const bg = [1, 3, 5].map((i) => parseInt(SCENE.bg.slice(i, i + 2), 16));
     const base = `rgb(${bg.map((v) => Math.round(lerp(0, v, bgK))).join(',')})`;
-    // after the hold, walk toward the doorway: a slow push in with a step's bob
+    // after the hold, the camera moves in toward the doorway: a steady,
+    // linear push in, no bob
     const wk = reduced ? 0 : clamp01((t - T.walk[0]) / (T.walk[1] - T.walk[0]));
-    const tau = Math.max(0, t - T.walk[0]) / 1000;
-    const bob = SCENE.walk.bob * m.vh * Math.min(1, wk * 4);
-    const cam = {
-      s: lerp(1, SCENE.walk.zoom, wk * wk * (3 - 2 * wk) * 0.4 + wk * wk * 0.6),
-      fx: m.scene.focus.x,
-      fy: m.scene.focus.y,
-      dx: Math.sin(tau * Math.PI * SCENE.walk.steps) * bob * 0.6,
-      dy: -Math.abs(Math.sin(tau * Math.PI * SCENE.walk.steps)) * bob * 2,
-    };
+    const cam = { s: lerp(1, SCENE.walk.zoom, wk), fx: m.scene.focus.x, fy: m.scene.focus.y, dx: 0, dy: 0 };
     const opacity = 1 - span(t, T.fadeOut);
     gc.draw(base, opacity, { ...cam, dx: cam.dx + pan.x, dy: cam.dy + (pan.y - shift * cellPx) });
     // the door's layer: transparent, placed over its cells, moved with the same camera

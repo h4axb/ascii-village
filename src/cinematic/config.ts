@@ -88,7 +88,7 @@ export const T = {
   build: [FALL + 4800, FALL + 11800], // the door emerges from the water, slowly, filling its shape
   open: [FALL + 12300, FALL + 14900], // it opens, slowly, onto the sea and the island
   beam: [FALL + 12600, FALL + 14900], // light comes out of the doorway
-  walk: [FALL + 16900, FALL + 19300], // after a 2 s hold: the camera walks toward the doorway
+  walk: [FALL + 16900, FALL + 19300], // after a 2 s hold: the camera moves in toward the doorway, steadily
   fadeOut: [FALL + 18100, FALL + 19300], // to black
   end: FALL + 22300, // 3 s of black, then the wake-up scene
 } as const;
@@ -119,7 +119,7 @@ export const LETTERS = {
 export const SCENE = {
   bg: '#16100d', // the darkness (the door drawing's own background)
   door: { h: 0.56, cy: 0.47, open: 0.55 }, // height and centre of the viewport height; open = the leaf's width when open, of its closed width
-  walk: { zoom: 1.45, bob: 0.004, steps: 1.8 }, // the walk toward the door: how near, the step bob (of the height), steps per second
+  walk: { zoom: 1.45 }, // the push in toward the door (linear): how near
 };
 
 // the game's own glyph ramp (src/craft/materials.ts RAMP_DEFAULT)

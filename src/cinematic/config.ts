@@ -111,7 +111,7 @@ export const LETTERS = {
   morphMs: 220, // the turn: it stretches into a streak and fades into the string
   streak: [0.45, 3] as const, // the streak's scale (x, y)
   tail: [5, 9] as const, // a water string's tail, cells
-  converge: 0.15, // how far a water string drifts toward the door's middle as it falls (0: straight down, 1: all to the middle)
+  converge: 0, // how far a water string drifts toward the door's middle as it falls (0: straight down, 1: all to the middle)
   pan: { dist: 0.95, center: 1600, smooth: 500 }, // the camera follows the falling letters down to the door: how far (of the height); how long it takes to bring them to the frame's centre (ms); its smoothing window (ms)
 };
 

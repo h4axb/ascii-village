@@ -308,12 +308,14 @@ export default forwardRef<
     // keeping them at the centre, down to the door's place); on the way each
     // turns into a string of water that drifts in to its column of the door
     // and lands on its foot; the door grows out of that water. The falling
-    // world is placed so the letters' middle is over the door's (D).
+    // world is placed so the letters' span is centred over the door (D; the
+    // final mail is placed so this is about 0: they fall straight down).
     const scene = buildScene(vw, vh);
     const P = LETTERS.pan.dist * vh; // world = the final framing; the letters start P above it
     const seeds: { c: number; r: number; t: number }[] = [];
     const mid = cellAt(scene, (DOOR.cols - 1) / 2, 0).x;
-    const D = mid - plan.reduce((a, p) => a + p.x0, 0) / plan.length;
+    const xs = plan.map((p) => p.x0);
+    const D = mid - (Math.min(...xs) + Math.max(...xs)) / 2;
     const { n, gap, jitter } = LETTERS.waves;
     scene.strings = plan.map((p, k) => {
       p.delay = Math.min(n - 1, Math.floor(rand(k, 7) * n)) * gap + rand(k, 8) * jitter;

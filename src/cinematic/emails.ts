@@ -112,11 +112,13 @@ export const WINDOWS: WindowShot[] = [
     hide: F[3],
     from: { x: 8, y: 0 },
   },
-  // Phase 4: the final one, prominent (it arrived the night before)
+  // Phase 4: the final one, prominent (it arrived the night before); set
+  // right of centre so its keywords sit straight above the door's place (the
+  // screen's middle), and their letters fall straight down onto it
   {
     email: 2,
     variant: 'standard',
-    left: 20,
+    left: 31.3,
     top: 8,
     width: 60,
     appear: F[5] + 400,

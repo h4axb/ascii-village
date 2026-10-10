@@ -32,23 +32,21 @@ export const T = {
   dotsIn: [7900, 8500], // "Unfortunately," -> "Unfortunately..."
   blackIn: [7300, 8600], // the room fades to black
   zoom: [7200, 8900], // the camera pushes in on the phrases
-  // falling letters
+  // falling letters -> water drops -> door (scene.ts): about 14 s in all
   fall: 9000,
-  pull: [10800, 14800], // a second force takes over from gravity
-  // portal
-  portal: 13000,
-  spin: 13000, // the ring starts its slow turn
-  morph: [14500, 16800], // some letters turn into glyphs
-  fillersIn: [14000, 17000], // extra glyph marks complete the ring
-  glowIn: [15500, 17500], // turquoise light inside the ring
-  // island reveal
-  reveal: 17500,
-  holeSmall: 19500, // a small window onto the island
-  holeFull: 23000, // the portal has opened over the whole screen
-  ringOut: [20500, 22500],
-  glowOut: [19500, 21500],
-  // the island alone, then the wake-up scene takes over
-  end: 26000,
+  cluster: [9500, 10600], // the letters drift together into 4 groups
+  merge: [10300, 10900], // each group becomes a water drop; they land ~11.1-11.7 s
+  ripplesOut: [11900, 12700], // the ripples, receding into depth, fade
+  rise: [12000, 12800], // the water gathers and rises into a block on the right
+  arc: [12800, 16000], // the block travels right -> left on an arc, dripping the door into being
+  settle: [16000, 16500], // it lands on the left and breaks into drops
+  open: [16500, 18000], // the door opens
+  beam: [16600, 17900], // the light reveals the sand
+  puddles: [16800, 17700],
+  plants: [16900, 18600],
+  doorZoom: [20600, 22400], // after a 2 s hold: into the door
+  fadeOut: [22200, 22800], // the glyph island fades to the real one
+  end: 22800,
 } as const;
 
 export const ENTER_MS = 160; // an email window's entrance
@@ -60,19 +58,18 @@ export const LETTERS = {
   gravity: 0.13, // in viewport heights / s²
   driftPx: 26, // sideways drift, px/s (either way)
   spinDeg: 70, // rotation while falling, deg/s (either way)
-  glyphShare: 0.45, // share of letters that turn into glyphs in the ring
 };
 
-// ---- the portal ----------------------------------------------------------------------
-export const PORTAL = {
-  radius: 0.3, // of the viewport's smaller side
-  ellipse: 0.9, // vertical radius / horizontal radius
-  jitter: 0.06, // per-slot radius irregularity
-  spinRadPerS: 0.07,
-  pulse: 0.015,
-  fillers: 30, // extra glyph marks around the ring
-  holeSmall: 0.72, // the first opening, of the ring radius
-  feather: 0.18, // soft edge of the opening, of the ring radius
+// ---- the water-and-door scene (scene.ts) -------------------------------------------------
+export const SCENE = {
+  bg: '#16212d', // the darkness (the reference picture's slate blue)
+  drops: 4,
+  dropR: 0.036, // a drop's radius, of the viewport height
+  horizon: 0.5, // the ground plane's horizon, of the height
+  door: { cx: 0.5, sill: 0.71, h: 0.36, aspect: 0.5, frame: 0.08 }, // sill y and height of the viewport height; width = h * aspect
+  arc: { xR: 0.84, xL: 0.16, y: 0.42, apex: 0.13 }, // the liquid's path (of width / height): same start and landing height
+  strips: 12, // the door is poured in this many vertical strips, two drips each
+  zoom: 1.12, // how far past "the opening fills the screen" the camera goes
 };
 
 // the game's own glyph ramp (src/craft/materials.ts RAMP_DEFAULT)
@@ -88,10 +85,12 @@ export const SHOT_LIST: { id: string; label: string; at: number; end: number }[]
   { id: 'shot5', label: '5 Driftwood', at: T.shots[4], end: T.shots[5] },
   { id: 'shot6', label: '6 Northstar', at: T.shots[5], end: T.montageEnd },
   { id: 'phrases', label: 'Phrases', at: T.montageEnd, end: T.fall },
-  { id: 'fall', label: 'Falling', at: T.fall, end: T.portal },
-  { id: 'portal', label: 'Portal', at: T.portal, end: T.reveal },
-  { id: 'reveal', label: 'Reveal', at: T.reveal, end: T.holeFull },
-  { id: 'handoff', label: 'Handoff', at: T.holeFull, end: T.end },
+  { id: 'fall', label: 'Letters → drops', at: T.fall, end: 11100 },
+  { id: 'ripples', label: 'Ripples', at: 11100, end: T.rise[0] },
+  { id: 'door', label: 'Liquid & door', at: T.rise[0], end: T.open[0] },
+  { id: 'open', label: 'Opening', at: T.open[0], end: T.doorZoom[0] },
+  { id: 'zoom', label: 'Zoom', at: T.doorZoom[0], end: T.fadeOut[0] },
+  { id: 'handoff', label: 'Handoff', at: T.fadeOut[0], end: T.end },
 ];
 
 // ---- small maths --------------------------------------------------------------------------

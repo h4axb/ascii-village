@@ -1,8 +1,9 @@
 // ---------------------------------------------------------------------------
-// THE INTRO CINEMATIC (about 26 s): six rejection emails pile up on the
+// THE INTRO CINEMATIC (about 23 s): six rejection emails pile up on the
 // laptop -> three phrases are left in the dark -> their letters fall apart
-// -> they gather into a glyph portal -> the portal opens onto the island ->
-// the wake-up scene (App.tsx's runIntro) takes over.
+// and gather into four water drops -> the drops land and ripple -> the water
+// pours a glyph door, which opens onto the island -> into the door -> the
+// wake-up scene (App.tsx's runIntro) takes over.
 //
 // One clock drives everything: `apply(t)` puts every layer where it belongs
 // at time t (ms), from config.ts's timeline. No scattered timers, so the dev
@@ -13,12 +14,13 @@
 // Layers, back to front:
 //   stage    the reference photo (scaled to cover), the room glow, a black
 //            fade, and the laptop screen with the HTML email windows
-//   void     black, with the portal's opening cut out of it (the reveal)
+//   scene    the glyph canvas (scene.ts): drops, ripples, the liquid that
+//            pours the door, the door opening onto the island, sand, puddles,
+//            plants, and the zoom into the doorway
 //   overlay  the falling letters (copies placed exactly over the email's own
-//            letters at the moment they come loose), the extra glyph marks
-//            and the light inside the ring
-// The island behind the void is the real game, already running underneath
-// with the player at PLAYER START, so the reveal hands straight over to it.
+//            letters at the moment they come loose), until they become drops
+// The real game already runs underneath with the player at PLAYER START: the
+// canvas fades out at the end of the zoom and hands straight over to it.
 // ---------------------------------------------------------------------------
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -30,9 +32,7 @@ import {
   ENTER_MS,
   ZOOM,
   LETTERS,
-  PORTAL,
-  GLYPHS,
-  GLYPH_FONT,
+  SCENE,
   SHOT_LIST,
   clamp01,
   lerp,
@@ -42,6 +42,8 @@ import {
   rand,
 } from './config';
 import { EMAILS, WINDOWS, FLASH, type WindowShot } from './emails';
+import { GlyphCanvas } from './glyphCanvas';
+import { buildScene, renderScene, type DropSeed, type Scene } from './scene';
 import './cinematic.css';
 
 export type IntroCinematicHandle = { skip: () => void };
@@ -159,20 +161,16 @@ interface Plan {
   vx: number;
   spin: number;
   phase: number;
-  slot: number; // angle on the ring
-  slotR: number; // radius factor on the ring
-  glyph: string | null; // what it turns into, if it does
-  morphAt: number;
+  group: number; // which of the drops it joins
+  ox: number; // its place in the gathering group, px
+  oy: number;
 }
 interface Measured {
   vw: number;
   vh: number;
-  cx: number;
-  cy: number;
-  R: number;
   font: { size: number; family: string; weight: string; spacing: string }[];
   plan: Plan[];
-  fillers: { a: number; r: number; at: number; ch: string }[];
+  scene: Scene;
 }
 
 export default forwardRef<
@@ -186,12 +184,11 @@ export default forwardRef<
   const blackRef = useRef<HTMLDivElement>(null);
   const tintRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
-  const voidRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const glyphs = useRef<GlyphCanvas | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const pglowRef = useRef<HTMLDivElement>(null);
   const winRefs = useRef<(HTMLDivElement | null)[]>([]);
   const cloneRefs = useRef<(HTMLSpanElement | null)[]>([]);
-  const fillerRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const timeRef = useRef<HTMLSpanElement>(null);
   const scrubRef = useRef<HTMLInputElement>(null);
   const onCompleteRef = useRef(onComplete);
@@ -199,7 +196,6 @@ export default forwardRef<
 
   const clock = useRef({ t: startAt, playing: false, speed: 1, stopAt: null as number | null, holdEnd: false, done: false, dirty: true });
   const measured = useRef<Measured | null>(null);
-  const letterState = useRef<(string | null)[]>(new Array(N).fill(null)); // 'orig' | 'glyph'
   const [playing, setPlaying] = useState(false);
   const [shot, setShot] = useState(SHOT_LIST[0].id);
   const [speed, setSpeed] = useState(1);
@@ -233,8 +229,6 @@ export default forwardRef<
     const root = rootRef.current!;
     const plan: Plan[] = [];
     const font: Measured['font'] = [];
-    const R = Math.min(vw, vh) * PORTAL.radius;
-    const cx = vw / 2, cy = vh / 2;
     const { S } = stageTransform(T.fall - 1, vw, vh);
     for (let k = 0; k < N; k++) {
       const el = root.querySelector<HTMLElement>(`.cin-ch[data-k="${k}"]`)!;
@@ -251,37 +245,37 @@ export default forwardRef<
         y0: r.top + r.height / 2,
         w: r.width,
         h: r.height,
-        delay: rand(k, 1) * LETTERS.staggerMs,
+        delay: rand(k, 1) * LETTERS.staggerMs * 0.6,
         vx: (rand(k, 2) * 2 - 1) * LETTERS.driftPx,
         spin: (rand(k, 3) * 2 - 1) * LETTERS.spinDeg,
         phase: rand(k, 4) * 6.28,
-        slot: 0,
-        slotR: 1,
-        glyph: rand(k, 6) < LETTERS.glyphShare ? GLYPHS[Math.floor(rand(k, 8) * GLYPHS.length)] : null,
-        morphAt: lerp(T.morph[0], T.morph[1], rand(k, 7)),
+        group: 0,
+        ox: (rand(k, 5) * 2 - 1) * vh * 0.02,
+        oy: (rand(k, 6) * 2 - 1) * vh * 0.02,
       });
     }
-    // ring slots: in the order the letters arrive around the centre, so the
-    // paths don't cross
-    const at = (T.pull[0] + T.pull[1]) / 2;
-    const order = plan
-      .map((p, k) => {
-        const f = fallPos(p, at, vh);
-        return { k, a: Math.atan2(f.y - cy, f.x - cx) };
-      })
-      .sort((a, b) => a.a - b.a);
-    const a0 = order[0].a;
-    order.forEach((o, j) => {
-      plan[o.k].slot = a0 + (j / N) * Math.PI * 2;
-      plan[o.k].slotR = 1 + (rand(j, 5) * 2 - 1) * PORTAL.jitter;
+    // four groups, left to right: each becomes one drop
+    const order = plan.map((p, k) => ({ k, x: p.x0 })).sort((a, b) => a.x - b.x);
+    order.forEach((o, j) => (plan[o.k].group = Math.min(SCENE.drops - 1, Math.floor((j / N) * SCENE.drops))));
+    const seeds: DropSeed[] = [];
+    for (let gIdx = 0; gIdx < SCENE.drops; gIdx++) {
+      const a = groupCentre(plan, gIdx, T.merge[1], vh), b = groupCentre(plan, gIdx, T.merge[1] - 50, vh);
+      seeds.push({ x: a.x, y: a.y, vy: Math.max(0, (a.y - b.y) / 0.05) });
+    }
+    return { vw, vh, font, plan, scene: buildScene(vw, vh, seeds) };
+  }
+
+  // the centre of a group of falling letters (where its drop forms)
+  function groupCentre(plan: Plan[], gIdx: number, t: number, vh: number) {
+    let x = 0, y = 0, n = 0;
+    plan.forEach((p) => {
+      if (p.group !== gIdx) return;
+      const f = fallPos(p, t, vh);
+      x += f.x;
+      y += f.y;
+      n++;
     });
-    const fillers = Array.from({ length: PORTAL.fillers }, (_, i) => ({
-      a: a0 + ((i + 0.5 + (rand(i, 9) - 0.5) * 0.6) / PORTAL.fillers) * Math.PI * 2,
-      r: 1 + (rand(i, 10) * 2 - 1) * 0.14,
-      at: lerp(T.fillersIn[0], T.fillersIn[1], rand(i, 11)),
-      ch: GLYPHS[Math.floor(rand(i, 12) * GLYPHS.length)],
-    }));
-    return { vw, vh, cx, cy, R, font, plan, fillers };
+    return { x: x / Math.max(1, n), y: y / Math.max(1, n) };
   }
 
   // where a falling letter would be under gravity alone
@@ -346,7 +340,6 @@ export default forwardRef<
     if (t >= T.fall && (!measured.current || measured.current.vw !== vw || measured.current.vh !== vh)) {
       measured.current = null;
       measured.current = measure();
-      letterState.current.fill(null);
       const mm = measured.current;
       mm.plan.forEach((p, k) => {
         const el = cloneRefs.current[k];
@@ -363,100 +356,45 @@ export default forwardRef<
       });
     }
     applyStage(t, vw, vh);
-    const revealing = t >= T.reveal;
-    root.style.background = revealing ? 'transparent' : '#000';
-    root.style.pointerEvents = t >= T.holeFull ? 'none' : 'auto';
+    // the darkness lifts into the real game at the end of the zoom
+    root.style.background = t >= T.fadeOut[0] ? 'transparent' : '#000';
+    root.style.pointerEvents = t >= T.fadeOut[0] ? 'none' : 'auto';
     // originals until the letters come loose, the copies after
     const loose = t >= T.fall;
     root.querySelectorAll<HTMLElement>('.cin-win.final .cin-ch').forEach((el) => (el.style.visibility = loose ? 'hidden' : 'visible'));
-    overlayRef.current!.style.display = loose && t < T.holeFull ? 'block' : 'none';
+    overlayRef.current!.style.display = loose && t < T.merge[1] ? 'block' : 'none';
     const m = measured.current;
-
-    // ---- the opening ----
-    const vd = voidRef.current!;
-    if (!revealing || t >= T.holeFull || !m) vd.style.display = 'none';
-    else {
-      vd.style.display = 'block';
-      const R = m.R;
-      let r: number;
-      if (t < T.holeSmall) r = R * PORTAL.holeSmall * easeInOutCubic(clamp01((t - T.reveal) / (T.holeSmall - T.reveal)));
-      else r = lerp(R * PORTAL.holeSmall, Math.hypot(vw, vh) / 2 + R, easeOutCubic(clamp01((t - T.holeSmall) / (T.holeFull - T.holeSmall))));
-      if (reduced) {
-        // no expanding opening: the dark simply lifts
-        vd.style.opacity = String(1 - span(t, [T.reveal, T.holeFull - 1500]));
-        vd.style.webkitMaskImage = vd.style.maskImage = 'none';
-      } else {
-        vd.style.opacity = '1';
-        const feather = PORTAL.feather * R;
-        const inner = r <= 0 ? 0 : Math.max(0, (1 - feather / r) * 100);
-        const g = r <= 0.5 ? 'none' : `radial-gradient(${r}px ${r * PORTAL.ellipse}px at ${m.cx}px ${m.cy}px, transparent ${inner}%, #000 100%)`;
-        vd.style.webkitMaskImage = vd.style.maskImage = g;
-      }
+    const cv = canvasRef.current!;
+    if (!m || !loose) {
+      cv.style.display = 'none';
+      return;
     }
-    if (!m || !loose) return;
 
-    // ---- the ring ----
-    const spin = t >= T.spin ? ((t - T.spin) / 1000) * PORTAL.spinRadPerS * (reduced ? 0 : 1) : 0;
-    const pulse = t >= 15000 && !reduced ? 1 + PORTAL.pulse * Math.sin((t - 15000) / 700) : 1;
-    const open = easeOutCubic(clamp01((t - T.holeSmall) / (T.holeFull - T.holeSmall)));
-    const ringR = m.R * pulse * (1 + 1.7 * open);
-    const ringFade = 1 - span(t, T.ringOut);
-    const pull = reduced ? span(t, [T.fall, T.portal]) : span(t, T.pull);
-    const tint = span(t, [14000, 17000]);
-
+    // ---- the letters: falling, drifting into four groups, becoming drops ----
+    const gather = reduced ? 0 : span(t, T.cluster);
+    const merge = span(t, T.merge);
+    const centres = Array.from({ length: SCENE.drops }, (_, gi) => groupCentre(m.plan, gi, t, m.vh));
     m.plan.forEach((p, k) => {
       const el = cloneRefs.current[k];
       if (!el) return;
-      const ta = p.slot + spin;
-      const tx = m.cx + Math.cos(ta) * ringR * p.slotR, ty = m.cy + Math.sin(ta) * ringR * p.slotR * PORTAL.ellipse;
-      let x: number, y: number, rot: number, op = ringFade;
-      if (reduced) {
-        // the letters fade where they are and fade in on the ring
-        const atRing = pull >= 0.5;
-        x = atRing ? tx : p.x0;
-        y = atRing ? ty : p.y0;
-        rot = 0;
-        op *= atRing ? pull * 2 - 1 : 1 - pull * 2;
-      } else {
-        const f = fallPos(p, t, m.vh);
-        // a second force bends the fall toward the ring: radius and angle
-        // around the centre ease separately, so the paths curve in
-        const rf = Math.hypot(f.x - m.cx, f.y - m.cy), af = Math.atan2(f.y - m.cy, f.x - m.cx);
-        const rt = Math.hypot(tx - m.cx, ty - m.cy), at = Math.atan2(ty - m.cy, tx - m.cx);
-        let da = at - af;
-        da = Math.atan2(Math.sin(da), Math.cos(da));
-        const a = af + da * pull, rr = lerp(rf, rt, pull);
-        x = m.cx + Math.cos(a) * rr;
-        y = m.cy + Math.sin(a) * rr;
-        rot = lerp(f.rot, ((ta * 180) / Math.PI + 90) * 0.15, pull);
-      }
-      el.style.transform = `translate(${x - p.w / 2}px, ${y - p.h / 2}px) rotate(${rot}deg)`;
-      el.style.opacity = String(op);
-      // some letters turn into the island's glyphs
-      const want = p.glyph && t >= p.morphAt ? 'glyph' : 'orig';
-      if (letterState.current[k] !== want) {
-        letterState.current[k] = want;
-        const f = m.font[k];
-        el.textContent = want === 'glyph' ? p.glyph : LETTER_LIST[k].ch;
-        el.style.fontFamily = want === 'glyph' ? GLYPH_FONT : f.family;
-        el.classList.toggle('glyph', want === 'glyph');
-      }
-      el.style.color = want === 'glyph' ? '#86e6d8' : mix('#e9eef6', '#c4f3ea', tint);
+      const f = fallPos(p, t, m.vh);
+      const c = centres[p.group];
+      const x = lerp(f.x, c.x + p.ox * (1 - merge), gather);
+      const y = lerp(f.y, c.y + p.oy * (1 - merge), gather);
+      const sc = 1 - 0.75 * merge;
+      el.style.transform = `translate(${x - p.w / 2}px, ${y - p.h / 2}px) rotate(${f.rot * (1 - gather)}deg) scale(${sc})`;
+      el.style.opacity = String(1 - merge);
+      el.style.color = `rgb(${Math.round(lerp(233, 143, gather))},${Math.round(lerp(238, 215, gather))},${Math.round(lerp(246, 216, gather))})`;
     });
-    m.fillers.forEach((f, i) => {
-      const el = fillerRefs.current[i];
-      if (!el) return;
-      const a = f.a + spin;
-      const x = m.cx + Math.cos(a) * ringR * f.r, y = m.cy + Math.sin(a) * ringR * f.r * PORTAL.ellipse;
-      el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
-      el.style.opacity = String(0.75 * span(t, [f.at, f.at + 900]) * ringFade);
-      el.style.fontSize = `${m.font[0].size * 0.55}px`;
-    });
-    const pg = pglowRef.current!;
-    const glow = span(t, T.glowIn) * (1 - span(t, T.glowOut));
-    pg.style.opacity = String(glow * 0.8);
-    pg.style.transform = `translate(${m.cx - m.R}px, ${m.cy - m.R}px) scale(${pulse * (1 + 1.7 * open)}, ${pulse * (1 + 1.7 * open) * PORTAL.ellipse})`;
-    pg.style.width = pg.style.height = `${m.R * 2}px`;
+
+    // ---- the glyph scene ----
+    cv.style.display = 'block';
+    const gc = (glyphs.current ??= new GlyphCanvas(cv));
+    gc.resize(vw, vh);
+    renderScene(m.scene, gc, t, reduced);
+    const bgK = span(t, [T.fall, T.fall + 1500]);
+    const base = `rgb(${Math.round(lerp(0, 0x16, bgK))},${Math.round(lerp(0, 0x21, bgK))},${Math.round(lerp(0, 0x2d, bgK))})`;
+    gc.draw(base, 1 - span(t, T.fadeOut));
   }
 
   // ---- the clock ----------------------------------------------------------------------------
@@ -587,14 +525,8 @@ export default forwardRef<
           <div ref={flashRef} className="cin-flash" />
         </div>
       </div>
-      <div ref={voidRef} className="cin-void" />
+      <canvas ref={canvasRef} className="cin-scene" />
       <div ref={overlayRef} className="cin-overlay">
-        <div ref={pglowRef} className="cin-portal-glow" />
-        {Array.from({ length: PORTAL.fillers }, (_, i) => (
-          <span key={`f${i}`} ref={(el) => (fillerRefs.current[i] = el)} className="cin-filler" style={{ fontFamily: GLYPH_FONT }}>
-            {GLYPHS[Math.floor(rand(i, 12) * GLYPHS.length)]}
-          </span>
-        ))}
         {/* a loose letter: a copy of the email's own letter, given its font
             when the letters are measured, so it can fall past the screen */}
         {LETTER_LIST.map((l, k) => (

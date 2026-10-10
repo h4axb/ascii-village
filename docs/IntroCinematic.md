@@ -1,11 +1,17 @@
 # Intro cinematic
 
-A cinematic of about 26 seconds:
+A cinematic of about 23 seconds:
 1. Six rejection emails pile up on the laptop.
 2. Three phrases are left in the dark.
-3. Their letters fall apart and gather into a glyph portal.
-4. The portal opens onto the island.
-5. The existing wake-up scene with Mitchy takes over.
+3. **Letters to drops** (about 14 s in all, drawn in glyphs):
+   - their letters fall apart and gather into **4 water drops**;
+   - the drops land and their **ripples recede into depth**;
+   - the water rises into a block on the right, and travels **right → left on an arc** (starting and landing at the same height), sloshing;
+   - its **drips pour a front-facing door**, strip by strip, bottom up;
+   - it lands on the left and splashes into seed drops.
+4. **The door opens.** Inside are a sky with clouds and birds, the sea and an island. A **light beam reveals sandy ground**, **puddles** spread, and **plants grow** from the seed drops (stems, leaves, a few flowers).
+5. After a **2 s hold**, the camera **zooms into the doorway**, and the glyph island fades into the real game.
+6. The existing wake-up scene with Mitchy takes over.
 
 For now it plays only on **`/cinematic`**. The usual intro (`/`, `/intro`, the laptop/MYLL prologue) is unchanged.
 
@@ -26,14 +32,21 @@ For now it plays only on **`/cinematic`**. The usual intro (`/`, `/intro`, the l
 
 | File | What |
 |---|---|
-| `config.ts` | All the numbers: the timeline per phase, the laptop screen's place in the reference picture, letter fall, portal size, the shot list |
+| `config.ts` | All the numbers: the timeline per phase (`T`), the laptop screen's place in the reference picture, the letter fall, the water-and-door scene (`SCENE`: drop size, door size and place, the arc, strips, zoom), and the shot list |
+| `scene.ts` | The water-and-door scene, a pure function of t, sampled per glyph cell: drops, ripples, the liquid's arc and drips, the door and its opening, the interior painting, the beam on the sand, puddles, plants, and the camera |
+| `glyphCanvas.ts` | The full-screen glyph canvas: a cell grid (about 150 columns) drawn in three cheap passes (backings, white glyph stamps, a colour layer) |
 | `emails.ts` | The six emails (text, with `*emphasis*` and `[surviving phrases]`) and every window's style, place and timing (styles: standard, portal, stacked) |
 | `IntroCinematic.tsx` | The scene and one clock: `apply(t)` places every layer for time t, so seeking, pausing and skipping are exact |
 | `cinematic.css` | The look of the room light, the windows, the letters and the timeline bar |
 
 - **Background:** `public/intro/state2-laptop-scene.png`, scaled to cover the screen; the email windows are HTML clipped to the laptop's screen.
 - **Phrases:** "Application Update", "Unfortunately" and "not selected" are real letters in the last email. The camera pushes in on them while everything else fades. When they come loose, each letter is replaced by a copy at exactly its place and size in a full-screen layer, so it can fall past the laptop.
-- **Ring:** the letters bend from falling into a ring (the radius and the angle around the centre ease separately, so the paths curve). Some turn into the island's glyphs, and extra glyph marks fill the ring.
-- **Opening:** the island behind the portal is the real game. It already runs underneath with the player at PLAYER START, so when the opening has grown over the whole screen there is nothing to swap.
-- **Reduced motion:** with `prefers-reduced-motion`, there is no camera push or falling. The letters fade out and fade in on the ring, and the dark lifts instead of opening.
+- **Drops:** the letters are grouped left to right into 4. Each group drifts together, shrinks, and becomes a water drop on the glyph canvas.
+- **Glyph scene:**
+  - one canvas (`scene.ts` and `glyphCanvas.ts`) draws everything after the fall in the game's glyph style, with the theme's water, sand, grass and flower colours;
+  - the zoom keeps the cell size and re-samples the doorway finer, so it stays glyph art.
+- **Handoff:** the real game already runs underneath with the player at PLAYER START. The canvas fades out at the end of the zoom, so there is nothing to swap.
+- **Reduced motion:** with `prefers-reduced-motion`:
+  - no camera push, falling, liquid or zoom;
+  - the letters fade, the door appears strip by strip and opens, then the scene fades into the game.
 - **Audio:** none. The game has no audio system yet.

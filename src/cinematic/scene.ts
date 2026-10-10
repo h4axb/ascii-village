@@ -246,10 +246,16 @@ function interior(sc: Scene, u: number, v: number, t: number): { ch: number; c: 
 }
 
 // ---- render one frame into the canvas buffer ------------------------------------------
+// The door itself (frame, leaf, foot) can be drawn on a layer of its own,
+// door-sized, so a filter can work on it alone (IntroCinematic's boil): the
+// door's cell (c, r) is the layer's cell (c + DOOR_PAD.c, r + DOOR_PAD.r).
+export const DOOR_PAD = { c: 2, r: 6 }; // room for the leaf's swing beyond the door's box
+
 // shift: whole rows the camera's pan moves everything down this frame (the
 // rest of the pan, under a cell, is applied when drawing)
-export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: boolean, shift = 0) {
+export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: boolean, shift = 0, doorGc?: GlyphCanvas) {
   gc.clear();
+  doorGc?.clear();
   const r0 = sc.r0 + shift;
   const C = sc.col;
   const D = DOOR;
@@ -262,6 +268,18 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
     gc.glyph[i] = gi;
     gc.fg[i] = pack(rgb);
     if (bg !== undefined) gc.bg[i] = bg;
+  };
+  // a cell of the door (screen grid coordinates): on the door's own layer if
+  // there is one; the main canvas under it is cleared (no doorway backing
+  // shows through the leaf)
+  const putDoor = (c: number, r: number, gi: number, rgb: RGB, bg?: number) => {
+    if (!doorGc) return put(c, r, gi, rgb, bg);
+    const lc = c - sc.c0 + DOOR_PAD.c, lr = r - r0 + DOOR_PAD.r;
+    if (lc < 0 || lr < 0 || lc >= doorGc.cols || lr >= doorGc.rows) return;
+    const i = lr * doorGc.cols + lc;
+    doorGc.glyph[i] = gi;
+    doorGc.fg[i] = pack(rgb);
+    if (bg === NONE) put(c, r, 0, rgb, NONE);
   };
   // the leaf's swing: its width goes from 1 to SCENE.door.open of itself
   const openK = easeInOutCubic(clamp01((t - T.open[0]) / (T.open[1] - T.open[0])));
@@ -331,16 +349,16 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
     const c = sc.c0 + k.c, r = r0 + k.r;
     const e = (t - born) / EMERGE;
     if (e < 1) {
-      if (reduced) put(c, r, g(k.ch), mixc(DARK, k.rgb, e));
+      if (reduced) putDoor(c, r, g(k.ch), mixc(DARK, k.rgb, e));
       else if (e < 0.45) {
         // the wet front: water, shimmering, coming up out of the dark
         const w = e / 0.45;
         const gl = hash(k.c + Math.floor(t / 140), k.r) > 0.5 ? '≈' : '~';
-        put(c, r, g(gl), mixc(DARK, mixc(C.shallow, C.foam, 0.35 * (1 - w)), easeOutCubic(w)));
+        putDoor(c, r, g(gl), mixc(DARK, mixc(C.shallow, C.foam, 0.35 * (1 - w)), easeOutCubic(w)));
       } else {
         // the water sets into the door's own glyph and colour
         const w = smooth((e - 0.45) / 0.55);
-        put(c, r, g(k.ch), mixc(mixc(C.shallow, C.foam, 0.2), mixc(k.rgb, WHITE, 0.3), w));
+        putDoor(c, r, g(k.ch), mixc(mixc(C.shallow, C.foam, 0.2), mixc(k.rgb, WHITE, 0.3), w));
       }
       continue;
     }
@@ -348,7 +366,7 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
     // the light from the doorway on the frame's inner edge
     if (openFrac > 0 && k.part === 'frame' && k.c > D.leafRight && k.c <= D.leafRight + 3 && k.r >= D.leafTop - 1)
       rgb = mixc(rgb, C.light, 0.35 * openFrac * (1 - (k.c - D.leafRight - 1) / 3));
-    put(c, r, g(k.ch), rgb);
+    putDoor(c, r, g(k.ch), rgb);
   }
 
   // ---- 2b. the water strings, falling onto the door's foot
@@ -374,8 +392,8 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
       const srcR = D.leafTop + Math.floor((y + 0.5) / scale);
       if (srcR > D.leafBottom || !D.leaf[srcR * D.cols + srcC]) continue;
       const cell = D.at[srcR * D.cols + srcC];
-      if (edge) put(sc.c0 + D.hinge + x, r0 + D.leafTop + y, g('|'), mul(cell ? cell.rgb : C.grassDark, 0.5), NONE);
-      else if (cell) put(sc.c0 + D.hinge + x, r0 + D.leafTop + y, g(cell.ch), mul(cell.rgb, shade), NONE);
+      if (edge) putDoor(sc.c0 + D.hinge + x, r0 + D.leafTop + y, g('|'), mul(cell ? cell.rgb : C.grassDark, 0.5), NONE);
+      else if (cell) putDoor(sc.c0 + D.hinge + x, r0 + D.leafTop + y, g(cell.ch), mul(cell.rgb, shade), NONE);
     }
   };
   const n = Math.max(1, Math.round(Wn));

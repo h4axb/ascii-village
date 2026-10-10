@@ -45,7 +45,7 @@ import {
 } from './config';
 import { EMAILS, WINDOWS, FLASH, INBOX, TOAST, SCROLL, type WindowShot } from './emails';
 import { GlyphCanvas } from './glyphCanvas';
-import { buildScene, renderScene, cellAt, growFrom, sceneCell, type Scene } from './scene';
+import { buildScene, renderScene, cellAt, growFrom, sceneCell, DOOR_PAD, type Scene } from './scene';
 import { DOOR } from './door';
 import './cinematic.css';
 
@@ -221,6 +221,10 @@ export default forwardRef<
   const flashRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glyphs = useRef<GlyphCanvas | null>(null);
+  // the door on a layer of its own, boiling (the SVG filter below)
+  const doorCanvasRef = useRef<HTMLCanvasElement>(null);
+  const doorGlyphs = useRef<GlyphCanvas | null>(null);
+  const boilRef = useRef<SVGFEDisplacementMapElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const winRefs = useRef<(HTMLDivElement | null)[]>([]);
   const cloneRefs = useRef<(HTMLSpanElement | null)[]>([]);
@@ -460,8 +464,10 @@ export default forwardRef<
     overlayRef.current!.style.display = loose && t < (m0?.lastLand ?? Infinity) + 50 ? 'block' : 'none';
     const m = measured.current;
     const cv = canvasRef.current!;
+    const dcv = doorCanvasRef.current!;
     if (!m || !loose) {
       cv.style.display = 'none';
+      dcv.style.display = 'none';
       return;
     }
 
@@ -490,7 +496,12 @@ export default forwardRef<
     // the pan moves the world down by whole cells in the scene, the rest when drawing
     const pan = panAt(t, m.vh);
     const shift = Math.floor(pan / m.scene.cell);
-    renderScene(m.scene, gc, t, reduced, shift);
+    // the door's own layer: door-sized, with room for the leaf's swing
+    const cellPx = m.scene.cell;
+    const dgc = (doorGlyphs.current ??= new GlyphCanvas(dcv));
+    dgc.resize((DOOR.cols + 2 * DOOR_PAD.c) * cellPx, (DOOR.rows + 2 * DOOR_PAD.r) * cellPx, cellPx, 0.85);
+    boilRef.current?.setAttribute('scale', String(Math.max(3, Math.round(cellPx * 0.55))));
+    renderScene(m.scene, gc, t, reduced, shift, dgc);
     const bgK = span(t, [T.fall, T.fall + 1500]);
     const bg = [1, 3, 5].map((i) => parseInt(SCENE.bg.slice(i, i + 2), 16));
     const base = `rgb(${bg.map((v) => Math.round(lerp(0, v, bgK))).join(',')})`;
@@ -498,12 +509,26 @@ export default forwardRef<
     const wk = reduced ? 0 : clamp01((t - T.walk[0]) / (T.walk[1] - T.walk[0]));
     const tau = Math.max(0, t - T.walk[0]) / 1000;
     const bob = SCENE.walk.bob * m.vh * Math.min(1, wk * 4);
-    gc.draw(base, 1 - span(t, T.fadeOut), {
+    const cam = {
       s: lerp(1, SCENE.walk.zoom, wk * wk * (3 - 2 * wk) * 0.4 + wk * wk * 0.6),
       fx: m.scene.focus.x,
       fy: m.scene.focus.y,
       dx: Math.sin(tau * Math.PI * SCENE.walk.steps) * bob * 0.6,
-      dy: -Math.abs(Math.sin(tau * Math.PI * SCENE.walk.steps)) * bob * 2 + (pan - shift * m.scene.cell),
+      dy: -Math.abs(Math.sin(tau * Math.PI * SCENE.walk.steps)) * bob * 2,
+    };
+    const opacity = 1 - span(t, T.fadeOut);
+    gc.draw(base, opacity, { ...cam, dy: cam.dy + (pan - shift * cellPx) });
+    // the door's layer: transparent, placed over its cells, moved with the same camera
+    dgc.draw('', 1, { s: 1, fx: 0, fy: 0, dx: 0, dy: 0 });
+    const L = (m.scene.c0 - DOOR_PAD.c) * cellPx, Tp = (m.scene.r0 - DOOR_PAD.r) * cellPx;
+    Object.assign(dcv.style, {
+      display: 'block',
+      left: `${L}px`,
+      top: `${Tp}px`,
+      opacity: String(opacity),
+      transformOrigin: `${cam.fx - L}px ${cam.fy - Tp}px`,
+      transform: `translate(${cam.dx}px, ${cam.dy + pan}px) scale(${cam.s})`,
+      filter: reduced ? 'none' : 'url(#cin-boil)',
     });
   }
 
@@ -683,6 +708,19 @@ export default forwardRef<
         </div>
       </div>
       <canvas ref={canvasRef} className="cin-scene" />
+      {/* the door's boil: noise displacing it a few px, its grain jumping
+          between four sizes (the reference SVG filter) */}
+      <svg className="cin-defs" width="0" height="0" aria-hidden="true">
+        <defs>
+          <filter id="cin-boil">
+            <feTurbulence type="turbulence" baseFrequency="0.01" numOctaves={2} seed={1} result="noise">
+              <animate attributeName="baseFrequency" values="0.01;0.025;0.015;0.03" calcMode="discrete" repeatCount="indefinite" dur="0.9s" />
+            </feTurbulence>
+            <feDisplacementMap ref={boilRef} in="SourceGraphic" in2="noise" scale={5} xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </defs>
+      </svg>
+      <canvas ref={doorCanvasRef} className="cin-door" />
       <div ref={overlayRef} className="cin-overlay">
         {/* a loose letter: a copy of the email's own letter, given its font
             when the letters are measured, so it can fall past the screen */}

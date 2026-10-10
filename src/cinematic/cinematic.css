@@ -398,6 +398,17 @@
   display: none;
   pointer-events: none;
 }
+/* the door on a layer of its own, boiling (IntroCinematic's #cin-boil) */
+.cin-door {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+}
+.cin-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
 .cin-overlay {
   position: absolute;
   inset: 0;

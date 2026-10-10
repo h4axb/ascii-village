@@ -124,8 +124,11 @@ export class GlyphCanvas {
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, this.cv.width, this.cv.height);
     ctx.globalAlpha = opacity;
-    ctx.fillStyle = base;
-    ctx.fillRect(0, 0, this.cv.width, this.cv.height);
+    if (base) {
+      // (no base: a transparent layer over another canvas)
+      ctx.fillStyle = base;
+      ctx.fillRect(0, 0, this.cv.width, this.cv.height);
+    }
     ctx.imageSmoothingEnabled = false;
     const k = dpr * (1 - cam.s);
     ctx.setTransform(cam.s, 0, 0, cam.s, cam.fx * k + cam.dx * dpr, cam.fy * k + cam.dy * dpr);

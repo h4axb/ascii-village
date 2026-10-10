@@ -54,28 +54,39 @@ export const T = {
   blackIn: [13600, 14800], // the room fades to black
   pullBack: [0, 13600], // all the while before, the camera eases slowly back, from the screen to the whole desk
   // falling letters -> the glyph door -> through it (scene.ts), then 3 s of black
-  fall: FALL, // the letters fall into the door's foot (they land ~1.0-1.7 s later)
-  build: [FALL + 1200, FALL + 4200], // the door builds itself bottom up, glyph by glyph
-  open: [FALL + 4600, FALL + 7200], // it opens, slowly, onto the sea and the island
-  beam: [FALL + 4900, FALL + 7200], // light comes out of the doorway
-  walk: [FALL + 9200, FALL + 11600], // after a 2 s hold: the camera walks toward the doorway
-  fadeOut: [FALL + 10400, FALL + 11600], // to black
-  end: FALL + 14600, // 3 s of black, then the wake-up scene
+  fall: FALL, // the letters drop straight down onto the door's foot line and bounce (done by ~2.8 s later)
+  build: [FALL + 2000, FALL + 5000], // the door rises from the middle of its foot, glyph by glyph
+  open: [FALL + 5400, FALL + 8000], // it opens, slowly, onto the sea and the island
+  beam: [FALL + 5700, FALL + 8000], // light comes out of the doorway
+  walk: [FALL + 10000, FALL + 12400], // after a 2 s hold: the camera walks toward the doorway
+  fadeOut: [FALL + 11200, FALL + 12400], // to black
+  end: FALL + 15400, // 3 s of black, then the wake-up scene
 } as const;
 
 export const ENTER_MS = 160; // an email window's entrance
 export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's screen (it pulls back to the full desk, then stays)
 
 // ---- falling letters ---------------------------------------------------------------
+// Each letter drops straight down onto the door's foot line, then bounces
+// like a dropped letter (the bounce of the reference CSS animation
+// txt-bouncing-letters-drop-in: squash, a 0.4em rebound, a 0.1em one, rest),
+// pivoting on its foot.
+export type Ease = 'in' | 'out';
 export const LETTERS = {
-  staggerMs: 700, // spread of the letters' start times
-  gravity: 1.9, // in viewport heights / s²: they drop, they don't drift
-  hop: 0.16, // the little upward jolt as each comes loose, viewport heights / s
-  spinDeg: 110, // rotation while falling, deg/s (either way), kept until impact
-  stretch: 0.3, // how much a letter stretches along its fall at full speed
-  bounce: 0.03, // the one bounce after impact, of the viewport height
-  impactMs: 90, // the squash on impact
-  settleMs: 300, // impact + bounce, then it settles into its cell
+  stepMs: 35, // each letter lets go this long after the one to its left
+  gravity: 1.9, // the drop, in viewport heights / s² (ease-in, as gravity is)
+  fallScale: [0.9, 1.15] as const, // stretched while it falls
+  // after impact, in order: ms to reach it, lift (in letter heights), scale x, scale y, easing into it
+  bounce: [
+    [80, 0, 1.2, 0.78, 'out'], // the squash
+    [180, 0.4, 0.96, 1.05, 'out'], // up
+    [140, 0, 1.08, 0.9, 'in'], // down again
+    [120, 0.1, 1, 1, 'out'], // a little one
+    [90, 0, 1.02, 0.98, 'in'],
+    [70, 0, 1, 1, 'out'], // at rest
+  ] as readonly (readonly [number, number, number, number, Ease])[],
+  restMs: 150, // then it rests a beat
+  fadeMs: 250, // and fades as the door rises
 };
 
 // ---- the water-and-door scene (scene.ts) -------------------------------------------------

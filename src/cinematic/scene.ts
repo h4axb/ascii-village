@@ -3,10 +3,10 @@
 // canvas (glyphCanvas.ts). Everything is a pure function of the clock t
 // (config.ts's T), so seeking is exact.
 //
-//   build     the door (door-glyphs.svg via door.ts) builds itself bottom
-//             up: each glyph drops into its cell as a letter and settles
-//             into the drawing's own glyph and colour; the falling phrase
-//             letters land first, in its foot
+//   build     the door (door-glyphs.svg via door.ts) rises from the middle
+//             of its foot, up and out: each glyph drops into its cell as a
+//             letter and settles into the drawing's own glyph and colour (the
+//             falling phrase letters have just bounced onto its foot line)
 //   open      the leaf swings open on its left hinge, slowly, to about half
 //             its width; it is re-sampled column by column into the grid (no
 //             squeezed glyphs), its free edge coming toward the viewer
@@ -64,10 +64,14 @@ export function buildScene(vw: number, vh: number): Scene {
   const born = new Float32Array(n).fill(Infinity);
   const fallGlyph = new Uint8Array(n);
   const dur = T.build[1] - T.build[0];
+  // the door rises from the middle of its foot: each glyph's time is its
+  // distance from there (up, and out to the sides)
+  const mid = (DOOR.cols - 1) / 2;
+  const dist = (k: { c: number; r: number }) => Math.hypot(DOOR.rows - 1 - k.r, Math.abs(k.c - mid) * 2.2);
+  const dMax = Math.max(...DOOR.cells.map(dist));
   for (const k of DOOR.cells) {
     const i = k.r * DOOR.cols + k.c;
-    const up = (DOOR.rows - 1 - k.r) / (DOOR.rows - 1); // 0 at the foot
-    born[i] = T.build[0] + up * (dur - 380) + rand(k.c, k.r) * 380;
+    born[i] = T.build[0] + (dist(k) / dMax) * (dur - 380) + rand(k.c, k.r) * 380;
     fallGlyph[i] = g(FALL_GLYPHS[Math.floor(rand(k.c + 7, k.r) * FALL_GLYPHS.length)]);
   }
   const open = (DOOR.hinge + (DOOR.leafRight + 1 - DOOR.hinge) * SCENE.door.open + DOOR.leafRight + 1) / 2;
@@ -105,11 +109,6 @@ export function buildScene(vw: number, vh: number): Scene {
 // where a door cell sits on screen (its centre, px)
 export const cellAt = (sc: Scene, c: number, r: number) => ({ x: (sc.c0 + c + 0.5) * sc.cell, y: (sc.r0 + r + 0.5) * sc.cell });
 
-// a falling letter lands in this door cell at time t: the cell appears then
-export function landIn(sc: Scene, c: number, r: number, t: number) {
-  const i = r * DOOR.cols + c;
-  sc.born[i] = Math.min(sc.born[i], t - DROP);
-}
 
 // ---- the interior painting (u, v in 0..1 of the doorway) ----------------------------
 function interior(sc: Scene, u: number, v: number, t: number): { ch: number; c: RGB } {

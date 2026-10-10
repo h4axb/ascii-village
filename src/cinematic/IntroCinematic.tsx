@@ -40,11 +40,10 @@ import {
   smooth,
   span,
   easeOutCubic,
-  rand,
 } from './config';
 import { EMAILS, WINDOWS, FLASH, INBOX, TOAST, SCROLL, type WindowShot } from './emails';
 import { GlyphCanvas } from './glyphCanvas';
-import { buildScene, renderScene, cellAt, landIn, sceneCell, type Scene } from './scene';
+import { buildScene, renderScene, cellAt, sceneCell, type Scene } from './scene';
 import { DOOR } from './door';
 import './cinematic.css';
 
@@ -185,12 +184,9 @@ interface Plan {
   y0: number;
   w: number;
   h: number;
-  delay: number;
-  spin: number;
-  phase: number;
-  landX: number; // where it lands: its cell in the door's foot (it drifts there as it falls)
-  landY: number;
-  tLand: number; // ms
+  delay: number; // ms after T.fall that it lets go
+  landY: number; // its centre once its foot is on the door's foot line
+  tLand: number; // ms: impact
 }
 interface Measured {
   vw: number;
@@ -285,66 +281,52 @@ export default forwardRef<
         y0: r.top + r.height / 2,
         w: r.width,
         h: r.height,
-        delay: rand(k, 1) * LETTERS.staggerMs * 0.6,
-        spin: (rand(k, 3) * 2 - 1) * LETTERS.spinDeg,
-        phase: rand(k, 4) * 6.28,
-        landX: 0,
+        delay: 0,
         landY: 0,
         tLand: 0,
       });
     }
-    // each letter lands in a cell of the door's foot (left to right, as they
-    // hang), and the door builds itself up from there
+    // each letter drops straight down onto the door's foot line, left to
+    // right one after another; the door then rises from the middle of it
     const scene = buildScene(vw, vh);
-    const foot = DOOR.cells.filter((k) => k.part === 'ground' && k.r < DOOR.rows - 1).sort((a, b) => a.c - b.c || b.r - a.r);
-    const order = plan.map((p, k) => ({ k, x: p.x0 })).sort((a, b) => a.x - b.x);
-    order.forEach((o, j) => {
-      const p = plan[o.k];
-      const cell = foot[Math.min(foot.length - 1, Math.floor(((j + 0.5) / order.length) * foot.length))];
-      const at = cellAt(scene, cell.c, cell.r);
-      p.landX = at.x;
-      p.landY = at.y;
-      // ballistic: a small hop up, then gravity down to the cell
-      const g = LETTERS.gravity * vh, v0 = -LETTERS.hop * vh;
-      p.tLand = T.fall + p.delay + ((-v0 + Math.sqrt(v0 * v0 + 2 * g * Math.max(1, at.y - p.y0))) / g) * 1000;
-      landIn(scene, cell.c, cell.r, p.tLand + LETTERS.settleMs);
-    });
+    const ground = cellAt(scene, 0, DOOR.rows - 2).y + scene.cell / 2;
+    const g = LETTERS.gravity * vh;
+    plan
+      .map((p, k) => ({ k, x: p.x0 }))
+      .sort((a, b) => a.x - b.x)
+      .forEach((o, j) => {
+        const p = plan[o.k];
+        p.delay = j * LETTERS.stepMs;
+        p.landY = ground - p.h / 2;
+        p.tLand = T.fall + p.delay + Math.sqrt((2 * Math.max(1, p.landY - p.y0)) / g) * 1000;
+      });
     return { vw, vh, font, plan, scene };
   }
 
-  // a falling letter: dropped under gravity (a small hop as it comes loose,
-  // then accelerating, spinning, stretched by its speed) onto its cell in the
-  // door's foot; there it hits (squash), bounces once and settles
+  // a letter at time t: straight down under gravity (stretched), then the
+  // bounce keyframes after impact (LETTERS.bounce), pivoting on its foot
   function fallPos(p: Plan, t: number, vh: number) {
-    const g = LETTERS.gravity * vh, v0 = -LETTERS.hop * vh;
-    const tl = Math.max(0.001, (p.tLand - T.fall - p.delay) / 1000);
-    const tau = Math.max(0, Math.min((t - T.fall - p.delay) / 1000, tl));
-    const after = (t - p.tLand) / 1000; // > 0 once it has landed
-    if (after <= 0) {
-      const v = v0 + g * tau; // px/s, down
-      const k = Math.min(1, Math.max(0, v) / (2.4 * vh));
-      return {
-        x: lerp(p.x0, p.landX, tau / tl), // a straight sideways speed
-        y: p.y0 + v0 * tau + 0.5 * g * tau * tau,
-        rot: p.spin * tau,
-        sx: 1 - 0.35 * LETTERS.stretch * k,
-        sy: 1 + LETTERS.stretch * k,
-      };
+    const [fx, fy] = LETTERS.fallScale;
+    if (reduced) return { y: p.landY, sx: 1, sy: 1 };
+    if (t < p.tLand) {
+      const tau = Math.max(0, t - T.fall - p.delay) / 1000;
+      const k = clamp01(tau / 0.12); // it stretches as it gets going
+      return { y: p.y0 + 0.5 * LETTERS.gravity * vh * tau * tau, sx: lerp(1, fx, k), sy: lerp(1, fy, k) };
     }
-    // impact: squash flat, spring back up in one short bounce, settle
-    const ms = after * 1000;
-    const imp = LETTERS.impactMs, rest = LETTERS.settleMs;
-    const squash = ms < imp ? Math.sin((ms / imp) * Math.PI) : 0;
-    const b = ms >= imp && ms < rest ? Math.sin(((ms - imp) / (rest - imp)) * Math.PI) : 0;
-    const rot0 = p.spin * tl;
-    return {
-      x: p.landX,
-      y: p.landY - LETTERS.bounce * vh * b,
-      rot: rot0 * Math.max(0, 1 - ms / imp) * 0.4, // knocked upright by the hit
-      sx: 1 + 0.4 * squash - 0.08 * b,
-      sy: 1 - 0.45 * squash + 0.1 * b,
-    };
+    let ms = t - p.tLand;
+    let from: { lift: number; sx: number; sy: number } = { lift: 0, sx: fx, sy: fy };
+    for (const [dur, lift, sx, sy, ease] of LETTERS.bounce) {
+      if (ms < dur) {
+        const k = ms / dur;
+        const e = ease === 'in' ? Math.pow(k, 2.2) : 1 - Math.pow(1 - k, 2.2);
+        return { y: p.landY - lerp(from.lift, lift, e) * p.h, sx: lerp(from.sx, sx, e), sy: lerp(from.sy, sy, e) };
+      }
+      ms -= dur;
+      from = { lift, sx, sy };
+    }
+    return { y: p.landY, sx: 1, sy: 1 };
   }
+  const BOUNCE_MS = LETTERS.bounce.reduce((a, b) => a + b[0], 0);
 
   // ---- the desktop: clock, mail app, inbox, notification ------------------------------------
   function applyDesktop(t: number, fi: number, quiet: number) {
@@ -469,7 +451,7 @@ export default forwardRef<
     const loose = t >= T.fall;
     const m0 = measured.current && { lastLand: Math.max(...measured.current.plan.map((p) => p.tLand)) };
     root.querySelectorAll<HTMLElement>('.cin-win.final .cin-ch').forEach((el) => (el.style.visibility = loose ? 'hidden' : 'visible'));
-    overlayRef.current!.style.display = loose && t < (m0?.lastLand ?? Infinity) + LETTERS.settleMs + 200 ? 'block' : 'none';
+    overlayRef.current!.style.display = loose && t < (m0?.lastLand ?? Infinity) + BOUNCE_MS + LETTERS.restMs + LETTERS.fadeMs + 50 ? 'block' : 'none';
     const m = measured.current;
     const cv = canvasRef.current!;
     if (!m || !loose) {
@@ -477,19 +459,17 @@ export default forwardRef<
       return;
     }
 
-    // ---- the letters: falling into the door's foot, shrinking into its cells ----
-    const cell = m.scene.cell;
+    // ---- the letters: dropping onto the door's foot line, bouncing ----
     m.plan.forEach((p, k) => {
       const el = cloneRefs.current[k];
       if (!el) return;
       const f = fallPos(p, t, m.vh);
-      // after the bounce it shrinks into its cell and the cell's glyph takes over
-      const settle = clamp01((t - p.tLand - LETTERS.settleMs) / 160);
-      const sc = lerp(1, Math.min(1, cell / p.h), settle);
-      // squash and stretch about the letter's foot, so it stands on the ground
+      // after the bounce and a beat of rest it fades as the door rises
+      const fade = clamp01((t - p.tLand - BOUNCE_MS - LETTERS.restMs) / LETTERS.fadeMs);
+      // squash and stretch about the letter's foot, so it stands on the line
       el.style.transformOrigin = '50% 100%';
-      el.style.transform = `translate(${f.x - p.w / 2}px, ${f.y - p.h / 2}px) rotate(${f.rot}deg) scale(${sc * f.sx}, ${sc * f.sy})`;
-      el.style.opacity = String(1 - settle);
+      el.style.transform = `translate(${p.x0 - p.w / 2}px, ${f.y - p.h / 2}px) scale(${f.sx}, ${f.sy})`;
+      el.style.opacity = String(reduced ? clamp01((t - T.fall) / 300) * (1 - fade) : 1 - fade);
     });
 
     // ---- the glyph scene ----

@@ -73,14 +73,14 @@ export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's s
 // falling, drifts in toward its column of the door and lands on its foot,
 // where the door starts to emerge (growFrom).
 export const LETTERS = {
-  stepMs: 20, // each letter lets go this long after the one to its left
+  stepMs: 0, // each letter lets go this long after the one to its left (0: all at once)
   gravity: 1.2, // the fall, letters and water alike, in viewport heights / s²
   fallScale: [0.9, 1.15] as const, // stretched while it falls
   morphAt: [0.32, 0.5] as const, // s into its fall when it turns to water (spread per letter)
   morphMs: 220, // the turn: it stretches into a streak and fades into the string
   streak: [0.45, 3] as const, // the streak's scale (x, y)
   tail: [5, 9] as const, // a water string's tail, cells
-  streams: 5, // the strings gather into this many streams onto the door's foot
+  streams: 1, // the strings gather into this many streams onto the door's foot (1: all to its centre)
   pan: { dist: 0.95, ms: 1800 }, // the camera's tilt down after the letters: how far (of the height), how long
 };
 

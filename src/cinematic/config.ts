@@ -68,8 +68,9 @@ export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's s
 
 // ---- falling letters ---------------------------------------------------------------
 // Each letter drops straight down. Those above the door's foot land on it -
-// a short squash, no bounce - and rest there until the door rises from them;
-// those too far to either side to become the door fade away as they fall.
+// a short squash, no bounce - and turn into the glyph there, and the door
+// grows out of them (scene.ts growFrom); those too far to either side to
+// become the door fade away as they fall.
 export const LETTERS = {
   stepMs: 35, // each letter lets go this long after the one to its left
   gravity: 1.9, // the drop, in viewport heights / s²
@@ -78,8 +79,8 @@ export const LETTERS = {
   squashMs: 140,
   margin: 1, // door cells either side of its foot that still count as the door
   vanish: [0.35, 0.9] as const, // a letter beside the door fades over this part of its fall
-  restMs: 250, // the landed ones rest a beat
-  fadeMs: 300, // then fade as the door rises from them
+  restMs: 120, // the landed ones rest a beat, taking on their glyph's colour
+  fadeMs: 260, // then fade into the glyph the door grows from
 };
 
 // ---- the water-and-door scene (scene.ts) -------------------------------------------------

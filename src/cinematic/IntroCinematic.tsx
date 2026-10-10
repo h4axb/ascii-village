@@ -43,7 +43,7 @@ import {
 } from './config';
 import { EMAILS, WINDOWS, FLASH, INBOX, TOAST, SCROLL, type WindowShot } from './emails';
 import { GlyphCanvas } from './glyphCanvas';
-import { buildScene, renderScene, cellAt, sceneCell, type Scene } from './scene';
+import { buildScene, renderScene, cellAt, growFrom, sceneCell, type Scene } from './scene';
 import { DOOR } from './door';
 import './cinematic.css';
 
@@ -188,6 +188,7 @@ interface Plan {
   landY: number; // its centre once its foot is on the door's foot line
   tLand: number; // ms: impact
   onDoor: boolean; // it lands on the door's foot (else it fades as it falls)
+  rgb: [number, number, number]; // on the door: the colour of the glyph it turns into
 }
 interface Measured {
   vw: number;
@@ -286,6 +287,7 @@ export default forwardRef<
         landY: 0,
         tLand: 0,
         onDoor: false,
+        rgb: [233, 238, 246],
       });
     }
     // each letter drops straight down, left to right one after another;
@@ -305,6 +307,18 @@ export default forwardRef<
         p.tLand = T.fall + p.delay + Math.sqrt((2 * Math.max(1, p.landY - p.y0)) / g) * 1000;
         p.onDoor = p.x0 >= footL && p.x0 <= footR;
       });
+    // the door grows out of the cells the landed letters fall into
+    const seeds: { c: number; r: number; t: number }[] = [];
+    plan.forEach((p) => {
+      if (!p.onDoor) return;
+      const c = Math.max(0, Math.min(DOOR.cols - 1, Math.round(p.x0 / scene.cell - 0.5 - scene.c0)));
+      let r = DOOR.rows - 2;
+      while (r > 0 && !DOOR.at[r * DOOR.cols + c]) r--;
+      const cell = DOOR.at[r * DOOR.cols + c];
+      if (cell) p.rgb = cell.rgb;
+      seeds.push({ c, r, t: p.tLand + LETTERS.squashMs * 0.5 });
+    });
+    growFrom(scene, seeds);
     return { vw, vh, font, plan, scene };
   }
 
@@ -471,6 +485,9 @@ export default forwardRef<
       el.style.transformOrigin = '50% 100%';
       el.style.transform = `translate(${p.x0 - p.w / 2}px, ${f.y - p.h / 2}px) scale(${f.sx}, ${f.sy})`;
       el.style.opacity = String(reduced ? clamp01((t - T.fall) / 300) * (1 - fade) : 1 - fade);
+      // landed: it takes on the colour of the glyph it is becoming
+      const tint = p.onDoor ? clamp01((t - p.tLand) / (LETTERS.squashMs + LETTERS.restMs)) : 0;
+      el.style.color = `rgb(${Math.round(lerp(233, p.rgb[0], tint))},${Math.round(lerp(238, p.rgb[1], tint))},${Math.round(lerp(246, p.rgb[2], tint))})`;
     });
 
     // ---- the glyph scene ----

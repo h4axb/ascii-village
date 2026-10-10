@@ -3,10 +3,10 @@
 // canvas (glyphCanvas.ts). Everything is a pure function of the clock t
 // (config.ts's T), so seeking is exact.
 //
-//   build     the door (door-glyphs.svg via door.ts) rises from the middle
-//             of its foot, up and out: each glyph drops into its cell, bright,
-//             and settles into the drawing's own colour (the falling phrase
-//             letters have just bounced together there)
+//   build     the door (door-glyphs.svg via door.ts) grows out of the
+//             letters that landed on its foot (growFrom), up and out: each
+//             glyph emerges in its cell - a speck, a mark, its glyph -
+//             brightening, then settles into the drawing's own colour
 //   open      the leaf swings open on its left hinge, slowly, to about half
 //             its width; it is re-sampled column by column into the grid (no
 //             squeezed glyphs), its free edge coming toward the viewer
@@ -36,7 +36,7 @@ function vnoise(x: number, y: number): number {
 const fbm = (x: number, y: number) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3) * 0.15;
 const hash = (a: number, b: number) => rand(a * 12.9898 + b * 78.233, 7);
 
-const DROP = 170; // ms: a glyph dropping into its cell
+const DROP = 200; // ms: a glyph emerging in its cell
 const SETTLE = 280; // ms: its brief brighten as it settles
 
 export interface Scene {
@@ -98,6 +98,32 @@ export function buildScene(vw: number, vh: number): Scene {
     focus: { x: (c0 + open) * cell, y: (r0 + (DOOR.leafTop + DOOR.leafBottom + 1) / 2) * cell },
     col,
   };
+}
+
+// The door emerges from the letters that landed on its foot: each lands
+// in a cell (a seed) at time t, and the door grows from the seeds, up and
+// out, each glyph's time its distance from the nearest seed. It is done by
+// the end of T.build. (Without seeds it keeps rising from the middle.)
+export function growFrom(sc: Scene, seeds: { c: number; r: number; t: number }[]) {
+  if (!seeds.length) return;
+  const near = (k: { c: number; r: number }) => {
+    let best = Infinity, at = 0;
+    for (const s of seeds) {
+      const d = Math.hypot(k.r - s.r, k.c - s.c);
+      if (s.t + d * 60 < best) {
+        best = s.t + d * 60;
+        at = d;
+      }
+    }
+    return { d: at, t: best - at * 60 };
+  };
+  const t0 = Math.min(...seeds.map((s) => s.t));
+  const dMax = Math.max(1, ...DOOR.cells.map((k) => near(k).d));
+  const per = Math.max(25, Math.min(90, (T.build[1] - t0 - 300) / dMax)); // ms per cell of growth
+  for (const k of DOOR.cells) {
+    const n = near(k);
+    sc.born[k.r * DOOR.cols + k.c] = n.t + n.d * per + (n.d ? rand(k.c, k.r) * 140 : 0);
+  }
 }
 
 // where a door cell sits on screen (its centre, px)
@@ -204,11 +230,8 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
     const e = (t - born) / DROP;
     if (e < 1) {
       if (reduced) put(c, r, g(k.ch), mixc(DARK, k.rgb, e));
-      else {
-        // still dropping in, bright
-        const off = Math.round((1 - easeOutCubic(e)) * (2 + Math.floor(hash(k.c, k.r) * 3)));
-        put(c, r - off, g(k.ch), mixc(WHITE, k.rgb, 0.4 + 0.6 * e));
-      }
+      // emerging in place: a speck, a mark, then its glyph, brightening
+      else put(c, r, e < 0.35 ? g('·') : e < 0.7 ? g(':') : g(k.ch), mixc(DARK, mixc(WHITE, k.rgb, 0.55), easeOutCubic(e)));
       continue;
     }
     let rgb = mixc(k.rgb, WHITE, 0.4 * clamp01(1 - (t - born - DROP) / SETTLE));

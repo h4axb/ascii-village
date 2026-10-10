@@ -1,7 +1,7 @@
 # Intro cinematic
 
 A cinematic of about 32 seconds:
-1. **Four phases at the laptop** (0–13.6 s), told in six stills of the same desk (`public/intro/cinematic/`), from bright morning sun to the cold blue light of the screen deep at night. The camera zooms slowly in, from outside toward the screen, the whole time. Over each still a desktop runs on the laptop's screen: the **taskbar clock** (time and date jump with each still), a **mail app** that stays open over the desktop icons and sits a little differently each shot, and its **inbox history**, rejections among ordinary mail.
+1. **Four phases at the laptop** (0–13.6 s), told in six stills of the same desk (`public/intro/cinematic/`), from bright morning sun to the cold blue light of the screen deep at night. The camera starts close on the laptop screen and slowly pulls back to the whole desk. Over each still a desktop runs on the laptop's screen: the **taskbar clock** (time and date jump with each still), a **mail app** that stays open over the desktop icons and sits a little differently each shot, and its **inbox history**, rejections among ordinary mail.
    - *Optimism* (morning, fresh coffee): a notification, "Thank you for your application to Northstar Games".
    - *The drift* (afternoon, long shadows): two rejections opened over the inbox, "We regret to inform you…" and "Unfortunately…".
    - *The routine* (overcast): the inbox scrolls down past a sea of bold unread "Update on your status".

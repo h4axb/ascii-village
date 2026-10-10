@@ -13,7 +13,7 @@
 export const STAGE_W = 1672;
 export const STAGE_H = 643;
 
-// The stills, morning to night: when each cuts in (it crossfades over
+// The stills, morning to deep night: when each cuts in (it crossfades over
 // FRAME_FADE), where the laptop's screen is in it (measured from its pixels;
 // the bottom 10 % of the screen is the taskbar), the desktop clock, the mail
 // app's place (% of the desktop above the taskbar) and the screen's glow in
@@ -31,28 +31,28 @@ export const FRAME_FADE = 450;
 export const TASKBAR = 0.1; // of the screen's height
 export const FRAMES: Frame[] = [
   // Phase 1, optimism: bright morning, fresh coffee
-  { src: '/intro/cinematic/01-morning.webp', at: 0, screen: { x: 468, y: 63, w: 736, h: 429 }, time: '08:12', date: 'Mon 3 Mar', app: { left: 12, top: 5, width: 80, height: 84 }, glow: 0 },
+  { src: '/intro/cinematic/01-morning.webp', at: 0, screen: { x: 468, y: 63, w: 736, h: 429 }, time: '08:12', date: 'Mon 3 Mar', app: { left: 2, top: 4, width: 95, height: 88 }, glow: 0 },
   // Phase 2, the drift: harsh afternoon light, long shadows
-  { src: '/intro/cinematic/02-midday.webp', at: 3000, screen: { x: 468, y: 63, w: 736, h: 425 }, time: '13:46', date: 'Wed 5 Mar', app: { left: 14, top: 7, width: 78, height: 82 }, glow: 0.05 },
-  { src: '/intro/cinematic/03-afternoon.webp', at: 5200, screen: { x: 468, y: 63, w: 736, h: 429 }, time: '17:38', date: 'Fri 14 Mar', app: { left: 11, top: 4, width: 81, height: 85 }, glow: 0.1 },
+  { src: '/intro/cinematic/02-midday.webp', at: 3000, screen: { x: 468, y: 63, w: 736, h: 425 }, time: '13:46', date: 'Wed 5 Mar', app: { left: 3, top: 6, width: 94, height: 86 }, glow: 0.05 },
+  { src: '/intro/cinematic/03-afternoon.webp', at: 5200, screen: { x: 468, y: 63, w: 736, h: 429 }, time: '17:38', date: 'Fri 14 Mar', app: { left: 1.5, top: 3, width: 96, height: 90 }, glow: 0.1 },
   // Phase 3, the routine: overcast, stagnant
-  { src: '/intro/cinematic/04-overcast.webp', at: 7400, screen: { x: 461, y: 48, w: 739, h: 423 }, time: '11:07', date: 'Thu 3 Apr', app: { left: 13, top: 6, width: 79, height: 84 }, glow: 0.2 },
+  { src: '/intro/cinematic/04-overcast.webp', at: 7400, screen: { x: 461, y: 48, w: 739, h: 423 }, time: '11:07', date: 'Thu 3 Apr', app: { left: 2.5, top: 5, width: 95, height: 88 }, glow: 0.2 },
   // Phase 4, resignation: deep night, only the screen's cold light
-  { src: '/intro/cinematic/05-night.webp', at: 10200, screen: { x: 462, y: 48, w: 738, h: 423 }, time: '23:51', date: 'Sun 27 Apr', app: { left: 12, top: 5, width: 80, height: 84 }, glow: 0.6 },
+  { src: '/intro/cinematic/05-night.webp', at: 10200, screen: { x: 462, y: 48, w: 738, h: 423 }, time: '23:51', date: 'Sun 27 Apr', app: { left: 2, top: 4, width: 95, height: 89 }, glow: 0.6 },
+  { src: '/intro/cinematic/06-deep-night.webp', at: 11600, screen: { x: 468, y: 63, w: 733, h: 429 }, time: '02:47', date: 'Mon 28 Apr', app: { left: 3, top: 6, width: 94, height: 87 }, glow: 0.75 },
 ];
 
 // ---- the timeline (ms) ---------------------------------------------------------
-const FALL = 16600; // the keywords come loose; everything after is relative to it
+const FALL = 17800; // the keywords come loose; everything after is relative to it
 export const T = {
   // the stills (FRAMES[].at); the opened mails' times are in emails.ts
-  montageEnd: 12400,
-  // only the three keywords remain
-  othersOut: [12400, 13000], // the mail app, the other text and the desktop fade
-  frameOut: [12600, 13300], // the last mail's window and other words dissolve
-  dotsIn: [13300, 13900], // "Unfortunately," -> "Unfortunately..."
-  blackIn: [12400, 13600], // the room fades to black
-  zoom: [12200, 13900], // the camera pushes in on the keywords; then they hold 3 s
-  track: [0, 12400], // all the while before, the camera eases slowly backward
+  montageEnd: 13600,
+  // the camera has stopped; everything but the three keywords fades, then they hold 3 s
+  othersOut: [13600, 14200], // the mail app, the other text and the desktop fade
+  frameOut: [13800, 14500], // the last mail's window and other words dissolve
+  dotsIn: [14500, 15100], // "Unfortunately," -> "Unfortunately..."
+  blackIn: [13600, 14800], // the room fades to black
+  zoomIn: [0, 13600], // all the while before, the camera eases slowly in, from outside
   // falling letters -> the glyph door -> through it (scene.ts), then 3 s of black
   fall: FALL, // the letters fall into the door's foot (they land ~1.0-1.7 s later)
   build: [FALL + 1200, FALL + 4200], // the door builds itself bottom up, glyph by glyph
@@ -64,8 +64,7 @@ export const T = {
 } as const;
 
 export const ENTER_MS = 160; // an email window's entrance
-export const ZOOM = 1.7; // how far the camera pushes in on the keywords
-export const TRACK = 1.12; // how near the camera starts (it eases back to 1)
+export const ZOOM_IN = 1.35; // how near the camera gets by the end of the stills (then it stays)
 
 // ---- falling letters ---------------------------------------------------------------
 export const LETTERS = {

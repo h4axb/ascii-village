@@ -29,10 +29,9 @@ import {
   FRAMES,
   FRAME_FADE,
   TASKBAR,
-  TRACK,
   T,
   ENTER_MS,
-  ZOOM,
+  ZOOM_IN,
   LETTERS,
   SCENE,
   SHOT_LIST,
@@ -41,7 +40,6 @@ import {
   smooth,
   span,
   easeOutCubic,
-  easeInOutCubic,
   rand,
 } from './config';
 import { EMAILS, WINDOWS, FLASH, INBOX, TOAST, SCROLL, type WindowShot } from './emails';
@@ -251,40 +249,14 @@ export default forwardRef<
     const s = Math.max(vw / STAGE_W, vh / STAGE_H);
     return { s, ox: (vw - STAGE_W * s) / 2, oy: (vh - STAGE_H * s) / 2 };
   };
-  // the stage transform at time t: cover, slowly tracking backward, then the
-  // push-in on the last mail's keywords
-  const finalWin = WINDOWS[FINAL];
+  // the stage transform at time t: cover, then slowly in from outside toward
+  // the laptop's screen through all the stills; after them the camera stays
   const lastScreen = FRAMES[FRAMES.length - 1].screen;
-  // the push-in aims at the keywords' own centre (measured once, in stage px,
-  // on the last still's screen); until they can be measured, the mail's middle
-  let focus: { x: number; y: number } | null = null;
-  const fallbackFocus = { x: lastScreen.x + (lastScreen.w * (finalWin.left + finalWin.width / 2)) / 100, y: lastScreen.y + lastScreen.h * ((finalWin.top + 26) / 100) };
-  function keywordFocus() {
-    if (focus) return focus;
-    const scr = screenRef.current, kws = rootRef.current?.querySelectorAll<HTMLElement>('.cin-win.final .cin-kw');
-    if (!scr || !kws?.length) return fallbackFocus;
-    const sr = scr.getBoundingClientRect();
-    const k = sr.width / scr.offsetWidth; // CSS px per stage px
-    if (!k) return fallbackFocus;
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    kws.forEach((e) => {
-      const q = e.getBoundingClientRect();
-      x0 = Math.min(x0, q.left);
-      y0 = Math.min(y0, q.top);
-      x1 = Math.max(x1, q.right);
-      y1 = Math.max(y1, q.bottom);
-    });
-    // in the screen's own px, then onto the last still's screen
-    const lx = ((x0 + x1) / 2 - sr.left) / k, ly = ((y0 + y1) / 2 - sr.top) / k;
-    focus = { x: lastScreen.x + (lx * lastScreen.w) / scr.offsetWidth, y: lastScreen.y + (ly * lastScreen.h) / scr.offsetHeight };
-    return focus;
-  }
+  const focus = { x: lastScreen.x + lastScreen.w / 2, y: lastScreen.y + lastScreen.h / 2 };
   function stageTransform(t: number, vw: number, vh: number) {
     const { s, ox, oy } = cover(vw, vh);
-    const focus = keywordFocus();
-    const k = reduced ? 0 : easeInOutCubic(clamp01((t - T.zoom[0]) / (T.zoom[1] - T.zoom[0])));
-    const track = reduced ? 1 : lerp(TRACK, 1, smooth(clamp01((t - T.track[0]) / (T.track[1] - T.track[0]))));
-    const S = s * track * lerp(1, ZOOM, k);
+    const k = reduced ? 0 : smooth(clamp01((t - T.zoomIn[0]) / (T.zoomIn[1] - T.zoomIn[0])));
+    const S = s * lerp(1, ZOOM_IN, k);
     const q0 = { x: (vw / 2 - ox) / s, y: (vh / 2 - oy) / s };
     const q = { x: lerp(q0.x, focus.x, k), y: lerp(q0.y, focus.y, k) };
     return { S, x: vw / 2 - q.x * S, y: vh / 2 - q.y * S };

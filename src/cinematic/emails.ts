@@ -91,14 +91,14 @@ export const WINDOWS: WindowShot[] = [
     hide: F[3],
     from: { x: 8, y: 0 },
   },
-  // Phase 4: the final one, prominent
+  // Phase 4: the final one, prominent (it arrived the night before)
   {
     email: 2,
     variant: 'standard',
     left: 20,
     top: 8,
     width: 60,
-    appear: F[4] + 600,
+    appear: F[5] + 400,
     from: { x: 0, y: -10 },
     final: true,
   },

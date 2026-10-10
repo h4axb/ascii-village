@@ -154,6 +154,9 @@ const mix = (a: string, b: string, k: number) => {
   return `rgb(${x.map((v, i) => Math.round(lerp(v, y[i], k))).join(',')})`;
 };
 
+// the door's boil: the turbulence's baseFrequency, stepping every 0.225 s
+const BOIL = ['0.01', '0.025', '0.015', '0.03'];
+
 // ---- the stills ----------------------------------------------------------------------------
 // which still is showing at t, and how far it has faded in over the one before
 function frameAt(t: number) {
@@ -225,6 +228,7 @@ export default forwardRef<
   const doorCanvasRef = useRef<HTMLCanvasElement>(null);
   const doorGlyphs = useRef<GlyphCanvas | null>(null);
   const boilRef = useRef<SVGFEDisplacementMapElement>(null);
+  const turbRef = useRef<SVGFETurbulenceElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const winRefs = useRef<(HTMLDivElement | null)[]>([]);
   const cloneRefs = useRef<(HTMLSpanElement | null)[]>([]);
@@ -501,6 +505,9 @@ export default forwardRef<
     const dgc = (doorGlyphs.current ??= new GlyphCanvas(dcv));
     dgc.resize((DOOR.cols + 2 * DOOR_PAD.c) * cellPx, (DOOR.rows + 2 * DOOR_PAD.r) * cellPx, cellPx, 0.85);
     boilRef.current?.setAttribute('scale', String(Math.max(3, Math.round(cellPx * 0.55))));
+    // the noise's grain jumps between four sizes, 0.9 s round (on the cinematic's clock, so it scrubs)
+    const grain = BOIL[Math.floor(t / 225) % BOIL.length];
+    if (turbRef.current && turbRef.current.getAttribute('baseFrequency') !== grain) turbRef.current.setAttribute('baseFrequency', grain);
     renderScene(m.scene, gc, t, reduced, shift, dgc);
     const bgK = span(t, [T.fall, T.fall + 1500]);
     const bg = [1, 3, 5].map((i) => parseInt(SCENE.bg.slice(i, i + 2), 16));
@@ -713,9 +720,7 @@ export default forwardRef<
       <svg className="cin-defs" width="0" height="0" aria-hidden="true">
         <defs>
           <filter id="cin-boil">
-            <feTurbulence type="turbulence" baseFrequency="0.01" numOctaves={2} seed={1} result="noise">
-              <animate attributeName="baseFrequency" values="0.01;0.025;0.015;0.03" calcMode="discrete" repeatCount="indefinite" dur="0.9s" />
-            </feTurbulence>
+            <feTurbulence ref={turbRef} type="turbulence" baseFrequency="0.01" numOctaves={2} seed={1} result="noise" />
             <feDisplacementMap ref={boilRef} in="SourceGraphic" in2="noise" scale={5} xChannelSelector="R" yChannelSelector="G" />
           </filter>
         </defs>

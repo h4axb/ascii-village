@@ -3096,7 +3096,8 @@ pre {
   padding: 0 16px;
 }
 
-.introb-dialogue-wrap .panel {
+.introb-dialogue-wrap .panel,
+.introb-dialogue-wrap .ds-panel {
   pointer-events: auto;
 }
 

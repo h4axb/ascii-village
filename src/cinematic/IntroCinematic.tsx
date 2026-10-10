@@ -1,9 +1,9 @@
 // ---------------------------------------------------------------------------
-// THE INTRO CINEMATIC (about 23 s): six rejection emails pile up on the
-// laptop -> three phrases are left in the dark -> their letters fall apart
-// and gather into four water drops -> the drops land and ripple -> the water
-// pours a glyph door, which opens onto the island -> into the door -> the
-// wake-up scene (App.tsx's runIntro) takes over.
+// THE INTRO CINEMATIC (about 26 s): six rejection emails pile up on the
+// laptop -> three phrases are left in the dark -> their letters fall into
+// the foot of a glyph door, which builds itself up from there -> it opens
+// onto the sea and an island, light pours out -> a slow walk toward it, into
+// black -> 3 s of black -> the wake-up scene (App.tsx's runIntro) takes over.
 //
 // One clock drives everything: `apply(t)` puts every layer where it belongs
 // at time t (ms), from config.ts's timeline. No scattered timers, so the dev
@@ -14,20 +14,22 @@
 // Layers, back to front:
 //   stage    the reference photo (scaled to cover), the room glow, a black
 //            fade, and the laptop screen with the HTML email windows
-//   scene    the glyph canvas (scene.ts): drops, ripples, the liquid that
-//            pours the door, the door opening onto the island, sand, puddles,
-//            plants, and the zoom into the doorway
+//   scene    the glyph canvas (scene.ts): the door (door-glyphs.svg, door.ts)
+//            building bottom up, opening onto the island, the beam; the walk
+//            toward it is a camera move in the canvas's draw
 //   overlay  the falling letters (copies placed exactly over the email's own
-//            letters at the moment they come loose), until they become drops
-// The real game already runs underneath with the player at PLAYER START: the
-// canvas fades out at the end of the zoom and hands straight over to it.
+//            letters at the moment they come loose), until they land
+// The canvas fades to black during the walk; after 3 s of black the wake-up
+// scene starts from black.
 // ---------------------------------------------------------------------------
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  CINEMATIC_BG,
   STAGE_W,
   STAGE_H,
-  SCREEN,
+  FRAMES,
+  FRAME_FADE,
+  TASKBAR,
+  TRACK,
   T,
   ENTER_MS,
   ZOOM,
@@ -36,14 +38,16 @@ import {
   SHOT_LIST,
   clamp01,
   lerp,
+  smooth,
   span,
   easeOutCubic,
   easeInOutCubic,
   rand,
 } from './config';
-import { EMAILS, WINDOWS, FLASH, type WindowShot } from './emails';
+import { EMAILS, WINDOWS, FLASH, INBOX, TOAST, SCROLL, type WindowShot } from './emails';
 import { GlyphCanvas } from './glyphCanvas';
-import { buildScene, renderScene, type DropSeed, type Scene } from './scene';
+import { buildScene, renderScene, cellAt, landIn, sceneCell, type Scene } from './scene';
+import { DOOR } from './door';
 import './cinematic.css';
 
 export type IntroCinematicHandle = { skip: () => void };
@@ -151,6 +155,32 @@ const mix = (a: string, b: string, k: number) => {
   return `rgb(${x.map((v, i) => Math.round(lerp(v, y[i], k))).join(',')})`;
 };
 
+// ---- the stills ----------------------------------------------------------------------------
+// which still is showing at t, and how far it has faded in over the one before
+function frameAt(t: number) {
+  let i = 0;
+  FRAMES.forEach((f, k) => {
+    if (t >= f.at) i = k;
+  });
+  return { i, fade: i ? clamp01((t - FRAMES[i].at) / FRAME_FADE) : 1 };
+}
+// the laptop screen's place at t (it moves a little between stills)
+function screenAt(t: number) {
+  const { i, fade } = frameAt(t);
+  const a = FRAMES[Math.max(0, i - 1)].screen, b = FRAMES[i].screen;
+  const k = smooth(fade);
+  return { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), w: lerp(a.w, b.w, k), h: lerp(a.h, b.h, k) };
+}
+// the inbox, latest arrival on top (among mails arriving together, the later one)
+const ORDER = INBOX.map((it, i) => ({ it, i })).sort((a, b) => b.it.at - a.it.at || b.i - a.i);
+const ROW_H = 13; // a list row, stage px
+// Phase 3's scroll: a few wheel ticks, each eased
+function scrollRows(t: number) {
+  const k = clamp01((t - SCROLL.at[0]) / (SCROLL.at[1] - SCROLL.at[0]));
+  const ticks = 6, p = k * ticks, n = Math.floor(p);
+  return (SCROLL.rows * Math.min(ticks, n + smooth(clamp01((p - n) * 2.5)))) / ticks;
+}
+
 // ---- the per-letter plan, fixed once the letters have been measured --------------------
 interface Plan {
   x0: number; // centre where the letter came loose (viewport px)
@@ -161,9 +191,9 @@ interface Plan {
   vx: number;
   spin: number;
   phase: number;
-  group: number; // which of the drops it joins
-  ox: number; // its place in the gathering group, px
-  oy: number;
+  landX: number; // where it lands: its cell in the door's foot (it drifts there as it falls)
+  landY: number;
+  tLand: number; // ms
 }
 interface Measured {
   vw: number;
@@ -182,7 +212,18 @@ export default forwardRef<
   const stageRef = useRef<HTMLDivElement>(null);
   const glowRef = useRef<HTMLDivElement>(null);
   const blackRef = useRef<HTMLDivElement>(null);
-  const tintRef = useRef<HTMLDivElement>(null);
+  const frameRefs = useRef<(HTMLImageElement | null)[]>([]);
+  const screenRef = useRef<HTMLDivElement>(null);
+  const deskRef = useRef<HTMLDivElement>(null);
+  const appRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
+  const unreadRef = useRef<HTMLSpanElement>(null);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const toastRef = useRef<HTMLDivElement>(null);
+  const clockRef = useRef<HTMLDivElement>(null);
+  const clockTimeRef = useRef<HTMLSpanElement>(null);
+  const clockDateRef = useRef<HTMLSpanElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glyphs = useRef<GlyphCanvas | null>(null);
@@ -210,13 +251,40 @@ export default forwardRef<
     const s = Math.max(vw / STAGE_W, vh / STAGE_H);
     return { s, ox: (vw - STAGE_W * s) / 2, oy: (vh - STAGE_H * s) / 2 };
   };
-  // the stage transform at time t: cover, then the push-in on the last email
+  // the stage transform at time t: cover, slowly tracking backward, then the
+  // push-in on the last mail's keywords
   const finalWin = WINDOWS[FINAL];
-  const focus = { x: SCREEN.x + (SCREEN.w * (finalWin.left + finalWin.width / 2)) / 100, y: SCREEN.y + SCREEN.h * ((finalWin.top + 26) / 100) };
+  const lastScreen = FRAMES[FRAMES.length - 1].screen;
+  // the push-in aims at the keywords' own centre (measured once, in stage px,
+  // on the last still's screen); until they can be measured, the mail's middle
+  let focus: { x: number; y: number } | null = null;
+  const fallbackFocus = { x: lastScreen.x + (lastScreen.w * (finalWin.left + finalWin.width / 2)) / 100, y: lastScreen.y + lastScreen.h * ((finalWin.top + 26) / 100) };
+  function keywordFocus() {
+    if (focus) return focus;
+    const scr = screenRef.current, kws = rootRef.current?.querySelectorAll<HTMLElement>('.cin-win.final .cin-kw');
+    if (!scr || !kws?.length) return fallbackFocus;
+    const sr = scr.getBoundingClientRect();
+    const k = sr.width / scr.offsetWidth; // CSS px per stage px
+    if (!k) return fallbackFocus;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    kws.forEach((e) => {
+      const q = e.getBoundingClientRect();
+      x0 = Math.min(x0, q.left);
+      y0 = Math.min(y0, q.top);
+      x1 = Math.max(x1, q.right);
+      y1 = Math.max(y1, q.bottom);
+    });
+    // in the screen's own px, then onto the last still's screen
+    const lx = ((x0 + x1) / 2 - sr.left) / k, ly = ((y0 + y1) / 2 - sr.top) / k;
+    focus = { x: lastScreen.x + (lx * lastScreen.w) / scr.offsetWidth, y: lastScreen.y + (ly * lastScreen.h) / scr.offsetHeight };
+    return focus;
+  }
   function stageTransform(t: number, vw: number, vh: number) {
     const { s, ox, oy } = cover(vw, vh);
+    const focus = keywordFocus();
     const k = reduced ? 0 : easeInOutCubic(clamp01((t - T.zoom[0]) / (T.zoom[1] - T.zoom[0])));
-    const S = s * lerp(1, ZOOM, k);
+    const track = reduced ? 1 : lerp(TRACK, 1, smooth(clamp01((t - T.track[0]) / (T.track[1] - T.track[0]))));
+    const S = s * track * lerp(1, ZOOM, k);
     const q0 = { x: (vw / 2 - ox) / s, y: (vh / 2 - oy) / s };
     const q = { x: lerp(q0.x, focus.x, k), y: lerp(q0.y, focus.y, k) };
     return { S, x: vw / 2 - q.x * S, y: vh / 2 - q.y * S };
@@ -249,43 +317,79 @@ export default forwardRef<
         vx: (rand(k, 2) * 2 - 1) * LETTERS.driftPx,
         spin: (rand(k, 3) * 2 - 1) * LETTERS.spinDeg,
         phase: rand(k, 4) * 6.28,
-        group: 0,
-        ox: (rand(k, 5) * 2 - 1) * vh * 0.02,
-        oy: (rand(k, 6) * 2 - 1) * vh * 0.02,
+        landX: 0,
+        landY: 0,
+        tLand: 0,
       });
     }
-    // four groups, left to right: each becomes one drop
+    // each letter lands in a cell of the door's foot (left to right, as they
+    // hang), and the door builds itself up from there
+    const scene = buildScene(vw, vh);
+    const foot = DOOR.cells.filter((k) => k.part === 'ground' && k.r < DOOR.rows - 1).sort((a, b) => a.c - b.c || b.r - a.r);
     const order = plan.map((p, k) => ({ k, x: p.x0 })).sort((a, b) => a.x - b.x);
-    order.forEach((o, j) => (plan[o.k].group = Math.min(SCENE.drops - 1, Math.floor((j / N) * SCENE.drops))));
-    const seeds: DropSeed[] = [];
-    for (let gIdx = 0; gIdx < SCENE.drops; gIdx++) {
-      const a = groupCentre(plan, gIdx, T.merge[1], vh), b = groupCentre(plan, gIdx, T.merge[1] - 50, vh);
-      seeds.push({ x: a.x, y: a.y, vy: Math.max(0, (a.y - b.y) / 0.05) });
-    }
-    return { vw, vh, font, plan, scene: buildScene(vw, vh, seeds) };
-  }
-
-  // the centre of a group of falling letters (where its drop forms)
-  function groupCentre(plan: Plan[], gIdx: number, t: number, vh: number) {
-    let x = 0, y = 0, n = 0;
-    plan.forEach((p) => {
-      if (p.group !== gIdx) return;
-      const f = fallPos(p, t, vh);
-      x += f.x;
-      y += f.y;
-      n++;
+    order.forEach((o, j) => {
+      const p = plan[o.k];
+      const cell = foot[Math.min(foot.length - 1, Math.floor(((j + 0.5) / order.length) * foot.length))];
+      const at = cellAt(scene, cell.c, cell.r);
+      p.landX = at.x;
+      p.landY = at.y;
+      p.tLand = T.fall + p.delay + Math.sqrt((2 * Math.max(1, at.y - p.y0)) / (LETTERS.gravity * vh)) * 1000;
+      landIn(scene, cell.c, cell.r, p.tLand);
     });
-    return { x: x / Math.max(1, n), y: y / Math.max(1, n) };
+    return { vw, vh, font, plan, scene };
   }
 
-  // where a falling letter would be under gravity alone
+  // a falling letter: gravity down to its cell in the door's foot, drifting
+  // toward it; after landing it stays (and becomes the cell's glyph, see apply)
   function fallPos(p: Plan, t: number, vh: number) {
-    const tau = Math.max(0, t - T.fall - p.delay) / 1000;
+    const tau = Math.max(0, Math.min(t, p.tLand) - T.fall - p.delay) / 1000;
+    const tl = Math.max(0.001, (p.tLand - T.fall - p.delay) / 1000);
+    const k = smooth(clamp01(tau / tl));
     return {
-      x: p.x0 + p.vx * tau + 7 * Math.sin(tau * 1.7 + p.phase) * Math.min(1, tau),
-      y: p.y0 + 0.5 * LETTERS.gravity * vh * tau * tau,
-      rot: p.spin * tau,
+      x: lerp(p.x0, p.landX, k) + 6 * Math.sin(tau * 2.4 + p.phase) * (1 - k),
+      y: Math.min(p.y0 + 0.5 * LETTERS.gravity * vh * tau * tau, p.landY),
+      rot: p.spin * tau * (1 - k * k),
     };
+  }
+
+  // ---- the desktop: clock, mail app, inbox, notification ------------------------------------
+  function applyDesktop(t: number, fi: number, quiet: number) {
+    const f = FRAMES[fi];
+    // the desktop and taskbar clock fade with everything but the keywords
+    deskRef.current!.style.opacity = String(quiet);
+    clockRef.current!.style.opacity = String(quiet);
+    if (clockTimeRef.current!.textContent !== f.time) {
+      clockTimeRef.current!.textContent = f.time;
+      clockDateRef.current!.textContent = f.date;
+    }
+    // the mail app: a little elsewhere each shot
+    Object.assign(appRef.current!.style, { left: `${f.app.left}%`, top: `${f.app.top}%`, width: `${f.app.width}%`, height: `${f.app.height}%` });
+    // the inbox: mails arrive on top, unread ones bold until read
+    let unread = 0, shown = 0;
+    ORDER.forEach(({ it }, k) => {
+      const el = rowRefs.current[k];
+      if (!el) return;
+      const here = it.at <= t;
+      el.style.display = here ? '' : 'none';
+      if (!here) return;
+      shown++;
+      const isUnread = !!it.unread && !(it.readAt !== undefined && t >= it.readAt);
+      if (isUnread) unread++;
+      el.classList.toggle('unread', isUnread);
+      el.style.setProperty('--new', String(it.at > 0 ? clamp01(1 - (t - it.at) / 1200) : 0));
+    });
+    unreadRef.current!.textContent = String(unread + 2);
+    // Phase 3: the scroll wheel, down past the status updates
+    const rows = fi === 3 ? (reduced ? (t >= SCROLL.at[0] ? SCROLL.rows : 0) : scrollRows(t)) : 0;
+    listRef.current!.style.transform = `translateY(${-rows * ROW_H}px)`;
+    const view = appRef.current!.clientHeight || 1;
+    const total = Math.max(view, shown * ROW_H + 24);
+    thumbRef.current!.style.height = `${(100 * view) / total}%`;
+    thumbRef.current!.style.top = `${(100 * rows * ROW_H) / total}%`;
+    // Phase 1's notification
+    const tin = easeOutCubic(clamp01((t - TOAST.at) / 320)), tout = clamp01((TOAST.hide - t) / 320);
+    toastRef.current!.style.opacity = String(t >= TOAST.at && t < TOAST.hide ? Math.min(tin, tout) : 0);
+    toastRef.current!.style.transform = `translateY(${reduced ? 0 : (1 - tin) * 14}px)`;
   }
 
   // ---- apply: everything at time t ----------------------------------------------------------
@@ -293,17 +397,26 @@ export default forwardRef<
     const st = stageTransform(t, vw, vh);
     stageRef.current!.style.transform = `translate(${st.x}px, ${st.y}px) scale(${st.S})`;
     stageRef.current!.style.visibility = t >= T.fall && t >= 0 && measured.current ? 'hidden' : 'visible';
-    // lighting: a flash at every new window, the screen dims as they pile up
+    // the stills, crossfading; the screen overlay follows the laptop's screen
+    const fr = frameAt(t);
+    FRAMES.forEach((f, k) => {
+      const el = frameRefs.current[k];
+      if (el) el.style.opacity = String(k < fr.i ? 1 : k === fr.i ? fr.fade : 0);
+    });
+    const scr = screenAt(t);
+    Object.assign(screenRef.current!.style, { left: `${scr.x}px`, top: `${scr.y}px`, width: `${scr.w}px`, height: `${scr.h}px` });
+    // lighting: a flash as each mail opens; the screen's glow in the room grows toward night
     let flash = 0;
-    T.shots.forEach((s0, i) => {
-      if (t >= s0 && t < T.montageEnd) flash += FLASH[i] * Math.exp(-(t - s0) / 110);
+    WINDOWS.forEach((w, i) => {
+      if (t >= w.appear && t < T.montageEnd) flash += FLASH[i] * Math.exp(-(t - w.appear) / 110);
     });
     if (reduced) flash *= 0.3;
     flashRef.current!.style.opacity = String(Math.min(0.5, flash));
-    tintRef.current!.style.opacity = String(0.06 + 0.3 * span(t, [0, T.montageEnd]));
     const quiet = 1 - span(t, T.othersOut);
-    glowRef.current!.style.opacity = String((0.55 + 0.9 * flash) * quiet);
+    const glow = lerp(FRAMES[Math.max(0, fr.i - 1)].glow, FRAMES[fr.i].glow, fr.fade);
+    glowRef.current!.style.opacity = String((glow + 0.9 * flash) * quiet);
     blackRef.current!.style.opacity = String(span(t, T.blackIn));
+    applyDesktop(t, fr.i, quiet);
     // the windows
     WINDOWS.forEach((w, i) => {
       const el = winRefs.current[i];
@@ -356,13 +469,13 @@ export default forwardRef<
       });
     }
     applyStage(t, vw, vh);
-    // the darkness lifts into the real game at the end of the zoom
-    root.style.background = t >= T.fadeOut[0] ? 'transparent' : '#000';
-    root.style.pointerEvents = t >= T.fadeOut[0] ? 'none' : 'auto';
+    // the zoom ends in black; the wake-up scene starts from black
+    root.style.background = '#000';
     // originals until the letters come loose, the copies after
     const loose = t >= T.fall;
+    const m0 = measured.current && { lastLand: Math.max(...measured.current.plan.map((p) => p.tLand)) };
     root.querySelectorAll<HTMLElement>('.cin-win.final .cin-ch').forEach((el) => (el.style.visibility = loose ? 'hidden' : 'visible'));
-    overlayRef.current!.style.display = loose && t < T.merge[1] ? 'block' : 'none';
+    overlayRef.current!.style.display = loose && t < (m0?.lastLand ?? Infinity) + 300 ? 'block' : 'none';
     const m = measured.current;
     const cv = canvasRef.current!;
     if (!m || !loose) {
@@ -370,31 +483,37 @@ export default forwardRef<
       return;
     }
 
-    // ---- the letters: falling, drifting into four groups, becoming drops ----
-    const gather = reduced ? 0 : span(t, T.cluster);
-    const merge = span(t, T.merge);
-    const centres = Array.from({ length: SCENE.drops }, (_, gi) => groupCentre(m.plan, gi, t, m.vh));
+    // ---- the letters: falling into the door's foot, shrinking into its cells ----
+    const cell = m.scene.cell;
     m.plan.forEach((p, k) => {
       const el = cloneRefs.current[k];
       if (!el) return;
       const f = fallPos(p, t, m.vh);
-      const c = centres[p.group];
-      const x = lerp(f.x, c.x + p.ox * (1 - merge), gather);
-      const y = lerp(f.y, c.y + p.oy * (1 - merge), gather);
-      const sc = 1 - 0.75 * merge;
-      el.style.transform = `translate(${x - p.w / 2}px, ${y - p.h / 2}px) rotate(${f.rot * (1 - gather)}deg) scale(${sc})`;
-      el.style.opacity = String(1 - merge);
-      el.style.color = `rgb(${Math.round(lerp(233, 143, gather))},${Math.round(lerp(238, 215, gather))},${Math.round(lerp(246, 216, gather))})`;
+      const land = clamp01((t - p.tLand) / 200);
+      const sc = lerp(1, Math.min(1, cell / p.h), land);
+      el.style.transform = `translate(${f.x - p.w / 2}px, ${f.y - p.h / 2}px) rotate(${f.rot}deg) scale(${sc})`;
+      el.style.opacity = String(1 - land);
     });
 
     // ---- the glyph scene ----
     cv.style.display = 'block';
     const gc = (glyphs.current ??= new GlyphCanvas(cv));
-    gc.resize(vw, vh);
+    gc.resize(vw, vh, sceneCell(vh), 0.85);
     renderScene(m.scene, gc, t, reduced);
     const bgK = span(t, [T.fall, T.fall + 1500]);
-    const base = `rgb(${Math.round(lerp(0, 0x16, bgK))},${Math.round(lerp(0, 0x21, bgK))},${Math.round(lerp(0, 0x2d, bgK))})`;
-    gc.draw(base, 1 - span(t, T.fadeOut));
+    const bg = [1, 3, 5].map((i) => parseInt(SCENE.bg.slice(i, i + 2), 16));
+    const base = `rgb(${bg.map((v) => Math.round(lerp(0, v, bgK))).join(',')})`;
+    // after the hold, walk toward the doorway: a slow push in with a step's bob
+    const wk = reduced ? 0 : clamp01((t - T.walk[0]) / (T.walk[1] - T.walk[0]));
+    const tau = Math.max(0, t - T.walk[0]) / 1000;
+    const bob = SCENE.walk.bob * m.vh * Math.min(1, wk * 4);
+    gc.draw(base, 1 - span(t, T.fadeOut), {
+      s: lerp(1, SCENE.walk.zoom, wk * wk * (3 - 2 * wk) * 0.4 + wk * wk * 0.6),
+      fx: m.scene.focus.x,
+      fy: m.scene.focus.y,
+      dx: Math.sin(tau * Math.PI * SCENE.walk.steps) * bob * 0.6,
+      dy: -Math.abs(Math.sin(tau * Math.PI * SCENE.walk.steps)) * bob * 2,
+    });
   }
 
   // ---- the clock ----------------------------------------------------------------------------
@@ -454,7 +573,8 @@ export default forwardRef<
     };
     img.onload = start;
     img.onerror = start;
-    img.src = CINEMATIC_BG;
+    img.src = FRAMES[0].src;
+    FRAMES.slice(1).forEach((f) => (new Image().src = f.src));
     const fallback = window.setTimeout(start, 2500);
     return () => {
       cancelAnimationFrame(raf);
@@ -514,14 +634,60 @@ export default forwardRef<
     return (
       <>
       <div ref={stageRef} className="cin-stage" style={{ width: STAGE_W, height: STAGE_H }}>
-        <img className="cin-bg" src={CINEMATIC_BG} alt="" draggable={false} />
+        {FRAMES.map((f, k) => (
+          <img key={k} ref={(el) => (frameRefs.current[k] = el)} className="cin-bg" src={f.src} alt="" draggable={false} style={{ opacity: k ? 0 : 1 }} />
+        ))}
         <div ref={glowRef} className="cin-glow" />
         <div ref={blackRef} className="cin-black" />
-        <div className="cin-screen" style={{ left: SCREEN.x, top: SCREEN.y, width: SCREEN.w, height: SCREEN.h }}>
-          <div ref={tintRef} className="cin-tint" />
+        <div ref={screenRef} className="cin-screen">
+          <div ref={deskRef} className="cin-desk" style={{ height: `${100 * (1 - TASKBAR)}%` }}>
+            <div ref={appRef} className="cin-app">
+              <div className="cin-app-bar">
+                <i />
+                <i />
+                <i />
+                <span>Mail — Inbox</span>
+                <em>Search mail</em>
+              </div>
+              <div className="cin-app-body">
+                <div className="cin-app-side">
+                  <b>
+                    Inbox <span ref={unreadRef}>2</span>
+                  </b>
+                  <span>Starred</span>
+                  <span>Sent</span>
+                  <span>Drafts</span>
+                  <span>Archive</span>
+                  <span>Trash</span>
+                </div>
+                <div className="cin-app-list">
+                  <div ref={listRef} className="cin-app-rows">
+                    {ORDER.map(({ it }, k) => (
+                      <div key={k} ref={(el) => (rowRefs.current[k] = el)} className="cin-row" style={{ height: ROW_H }}>
+                        <span className="cin-row-from">{it.from}</span>
+                        <span className="cin-row-subj">{it.subject}</span>
+                        <span className="cin-row-time">{it.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="cin-app-track">
+                    <div ref={thumbRef} className="cin-app-thumb" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div ref={toastRef} className="cin-toast">
+              <b>{TOAST.from}</b>
+              <span>{TOAST.text}</span>
+            </div>
+          </div>
           {WINDOWS.map((w, i) => (
             <EmailWindow key={i} w={w} final={i === FINAL} next={next} winRef={(el) => (winRefs.current[i] = el)} />
           ))}
+          <div ref={clockRef} className="cin-clock" style={{ height: `${100 * TASKBAR}%` }}>
+            <span ref={clockTimeRef}>{FRAMES[0].time}</span>
+            <span ref={clockDateRef}>{FRAMES[0].date}</span>
+          </div>
           <div ref={flashRef} className="cin-flash" />
         </div>
       </div>

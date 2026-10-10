@@ -21,6 +21,10 @@
   height: 100%;
   display: block;
 }
+/* the stills crossfade on top of each other */
+.cin-bg {
+  will-change: opacity;
+}
 /* the cold light of the screen spilling into the room */
 .cin-glow {
   position: absolute;
@@ -40,13 +44,6 @@
   overflow: hidden;
   font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
 }
-/* the screen dims and cools as the rejections pile up */
-.cin-tint {
-  position: absolute;
-  inset: 0;
-  background: #0b1a3a;
-  opacity: 0.06;
-}
 .cin-flash {
   position: absolute;
   inset: 0;
@@ -55,11 +52,194 @@
   pointer-events: none;
 }
 
-/* ---- email windows ---- */
+/* ---- the desktop over the stills: mail app, inbox, notification, clock ----
+   (sizes in stage px: the stills are 643 px tall, scaled up to cover) */
+.cin-desk {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+}
+.cin-app {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  border-radius: 4px;
+  background: #f7f8fa;
+  border: 0.6px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 5px 16px rgba(0, 0, 20, 0.35);
+  overflow: hidden;
+  color: #2a2f38;
+  font-size: 6px;
+}
+.cin-app-bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 13px;
+  padding: 0 6px;
+  background: #e9ecf1;
+  border-bottom: 0.6px solid rgba(0, 0, 0, 0.08);
+  color: #6b7280;
+  font-size: 5.6px;
+}
+.cin-app-bar i {
+  width: 4.5px;
+  height: 4.5px;
+  border-radius: 50%;
+  background: #cfd3da;
+}
+.cin-app-bar span {
+  margin-left: 4px;
+}
+.cin-app-bar em {
+  margin-left: auto;
+  width: 30%;
+  padding: 1.5px 5px;
+  border-radius: 6px;
+  background: #fff;
+  border: 0.6px solid rgba(0, 0, 0, 0.1);
+  font-style: normal;
+  color: #a0a6b0;
+}
+.cin-app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.cin-app-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 17%;
+  padding: 7px 6px;
+  background: #eef0f4;
+  border-right: 0.6px solid rgba(0, 0, 0, 0.06);
+  color: #6b7280;
+}
+.cin-app-side b {
+  display: flex;
+  justify-content: space-between;
+  color: #1f3b7a;
+}
+.cin-app-side b span {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: #3b6fd8;
+  color: #fff;
+  font-size: 5px;
+  line-height: 7px;
+}
+.cin-app-list {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+.cin-app-rows {
+  will-change: transform;
+}
+.cin-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 7px;
+  border-bottom: 0.6px solid rgba(0, 0, 0, 0.05);
+  color: #6b7280;
+  background: rgba(255, 214, 102, calc(var(--new, 0) * 0.35));
+  white-space: nowrap;
+}
+.cin-row-from {
+  flex: 0 0 28%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #3a404a;
+}
+.cin-row-subj {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cin-row-time {
+  flex: 0 0 auto;
+  font-size: 5.4px;
+}
+.cin-row.unread {
+  background-color: #fff;
+}
+.cin-row.unread::before {
+  content: '';
+  position: absolute;
+  left: 2.5px;
+  width: 2.5px;
+  height: 2.5px;
+  border-radius: 50%;
+  background: #3b6fd8;
+}
+.cin-row.unread .cin-row-from,
+.cin-row.unread .cin-row-subj,
+.cin-row.unread .cin-row-time {
+  font-weight: 700;
+  color: #14181f;
+}
+.cin-app-track {
+  position: absolute;
+  right: 1.5px;
+  top: 2px;
+  bottom: 2px;
+  width: 2.5px;
+}
+.cin-app-thumb {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.22);
+}
+.cin-toast {
+  position: absolute;
+  right: 2.5%;
+  bottom: 3%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5px;
+  width: 34%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(250, 251, 253, 0.97);
+  box-shadow: 0 4px 12px rgba(0, 0, 20, 0.35);
+  color: #3a404a;
+  font-size: 6px;
+  opacity: 0;
+}
+.cin-toast b {
+  color: #14181f;
+  font-size: 6.4px;
+}
+/* the taskbar clock, after the tray icons */
+.cin-clock {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 9.5%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #1c2740;
+  font-size: 6.6px;
+  line-height: 1.15;
+}
+.cin-clock span + span {
+  font-size: 5.2px;
+  opacity: 0.8;
+}
+
+/* ---- opened mails ---- */
 .cin-win {
   position: absolute;
   opacity: 0;
-  font-size: 11px;
+  font-size: 6.6px;
   line-height: 1.45;
   color: #23272f;
   will-change: transform, opacity;
@@ -67,23 +247,23 @@
 .cin-win-bg {
   position: absolute;
   inset: 0;
-  border-radius: 7px;
+  border-radius: 4.2px;
   background: #f5f6f8;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  box-shadow: 0 10px 28px rgba(0, 0, 20, 0.45);
+  border: 0.6px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 6px 16.8px rgba(0, 0, 20, 0.45);
   opacity: var(--frame, 1);
 }
 .cin-win-dim {
   position: absolute;
   inset: 0;
-  border-radius: 7px;
+  border-radius: 4.2px;
   background: #0a1430;
   opacity: var(--dim, 0);
   pointer-events: none;
 }
 .cin-win-in {
   position: relative;
-  padding: 0 14px 10px;
+  padding: 0 8.4px 6px;
 }
 .cin-win.final .cin-fade {
   opacity: var(--fade, 1);
@@ -91,77 +271,77 @@
 .cin-titlebar {
   display: flex;
   align-items: center;
-  gap: 5px;
-  height: 22px;
-  margin: 0 -14px 8px;
-  padding: 0 10px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  font-size: 10px;
+  gap: 3px;
+  height: 13.2px;
+  margin: 0 -8.4px 4.8px;
+  padding: 0 6px;
+  border-bottom: 0.6px solid rgba(0, 0, 0, 0.08);
+  font-size: 6px;
   color: #6b7280;
 }
 .cin-titlebar i {
-  width: 8px;
-  height: 8px;
+  width: 4.8px;
+  height: 4.8px;
   border-radius: 50%;
   background: #cfd3da;
 }
 .cin-titlebar span {
-  margin-left: 6px;
+  margin-left: 3.6px;
 }
 .cin-from {
-  font-size: 10.5px;
+  font-size: 6.3px;
   color: #4b5563;
 }
 .cin-from span {
   display: inline-block;
-  min-width: 34px;
+  min-width: 20.4px;
   color: #9aa1ab;
 }
 .cin-subject {
-  margin: 2px 0 8px;
-  font-size: 13.5px;
+  margin: 1.2px 0 4.8px;
+  font-size: 8.1px;
   font-weight: 600;
 }
 .cin-text p {
-  margin: 0 0 6px;
+  margin: 0 0 3.6px;
 }
 .cin-sign {
   color: #4b5563;
 }
 .cin-actions {
   display: flex;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 3.6px;
+  margin-top: 2.4px;
 }
 .cin-actions span {
-  padding: 2px 9px;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  font-size: 9.5px;
+  padding: 1.2px 5.4px;
+  border-radius: 2.4px;
+  border: 0.6px solid rgba(0, 0, 0, 0.14);
+  font-size: 5.7px;
   color: #4b5563;
 }
 .cin-em {
   color: inherit;
   background: rgba(255, 196, 64, calc(var(--em, 0) * 0.45));
-  border-radius: 2px;
-  padding: 0 1px;
+  border-radius: 1.2px;
+  padding: 0 0.6px;
 }
 
 /* the application-portal look: darker, more compact */
 .cin-portal {
   color: #d5d9e2;
-  font-size: 10.5px;
+  font-size: 6.3px;
 }
 .cin-portal .cin-win-bg {
   background: #2a2f3c;
   border-color: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
+  border-radius: 2.4px;
 }
 .cin-portal .cin-titlebar {
   background: #3a4153;
   color: #aab2c4;
   border-bottom: 0;
-  border-radius: 4px 4px 0 0;
+  border-radius: 2.4px 2.4px 0 0;
 }
 .cin-portal .cin-titlebar i {
   display: none;
@@ -178,22 +358,22 @@
 /* the notification look of the stacked windows */
 .cin-stacked .cin-win-bg {
   background: #e9ecf1;
-  border-radius: 5px;
+  border-radius: 3px;
 }
 .cin-stacked .cin-titlebar {
   background: #d8dde6;
-  border-radius: 5px 5px 0 0;
+  border-radius: 3px 3px 0 0;
 }
 
 /* the last email: a little larger, the phrases that survive */
 .cin-win.final {
-  font-size: 12px;
+  font-size: 7.2px;
 }
 .cin-win.final .cin-win-bg {
-  box-shadow: 0 16px 40px rgba(0, 0, 20, 0.6);
+  box-shadow: 0 9.6px 24px rgba(0, 0, 20, 0.6);
 }
 .cin-win.final .cin-subject {
-  font-size: 16px;
+  font-size: 9.6px;
 }
 .cin-kw {
   position: relative;
@@ -210,7 +390,7 @@
   opacity: var(--dots, 0);
 }
 
-/* ---- the water-and-door scene (scene.ts, drawn in glyphs) ---- */
+/* ---- the door scene (scene.ts, drawn in glyphs) ---- */
 .cin-scene {
   position: absolute;
   left: 0;

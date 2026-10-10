@@ -9,11 +9,16 @@
 // image scaled up; every glyph stamped in white from a small atlas; their
 // colours as another one-pixel-per-cell image, scaled up and kept only where
 // a glyph is (destination-in).
+//
+// The cells are square here, like the door's glyph drawing (door.ts), so its
+// cells map one to one onto the canvas. draw() can move a camera (a scale
+// about a point plus an offset) without re-sampling.
 // ---------------------------------------------------------------------------
 import { GLYPH_FONT } from './config';
 
 // every glyph the scene uses (index 0 = empty)
-export const GLYPHSET = ' ·.:,\'`-~=+*oO0@°|/\\_v^&%§¤‡†¥Ø#≈()<>!;"ˇY¦';
+// (the door's own glyphs, and the falling phrases' letters)
+export const GLYPHSET = ' ·.:,\'`-~=+*oO0@°|/\\_v^&%§¤‡†¥Ø#≈()<>!;"ˇY¦¬AUacdefilnoprstuy';
 const GI = new Map([...GLYPHSET].map((c, i) => [c, i]));
 export const g = (c: string): number => GI.get(c) ?? 0;
 
@@ -48,14 +53,14 @@ export class GlyphCanvas {
     this.ctx = cv.getContext('2d', { alpha: true })!;
   }
 
-  // cells ~ 1/150 of the width, about 1.8x as tall as wide (a monospace glyph)
-  resize(vw: number, vh: number) {
-    if (vw === this.vw && vh === this.vh) return;
+  // square cells of `cell` px; glyphs drawn at `font` of the cell's height
+  resize(vw: number, vh: number, cell: number, font = 0.75) {
+    if (vw === this.vw && vh === this.vh && cell === this.cw) return;
     this.vw = vw;
     this.vh = vh;
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
-    this.cw = Math.max(7, Math.round(vw / 150));
-    this.ch = Math.round(this.cw * 1.8);
+    this.cw = Math.max(5, cell);
+    this.ch = this.cw;
     this.cols = Math.ceil(vw / this.cw);
     this.rows = Math.ceil(vh / this.ch);
     const n = this.cols * this.rows;
@@ -79,7 +84,7 @@ export class GlyphCanvas {
     this.atlas.width = tw * GLYPHSET.length;
     this.atlas.height = th;
     const a = this.atlas.getContext('2d')!;
-    a.font = `${this.ch * this.dpr * 0.82}px ${GLYPH_FONT}`;
+    a.font = `${this.ch * this.dpr * font}px ${GLYPH_FONT}`;
     a.textAlign = 'center';
     a.textBaseline = 'middle';
     a.fillStyle = '#fff';
@@ -93,8 +98,9 @@ export class GlyphCanvas {
     this.bg.fill(NONE);
   }
 
-  // paint the buffer over a base colour (the scene's darkness)
-  draw(base: string, opacity = 1) {
+  // paint the buffer over a base colour (the scene's darkness); cam scales
+  // the picture by s about (fx, fy) and shifts it by (dx, dy), CSS px
+  draw(base: string, opacity = 1, cam = { s: 1, fx: 0, fy: 0, dx: 0, dy: 0 }) {
     const { ctx, cols, rows, dpr } = this;
     const W = this.mask.width, H = this.mask.height;
     const px = this.smallImg!;
@@ -121,6 +127,8 @@ export class GlyphCanvas {
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, this.cv.width, this.cv.height);
     ctx.imageSmoothingEnabled = false;
+    const k = dpr * (1 - cam.s);
+    ctx.setTransform(cam.s, 0, 0, cam.s, cam.fx * k + cam.dx * dpr, cam.fy * k + cam.dy * dpr);
     ctx.drawImage(this.small, 0, 0, cols, rows, 0, 0, W, H);
     // 2. the glyphs in white
     const m = this.mask.getContext('2d')!;
@@ -152,7 +160,9 @@ export class GlyphCanvas {
     tctx.drawImage(this.small, 0, 0, cols, rows, 0, 0, W, H);
     tctx.globalCompositeOperation = 'destination-in';
     tctx.drawImage(this.mask, 0, 0);
+    ctx.imageSmoothingEnabled = cam.s !== 1;
     ctx.drawImage(this.tint, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
   }
 }

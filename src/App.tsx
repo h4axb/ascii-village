@@ -5443,10 +5443,8 @@ function Game() {
             ref={introARef}
             devTimeline={import.meta.env.DEV}
             startAt={CINEMATIC_START}
-            onComplete={() => {
-              portalHandoffRef.current = true;
-              setIntroAActive(false);
-            }}
+            // the cinematic ends on 3 s of black: the wake-up starts from black
+            onComplete={() => setIntroAActive(false)}
           />
         ) : (
           <IntroA ref={introARef} onComplete={() => setIntroAActive(false)} />

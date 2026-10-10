@@ -54,36 +54,34 @@ export const T = {
   blackIn: [13600, 14800], // the room fades to black
   pullBack: [0, 13600], // all the while before, the camera eases slowly back, from the screen to the whole desk
   // falling letters -> the glyph door -> through it (scene.ts), then 3 s of black
-  fall: FALL, // the letters drop straight down into a heap, then rise into the door's outline (LETTERS)
-  build: [FALL + 3300, FALL + 6000], // the door fills in from the letters along its outline, glyph by glyph
-  open: [FALL + 6400, FALL + 9000], // it opens, slowly, onto the sea and the island
-  beam: [FALL + 6700, FALL + 9000], // light comes out of the doorway
-  walk: [FALL + 11000, FALL + 13400], // after a 2 s hold: the camera walks toward the doorway
-  fadeOut: [FALL + 12200, FALL + 13400], // to black
-  end: FALL + 16400, // 3 s of black, then the wake-up scene
+  fall: FALL, // the letters fall, the camera following them down; they turn to water (LETTERS)
+  build: [FALL + 1500, FALL + 8500], // the door emerges from the water, slowly, filling its shape
+  open: [FALL + 9000, FALL + 11600], // it opens, slowly, onto the sea and the island
+  beam: [FALL + 9300, FALL + 11600], // light comes out of the doorway
+  walk: [FALL + 13600, FALL + 16000], // after a 2 s hold: the camera walks toward the doorway
+  fadeOut: [FALL + 14800, FALL + 16000], // to black
+  end: FALL + 19000, // 3 s of black, then the wake-up scene
 } as const;
 
 export const ENTER_MS = 160; // an email window's entrance
 export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's screen (it pulls back to the full desk, then stays)
 
 // ---- falling letters ---------------------------------------------------------------
-// The letters drop straight down and pile up in a heap on the door's foot
-// line, each tipping over as it lands and resting on the ones below. Then,
-// one by one, they rise out of the heap into the door's outline (left side
-// up, over the arch, down the right), straightening as they go; each turns
-// into the glyph where it arrives, and the door fills in from them.
+// The letters let go and fall; the camera tilts down after them, from the
+// keywords to the door's place below. On the way each letter stretches into
+// a streak and turns to water - a string of glyphs (scene.ts) that keeps
+// falling, drifts in toward its column of the door and lands on its foot,
+// where the door starts to emerge (growFrom).
 export const LETTERS = {
-  stepMs: 35, // each letter lets go this long after the one to its left
-  gravity: 1.9, // the drop, in viewport heights / s²
+  stepMs: 20, // each letter lets go this long after the one to its left
+  gravity: 1.2, // the fall, letters and water alike, in viewport heights / s²
   fallScale: [0.9, 1.15] as const, // stretched while it falls
-  squash: [1.15, 0.85] as const, // the landing, pivoting on its foot
-  squashMs: 140,
-  tilt: 45, // it tips over to up to this many degrees either way as it lands
-  stack: 0.7, // a landed letter raises the heap by this much of its height
-  holdMs: 600, // the heap rests this long after the last letter lands
-  riseMs: 950, // a letter's flight up into the door's outline
-  riseStepMs: 22, // each one lifts off this long after the one before
-  fadeMs: 260, // on arrival it turns into the door's glyph
+  morphAt: [0.32, 0.5] as const, // s into its fall when it turns to water (spread per letter)
+  morphMs: 220, // the turn: it stretches into a streak and fades into the string
+  streak: [0.45, 3] as const, // the streak's scale (x, y)
+  tail: [5, 9] as const, // a water string's tail, cells
+  streams: 5, // the strings gather into this many streams onto the door's foot
+  pan: { dist: 0.95, ms: 1800 }, // the camera's tilt down after the letters: how far (of the height), how long
 };
 
 // ---- the water-and-door scene (scene.ts) -------------------------------------------------

@@ -3,10 +3,12 @@
 // canvas (glyphCanvas.ts). Everything is a pure function of the clock t
 // (config.ts's T), so seeking is exact.
 //
-//   build     the door (door-glyphs.svg via door.ts) grows out of the
-//             letters that landed on its foot (growFrom), up and out: each
-//             glyph emerges in its cell - a speck, a mark, its glyph -
-//             brightening, then settles into the drawing's own colour
+//   strings   the falling letters, turned to water: strings of glyphs that
+//             drift in toward the door and land on its foot
+//   build     the door (door-glyphs.svg via door.ts) grows out of that water
+//             (growFrom), slowly, through its own shape like a liquid: each
+//             glyph emerges as water, then sets into the drawing's glyph and
+//             colour
 //   open      the leaf swings open on its left hinge, slowly, to about half
 //             its width; it is re-sampled column by column into the grid (no
 //             squeezed glyphs), its free edge coming toward the viewer
@@ -15,7 +17,7 @@
 // The camera's walk toward the door and the fade to black are in draw()
 // (IntroCinematic.tsx), so the glyphs are never re-sampled.
 // ---------------------------------------------------------------------------
-import { T, SCENE, clamp01, lerp, smooth, span, easeOutCubic, easeInOutCubic, rand } from './config';
+import { T, SCENE, LETTERS, clamp01, lerp, smooth, span, easeOutCubic, easeInOutCubic, rand } from './config';
 import { g, pack, NONE, type GlyphCanvas, type RGB } from './glyphCanvas';
 import { DOOR } from './door';
 import { themeColor } from '../theme';
@@ -36,8 +38,23 @@ function vnoise(x: number, y: number): number {
 const fbm = (x: number, y: number) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3) * 0.15;
 const hash = (a: number, b: number) => rand(a * 12.9898 + b * 78.233, 7);
 
-const DROP = 200; // ms: a glyph emerging in its cell
-const SETTLE = 280; // ms: its brief brighten as it settles
+const SCENE_G = LETTERS.gravity; // the strings fall as the letters did (viewport heights / s²)
+const EMERGE = 750; // ms: a glyph emerging - water first, then the door's own glyph
+const SETTLE = 400; // ms: its brief brighten as it sets
+
+// A letter turned to water: a string of glyphs falling from where the letter
+// was (world px: the final framing; the camera pan shifts it on screen),
+// drifting in toward its column of the door and landing on the door's foot.
+export interface WaterString {
+  x0: number; // where it starts (px), with its speed (px/s, down)
+  y0: number;
+  v0: number;
+  t0: number; // ms
+  tx: number; // the door column it lands in (px)
+  landY: number;
+  tLand: number; // ms
+  len: number; // tail length, cells
+}
 
 export interface Scene {
   vw: number;
@@ -45,7 +62,8 @@ export interface Scene {
   cell: number; // the grid's square cell, px
   c0: number; // the grid cell of the door's top-left
   r0: number;
-  born: Float32Array; // per door cell (r * cols + c): when it lands, ms
+  born: Float32Array; // per door cell (r * cols + c): when it emerges, ms
+  strings: WaterString[]; // the letters, turned to water, falling onto the door's foot
   focus: { x: number; y: number }; // the open doorway's centre, px (the walk aims here)
   col: Record<string, RGB>;
 }
@@ -95,35 +113,84 @@ export function buildScene(vw: number, vh: number): Scene {
     c0,
     r0,
     born,
+    strings: [],
     focus: { x: (c0 + open) * cell, y: (r0 + (DOOR.leafTop + DOOR.leafBottom + 1) / 2) * cell },
     col,
   };
 }
 
-// The door emerges from the letters that landed on its foot: each lands
-// in a cell (a seed) at time t, and the door grows from the seeds, up and
-// out, each glyph's time its distance from the nearest seed. It is done by
-// the end of T.build. (Without seeds it keeps rising from the middle.)
+// The door emerges from the water that lands on its foot: each string lands
+// in a cell (a seed) at time t, and the door grows from the seeds through its
+// own shape like a liquid finding its way - a flood fill whose every step
+// costs a little noise, so the front advances in uneven lobes - slowly, until
+// the whole shape is filled by the end of T.build.
 export function growFrom(sc: Scene, seeds: { c: number; r: number; t: number }[]) {
   if (!seeds.length) return;
-  const near = (k: { c: number; r: number }) => {
-    let best = Infinity, at = 0;
-    for (const s of seeds) {
-      const d = Math.hypot(k.r - s.r, k.c - s.c);
-      if (s.t + d * 60 < best) {
-        best = s.t + d * 60;
-        at = d;
+  const { cols, rows } = DOOR;
+  const t0 = Math.min(...seeds.map((s) => s.t));
+  const guess = (T.build[1] - t0) / (rows * 1.6); // ms per step, to weigh the seeds' times
+  const dist = new Float64Array(cols * rows).fill(Infinity);
+  // a small binary heap of [cost, index]
+  const heap: [number, number][] = [];
+  const push = (d: number, i: number) => {
+    heap.push([d, i]);
+    let j = heap.length - 1;
+    while (j > 0) {
+      const p = (j - 1) >> 1;
+      if (heap[p][0] <= heap[j][0]) break;
+      [heap[p], heap[j]] = [heap[j], heap[p]];
+      j = p;
+    }
+  };
+  const pop = () => {
+    const top = heap[0], last = heap.pop()!;
+    if (heap.length) {
+      heap[0] = last;
+      let j = 0;
+      for (;;) {
+        const a = 2 * j + 1, b = a + 1;
+        let m = j;
+        if (a < heap.length && heap[a][0] < heap[m][0]) m = a;
+        if (b < heap.length && heap[b][0] < heap[m][0]) m = b;
+        if (m === j) break;
+        [heap[m], heap[j]] = [heap[j], heap[m]];
+        j = m;
       }
     }
-    return { d: at, t: best - at * 60 };
+    return top;
   };
-  const t0 = Math.min(...seeds.map((s) => s.t));
-  const dMax = Math.max(1, ...DOOR.cells.map((k) => near(k).d));
-  const per = Math.max(25, Math.min(90, (T.build[1] - t0 - 300) / dMax)); // ms per cell of growth
-  for (const k of DOOR.cells) {
-    const n = near(k);
-    sc.born[k.r * DOOR.cols + k.c] = n.t + n.d * per + (n.d ? rand(k.c, k.r) * 140 : 0);
+  for (const s of seeds) {
+    const i = s.r * cols + s.c, d = (s.t - t0) / guess;
+    if (d < dist[i]) {
+      dist[i] = d;
+      push(d, i);
+    }
   }
+  const cost = (c: number, r: number) => 0.35 + 1.9 * Math.pow(fbm(c * 0.22 + 3.1, r * 0.22 + 7.7), 1.6);
+  while (heap.length) {
+    const [d, i] = pop();
+    if (d > dist[i]) continue;
+    const c = i % cols, r = (i / cols) | 0;
+    for (let dr = -1; dr <= 1; dr++)
+      for (let dc = -1; dc <= 1; dc++) {
+        if (!dr && !dc) continue;
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nr < 0 || nc >= cols || nr >= rows || !DOOR.at[nr * cols + nc]) continue;
+        const nd = d + cost(nc, nr) * (dr && dc ? 1.41 : 1);
+        if (nd < dist[nr * cols + nc]) {
+          dist[nr * cols + nc] = nd;
+          push(nd, nr * cols + nc);
+        }
+      }
+  }
+  // cells the flood can't reach (stray glyphs): by plain distance to a seed
+  for (const k of DOOR.cells) {
+    const i = k.r * cols + k.c;
+    if (dist[i] === Infinity) dist[i] = Math.min(...seeds.map((s) => Math.hypot(k.r - s.r, k.c - s.c) * 1.2));
+  }
+  const dMax = Math.max(1, ...DOOR.cells.map((k) => dist[k.r * cols + k.c]));
+  const per = (T.build[1] - t0 - EMERGE) / dMax;
+  for (const k of DOOR.cells) sc.born[k.r * cols + k.c] = t0 + dist[k.r * cols + k.c] * per;
 }
 
 // where a door cell sits on screen (its centre, px)
@@ -179,8 +246,11 @@ function interior(sc: Scene, u: number, v: number, t: number): { ch: number; c: 
 }
 
 // ---- render one frame into the canvas buffer ------------------------------------------
-export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: boolean) {
+// shift: whole rows the camera's pan moves everything down this frame (the
+// rest of the pan, under a cell, is applied when drawing)
+export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: boolean, shift = 0) {
   gc.clear();
+  const r0 = sc.r0 + shift;
   const C = sc.col;
   const D = DOOR;
   const { cols, rows } = gc;
@@ -199,7 +269,39 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
   const openFrac = (1 - cosT) / (1 - SCENE.door.open);
   const beamK = span(t, T.beam) * openFrac;
   const W = D.leafRight + 1 - D.hinge; // the leaf's width, cells
-  const sill = sc.r0 + D.leafBottom + 1;
+  const sill = r0 + D.leafBottom + 1;
+
+  // a water string at t: a bright head, a tail of thinning water above it;
+  // landed, a small splash while the tail drains into the door's foot
+  const cellPx = sc.cell, gA = SCENE_G * sc.vh;
+  const drawString = (w: WaterString) => {
+    if (t < w.t0 || t > w.tLand + 320) return;
+    const tau = (Math.min(t, w.tLand) - w.t0) / 1000;
+    const y = Math.min(w.landY, w.y0 + w.v0 * tau + 0.5 * gA * tau * tau);
+    const prog = clamp01((y - w.y0) / Math.max(1, w.landY - w.y0));
+    const x = lerp(w.x0, w.tx, smooth(prog));
+    const hc = Math.floor(x / cellPx), hr = Math.floor(y / cellPx) + shift;
+    const drain = t > w.tLand ? clamp01((t - w.tLand) / 300) : 0;
+    const len = Math.max(0, Math.round(w.len * (1 - drain)));
+    const appear = clamp01((t - w.t0) / 160);
+    // the tail follows the path it came down (the drift bends it)
+    for (let k = len; k >= 1; k--) {
+      const yk = y - k * cellPx;
+      if (yk < w.y0 - cellPx) continue;
+      const pk = clamp01((yk - w.y0) / Math.max(1, w.landY - w.y0));
+      const ck = Math.floor(lerp(w.x0, w.tx, smooth(pk)) / cellPx);
+      const f = 1 - k / (len + 1);
+      const gl = k <= 1 ? '|' : k <= 3 ? '¦' : k <= 5 ? ':' : '.';
+      put(ck, Math.floor(yk / cellPx) + shift, g(gl), mixc(DARK, mixc(C.shallow, C.foam, 0.5 * f), (0.35 + 0.65 * f) * appear));
+    }
+    if (drain < 1) put(hc, hr, g(t > w.tLand ? '°' : 'o'), mixc(DARK, C.foam, appear * (1 - drain)));
+    if (t > w.tLand) {
+      // the splash
+      const sp = clamp01((t - w.tLand) / 320);
+      for (const dx of [-2, -1, 1, 2])
+        if (hash(hc + dx, Math.floor(w.tLand)) > 0.35) put(hc + dx * (1 + Math.round(sp)), hr - (Math.abs(dx) === 1 ? 1 : 0), g(sp < 0.5 ? '°' : '.'), mixc(C.foam, DARK, sp));
+    }
+  };
 
   // ---- 1. the beam: light out of the doorway onto sandy ground
   if (beamK > 0) {
@@ -212,7 +314,7 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
         const ax = Math.abs(c + 0.5 - cx);
         const I = beamK * (0.3 + 0.7 * Math.exp(-Math.max(0, dy) / (D.rows * 0.32))) * smooth(clamp01((half * 1.4 - ax) / (half * 0.7)));
         if (I < 0.05) continue;
-        const n = hash(c - sc.c0, r - sc.r0);
+        const n = hash(c - sc.c0, r - r0);
         const base = mixc(C.sand, C.sandOuter, vnoise(c / 5, r / 3));
         const cc = mixc(DARK, mixc(base, C.light, 0.25), Math.min(1, I * 1.15));
         put(c, r, g(n > 0.86 ? ':' : n > 0.6 ? '·' : n > 0.45 ? ',' : n > 0.4 ? '°' : '.'), mixc(cc, C.sandGrain, 0.3 * I), pack(mixc(DARK, cc, 0.6)));
@@ -226,20 +328,31 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
     const born = sc.born[i];
     if (t < born) continue;
     if (k.part === 'leaf' && openK > 0) continue; // the swing draws it
-    const c = sc.c0 + k.c, r = sc.r0 + k.r;
-    const e = (t - born) / DROP;
+    const c = sc.c0 + k.c, r = r0 + k.r;
+    const e = (t - born) / EMERGE;
     if (e < 1) {
       if (reduced) put(c, r, g(k.ch), mixc(DARK, k.rgb, e));
-      // emerging in place: a speck, a mark, then its glyph, brightening
-      else put(c, r, e < 0.35 ? g('·') : e < 0.7 ? g(':') : g(k.ch), mixc(DARK, mixc(WHITE, k.rgb, 0.55), easeOutCubic(e)));
+      else if (e < 0.45) {
+        // the wet front: water, shimmering, coming up out of the dark
+        const w = e / 0.45;
+        const gl = hash(k.c + Math.floor(t / 140), k.r) > 0.5 ? '≈' : '~';
+        put(c, r, g(gl), mixc(DARK, mixc(C.shallow, C.foam, 0.35 * (1 - w)), easeOutCubic(w)));
+      } else {
+        // the water sets into the door's own glyph and colour
+        const w = smooth((e - 0.45) / 0.55);
+        put(c, r, g(k.ch), mixc(mixc(C.shallow, C.foam, 0.2), mixc(k.rgb, WHITE, 0.3), w));
+      }
       continue;
     }
-    let rgb = mixc(k.rgb, WHITE, 0.4 * clamp01(1 - (t - born - DROP) / SETTLE));
+    let rgb = mixc(k.rgb, WHITE, 0.3 * clamp01(1 - (t - born - EMERGE) / SETTLE));
     // the light from the doorway on the frame's inner edge
     if (openFrac > 0 && k.part === 'frame' && k.c > D.leafRight && k.c <= D.leafRight + 3 && k.r >= D.leafTop - 1)
       rgb = mixc(rgb, C.light, 0.35 * openFrac * (1 - (k.c - D.leafRight - 1) / 3));
     put(c, r, g(k.ch), rgb);
   }
+
+  // ---- 2b. the water strings, falling onto the door's foot
+  if (!reduced) for (const w of sc.strings) drawString(w);
 
   if (openK <= 0) return;
   // ---- 3. the doorway: the sea and the island, where the leaf was
@@ -249,7 +362,7 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
       if (!D.leaf[r * D.cols + c]) continue;
       const p = interior(sc, (c - D.hinge + 0.5) / W, (r - D.leafTop + 0.5) / (D.leafBottom + 1 - D.leafTop), t);
       const cc = mixc(DARK, p.c, lift);
-      put(sc.c0 + c, sc.r0 + r, p.ch, mixc(cc, WHITE, 0.3 * lift), pack(mul(cc, 0.72)));
+      put(sc.c0 + c, r0 + r, p.ch, mixc(cc, WHITE, 0.3 * lift), pack(mul(cc, 0.72)));
     }
   // ---- 4. the leaf, swung toward the viewer: narrower, its free edge taller and darker
   const Wn = W * cosT;
@@ -261,8 +374,8 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
       const srcR = D.leafTop + Math.floor((y + 0.5) / scale);
       if (srcR > D.leafBottom || !D.leaf[srcR * D.cols + srcC]) continue;
       const cell = D.at[srcR * D.cols + srcC];
-      if (edge) put(sc.c0 + D.hinge + x, sc.r0 + D.leafTop + y, g('|'), mul(cell ? cell.rgb : C.grassDark, 0.5), NONE);
-      else if (cell) put(sc.c0 + D.hinge + x, sc.r0 + D.leafTop + y, g(cell.ch), mul(cell.rgb, shade), NONE);
+      if (edge) put(sc.c0 + D.hinge + x, r0 + D.leafTop + y, g('|'), mul(cell ? cell.rgb : C.grassDark, 0.5), NONE);
+      else if (cell) put(sc.c0 + D.hinge + x, r0 + D.leafTop + y, g(cell.ch), mul(cell.rgb, shade), NONE);
     }
   };
   const n = Math.max(1, Math.round(Wn));

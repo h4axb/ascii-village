@@ -13,15 +13,18 @@
 export const STAGE_W = 1672;
 export const STAGE_H = 643;
 
-// The stills, morning to deep night: when each cuts in (it crossfades over
-// FRAME_FADE), where the laptop's screen is in it (measured from its pixels;
-// the bottom 10 % of the screen is the taskbar), the desktop clock, the mail
-// app's place (% of the desktop above the taskbar) and the screen's glow in
-// the room.
+// The shots, one still each (morning to deep night; a still can serve more
+// than one day): when each cuts in (it crossfades over FRAME_FADE), where
+// the laptop's screen is in it (measured from its pixels; the bottom 10 % of
+// the screen is the taskbar), where its taskbar's battery icon is (its right
+// edge and middle, measured: the clock sits beside it, so it is on the same
+// spot of the laptop in every still), the desktop clock, the mail app's place
+// (% of the desktop above the taskbar) and the screen's glow in the room.
 export interface Frame {
   src: string;
   at: number;
   screen: { x: number; y: number; w: number; h: number };
+  tray: { x: number; y: number };
   time: string;
   date: string;
   app: { left: number; top: number; width: number; height: number };
@@ -59,30 +62,33 @@ export const fitFrame = (i: number) => (fitCache ??= fits()).frames[i];
 export const screenFit = () => (fitCache ??= fits()).screen;
 export const TASKBAR = 0.1; // of the screen's height
 export const FRAMES: Frame[] = [
-  // Phase 1, optimism: bright morning, fresh coffee
-  { src: '/intro/cinematic/01-morning.webp', at: 0, screen: { x: 468, y: 63, w: 736, h: 429 }, time: '08:12', date: 'Mon 3 Mar', app: { left: 2, top: 4, width: 95, height: 88 }, glow: 0 },
-  // Phase 2, the drift: harsh afternoon light, long shadows
-  { src: '/intro/cinematic/02-midday.webp', at: 4500, screen: { x: 468, y: 63, w: 736, h: 425 }, time: '13:46', date: 'Wed 5 Mar', app: { left: 3, top: 6, width: 94, height: 86 }, glow: 0.05 },
-  { src: '/intro/cinematic/03-afternoon.webp', at: 6700, screen: { x: 468, y: 63, w: 736, h: 429 }, time: '17:38', date: 'Fri 14 Mar', app: { left: 1.5, top: 3, width: 96, height: 90 }, glow: 0.1 },
-  // Phase 3, the routine: overcast, stagnant
-  { src: '/intro/cinematic/04-overcast.webp', at: 8900, screen: { x: 461, y: 48, w: 739, h: 423 }, time: '11:07', date: 'Thu 3 Apr', app: { left: 2.5, top: 5, width: 95, height: 88 }, glow: 0.2 },
-  // Phase 4, resignation: deep night, only the screen's cold light
-  { src: '/intro/cinematic/05-night.webp', at: 11700, screen: { x: 462, y: 48, w: 738, h: 423 }, time: '23:51', date: 'Sun 27 Apr', app: { left: 2, top: 4, width: 95, height: 89 }, glow: 0.6 },
-  { src: '/intro/cinematic/06-deep-night.webp', at: 13100, screen: { x: 468, y: 63, w: 733, h: 429 }, time: '02:47', date: 'Mon 28 Apr', app: { left: 3, top: 6, width: 94, height: 87 }, glow: 0.75 },
+  // the thank-you: bright morning, fresh coffee (a notification, then it opens)
+  { src: '/intro/cinematic/01-morning.webp', at: 0, screen: { x: 468, y: 63, w: 736, h: 429 }, tray: { x: 1120, y: 468.5 }, time: '08:12', date: 'Mon 3 Mar', app: { left: 2, top: 4, width: 95, height: 88 }, glow: 0 },
+  // then a rejection a shot, each already open when the shot cuts in: the
+  // days go by, the light goes from harsh afternoon to overcast to night
+  { src: '/intro/cinematic/02-midday.webp', at: 4500, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '13:46', date: 'Wed 5 Mar', app: { left: 3, top: 6, width: 94, height: 86 }, glow: 0.05 },
+  { src: '/intro/cinematic/03-afternoon.webp', at: 6500, screen: { x: 468, y: 63, w: 736, h: 429 }, tray: { x: 1121, y: 468.5 }, time: '17:38', date: 'Fri 14 Mar', app: { left: 1.5, top: 3, width: 96, height: 90 }, glow: 0.1 },
+  { src: '/intro/cinematic/04-overcast.webp', at: 8500, screen: { x: 461, y: 48, w: 739, h: 423 }, tray: { x: 1119, y: 448.5 }, time: '11:07', date: 'Thu 3 Apr', app: { left: 2.5, top: 5, width: 95, height: 88 }, glow: 0.2 },
+  { src: '/intro/cinematic/02-midday.webp', at: 10500, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '14:22', date: 'Tue 15 Apr', app: { left: 2, top: 5, width: 95, height: 88 }, glow: 0.3 },
+  { src: '/intro/cinematic/05-night.webp', at: 12500, screen: { x: 462, y: 48, w: 738, h: 423 }, tray: { x: 1120, y: 448.5 }, time: '23:51', date: 'Sun 27 Apr', app: { left: 2, top: 4, width: 95, height: 89 }, glow: 0.6 },
+  // the last one, deep night, only the screen's cold light
+  { src: '/intro/cinematic/06-deep-night.webp', at: 14500, screen: { x: 468, y: 63, w: 733, h: 429 }, tray: { x: 1120, y: 468.5 }, time: '02:47', date: 'Mon 28 Apr', app: { left: 3, top: 6, width: 94, height: 87 }, glow: 0.75 },
 ];
+// the clock's right edge, this far right of the battery icon's (px of the stills)
+export const CLOCK_GAP = 62;
 
 // ---- the timeline (ms) ---------------------------------------------------------
-const FALL = 24100; // the keywords come loose; everything after is relative to it
+const FALL = 25900; // the keywords come loose; everything after is relative to it
 export const T = {
   // the stills (FRAMES[].at); the opened mails' times are in emails.ts
-  montageEnd: 15100,
+  montageEnd: 16900,
   // the camera has stopped; slowly (about 6 s) everything but the three
   // keywords fades away, then they hold alone 3 s
-  othersOut: [15100, 20100], // the mail app, the other text and the desktop fade
-  frameOut: [16100, 21100], // the last mail's window and other words dissolve
-  dotsIn: [20500, 21100], // "Unfortunately," -> "Unfortunately..."
-  blackIn: [15100, 21100], // the room fades to black
-  pullBack: [4100, 15100], // the camera holds on the first mail, then pulls back from the screen to the whole desk, slowly at first, faster and faster
+  othersOut: [16900, 21900], // the mail app, the other text and the desktop fade
+  frameOut: [17900, 22900], // the last mail's window and other words dissolve
+  dotsIn: [22300, 22900], // "Unfortunately," -> "Unfortunately..."
+  blackIn: [16900, 22900], // the room fades to black
+  pullBack: [4100, 16900], // the camera holds on the first mail, then pulls back from the screen to the whole desk, slowly at first, faster and faster
   // falling letters -> the glyph door -> through it (scene.ts), then 3 s of black
   fall: FALL, // the letters fall, the camera following them down; they turn to water (LETTERS)
   build: [FALL + 4800, FALL + 11800], // the door emerges from the water, slowly, filling its shape
@@ -112,7 +118,7 @@ export const LETTERS = {
   streak: [0.45, 3] as const, // the streak's scale (x, y)
   tail: [5, 9] as const, // a water string's tail, cells
   converge: 0, // how far a water string drifts toward the door's middle as it falls (0: straight down, 1: all to the middle)
-  pan: { dist: 0.95, center: 1600, smooth: 500 }, // the camera follows the falling letters down to the door: how far (of the height); how long it takes to bring them to the frame's centre (ms); its smoothing window (ms)
+  pan: { dist: 0.95, smooth: 380 }, // the camera follows the falling letters down to the door: how far (of the height); how softly it starts and stops (ms, the spread of its smoothing)
 };
 
 // ---- the water-and-door scene (scene.ts) -------------------------------------------------
@@ -128,11 +134,8 @@ export const GLYPH_FONT = "'Sarasa Mono', 'Cascadia Code', 'Courier New', ui-mon
 
 // ---- the shots, as the dev timeline lists them ----------------------------------------
 export const SHOT_LIST: { id: string; label: string; at: number; end: number }[] = [
-  { id: 'optimism', label: '1 Optimism', at: FRAMES[0].at, end: FRAMES[1].at },
-  { id: 'drift', label: '2 Drift', at: FRAMES[1].at, end: FRAMES[2].at },
-  { id: 'drift2', label: '2b Drift', at: FRAMES[2].at, end: FRAMES[3].at },
-  { id: 'routine', label: '3 Routine', at: FRAMES[3].at, end: FRAMES[4].at },
-  { id: 'resignation', label: '4 Resignation', at: FRAMES[4].at, end: T.montageEnd },
+  { id: 'optimism', label: '1 Thank-you', at: FRAMES[0].at, end: FRAMES[1].at },
+  ...FRAMES.slice(1).map((f, i) => ({ id: `reject${i + 1}`, label: `${i + 2} Rejection ${i + 1}`, at: f.at, end: FRAMES[i + 2]?.at ?? T.montageEnd })),
   { id: 'keywords', label: 'Keywords', at: T.montageEnd, end: T.fall },
   { id: 'fall', label: 'Letters fall', at: T.fall, end: T.build[0] },
   { id: 'build', label: 'Door builds', at: T.build[0], end: T.open[0] },

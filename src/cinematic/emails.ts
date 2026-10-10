@@ -1,8 +1,7 @@
 // The mail on the laptop (src/cinematic/): the inbox's history, the mails
 // opened on top of it shot by shot, and the notification of the first shot.
 //
-// Body text of an opened mail is written with two markers:
-//   *words*  the visual emphasis (a soft highlight after the window opens)
+// Body text of an opened mail can mark words:
 //   [words]  a keyword that survives and falls apart into letters (only the
 //            final mail has these)
 import { FRAMES } from './config';
@@ -24,7 +23,7 @@ export const EMAILS: Email[] = [
     body: [
       'Dear Applicant,',
       'Thank you for your interest in joining Lumen Forge Games.',
-      '*We regret to inform you* that we will not be moving forward with your application at this time.',
+      'We regret to inform you that we will not be moving forward with your application at this time.',
       'We wish you every success in your search.',
     ],
     sign: ['Kind regards,', 'Lumen Forge Recruiting'],
@@ -35,7 +34,7 @@ export const EMAILS: Email[] = [
     body: [
       'Hello,',
       'We appreciate your interest in the Junior Game Designer position.',
-      '*Unfortunately*, we received a large number of applications and are unable to offer you a position at this time.',
+      'Unfortunately, we received a large number of applications and are unable to offer you a position at this time.',
       'Thank you for considering our studio.',
     ],
     sign: ['Moss & Moon Games'],
@@ -53,12 +52,45 @@ export const EMAILS: Email[] = [
     sign: ['Northstar Games Recruitment Team'],
   },
   {
+    from: 'Pixelvale Studio',
+    subject: 'Your application status',
+    body: [
+      'Hi there,',
+      'Thanks for applying for the Environment Artist role and for your patience.',
+      'After reviewing your portfolio, we have decided not to proceed with your application.',
+      'We encourage you to apply again in the future.',
+    ],
+    sign: ['Best,', 'The Pixelvale Team'],
+  },
+  {
+    from: 'Tidewater Games',
+    subject: 'Re: Junior UI Artist',
+    body: [
+      'Dear Applicant,',
+      'Thank you for taking the time to apply.',
+      'Unfortunately, the position has now been filled.',
+      'We will keep your details on file should anything suitable come up.',
+    ],
+    sign: ['Kind regards,', 'Tidewater Games HR'],
+  },
+  {
+    from: 'Ember & Ash',
+    subject: 'Application outcome',
+    body: [
+      'Hello,',
+      'We appreciate your interest in Ember & Ash.',
+      'We are sorry to let you know that you have not been shortlisted for this role.',
+      'Thank you again, and good luck with your search.',
+    ],
+    sign: ['Ember & Ash Recruiting'],
+  },
+  {
     from: 'Northstar Games',
     subject: 'Thank you for your application',
     body: [
       'Dear Applicant,',
       'Thank you for your application for the UI Artist position at Northstar Games. We have received it, and our team will review it carefully.',
-      "We'll be in touch *soon*.",
+      "We'll be in touch soon.",
     ],
     sign: ['Warm regards,', 'Northstar Games Recruitment Team'],
   },
@@ -75,62 +107,62 @@ export interface WindowShot {
   appear: number; // ms
   hide?: number; // ms; absent = stays until the montage ends
   from: { x: number; y: number }; // entrance offset, px
+  open?: boolean; // already open when its shot cuts in (fades in with the still, no flash)
   final?: boolean; // the last mail: its keywords fall apart
 }
 
 const F = FRAMES.map((f) => f.at);
+// a rejection, already open when its shot cuts in (it crossfades in with
+// the still; the one before stays under it until the cut is done)
+const rejection = (shot: number, email: number, variant: Variant, left: number, top: number, width: number): WindowShot => ({
+  email,
+  variant,
+  left,
+  top,
+  width,
+  appear: F[shot],
+  hide: F[shot + 1] + 450,
+  from: { x: 0, y: 0 },
+  open: true,
+});
 export const WINDOWS: WindowShot[] = [
-  // Phase 1: the thank-you, opened from its notification (the camera holds)
+  // the thank-you, opened from its notification (the camera holds)
   {
-    email: 3,
+    email: 6,
     variant: 'standard',
     left: 26,
     top: 12,
     width: 52,
     appear: F[0] + 1600,
-    hide: F[1],
+    hide: F[1] + 450,
     from: { x: 0, y: 8 },
   },
-  // Phase 2: two rejections, one a shot, each opened over the inbox
-  {
-    email: 0,
-    variant: 'standard',
-    left: 30,
-    top: 10,
-    width: 52,
-    appear: F[1] + 500,
-    hide: F[2],
-    from: { x: 0, y: 8 },
-  },
-  {
-    email: 1,
-    variant: 'portal',
-    left: 24,
-    top: 14,
-    width: 54,
-    appear: F[2] + 450,
-    hide: F[3],
-    from: { x: 8, y: 0 },
-  },
-  // Phase 4: the final one, prominent (it arrived the night before); set
-  // right of centre so its keywords sit straight above the door's place (the
-  // screen's middle), and their letters fall straight down onto it
+  // then a rejection a shot, a little elsewhere each time
+  rejection(1, 0, 'standard', 30, 10, 52),
+  rejection(2, 1, 'portal', 24, 14, 54),
+  rejection(3, 3, 'standard', 27, 9, 52),
+  rejection(4, 4, 'standard', 22, 13, 54),
+  rejection(5, 5, 'portal', 29, 11, 52),
+  // the last one, prominent (it arrived in the night), set right of centre
+  // so its keywords sit straight above the door's place (the screen's
+  // middle), and their letters fall straight down onto it
   {
     email: 2,
     variant: 'standard',
     left: 31.3,
     top: 8,
     width: 60,
-    appear: F[5] + 400,
-    from: { x: 0, y: -10 },
+    appear: F[6],
+    from: { x: 0, y: 0 },
+    open: true,
     final: true,
   },
 ];
 
 // the flash strength when a mail opens (a little stronger each time)
-export const FLASH = [0.05, 0.08, 0.12, 0.2];
+export const FLASH = 0.05; // the flash when the thank-you opens
 
-// Phase 1's notification (above the taskbar, bottom right)
+// the thank-you's notification (above the taskbar, bottom right)
 export const TOAST = {
   at: F[0] + 900,
   hide: F[0] + 1600, // clicked: the mail opens
@@ -153,7 +185,7 @@ export interface InboxItem {
   readAt?: number;
 }
 
-// Phase 3: a sea of unread status updates, with life in between
+// a sea of unread status updates, with life in between
 const STATUS_FROM = [
   'Pixelvale Studio',
   'Paper Lantern Interactive',
@@ -258,7 +290,7 @@ export const INBOX: InboxItem[] = [
       time: '26 Feb',
     },
   ].reverse(),
-  // Phase 1
+  // the thank-you
   {
     at: TOAST.at,
     from: 'Northstar Games',
@@ -267,7 +299,7 @@ export const INBOX: InboxItem[] = [
     unread: true,
     readAt: WINDOWS[0].appear,
   },
-  // Phase 2
+  // the first rejections
   {
     at: F[1],
     from: 'Pixel Weekly',
@@ -292,18 +324,18 @@ export const INBOX: InboxItem[] = [
     unread: true,
     readAt: WINDOWS[2].appear,
   },
-  // Phase 3
+  // the routine: a sea of unread status updates, rejections in between
   ...routine.reverse(),
-  // Phase 4
+  { at: F[3], from: 'Pixelvale Studio', subject: 'Your application status', time: '11:02', unread: true, readAt: WINDOWS[3].appear },
+  { at: F[4], from: 'Tidewater Games', subject: 'Re: Junior UI Artist', time: '14:15', unread: true, readAt: WINDOWS[4].appear },
+  { at: F[5], from: 'Ember & Ash', subject: 'Application outcome', time: '23:40', unread: true, readAt: WINDOWS[5].appear },
+  // the last one
   {
-    at: F[4],
+    at: F[6],
     from: 'Northstar Games',
     subject: 'Application Update',
-    time: '23:49',
+    time: '02:31',
     unread: true,
-    readAt: WINDOWS[3].appear,
+    readAt: WINDOWS[6].appear,
   },
 ];
-
-// Phase 3's scroll down the list (rows, eased like a scroll wheel's ticks)
-export const SCROLL = { at: [F[3] + 500, F[4] - 300] as const, rows: 14 };

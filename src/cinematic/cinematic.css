@@ -219,12 +219,8 @@
 /* the taskbar clock, after the tray icons: time over date, both ending on
    one right edge */
 .cin-clock {
+  /* left/top: its right edge and middle, beside the still's battery icon (set per still) */
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 11.5%;
-  padding-right: 1.4%;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -239,7 +235,7 @@
   /* its own layer, rastered once and scaled with the stage: re-laying the
      text out at every zoom step snapped it to different pixels (it shook) */
   will-change: transform;
-  transform: translateZ(0);
+  transform: translate(-100%, -50%) translateZ(0);
   text-rendering: geometricPrecision;
 }
 .cin-clock span + span {

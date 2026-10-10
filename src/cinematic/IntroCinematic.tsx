@@ -49,6 +49,7 @@ import { EMAILS, WINDOWS, FLASH, INBOX, TOAST, type WindowShot } from './emails'
 import { GlyphCanvas } from './glyphCanvas';
 import { buildScene, renderScene, cellAt, growFrom, sceneCell, DOOR_PAD, type Scene } from './scene';
 import { DOOR } from './door';
+import { LETTERBOX_BAR_VH } from '../introPartB';
 import './cinematic.css';
 
 export type IntroCinematicHandle = { skip: () => void };
@@ -259,11 +260,17 @@ export default forwardRef<
   const focus = { x: first.x + first.w / 2, y: first.y + first.h / 2 };
   function stageTransform(t: number, vw: number, vh: number) {
     const { s, ox, oy } = cover(vw, vh);
+    // framed for the letterbox: the band between the bars. Close, the whole
+    // screen (taskbar and clock too) fits in it; wide, the desk still fills
+    // it (and the viewport's width)
+    const band = vh * (1 - (2 * LETTERBOX_BAR_VH) / 100);
+    const zEnd = Math.max(band / (STAGE_H * s), vw / (STAGE_W * s)) * 1.01;
+    const zStart = Math.max(zEnd, Math.min(ZOOM_START, (0.96 * band) / (first.h * s)));
     // it holds on the first mail, then pulls back - slowly at first, faster
     // and faster (exponential)
     const u = clamp01((t - T.pullBack[0]) / (T.pullBack[1] - T.pullBack[0]));
     const k = reduced ? 0 : 1 - (Math.exp(PULL_EXP * u) - 1) / (Math.exp(PULL_EXP) - 1);
-    const S = s * lerp(1, ZOOM_START, k);
+    const S = s * lerp(zEnd, zStart, k);
     const q0 = { x: (vw / 2 - ox) / s, y: (vh / 2 - oy) / s };
     const q = { x: lerp(q0.x, focus.x, k), y: lerp(q0.y, focus.y, k) };
     return { S, x: vw / 2 - q.x * S, y: vh / 2 - q.y * S };
@@ -419,8 +426,7 @@ export default forwardRef<
       shown++;
       const isUnread = !!it.unread && !(it.readAt !== undefined && t >= it.readAt);
       if (isUnread) unread++;
-      el.classList.toggle('unread', isUnread);
-      el.style.setProperty('--new', String(it.at > 0 ? clamp01(1 - (t - it.at) / 1200) : 0));
+      // (the list's rows stay plain: no bold, dot or flash for unread or new mail)
     });
     unreadRef.current!.textContent = String(unread + 2);
     const view = appRef.current!.clientHeight || 1;
@@ -438,6 +444,8 @@ export default forwardRef<
     const st = stageTransform(t, vw, vh);
     stageRef.current!.style.transform = `translate(${st.x}px, ${st.y}px) scale(${st.S})`;
     stageRef.current!.style.visibility = t >= T.fall && t >= 0 && measured.current ? 'hidden' : 'visible';
+    // it opens on black, then fades in on the first shot
+    stageRef.current!.style.opacity = String(span(t, T.fadeIn));
     // the stills, crossfading; the screen overlay follows the laptop's screen
     const fr = frameAt(t);
     FRAMES.forEach((f, k) => {
@@ -796,6 +804,9 @@ export default forwardRef<
   return (
     <div ref={rootRef} className="cin-root">
       {scene}
+      {/* letterbox bars, the same as the wake-up scene's (Letterbox.tsx) */}
+      <div className="cin-bar" style={{ top: 0, height: `${LETTERBOX_BAR_VH}vh` }} />
+      <div className="cin-bar" style={{ bottom: 0, height: `${LETTERBOX_BAR_VH}vh` }} />
       {devTimeline && (
         <div className={'cin-dev' + (barOpen ? '' : ' closed')} onPointerDown={(e) => e.stopPropagation()}>
           <div className="cin-dev-row">

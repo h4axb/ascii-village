@@ -8,6 +8,13 @@
   background: #000;
   user-select: none;
 }
+.cin-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: #000;
+  pointer-events: none;
+}
 .cin-stage {
   position: absolute;
   left: 0;

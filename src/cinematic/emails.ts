@@ -1,7 +1,8 @@
 // The mail on the laptop (src/cinematic/): the inbox's history, the mails
 // opened on top of it shot by shot, and the notification of the first shot.
 //
-// Body text of an opened mail can mark words:
+// Body text of an opened mail is written with two markers:
+//   *words*  the visual emphasis (a soft highlight after the window opens)
 //   [words]  a keyword that survives and falls apart into letters (only the
 //            final mail has these)
 import { FRAMES } from './config';
@@ -23,7 +24,7 @@ export const EMAILS: Email[] = [
     body: [
       'Dear Applicant,',
       'Thank you for your interest in joining Lumen Forge Games.',
-      'We regret to inform you that we will not be moving forward with your application at this time.',
+      '*We regret to inform you* that we will not be moving forward with your application at this time.',
       'We wish you every success in your search.',
     ],
     sign: ['Kind regards,', 'Lumen Forge Recruiting'],
@@ -34,7 +35,7 @@ export const EMAILS: Email[] = [
     body: [
       'Hello,',
       'We appreciate your interest in the Junior Game Designer position.',
-      'Unfortunately, we received a large number of applications and are unable to offer you a position at this time.',
+      '*Unfortunately*, we received a large number of applications and are unable to offer you a position at this time.',
       'Thank you for considering our studio.',
     ],
     sign: ['Moss & Moon Games'],
@@ -57,7 +58,7 @@ export const EMAILS: Email[] = [
     body: [
       'Hi there,',
       'Thanks for applying for the Environment Artist role and for your patience.',
-      'After reviewing your portfolio, we have decided not to proceed with your application.',
+      'After reviewing your portfolio, we have decided *not to proceed* with your application.',
       'We encourage you to apply again in the future.',
     ],
     sign: ['Best,', 'The Pixelvale Team'],
@@ -68,7 +69,7 @@ export const EMAILS: Email[] = [
     body: [
       'Dear Applicant,',
       'Thank you for taking the time to apply.',
-      'Unfortunately, the position has now been filled.',
+      '*Unfortunately*, the position has now been filled.',
       'We will keep your details on file should anything suitable come up.',
     ],
     sign: ['Kind regards,', 'Tidewater Games HR'],
@@ -79,7 +80,7 @@ export const EMAILS: Email[] = [
     body: [
       'Hello,',
       'We appreciate your interest in Ember & Ash.',
-      'We are sorry to let you know that you have not been shortlisted for this role.',
+      'We are sorry to let you know that you have *not been shortlisted* for this role.',
       'Thank you again, and good luck with your search.',
     ],
     sign: ['Ember & Ash Recruiting'],
@@ -90,7 +91,7 @@ export const EMAILS: Email[] = [
     body: [
       'Dear Applicant,',
       'Thank you for your application for the UI Artist position at Northstar Games. We have received it, and our team will review it carefully.',
-      "We'll be in touch soon.",
+      "We'll be in touch *soon*.",
     ],
     sign: ['Warm regards,', 'Northstar Games Recruitment Team'],
   },

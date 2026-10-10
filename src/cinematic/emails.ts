@@ -52,6 +52,16 @@ export const EMAILS: Email[] = [
     ],
     sign: ['Northstar Games Recruitment Team'],
   },
+  {
+    from: 'Northstar Games',
+    subject: 'Thank you for your application',
+    body: [
+      'Dear Applicant,',
+      'Thank you for your application for the UI Artist position at Northstar Games. We have received it, and our team will review it carefully.',
+      "We'll be in touch *soon*.",
+    ],
+    sign: ['Warm regards,', 'Northstar Games Recruitment Team'],
+  },
 ];
 
 // An opened mail on the laptop screen: which email, its style, its place (in %
@@ -70,6 +80,17 @@ export interface WindowShot {
 
 const F = FRAMES.map((f) => f.at);
 export const WINDOWS: WindowShot[] = [
+  // Phase 1: the thank-you, opened from its notification (the camera holds)
+  {
+    email: 3,
+    variant: 'standard',
+    left: 26,
+    top: 12,
+    width: 52,
+    appear: F[0] + 1600,
+    hide: F[1],
+    from: { x: 0, y: 8 },
+  },
   // Phase 2: two rejections, one a shot, each opened over the inbox
   {
     email: 0,
@@ -105,12 +126,12 @@ export const WINDOWS: WindowShot[] = [
 ];
 
 // the flash strength when a mail opens (a little stronger each time)
-export const FLASH = [0.08, 0.12, 0.2];
+export const FLASH = [0.05, 0.08, 0.12, 0.2];
 
 // Phase 1's notification (above the taskbar, bottom right)
 export const TOAST = {
   at: F[0] + 900,
-  hide: F[1] - 300,
+  hide: F[0] + 1600, // clicked: the mail opens
   from: 'Northstar Games',
   text: 'Thank you for your application to Northstar Games.',
 };
@@ -242,7 +263,7 @@ export const INBOX: InboxItem[] = [
     subject: 'Thank you for your application',
     time: '08:11',
     unread: true,
-    readAt: F[1],
+    readAt: WINDOWS[0].appear,
   },
   // Phase 2
   {
@@ -257,7 +278,7 @@ export const INBOX: InboxItem[] = [
     subject: 'Your application — Junior Game Artist',
     time: '13:41',
     unread: true,
-    readAt: WINDOWS[0].appear,
+    readAt: WINDOWS[1].appear,
   },
   { at: F[2], from: 'Steam', subject: 'Your wishlist is on sale', time: 'Thu' },
   { at: F[2], from: 'Mom', subject: 'Did you eat?', time: 'Thu', unread: true },
@@ -267,7 +288,7 @@ export const INBOX: InboxItem[] = [
     subject: 'Update regarding your application',
     time: '17:35',
     unread: true,
-    readAt: WINDOWS[1].appear,
+    readAt: WINDOWS[2].appear,
   },
   // Phase 3
   ...routine.reverse(),
@@ -278,7 +299,7 @@ export const INBOX: InboxItem[] = [
     subject: 'Application Update',
     time: '23:49',
     unread: true,
-    readAt: WINDOWS[2].appear,
+    readAt: WINDOWS[3].appear,
   },
 ];
 

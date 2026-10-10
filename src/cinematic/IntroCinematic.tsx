@@ -28,6 +28,8 @@ import {
   STAGE_H,
   FRAMES,
   FRAME_FADE,
+  fitFrame,
+  screenFit,
   TASKBAR,
   T,
   ENTER_MS,
@@ -166,16 +168,14 @@ function frameAt(t: number) {
   });
   return { i, fade: i ? clamp01((t - FRAMES[i].at) / FRAME_FADE) : 1 };
 }
-// the laptop screen's place at t (it moves a little between stills)
-function screenAt(t: number) {
-  const { i, fade } = frameAt(t);
-  const a = FRAMES[Math.max(0, i - 1)].screen, b = FRAMES[i].screen;
-  const k = smooth(fade);
-  return { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), w: lerp(a.w, b.w, k), h: lerp(a.h, b.h, k) };
+// the laptop screen's place (every still is fitted to put its screen there)
+function screenAt() {
+  return screenFit();
 }
 // the inbox, latest arrival on top (among mails arriving together, the later one)
 const ORDER = INBOX.map((it, i) => ({ it, i })).sort((a, b) => b.it.at - a.it.at || b.i - a.i);
 const ROW_H = 13; // a list row, stage px
+const PULL_EXP = 3.2; // how sharply the camera's pull back speeds up
 // Phase 3's scroll: a few wheel ticks, each eased
 function scrollRows(t: number) {
   const k = clamp01((t - SCROLL.at[0]) / (SCROLL.at[1] - SCROLL.at[0]));
@@ -256,11 +256,14 @@ export default forwardRef<
   // the stage transform at time t: cover, starting close on the laptop's
   // screen and slowly pulling back to the whole desk through all the stills;
   // after them the camera stays
-  const first = FRAMES[0].screen;
+  const first = screenFit();
   const focus = { x: first.x + first.w / 2, y: first.y + first.h / 2 };
   function stageTransform(t: number, vw: number, vh: number) {
     const { s, ox, oy } = cover(vw, vh);
-    const k = reduced ? 0 : 1 - smooth(clamp01((t - T.pullBack[0]) / (T.pullBack[1] - T.pullBack[0])));
+    // it holds on the first mail, then pulls back - slowly at first, faster
+    // and faster (exponential)
+    const u = clamp01((t - T.pullBack[0]) / (T.pullBack[1] - T.pullBack[0]));
+    const k = reduced ? 0 : 1 - (Math.exp(PULL_EXP * u) - 1) / (Math.exp(PULL_EXP) - 1);
     const S = s * lerp(1, ZOOM_START, k);
     const q0 = { x: (vw / 2 - ox) / s, y: (vh / 2 - oy) / s };
     const q = { x: lerp(q0.x, focus.x, k), y: lerp(q0.y, focus.y, k) };
@@ -395,7 +398,7 @@ export default forwardRef<
       const el = frameRefs.current[k];
       if (el) el.style.opacity = String(k < fr.i ? 1 : k === fr.i ? fr.fade : 0);
     });
-    const scr = screenAt(t);
+    const scr = screenAt();
     Object.assign(screenRef.current!.style, { left: `${scr.x}px`, top: `${scr.y}px`, width: `${scr.w}px`, height: `${scr.h}px` });
     // lighting: a flash as each mail opens; the screen's glow in the room grows toward night
     let flash = 0;
@@ -660,7 +663,15 @@ export default forwardRef<
       <>
       <div ref={stageRef} className="cin-stage" style={{ width: STAGE_W, height: STAGE_H }}>
         {FRAMES.map((f, k) => (
-          <img key={k} ref={(el) => (frameRefs.current[k] = el)} className="cin-bg" src={f.src} alt="" draggable={false} style={{ opacity: k ? 0 : 1 }} />
+          <img
+            key={k}
+            ref={(el) => (frameRefs.current[k] = el)}
+            className="cin-bg"
+            src={f.src}
+            alt=""
+            draggable={false}
+            style={{ opacity: k ? 0 : 1, transformOrigin: '0 0', transform: `translate(${fitFrame(k).x}px, ${fitFrame(k).y}px) scale(${fitFrame(k).s})` }}
+          />
         ))}
         <div ref={glowRef} className="cin-glow" />
         <div ref={blackRef} className="cin-black" />

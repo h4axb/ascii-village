@@ -28,32 +28,61 @@ export interface Frame {
   glow: number;
 }
 export const FRAME_FADE = 450;
+
+// The stills were shot a little apart (the laptop sits higher and smaller in
+// some), so each is placed on the stage to put its screen exactly on the
+// first still's - plus one small zoom for all, so none leaves a gap at an
+// edge. fitFrame(i): where still i goes (stage px, scale about its top
+// left); SCREEN_FIT: the laptop screen's place, the same in every still.
+const fits = () => {
+  const ref = FRAMES[0].screen;
+  const base = FRAMES.map((f) => {
+    const a = (ref.w / f.screen.w + ref.h / f.screen.h) / 2;
+    return { a, bx: ref.x - a * f.screen.x, by: ref.y - a * f.screen.y };
+  });
+  const cx = ref.x + ref.w / 2, cy = ref.y + ref.h / 2;
+  let k = 1;
+  for (const { a, bx, by } of base) {
+    if (bx > 0) k = Math.max(k, cx / (cx - bx));
+    if (by > 0) k = Math.max(k, cy / (cy - by));
+    if (a * STAGE_W + bx < STAGE_W) k = Math.max(k, (STAGE_W - cx) / (a * STAGE_W + bx - cx));
+    if (a * STAGE_H + by < STAGE_H) k = Math.max(k, (STAGE_H - cy) / (a * STAGE_H + by - cy));
+  }
+  k *= 1.002; // a hair more, against rounding
+  return {
+    frames: base.map(({ a, bx, by }) => ({ s: k * a, x: cx + k * (bx - cx), y: cy + k * (by - cy) })),
+    screen: { x: cx + k * (ref.x - cx), y: cy + k * (ref.y - cy), w: k * ref.w, h: k * ref.h },
+  };
+};
+let fitCache: ReturnType<typeof fits> | null = null;
+export const fitFrame = (i: number) => (fitCache ??= fits()).frames[i];
+export const screenFit = () => (fitCache ??= fits()).screen;
 export const TASKBAR = 0.1; // of the screen's height
 export const FRAMES: Frame[] = [
   // Phase 1, optimism: bright morning, fresh coffee
   { src: '/intro/cinematic/01-morning.webp', at: 0, screen: { x: 468, y: 63, w: 736, h: 429 }, time: '08:12', date: 'Mon 3 Mar', app: { left: 2, top: 4, width: 95, height: 88 }, glow: 0 },
   // Phase 2, the drift: harsh afternoon light, long shadows
-  { src: '/intro/cinematic/02-midday.webp', at: 3000, screen: { x: 468, y: 63, w: 736, h: 425 }, time: '13:46', date: 'Wed 5 Mar', app: { left: 3, top: 6, width: 94, height: 86 }, glow: 0.05 },
-  { src: '/intro/cinematic/03-afternoon.webp', at: 5200, screen: { x: 468, y: 63, w: 736, h: 429 }, time: '17:38', date: 'Fri 14 Mar', app: { left: 1.5, top: 3, width: 96, height: 90 }, glow: 0.1 },
+  { src: '/intro/cinematic/02-midday.webp', at: 4500, screen: { x: 468, y: 63, w: 736, h: 425 }, time: '13:46', date: 'Wed 5 Mar', app: { left: 3, top: 6, width: 94, height: 86 }, glow: 0.05 },
+  { src: '/intro/cinematic/03-afternoon.webp', at: 6700, screen: { x: 468, y: 63, w: 736, h: 429 }, time: '17:38', date: 'Fri 14 Mar', app: { left: 1.5, top: 3, width: 96, height: 90 }, glow: 0.1 },
   // Phase 3, the routine: overcast, stagnant
-  { src: '/intro/cinematic/04-overcast.webp', at: 7400, screen: { x: 461, y: 48, w: 739, h: 423 }, time: '11:07', date: 'Thu 3 Apr', app: { left: 2.5, top: 5, width: 95, height: 88 }, glow: 0.2 },
+  { src: '/intro/cinematic/04-overcast.webp', at: 8900, screen: { x: 461, y: 48, w: 739, h: 423 }, time: '11:07', date: 'Thu 3 Apr', app: { left: 2.5, top: 5, width: 95, height: 88 }, glow: 0.2 },
   // Phase 4, resignation: deep night, only the screen's cold light
-  { src: '/intro/cinematic/05-night.webp', at: 10200, screen: { x: 462, y: 48, w: 738, h: 423 }, time: '23:51', date: 'Sun 27 Apr', app: { left: 2, top: 4, width: 95, height: 89 }, glow: 0.6 },
-  { src: '/intro/cinematic/06-deep-night.webp', at: 11600, screen: { x: 468, y: 63, w: 733, h: 429 }, time: '02:47', date: 'Mon 28 Apr', app: { left: 3, top: 6, width: 94, height: 87 }, glow: 0.75 },
+  { src: '/intro/cinematic/05-night.webp', at: 11700, screen: { x: 462, y: 48, w: 738, h: 423 }, time: '23:51', date: 'Sun 27 Apr', app: { left: 2, top: 4, width: 95, height: 89 }, glow: 0.6 },
+  { src: '/intro/cinematic/06-deep-night.webp', at: 13100, screen: { x: 468, y: 63, w: 733, h: 429 }, time: '02:47', date: 'Mon 28 Apr', app: { left: 3, top: 6, width: 94, height: 87 }, glow: 0.75 },
 ];
 
 // ---- the timeline (ms) ---------------------------------------------------------
-const FALL = 22600; // the keywords come loose; everything after is relative to it
+const FALL = 24100; // the keywords come loose; everything after is relative to it
 export const T = {
   // the stills (FRAMES[].at); the opened mails' times are in emails.ts
-  montageEnd: 13600,
+  montageEnd: 15100,
   // the camera has stopped; slowly (about 6 s) everything but the three
   // keywords fades away, then they hold alone 3 s
-  othersOut: [13600, 18600], // the mail app, the other text and the desktop fade
-  frameOut: [14600, 19600], // the last mail's window and other words dissolve
-  dotsIn: [19000, 19600], // "Unfortunately," -> "Unfortunately..."
-  blackIn: [13600, 19600], // the room fades to black
-  pullBack: [0, 13600], // all the while before, the camera eases slowly back, from the screen to the whole desk
+  othersOut: [15100, 20100], // the mail app, the other text and the desktop fade
+  frameOut: [16100, 21100], // the last mail's window and other words dissolve
+  dotsIn: [20500, 21100], // "Unfortunately," -> "Unfortunately..."
+  blackIn: [15100, 21100], // the room fades to black
+  pullBack: [4100, 15100], // the camera holds on the first mail, then pulls back from the screen to the whole desk, slowly at first, faster and faster
   // falling letters -> the glyph door -> through it (scene.ts), then 3 s of black
   fall: FALL, // the letters fall, the camera following them down; they turn to water (LETTERS)
   build: [FALL + 4800, FALL + 11800], // the door emerges from the water, slowly, filling its shape

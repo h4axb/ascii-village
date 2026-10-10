@@ -216,23 +216,28 @@
   color: #14181f;
   font-size: 6.4px;
 }
-/* the taskbar clock, after the tray icons */
+/* the taskbar clock, after the tray icons: time over date, both ending on
+   one right edge */
 .cin-clock {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 9.5%;
+  width: 11.5%;
+  padding-right: 1.4%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   color: #1c2740;
-  font-size: 6.6px;
-  line-height: 1.15;
+  font-size: 9.6px;
+  line-height: 1.18;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .cin-clock span + span {
-  font-size: 5.2px;
-  opacity: 0.8;
+  font-size: 8.4px;
+  opacity: 0.85;
 }
 
 /* ---- opened mails ---- */

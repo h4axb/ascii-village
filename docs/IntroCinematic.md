@@ -7,7 +7,7 @@ A cinematic of about 32 seconds:
    - *The routine* (overcast): the inbox scrolls down past a sea of bold unread "Update on your status".
    - *Resignation* (night, then deep night): the final mail arrives unread at 23:51 and is opened at 02:47: "Unfortunately… not selected… While your background is impressive, we have decided to move forward with other candidates."
 2. The camera stops. Everything but the three keywords, **Application Update · Unfortunately… · not selected**, fades to black; they **hold 3 s**, the camera still.
-3. **The letters fall into the foot of a door** (from 17.8 s), and the door **builds itself up from there, glyph by glyph**: each glyph drops into its cell as a letter and settles into the door drawing's own glyph and colour. The door is `src/cinematic/door-glyphs.svg` (31 × 44 glyphs), centred, with space around it.
+3. **The letters fall into the foot of a door** (from 17.8 s): each is dropped by gravity, hops loose, accelerates spinning, hits the ground with a squash and one bounce, and settles into its cell; the door **builds itself up from there, glyph by glyph**: each glyph drops into its cell as a letter and settles into the door drawing's own glyph and colour. The door is `src/cinematic/door-glyphs.svg` (31 × 44 glyphs), centred, with space around it.
 4. **The door opens, slowly** (about 2.6 s): the leaf swings on its left hinge to about half its width, its free edge coming toward you. Inside are a sky with clouds and birds, the sea and an island; **light pours out** onto sandy ground.
 5. After a **2 s hold**, the camera **walks slowly toward the doorway** (a gentle push in with a step's bob) and **fades to black**.
 6. After **3 s of black**, the wake-up scene with Mitchy starts (from black).

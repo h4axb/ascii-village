@@ -31,7 +31,7 @@ import {
   TASKBAR,
   T,
   ENTER_MS,
-  ZOOM_IN,
+  ZOOM_START,
   LETTERS,
   SCENE,
   SHOT_LIST,
@@ -186,7 +186,6 @@ interface Plan {
   w: number;
   h: number;
   delay: number;
-  vx: number;
   spin: number;
   phase: number;
   landX: number; // where it lands: its cell in the door's foot (it drifts there as it falls)
@@ -249,14 +248,15 @@ export default forwardRef<
     const s = Math.max(vw / STAGE_W, vh / STAGE_H);
     return { s, ox: (vw - STAGE_W * s) / 2, oy: (vh - STAGE_H * s) / 2 };
   };
-  // the stage transform at time t: cover, then slowly in from outside toward
-  // the laptop's screen through all the stills; after them the camera stays
-  const lastScreen = FRAMES[FRAMES.length - 1].screen;
-  const focus = { x: lastScreen.x + lastScreen.w / 2, y: lastScreen.y + lastScreen.h / 2 };
+  // the stage transform at time t: cover, starting close on the laptop's
+  // screen and slowly pulling back to the whole desk through all the stills;
+  // after them the camera stays
+  const first = FRAMES[0].screen;
+  const focus = { x: first.x + first.w / 2, y: first.y + first.h / 2 };
   function stageTransform(t: number, vw: number, vh: number) {
     const { s, ox, oy } = cover(vw, vh);
-    const k = reduced ? 0 : smooth(clamp01((t - T.zoomIn[0]) / (T.zoomIn[1] - T.zoomIn[0])));
-    const S = s * lerp(1, ZOOM_IN, k);
+    const k = reduced ? 0 : 1 - smooth(clamp01((t - T.pullBack[0]) / (T.pullBack[1] - T.pullBack[0])));
+    const S = s * lerp(1, ZOOM_START, k);
     const q0 = { x: (vw / 2 - ox) / s, y: (vh / 2 - oy) / s };
     const q = { x: lerp(q0.x, focus.x, k), y: lerp(q0.y, focus.y, k) };
     return { S, x: vw / 2 - q.x * S, y: vh / 2 - q.y * S };
@@ -286,7 +286,6 @@ export default forwardRef<
         w: r.width,
         h: r.height,
         delay: rand(k, 1) * LETTERS.staggerMs * 0.6,
-        vx: (rand(k, 2) * 2 - 1) * LETTERS.driftPx,
         spin: (rand(k, 3) * 2 - 1) * LETTERS.spinDeg,
         phase: rand(k, 4) * 6.28,
         landX: 0,
@@ -305,22 +304,45 @@ export default forwardRef<
       const at = cellAt(scene, cell.c, cell.r);
       p.landX = at.x;
       p.landY = at.y;
-      p.tLand = T.fall + p.delay + Math.sqrt((2 * Math.max(1, at.y - p.y0)) / (LETTERS.gravity * vh)) * 1000;
-      landIn(scene, cell.c, cell.r, p.tLand);
+      // ballistic: a small hop up, then gravity down to the cell
+      const g = LETTERS.gravity * vh, v0 = -LETTERS.hop * vh;
+      p.tLand = T.fall + p.delay + ((-v0 + Math.sqrt(v0 * v0 + 2 * g * Math.max(1, at.y - p.y0))) / g) * 1000;
+      landIn(scene, cell.c, cell.r, p.tLand + LETTERS.settleMs);
     });
     return { vw, vh, font, plan, scene };
   }
 
-  // a falling letter: gravity down to its cell in the door's foot, drifting
-  // toward it; after landing it stays (and becomes the cell's glyph, see apply)
+  // a falling letter: dropped under gravity (a small hop as it comes loose,
+  // then accelerating, spinning, stretched by its speed) onto its cell in the
+  // door's foot; there it hits (squash), bounces once and settles
   function fallPos(p: Plan, t: number, vh: number) {
-    const tau = Math.max(0, Math.min(t, p.tLand) - T.fall - p.delay) / 1000;
+    const g = LETTERS.gravity * vh, v0 = -LETTERS.hop * vh;
     const tl = Math.max(0.001, (p.tLand - T.fall - p.delay) / 1000);
-    const k = smooth(clamp01(tau / tl));
+    const tau = Math.max(0, Math.min((t - T.fall - p.delay) / 1000, tl));
+    const after = (t - p.tLand) / 1000; // > 0 once it has landed
+    if (after <= 0) {
+      const v = v0 + g * tau; // px/s, down
+      const k = Math.min(1, Math.max(0, v) / (2.4 * vh));
+      return {
+        x: lerp(p.x0, p.landX, tau / tl), // a straight sideways speed
+        y: p.y0 + v0 * tau + 0.5 * g * tau * tau,
+        rot: p.spin * tau,
+        sx: 1 - 0.35 * LETTERS.stretch * k,
+        sy: 1 + LETTERS.stretch * k,
+      };
+    }
+    // impact: squash flat, spring back up in one short bounce, settle
+    const ms = after * 1000;
+    const imp = LETTERS.impactMs, rest = LETTERS.settleMs;
+    const squash = ms < imp ? Math.sin((ms / imp) * Math.PI) : 0;
+    const b = ms >= imp && ms < rest ? Math.sin(((ms - imp) / (rest - imp)) * Math.PI) : 0;
+    const rot0 = p.spin * tl;
     return {
-      x: lerp(p.x0, p.landX, k) + 6 * Math.sin(tau * 2.4 + p.phase) * (1 - k),
-      y: Math.min(p.y0 + 0.5 * LETTERS.gravity * vh * tau * tau, p.landY),
-      rot: p.spin * tau * (1 - k * k),
+      x: p.landX,
+      y: p.landY - LETTERS.bounce * vh * b,
+      rot: rot0 * Math.max(0, 1 - ms / imp) * 0.4, // knocked upright by the hit
+      sx: 1 + 0.4 * squash - 0.08 * b,
+      sy: 1 - 0.45 * squash + 0.1 * b,
     };
   }
 
@@ -447,7 +469,7 @@ export default forwardRef<
     const loose = t >= T.fall;
     const m0 = measured.current && { lastLand: Math.max(...measured.current.plan.map((p) => p.tLand)) };
     root.querySelectorAll<HTMLElement>('.cin-win.final .cin-ch').forEach((el) => (el.style.visibility = loose ? 'hidden' : 'visible'));
-    overlayRef.current!.style.display = loose && t < (m0?.lastLand ?? Infinity) + 300 ? 'block' : 'none';
+    overlayRef.current!.style.display = loose && t < (m0?.lastLand ?? Infinity) + LETTERS.settleMs + 200 ? 'block' : 'none';
     const m = measured.current;
     const cv = canvasRef.current!;
     if (!m || !loose) {
@@ -461,10 +483,13 @@ export default forwardRef<
       const el = cloneRefs.current[k];
       if (!el) return;
       const f = fallPos(p, t, m.vh);
-      const land = clamp01((t - p.tLand) / 200);
-      const sc = lerp(1, Math.min(1, cell / p.h), land);
-      el.style.transform = `translate(${f.x - p.w / 2}px, ${f.y - p.h / 2}px) rotate(${f.rot}deg) scale(${sc})`;
-      el.style.opacity = String(1 - land);
+      // after the bounce it shrinks into its cell and the cell's glyph takes over
+      const settle = clamp01((t - p.tLand - LETTERS.settleMs) / 160);
+      const sc = lerp(1, Math.min(1, cell / p.h), settle);
+      // squash and stretch about the letter's foot, so it stands on the ground
+      el.style.transformOrigin = '50% 100%';
+      el.style.transform = `translate(${f.x - p.w / 2}px, ${f.y - p.h / 2}px) rotate(${f.rot}deg) scale(${sc * f.sx}, ${sc * f.sy})`;
+      el.style.opacity = String(1 - settle);
     });
 
     // ---- the glyph scene ----

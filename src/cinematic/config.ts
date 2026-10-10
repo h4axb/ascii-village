@@ -52,7 +52,7 @@ export const T = {
   frameOut: [13800, 14500], // the last mail's window and other words dissolve
   dotsIn: [14500, 15100], // "Unfortunately," -> "Unfortunately..."
   blackIn: [13600, 14800], // the room fades to black
-  zoomIn: [0, 13600], // all the while before, the camera eases slowly in, from outside
+  pullBack: [0, 13600], // all the while before, the camera eases slowly back, from the screen to the whole desk
   // falling letters -> the glyph door -> through it (scene.ts), then 3 s of black
   fall: FALL, // the letters fall into the door's foot (they land ~1.0-1.7 s later)
   build: [FALL + 1200, FALL + 4200], // the door builds itself bottom up, glyph by glyph
@@ -64,14 +64,18 @@ export const T = {
 } as const;
 
 export const ENTER_MS = 160; // an email window's entrance
-export const ZOOM_IN = 1.35; // how near the camera gets by the end of the stills (then it stays)
+export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's screen (it pulls back to the full desk, then stays)
 
 // ---- falling letters ---------------------------------------------------------------
 export const LETTERS = {
   staggerMs: 700, // spread of the letters' start times
-  gravity: 0.55, // in viewport heights / s²
-  driftPx: 26, // sideways drift, px/s (either way)
-  spinDeg: 70, // rotation while falling, deg/s (either way)
+  gravity: 1.9, // in viewport heights / s²: they drop, they don't drift
+  hop: 0.16, // the little upward jolt as each comes loose, viewport heights / s
+  spinDeg: 110, // rotation while falling, deg/s (either way), kept until impact
+  stretch: 0.3, // how much a letter stretches along its fall at full speed
+  bounce: 0.03, // the one bounce after impact, of the viewport height
+  impactMs: 90, // the squash on impact
+  settleMs: 300, // impact + bounce, then it settles into its cell
 };
 
 // ---- the water-and-door scene (scene.ts) -------------------------------------------------

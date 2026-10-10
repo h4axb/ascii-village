@@ -97,13 +97,14 @@ export const ENTER_MS = 160; // an email window's entrance
 export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's screen (it pulls back to the full desk, then stays)
 
 // ---- falling letters ---------------------------------------------------------------
-// The letters let go and fall; the camera tilts down after them, from the
+// The letters let go (in a few waves) and fall; the camera follows them, keeping them at the centre of the frame, from the
 // keywords to the door's place below. On the way each letter stretches into
 // a streak and turns to water - a string of glyphs (scene.ts) that keeps
 // falling, drifting only a little toward the door, and lands on its foot,
 // where the door starts to emerge (growFrom).
 export const LETTERS = {
-  stepMs: 0, // each letter lets go this long after the one to its left (0: all at once)
+  waves: { n: 4, gap: 250, jitter: 70 }, // the letters let go in a few waves (each letter one at random), gap ms apart, with a little jitter each
+  speed: 0.08, // each letter falls up to this much faster or slower (of gravity)
   gravity: 0.11, // the fall, letters and water alike, in viewport heights / s² (about 5 s down: slow, weightless)
   fallScale: [0.9, 1.15] as const, // stretched while it falls
   morphAt: [1.0, 1.6] as const, // s into its fall when it turns to water (spread per letter)
@@ -111,7 +112,7 @@ export const LETTERS = {
   streak: [0.45, 3] as const, // the streak's scale (x, y)
   tail: [5, 9] as const, // a water string's tail, cells
   converge: 0.15, // how far a water string drifts toward the door's middle as it falls (0: straight down, 1: all to the middle)
-  pan: { dist: 0.95, ms: 4800 }, // the camera's tilt down after the letters: how far (of the height), how long
+  pan: { dist: 0.95, center: 1600, smooth: 500 }, // the camera follows the falling letters down to the door: how far (of the height); how long it takes to bring them to the frame's centre (ms); its smoothing window (ms)
 };
 
 // ---- the water-and-door scene (scene.ts) -------------------------------------------------

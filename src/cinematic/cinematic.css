@@ -229,15 +229,24 @@
   flex-direction: column;
   align-items: flex-end;
   justify-content: center;
-  color: #1c2740;
+  /* the tray icons' blue, so it reads as part of the desktop */
+  color: #0b45c6;
   font-size: 9.6px;
+  font-weight: 600;
   line-height: 1.18;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  /* its own layer, rastered once and scaled with the stage: re-laying the
+     text out at every zoom step snapped it to different pixels (it shook) */
+  will-change: transform;
+  transform: translateZ(0);
+  text-rendering: geometricPrecision;
 }
 .cin-clock span + span {
+  margin-top: 2.5px;
   font-size: 8.4px;
-  opacity: 0.85;
+  font-weight: 500;
+  opacity: 0.8;
 }
 
 /* ---- opened mails ---- */

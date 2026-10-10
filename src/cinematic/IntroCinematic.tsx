@@ -190,7 +190,9 @@ interface Plan {
   w: number;
   h: number;
   delay: number; // ms after T.fall that it lets go
+  g: number; // its gravity, px/s²
   tMorph: number; // ms: it turns to water (a string in the scene takes over)
+  landY: number; // world px: where its water lands
 }
 interface Measured {
   vw: number;
@@ -198,6 +200,9 @@ interface Measured {
   font: { size: number; family: string; weight: string; spacing: string }[];
   plan: Plan[];
   scene: Scene;
+  P: number; // px: how far above the final framing the letters hang (world)
+  D: number; // px: the falling world's x offset (the letters' middle over the door's)
+  m0: number; // screen px: the letters' mean height where they hang
 }
 
 export default forwardRef<
@@ -294,57 +299,86 @@ export default forwardRef<
         w: r.width,
         h: r.height,
         delay: 0,
+        g: 0,
         tMorph: 0,
+        landY: 0,
       });
     }
-    // the letters let go left to right and fall (the camera follows them
-    // down to the door's place, pan); on the way each turns into a string of
-    // water that drifts in to its column of the door and lands on its foot;
-    // the door grows out of that water
+    // the letters let go in a few waves and fall (the camera follows them,
+    // keeping them at the centre, down to the door's place); on the way each
+    // turns into a string of water that drifts in to its column of the door
+    // and lands on its foot; the door grows out of that water. The falling
+    // world is placed so the letters' middle is over the door's (D).
     const scene = buildScene(vw, vh);
     const P = LETTERS.pan.dist * vh; // world = the final framing; the letters start P above it
-    const g = LETTERS.gravity * vh;
-    const byX = plan.map((p, k) => ({ k, x: p.x0 })).sort((a, b) => a.x - b.x);
     const seeds: { c: number; r: number; t: number }[] = [];
     const mid = cellAt(scene, (DOOR.cols - 1) / 2, 0).x;
-    scene.strings = byX.map((o, j) => {
-      const p = plan[o.k];
-      p.delay = j * LETTERS.stepMs;
-      const tm = lerp(LETTERS.morphAt[0], LETTERS.morphAt[1], rand(o.k, 5)); // s into its fall
+    const D = mid - plan.reduce((a, p) => a + p.x0, 0) / plan.length;
+    const { n, gap, jitter } = LETTERS.waves;
+    scene.strings = plan.map((p, k) => {
+      p.delay = Math.min(n - 1, Math.floor(rand(k, 7) * n)) * gap + rand(k, 8) * jitter;
+      p.g = LETTERS.gravity * vh * (1 + LETTERS.speed * (2 * rand(k, 9) - 1));
+      const g = p.g;
+      const tm = lerp(LETTERS.morphAt[0], LETTERS.morphAt[1], rand(k, 5)); // s into its fall
       p.tMorph = T.fall + p.delay + tm * 1000;
       // the strings drift only a little toward the door's middle (mostly
       // they fall straight); where one lands on the door's foot the door
       // starts there - one landing beside the door seeds its nearest edge
-      const tx = lerp(p.x0, mid, LETTERS.converge);
+      const x0 = p.x0 + D;
+      const tx = lerp(x0, mid, LETTERS.converge);
       const c = Math.max(0, Math.min(DOOR.cols - 1, Math.round(tx / scene.cell - 0.5 - scene.c0)));
       let r = DOOR.rows - 2;
       while (r > 0 && !DOOR.at[r * DOOR.cols + c]) r--;
       const land = { x: tx, y: cellAt(scene, c, r).y };
+      p.landY = land.y;
       const y0 = p.y0 - P + 0.5 * g * tm * tm, v0 = g * tm;
       const tau = (-v0 + Math.sqrt(v0 * v0 + 2 * g * Math.max(1, land.y - y0))) / g;
       const tLand = p.tMorph + tau * 1000;
       seeds.push({ c, r, t: tLand });
-      return { x0: p.x0, y0, v0, t0: p.tMorph, tx: land.x, landY: land.y, tLand, len: Math.round(lerp(LETTERS.tail[0], LETTERS.tail[1], rand(o.k, 6))) };
+      return { x0, y0, v0, t0: p.tMorph, tx: land.x, landY: land.y, tLand, len: Math.round(lerp(LETTERS.tail[0], LETTERS.tail[1], rand(k, 6))), g };
     });
     growFrom(scene, seeds);
-    return { vw, vh, font, plan, scene };
+    const m0 = plan.reduce((a, p) => a + p.y0, 0) / plan.length;
+    return { vw, vh, font, plan, scene, P, D, m0 };
   }
 
-  // the camera's pan after the falling letters: how far below its final
-  // framing the world still is (px)
-  function panAt(t: number, vh: number) {
-    if (reduced) return 0;
-    return LETTERS.pan.dist * vh * (1 - easeInOutCubic(clamp01((t - T.fall) / LETTERS.pan.ms)));
+  // a letter's height in the world at t (px): hanging, falling, then (as
+  // water) landed on the door's foot
+  const fallY = (p: Plan, P: number, t: number) => {
+    const tau = Math.max(0, t - T.fall - p.delay) / 1000;
+    return p.y0 - P + 0.5 * p.g * tau * tau;
+  };
+  // the camera after the falling letters: it brings their middle (letters
+  // and water alike) to the frame's centre as they let go - from where they
+  // hang, so it starts from the keyword shot without a jump - and keeps it
+  // there all the way down, until it rests on the door's framing; smoothed
+  // over a short window around t (still a pure function of t, so scrubbing
+  // and recording stay exact)
+  function panRaw(m: Measured, t: number) {
+    if (t <= T.fall) return m.P;
+    let y = 0;
+    for (const p of m.plan) y += Math.min(p.landY, fallY(p, m.P, t));
+    y /= m.plan.length;
+    const c = lerp(m.m0, m.vh / 2, easeInOutCubic(clamp01((t - T.fall) / LETTERS.pan.center)));
+    return Math.max(0, c - y);
+  }
+  // the pan: how far below its final framing the world still is (px, y);
+  // and the camera's x offset (the falling world's middle eases to the frame's)
+  function panAt(m: Measured, t: number) {
+    if (reduced) return { x: 0, y: 0 };
+    const W = LETTERS.pan.smooth, K = 8;
+    let y = 0;
+    for (let i = 0; i <= K; i++) y += panRaw(m, t - W / 2 + (W * i) / K);
+    return { x: -m.D * (1 - easeInOutCubic(clamp01((t - T.fall) / LETTERS.pan.center))), y: y / (K + 1) };
   }
   // a letter at time t (screen px): falling under gravity, stretched; then
   // it stretches into a streak and fades as its water string takes over
-  function letterAt(p: Plan, t: number, vh: number) {
+  function letterAt(m: Measured, p: Plan, t: number, pan: { x: number; y: number }) {
     const [fx, fy] = LETTERS.fallScale, [qx, qy] = LETTERS.streak;
     const tau = Math.max(0, t - T.fall - p.delay) / 1000;
-    const yWorld = p.y0 - LETTERS.pan.dist * vh + 0.5 * LETTERS.gravity * vh * tau * tau;
     const k = clamp01(tau / 0.12); // it stretches as it gets going
-    const m = smooth(clamp01((t - p.tMorph) / LETTERS.morphMs));
-    return { y: yWorld + panAt(t, vh), sx: lerp(lerp(1, fx, k), qx, m), sy: lerp(lerp(1, fy, k), qy, m), m };
+    const mk = smooth(clamp01((t - p.tMorph) / LETTERS.morphMs));
+    return { x: p.x0 + m.D + pan.x, y: fallY(p, m.P, t) + pan.y, sx: lerp(lerp(1, fx, k), qx, mk), sy: lerp(lerp(1, fy, k), qy, mk), m: mk };
   }
 
   // ---- the desktop: clock, mail app, inbox, notification ------------------------------------
@@ -482,6 +516,7 @@ export default forwardRef<
 
     // ---- the letters: falling (the camera after them), turning to water ----
     const water = m.scene.col.shallow;
+    const pan = panAt(m, t);
     m.plan.forEach((p, k) => {
       const el = cloneRefs.current[k];
       if (!el) return;
@@ -491,9 +526,9 @@ export default forwardRef<
         el.style.opacity = String(1 - clamp01((t - T.fall) / 600));
         return;
       }
-      const f = letterAt(p, t, m.vh);
+      const f = letterAt(m, p, t, pan);
       el.style.transformOrigin = '50% 50%';
-      el.style.transform = `translate(${p.x0 - p.w / 2}px, ${f.y - p.h / 2}px) scale(${f.sx}, ${f.sy})`;
+      el.style.transform = `translate(${f.x - p.w / 2}px, ${f.y - p.h / 2}px) scale(${f.sx}, ${f.sy})`;
       el.style.opacity = String(1 - f.m);
       el.style.color = `rgb(${Math.round(lerp(233, water[0], f.m))},${Math.round(lerp(238, water[1], f.m))},${Math.round(lerp(246, water[2], f.m))})`;
     });
@@ -503,8 +538,7 @@ export default forwardRef<
     const gc = (glyphs.current ??= new GlyphCanvas(cv));
     gc.resize(vw, vh, sceneCell(vh), 0.85);
     // the pan moves the world down by whole cells in the scene, the rest when drawing
-    const pan = panAt(t, m.vh);
-    const shift = Math.floor(pan / m.scene.cell);
+    const shift = Math.floor(pan.y / m.scene.cell);
     // the door's own layer: door-sized, with room for the leaf's swing
     const cellPx = m.scene.cell;
     const dgc = (doorGlyphs.current ??= new GlyphCanvas(dcv));
@@ -529,7 +563,7 @@ export default forwardRef<
       dy: -Math.abs(Math.sin(tau * Math.PI * SCENE.walk.steps)) * bob * 2,
     };
     const opacity = 1 - span(t, T.fadeOut);
-    gc.draw(base, opacity, { ...cam, dy: cam.dy + (pan - shift * cellPx) });
+    gc.draw(base, opacity, { ...cam, dx: cam.dx + pan.x, dy: cam.dy + (pan.y - shift * cellPx) });
     // the door's layer: transparent, placed over its cells, moved with the same camera
     dgc.draw('', 1, { s: 1, fx: 0, fy: 0, dx: 0, dy: 0 });
     const L = (m.scene.c0 - DOOR_PAD.c) * cellPx, Tp = (m.scene.r0 - DOOR_PAD.r) * cellPx;
@@ -539,7 +573,7 @@ export default forwardRef<
       top: `${Tp}px`,
       opacity: String(opacity),
       transformOrigin: `${cam.fx - L}px ${cam.fy - Tp}px`,
-      transform: `translate(${cam.dx}px, ${cam.dy + pan}px) scale(${cam.s})`,
+      transform: `translate(${cam.dx + pan.x}px, ${cam.dy + pan.y}px) scale(${cam.s})`,
       filter: reduced ? 'none' : 'url(#cin-boil)',
     });
   }

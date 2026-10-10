@@ -17,7 +17,7 @@
 // The camera's walk toward the door and the fade to black are in draw()
 // (IntroCinematic.tsx), so the glyphs are never re-sampled.
 // ---------------------------------------------------------------------------
-import { T, SCENE, LETTERS, clamp01, lerp, smooth, span, easeOutCubic, easeInOutCubic, rand } from './config';
+import { T, SCENE, clamp01, lerp, smooth, span, easeOutCubic, easeInOutCubic, rand } from './config';
 import { g, pack, NONE, type GlyphCanvas, type RGB } from './glyphCanvas';
 import { DOOR } from './door';
 import { themeColor } from '../theme';
@@ -39,7 +39,6 @@ const fbm = (x: number, y: number) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 
 const hash = (a: number, b: number) => rand(a * 12.9898 + b * 78.233, 7);
 
 const easeInOutSine = (k: number) => 0.5 - 0.5 * Math.cos(Math.PI * k);
-const SCENE_G = LETTERS.gravity; // the strings fall as the letters did (viewport heights / s²)
 const EMERGE = 750; // ms: a glyph emerging - water first, then the door's own glyph
 const SETTLE = 400; // ms: its brief brighten as it sets
 
@@ -55,6 +54,7 @@ export interface WaterString {
   landY: number;
   tLand: number; // ms
   len: number; // tail length, cells
+  g: number; // its gravity, px/s² (each letter falls a touch faster or slower)
 }
 
 export interface Scene {
@@ -292,8 +292,9 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
 
   // a water string at t: a bright head, a tail of thinning water above it;
   // landed, a small splash while the tail drains into the door's foot
-  const cellPx = sc.cell, gA = SCENE_G * sc.vh;
+  const cellPx = sc.cell;
   const drawString = (w: WaterString) => {
+    const gA = w.g;
     if (t < w.t0 || t > w.tLand + 320) return;
     const tau = (Math.min(t, w.tLand) - w.t0) / 1000;
     const y = Math.min(w.landY, w.y0 + w.v0 * tau + 0.5 * gA * tau * tau);

@@ -67,29 +67,19 @@ export const ENTER_MS = 160; // an email window's entrance
 export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's screen (it pulls back to the full desk, then stays)
 
 // ---- falling letters ---------------------------------------------------------------
-// Each letter drops straight down onto the door's foot line, then bounces
-// toward its middle - one long hop and a small one, a squash at each impact
-// (the squash and stretch of the reference CSS animation
-// txt-bouncing-letters-drop-in), pivoting on its foot - and the letters heap
-// up where the door then rises.
+// Each letter drops straight down. Those above the door's foot land on it -
+// a short squash, no bounce - and rest there until the door rises from them;
+// those too far to either side to become the door fade away as they fall.
 export const LETTERS = {
   stepMs: 35, // each letter lets go this long after the one to its left
-  gravity: 1.9, // the drop and the hops, in viewport heights / s²
+  gravity: 1.9, // the drop, in viewport heights / s²
   fallScale: [0.9, 1.15] as const, // stretched while it falls
-  airScale: [0.96, 1.05] as const, // and in the air between bounces
-  // the bounces toward the middle: share of the way, least height (letter
-  // heights), the squash of the impact it leaves from
-  hops: [
-    { share: 0.75, lift: 0.4, squash: [1.2, 0.78] as const },
-    { share: 0.25, lift: 0.1, squash: [1.08, 0.9] as const },
-  ],
-  arc: 0.28, // a hop rises at least this much of the way it travels
-  squashMs: 80, // each impact
-  settle: [1.02, 0.98] as const, // the last little landing
-  settleMs: 160,
-  heap: 2.5, // they gather within this many door cells either side of the middle
-  restMs: 150, // then they rest a beat
-  fadeMs: 250, // and fade as the door rises
+  squash: [1.15, 0.85] as const, // the landing, pivoting on its foot
+  squashMs: 140,
+  margin: 1, // door cells either side of its foot that still count as the door
+  vanish: [0.35, 0.9] as const, // a letter beside the door fades over this part of its fall
+  restMs: 250, // the landed ones rest a beat
+  fadeMs: 300, // then fade as the door rises from them
 };
 
 // ---- the water-and-door scene (scene.ts) -------------------------------------------------

@@ -27,7 +27,6 @@ import {
   STAGE_W,
   STAGE_H,
   FRAMES,
-  FRAME_FADE,
   fitFrame,
   screenFit,
   CLOCK_GAP,
@@ -161,13 +160,13 @@ const mix = (a: string, b: string, k: number) => {
 const BOIL = ['0.01', '0.025', '0.015', '0.03'];
 
 // ---- the stills ----------------------------------------------------------------------------
-// which still is showing at t, and how far it has faded in over the one before
+// which still is showing at t (each cuts in)
 function frameAt(t: number) {
   let i = 0;
   FRAMES.forEach((f, k) => {
     if (t >= f.at) i = k;
   });
-  return { i, fade: i ? clamp01((t - FRAMES[i].at) / FRAME_FADE) : 1 };
+  return i;
 }
 // the laptop screen's place (every still is fitted to put its screen there)
 function screenAt() {
@@ -395,17 +394,13 @@ export default forwardRef<
   }
 
   // ---- the desktop: clock, mail app, inbox, notification ------------------------------------
-  function applyDesktop(t: number, fi: number, fade: number, quiet: number) {
+  function applyDesktop(t: number, fi: number, quiet: number) {
     const f = FRAMES[fi];
     // the clock: beside each still's own battery icon (stage px within the
-    // screen), so it is on the same spot of the laptop in every still
-    const scr = screenAt();
-    const at = (k: number) => {
-      const ff = fitFrame(k), tr = FRAMES[k].tray;
-      return { x: ff.x + ff.s * (tr.x + CLOCK_GAP) - scr.x, y: ff.y + ff.s * tr.y - scr.y };
-    };
-    const a = at(Math.max(0, fi - 1)), b = at(fi);
-    Object.assign(clockRef.current!.style, { left: `${lerp(a.x, b.x, fade)}px`, top: `${lerp(a.y, b.y, fade)}px` });
+    // screen), so it is on the same spot of the laptop in every still; it
+    // jumps there with the cut, never slides
+    const scr = screenAt(), ff = fitFrame(fi);
+    Object.assign(clockRef.current!.style, { left: `${ff.x + ff.s * (f.tray.x + CLOCK_GAP) - scr.x}px`, top: `${ff.y + ff.s * f.tray.y - scr.y}px` });
     // the desktop and taskbar clock fade with everything but the keywords
     deskRef.current!.style.opacity = String(quiet);
     clockRef.current!.style.opacity = String(quiet);
@@ -446,11 +441,11 @@ export default forwardRef<
     stageRef.current!.style.visibility = t >= T.fall && t >= 0 && measured.current ? 'hidden' : 'visible';
     // it opens on black, then fades in on the first shot
     stageRef.current!.style.opacity = String(span(t, T.fadeIn));
-    // the stills, crossfading; the screen overlay follows the laptop's screen
-    const fr = frameAt(t);
+    // the stills, a hard cut from one to the next; the screen overlay is on the laptop's screen
+    const fi = frameAt(t);
     FRAMES.forEach((f, k) => {
       const el = frameRefs.current[k];
-      if (el) el.style.opacity = String(k < fr.i ? 1 : k === fr.i ? fr.fade : 0);
+      if (el) el.style.opacity = k === fi ? '1' : '0';
     });
     const scr = screenAt();
     Object.assign(screenRef.current!.style, { left: `${scr.x}px`, top: `${scr.y}px`, width: `${scr.w}px`, height: `${scr.h}px` });
@@ -462,10 +457,10 @@ export default forwardRef<
     if (reduced) flash *= 0.3;
     flashRef.current!.style.opacity = String(Math.min(0.5, flash));
     const quiet = 1 - span(t, T.othersOut);
-    const glow = lerp(FRAMES[Math.max(0, fr.i - 1)].glow, FRAMES[fr.i].glow, fr.fade);
+    const glow = FRAMES[fi].glow;
     glowRef.current!.style.opacity = String((glow + 0.9 * flash) * quiet);
     blackRef.current!.style.opacity = String(span(t, T.blackIn));
-    applyDesktop(t, fr.i, fr.fade, quiet);
+    applyDesktop(t, fi, quiet);
     // the windows
     WINDOWS.forEach((w, i) => {
       const el = winRefs.current[i];
@@ -478,8 +473,8 @@ export default forwardRef<
       const e = clamp01((t - w.appear) / ENTER_MS);
       const ee = easeOutCubic(e);
       const dx = reduced ? 0 : w.from.x * (1 - ee), dy = reduced ? 0 : w.from.y * (1 - ee);
-      // already open: it comes in with its still's crossfade
-      let op = w.open ? clamp01((t - w.appear) / FRAME_FADE) : i === 0 ? ee : Math.min(1, e * 2.5);
+      // already open: it is there from its still's cut
+      let op = w.open ? 1 : i === 0 ? ee : Math.min(1, e * 2.5);
       if (!w.final) op *= 1 - span(t, T.othersOut);
       el.style.opacity = String(op);
       el.style.transform = `translate(${dx}px, ${dy}px)`;

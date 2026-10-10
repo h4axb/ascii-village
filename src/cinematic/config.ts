@@ -14,7 +14,8 @@ export const STAGE_W = 1672;
 export const STAGE_H = 643;
 
 // The shots, one still each (morning to deep night; a still can serve more
-// than one day): when each cuts in (it crossfades over FRAME_FADE), where
+// than one day): when each cuts in (a hard cut: the clock and the open mail appear at
+// their new place with it), where
 // the laptop's screen is in it (measured from its pixels; the bottom 10 % of
 // the screen is the taskbar), where its taskbar's battery icon is (its right
 // edge and middle, measured: the clock sits beside it, so it is on the same
@@ -30,7 +31,6 @@ export interface Frame {
   app: { left: number; top: number; width: number; height: number };
   glow: number;
 }
-export const FRAME_FADE = 450;
 
 // The stills were shot a little apart (the laptop sits higher and smaller in
 // some), so each is placed on the stage to put its screen exactly on the

@@ -108,13 +108,13 @@ export interface WindowShot {
   appear: number; // ms
   hide?: number; // ms; absent = stays until the montage ends
   from: { x: number; y: number }; // entrance offset, px
-  open?: boolean; // already open when its shot cuts in (fades in with the still, no flash)
+  open?: boolean; // already open when its shot cuts in (appears with the still, no flash)
   final?: boolean; // the last mail: its keywords fall apart
 }
 
 const F = FRAMES.map((f) => f.at);
-// a rejection, already open when its shot cuts in (it crossfades in with
-// the still; the one before stays under it until the cut is done)
+// a rejection, already open when its shot cuts in (it appears with the
+// still, in the same cut)
 const rejection = (shot: number, email: number, variant: Variant, left: number, top: number, width: number): WindowShot => ({
   email,
   variant,
@@ -122,7 +122,7 @@ const rejection = (shot: number, email: number, variant: Variant, left: number, 
   top,
   width,
   appear: F[shot],
-  hide: F[shot + 1] + 450,
+  hide: F[shot + 1],
   from: { x: 0, y: 0 },
   open: true,
 });
@@ -135,7 +135,7 @@ export const WINDOWS: WindowShot[] = [
     top: 12,
     width: 52,
     appear: F[0] + 1600,
-    hide: F[1] + 450,
+    hide: F[1],
     from: { x: 0, y: 8 },
   },
   // then a rejection a shot, a little elsewhere each time

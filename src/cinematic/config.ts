@@ -55,12 +55,12 @@ export const T = {
   pullBack: [0, 13600], // all the while before, the camera eases slowly back, from the screen to the whole desk
   // falling letters -> the glyph door -> through it (scene.ts), then 3 s of black
   fall: FALL, // the letters fall, the camera following them down; they turn to water (LETTERS)
-  build: [FALL + 1500, FALL + 8500], // the door emerges from the water, slowly, filling its shape
-  open: [FALL + 9000, FALL + 11600], // it opens, slowly, onto the sea and the island
-  beam: [FALL + 9300, FALL + 11600], // light comes out of the doorway
-  walk: [FALL + 13600, FALL + 16000], // after a 2 s hold: the camera walks toward the doorway
-  fadeOut: [FALL + 14800, FALL + 16000], // to black
-  end: FALL + 19000, // 3 s of black, then the wake-up scene
+  build: [FALL + 2000, FALL + 8800], // the door emerges from the water, slowly, filling its shape
+  open: [FALL + 9300, FALL + 11900], // it opens, slowly, onto the sea and the island
+  beam: [FALL + 9600, FALL + 11900], // light comes out of the doorway
+  walk: [FALL + 13900, FALL + 16300], // after a 2 s hold: the camera walks toward the doorway
+  fadeOut: [FALL + 15100, FALL + 16300], // to black
+  end: FALL + 19300, // 3 s of black, then the wake-up scene
 } as const;
 
 export const ENTER_MS = 160; // an email window's entrance
@@ -74,14 +74,14 @@ export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's s
 // where the door starts to emerge (growFrom).
 export const LETTERS = {
   stepMs: 0, // each letter lets go this long after the one to its left (0: all at once)
-  gravity: 1.2, // the fall, letters and water alike, in viewport heights / s²
+  gravity: 0.7, // the fall, letters and water alike, in viewport heights / s² (about 2 s down)
   fallScale: [0.9, 1.15] as const, // stretched while it falls
-  morphAt: [0.32, 0.5] as const, // s into its fall when it turns to water (spread per letter)
+  morphAt: [0.45, 0.7] as const, // s into its fall when it turns to water (spread per letter)
   morphMs: 220, // the turn: it stretches into a streak and fades into the string
   streak: [0.45, 3] as const, // the streak's scale (x, y)
   tail: [5, 9] as const, // a water string's tail, cells
   streams: 1, // the strings gather into this many streams onto the door's foot (1: all to its centre)
-  pan: { dist: 0.95, ms: 1800 }, // the camera's tilt down after the letters: how far (of the height), how long
+  pan: { dist: 0.95, ms: 2600 }, // the camera's tilt down after the letters: how far (of the height), how long
 };
 
 // ---- the water-and-door scene (scene.ts) -------------------------------------------------

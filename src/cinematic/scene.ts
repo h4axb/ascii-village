@@ -38,6 +38,7 @@ function vnoise(x: number, y: number): number {
 const fbm = (x: number, y: number) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3) * 0.15;
 const hash = (a: number, b: number) => rand(a * 12.9898 + b * 78.233, 7);
 
+const easeInOutSine = (k: number) => 0.5 - 0.5 * Math.cos(Math.PI * k);
 const SCENE_G = LETTERS.gravity; // the strings fall as the letters did (viewport heights / s²)
 const EMERGE = 750; // ms: a glyph emerging - water first, then the door's own glyph
 const SETTLE = 400; // ms: its brief brighten as it sets
@@ -296,8 +297,14 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
     if (t < w.t0 || t > w.tLand + 320) return;
     const tau = (Math.min(t, w.tLand) - w.t0) / 1000;
     const y = Math.min(w.landY, w.y0 + w.v0 * tau + 0.5 * gA * tau * tau);
-    const prog = clamp01((y - w.y0) / Math.max(1, w.landY - w.y0));
-    const x = lerp(w.x0, w.tx, smooth(prog));
+    // it drifts to the centre evenly over its whole flight (by time, eased in
+    // and out), not all at the end where it falls fastest
+    const flight = Math.max(1, w.tLand - w.t0) / 1000;
+    const driftAt = (y: number) => {
+      const tauY = (-w.v0 + Math.sqrt(Math.max(0, w.v0 * w.v0 + 2 * gA * Math.max(0, y - w.y0)))) / gA;
+      return lerp(w.x0, w.tx, easeInOutSine(clamp01(tauY / flight)));
+    };
+    const x = driftAt(y);
     const hc = Math.floor(x / cellPx), hr = Math.floor(y / cellPx) + shift;
     const drain = t > w.tLand ? clamp01((t - w.tLand) / 300) : 0;
     const len = Math.max(0, Math.round(w.len * (1 - drain)));
@@ -306,8 +313,7 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
     for (let k = len; k >= 1; k--) {
       const yk = y - k * cellPx;
       if (yk < w.y0 - cellPx) continue;
-      const pk = clamp01((yk - w.y0) / Math.max(1, w.landY - w.y0));
-      const ck = Math.floor(lerp(w.x0, w.tx, smooth(pk)) / cellPx);
+      const ck = Math.floor(driftAt(yk) / cellPx);
       const f = 1 - k / (len + 1);
       const gl = k <= 1 ? '|' : k <= 3 ? '¦' : k <= 5 ? ':' : '.';
       put(ck, Math.floor(yk / cellPx) + shift, g(gl), mixc(DARK, mixc(C.shallow, C.foam, 0.5 * f), (0.35 + 0.65 * f) * appear));

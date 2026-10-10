@@ -4,9 +4,9 @@
 // (config.ts's T), so seeking is exact.
 //
 //   build     the door (door-glyphs.svg via door.ts) rises from the middle
-//             of its foot, up and out: each glyph drops into its cell as a
-//             letter and settles into the drawing's own glyph and colour (the
-//             falling phrase letters have just bounced onto its foot line)
+//             of its foot, up and out: each glyph drops into its cell, bright,
+//             and settles into the drawing's own colour (the falling phrase
+//             letters have just bounced together there)
 //   open      the leaf swings open on its left hinge, slowly, to about half
 //             its width; it is re-sampled column by column into the grid (no
 //             squeezed glyphs), its free edge coming toward the viewer
@@ -25,7 +25,6 @@ const mixc = (a: RGB, b: RGB, k: number): RGB => [lerp(a[0], b[0], k), lerp(a[1]
 const mul = (a: RGB, k: number): RGB => [a[0] * k, a[1] * k, a[2] * k];
 const DARK = hex(SCENE.bg);
 const WHITE: RGB = [255, 255, 255];
-const LETTER: RGB = [233, 238, 246]; // the falling letters' colour
 
 // value noise + fbm, for clouds, sand grain and water texture
 function vnoise(x: number, y: number): number {
@@ -39,7 +38,6 @@ const hash = (a: number, b: number) => rand(a * 12.9898 + b * 78.233, 7);
 
 const DROP = 170; // ms: a glyph dropping into its cell
 const SETTLE = 280; // ms: its brief brighten as it settles
-const FALL_GLYPHS = 'AUacdefilnoprstuy';
 
 export interface Scene {
   vw: number;
@@ -48,7 +46,6 @@ export interface Scene {
   c0: number; // the grid cell of the door's top-left
   r0: number;
   born: Float32Array; // per door cell (r * cols + c): when it lands, ms
-  fallGlyph: Uint8Array; // the letter it falls as
   focus: { x: number; y: number }; // the open doorway's centre, px (the walk aims here)
   col: Record<string, RGB>;
 }
@@ -62,7 +59,6 @@ export function buildScene(vw: number, vh: number): Scene {
   const r0 = Math.round((SCENE.door.cy * vh) / cell - DOOR.rows / 2);
   const n = DOOR.cols * DOOR.rows;
   const born = new Float32Array(n).fill(Infinity);
-  const fallGlyph = new Uint8Array(n);
   const dur = T.build[1] - T.build[0];
   // the door rises from the middle of its foot: each glyph's time is its
   // distance from there (up, and out to the sides)
@@ -72,7 +68,6 @@ export function buildScene(vw: number, vh: number): Scene {
   for (const k of DOOR.cells) {
     const i = k.r * DOOR.cols + k.c;
     born[i] = T.build[0] + (dist(k) / dMax) * (dur - 380) + rand(k.c, k.r) * 380;
-    fallGlyph[i] = g(FALL_GLYPHS[Math.floor(rand(k.c + 7, k.r) * FALL_GLYPHS.length)]);
   }
   const open = (DOOR.hinge + (DOOR.leafRight + 1 - DOOR.hinge) * SCENE.door.open + DOOR.leafRight + 1) / 2;
   const col = {
@@ -100,7 +95,6 @@ export function buildScene(vw: number, vh: number): Scene {
     c0,
     r0,
     born,
-    fallGlyph,
     focus: { x: (c0 + open) * cell, y: (r0 + (DOOR.leafTop + DOOR.leafBottom + 1) / 2) * cell },
     col,
   };
@@ -211,9 +205,9 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
     if (e < 1) {
       if (reduced) put(c, r, g(k.ch), mixc(DARK, k.rgb, e));
       else {
-        // still dropping in, as a letter
+        // still dropping in, bright
         const off = Math.round((1 - easeOutCubic(e)) * (2 + Math.floor(hash(k.c, k.r) * 3)));
-        put(c, r - off, sc.fallGlyph[i], mixc(LETTER, k.rgb, e * 0.5));
+        put(c, r - off, g(k.ch), mixc(WHITE, k.rgb, 0.4 + 0.6 * e));
       }
       continue;
     }

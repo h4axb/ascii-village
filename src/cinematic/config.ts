@@ -68,25 +68,28 @@ export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's s
 
 // ---- falling letters ---------------------------------------------------------------
 // Each letter drops straight down onto the door's foot line, then bounces
-// like a dropped letter (the bounce of the reference CSS animation
-// txt-bouncing-letters-drop-in: squash, a 0.4em rebound, a 0.1em one, rest),
-// pivoting on its foot.
-export type Ease = 'in' | 'out';
+// toward its middle - one long hop and a small one, a squash at each impact
+// (the squash and stretch of the reference CSS animation
+// txt-bouncing-letters-drop-in), pivoting on its foot - and the letters heap
+// up where the door then rises.
 export const LETTERS = {
   stepMs: 35, // each letter lets go this long after the one to its left
-  gravity: 1.9, // the drop, in viewport heights / s² (ease-in, as gravity is)
+  gravity: 1.9, // the drop and the hops, in viewport heights / s²
   fallScale: [0.9, 1.15] as const, // stretched while it falls
-  // after impact, in order: ms to reach it, lift (in letter heights), scale x, scale y, easing into it
-  bounce: [
-    [80, 0, 1.2, 0.78, 'out'], // the squash
-    [180, 0.4, 0.96, 1.05, 'out'], // up
-    [140, 0, 1.08, 0.9, 'in'], // down again
-    [120, 0.1, 1, 1, 'out'], // a little one
-    [90, 0, 1.02, 0.98, 'in'],
-    [70, 0, 1, 1, 'out'], // at rest
-  ] as readonly (readonly [number, number, number, number, Ease])[],
-  restMs: 150, // then it rests a beat
-  fadeMs: 250, // and fades as the door rises
+  airScale: [0.96, 1.05] as const, // and in the air between bounces
+  // the bounces toward the middle: share of the way, least height (letter
+  // heights), the squash of the impact it leaves from
+  hops: [
+    { share: 0.75, lift: 0.4, squash: [1.2, 0.78] as const },
+    { share: 0.25, lift: 0.1, squash: [1.08, 0.9] as const },
+  ],
+  arc: 0.28, // a hop rises at least this much of the way it travels
+  squashMs: 80, // each impact
+  settle: [1.02, 0.98] as const, // the last little landing
+  settleMs: 160,
+  heap: 2.5, // they gather within this many door cells either side of the middle
+  restMs: 150, // then they rest a beat
+  fadeMs: 250, // and fade as the door rises
 };
 
 // ---- the water-and-door scene (scene.ts) -------------------------------------------------

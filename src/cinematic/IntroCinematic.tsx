@@ -187,6 +187,15 @@ interface Plan {
   delay: number; // ms after T.fall that it lets go
   landY: number; // its centre once its foot is on the door's foot line
   tLand: number; // ms: impact
+  hops: Hop[]; // then it bounces toward the middle
+  doneMs: number; // ms from impact until it rests
+}
+interface Hop {
+  from: number; // x, px
+  to: number;
+  H: number; // height, px
+  ms: number;
+  squash: readonly [number, number];
 }
 interface Measured {
   vw: number;
@@ -284,49 +293,68 @@ export default forwardRef<
         delay: 0,
         landY: 0,
         tLand: 0,
+        hops: [],
+        doneMs: 0,
       });
     }
     // each letter drops straight down onto the door's foot line, left to
-    // right one after another; the door then rises from the middle of it
+    // right one after another, then bounces toward the middle, where they
+    // heap up and the door rises
     const scene = buildScene(vw, vh);
     const ground = cellAt(scene, 0, DOOR.rows - 2).y + scene.cell / 2;
+    const mid = cellAt(scene, (DOOR.cols - 1) / 2, 0).x;
     const g = LETTERS.gravity * vh;
-    plan
-      .map((p, k) => ({ k, x: p.x0 }))
-      .sort((a, b) => a.x - b.x)
-      .forEach((o, j) => {
-        const p = plan[o.k];
-        p.delay = j * LETTERS.stepMs;
-        p.landY = ground - p.h / 2;
-        p.tLand = T.fall + p.delay + Math.sqrt((2 * Math.max(1, p.landY - p.y0)) / g) * 1000;
+    const order = plan.map((p, k) => ({ k, x: p.x0 })).sort((a, b) => a.x - b.x);
+    order.forEach((o, j) => {
+      const p = plan[o.k];
+      p.delay = j * LETTERS.stepMs;
+      p.landY = ground - p.h / 2;
+      p.tLand = T.fall + p.delay + Math.sqrt((2 * Math.max(1, p.landY - p.y0)) / g) * 1000;
+      // where it ends: the middle, keeping the letters' order
+      const end = mid + ((order.length > 1 ? j / (order.length - 1) : 0.5) * 2 - 1) * LETTERS.heap * scene.cell;
+      let x = p.x0;
+      p.hops = LETTERS.hops.map((h) => {
+        const to = x + h.share * (end - p.x0);
+        const H = Math.max(h.lift * p.h, LETTERS.arc * Math.abs(to - x));
+        const hop = { from: x, to, H, ms: 2 * Math.sqrt((2 * H) / g) * 1000, squash: h.squash };
+        x = to;
+        return hop;
       });
+      p.doneMs = p.hops.reduce((a, h) => a + LETTERS.squashMs + h.ms, 0) + LETTERS.settleMs;
+    });
     return { vw, vh, font, plan, scene };
   }
 
   // a letter at time t: straight down under gravity (stretched), then the
-  // bounce keyframes after impact (LETTERS.bounce), pivoting on its foot
+  // hops toward the middle (a squash at each impact), then a little settle;
+  // it pivots on its foot
   function fallPos(p: Plan, t: number, vh: number) {
-    const [fx, fy] = LETTERS.fallScale;
-    if (reduced) return { y: p.landY, sx: 1, sy: 1 };
+    const [fx, fy] = LETTERS.fallScale, [ax, ay] = LETTERS.airScale;
+    if (reduced) return { x: p.x0, y: p.landY, sx: 1, sy: 1 };
     if (t < p.tLand) {
       const tau = Math.max(0, t - T.fall - p.delay) / 1000;
       const k = clamp01(tau / 0.12); // it stretches as it gets going
-      return { y: p.y0 + 0.5 * LETTERS.gravity * vh * tau * tau, sx: lerp(1, fx, k), sy: lerp(1, fy, k) };
+      return { x: p.x0, y: p.y0 + 0.5 * LETTERS.gravity * vh * tau * tau, sx: lerp(1, fx, k), sy: lerp(1, fy, k) };
     }
     let ms = t - p.tLand;
-    let from: { lift: number; sx: number; sy: number } = { lift: 0, sx: fx, sy: fy };
-    for (const [dur, lift, sx, sy, ease] of LETTERS.bounce) {
-      if (ms < dur) {
-        const k = ms / dur;
-        const e = ease === 'in' ? Math.pow(k, 2.2) : 1 - Math.pow(1 - k, 2.2);
-        return { y: p.landY - lerp(from.lift, lift, e) * p.h, sx: lerp(from.sx, sx, e), sy: lerp(from.sy, sy, e) };
+    const out = (k: number) => 1 - Math.pow(1 - k, 2.2);
+    for (const h of p.hops) {
+      if (ms < LETTERS.squashMs) {
+        // the impact: flattened at once, springing back into the air shape
+        const k = out(ms / LETTERS.squashMs);
+        return { x: h.from, y: p.landY, sx: lerp(h.squash[0], ax, k), sy: lerp(h.squash[1], ay, k) };
       }
-      ms -= dur;
-      from = { lift, sx, sy };
+      ms -= LETTERS.squashMs;
+      if (ms < h.ms) {
+        const u = ms / h.ms; // a parabola: straight sideways speed, gravity up and down
+        return { x: lerp(h.from, h.to, u), y: p.landY - 4 * h.H * u * (1 - u), sx: ax, sy: ay };
+      }
+      ms -= h.ms;
     }
-    return { y: p.landY, sx: 1, sy: 1 };
+    const last = p.hops[p.hops.length - 1];
+    const k = out(clamp01(ms / LETTERS.settleMs));
+    return { x: last ? last.to : p.x0, y: p.landY, sx: lerp(LETTERS.settle[0], 1, k), sy: lerp(LETTERS.settle[1], 1, k) };
   }
-  const BOUNCE_MS = LETTERS.bounce.reduce((a, b) => a + b[0], 0);
 
   // ---- the desktop: clock, mail app, inbox, notification ------------------------------------
   function applyDesktop(t: number, fi: number, quiet: number) {
@@ -449,9 +477,9 @@ export default forwardRef<
     root.style.background = '#000';
     // originals until the letters come loose, the copies after
     const loose = t >= T.fall;
-    const m0 = measured.current && { lastLand: Math.max(...measured.current.plan.map((p) => p.tLand)) };
+    const m0 = measured.current && { lastLand: Math.max(...measured.current.plan.map((p) => p.tLand + p.doneMs)) };
     root.querySelectorAll<HTMLElement>('.cin-win.final .cin-ch').forEach((el) => (el.style.visibility = loose ? 'hidden' : 'visible'));
-    overlayRef.current!.style.display = loose && t < (m0?.lastLand ?? Infinity) + BOUNCE_MS + LETTERS.restMs + LETTERS.fadeMs + 50 ? 'block' : 'none';
+    overlayRef.current!.style.display = loose && t < (m0?.lastLand ?? Infinity) + LETTERS.restMs + LETTERS.fadeMs + 50 ? 'block' : 'none';
     const m = measured.current;
     const cv = canvasRef.current!;
     if (!m || !loose) {
@@ -465,10 +493,10 @@ export default forwardRef<
       if (!el) return;
       const f = fallPos(p, t, m.vh);
       // after the bounce and a beat of rest it fades as the door rises
-      const fade = clamp01((t - p.tLand - BOUNCE_MS - LETTERS.restMs) / LETTERS.fadeMs);
+      const fade = clamp01((t - p.tLand - p.doneMs - LETTERS.restMs) / LETTERS.fadeMs);
       // squash and stretch about the letter's foot, so it stands on the line
       el.style.transformOrigin = '50% 100%';
-      el.style.transform = `translate(${p.x0 - p.w / 2}px, ${f.y - p.h / 2}px) scale(${f.sx}, ${f.sy})`;
+      el.style.transform = `translate(${f.x - p.w / 2}px, ${f.y - p.h / 2}px) scale(${f.sx}, ${f.sy})`;
       el.style.opacity = String(reduced ? clamp01((t - T.fall) / 300) * (1 - fade) : 1 - fade);
     });
 

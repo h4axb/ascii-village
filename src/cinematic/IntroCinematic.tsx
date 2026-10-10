@@ -303,18 +303,20 @@ export default forwardRef<
     const g = LETTERS.gravity * vh;
     const byX = plan.map((p, k) => ({ k, x: p.x0 })).sort((a, b) => a.x - b.x);
     const seeds: { c: number; r: number; t: number }[] = [];
+    const mid = cellAt(scene, (DOOR.cols - 1) / 2, 0).x;
     scene.strings = byX.map((o, j) => {
       const p = plan[o.k];
       p.delay = j * LETTERS.stepMs;
       const tm = lerp(LETTERS.morphAt[0], LETTERS.morphAt[1], rand(o.k, 5)); // s into its fall
       p.tMorph = T.fall + p.delay + tm * 1000;
-      // the strings gather into a few streams onto the door's foot (in the
-      // letters' order), so the door grows from a few places, in lobes
-      const stream = Math.min(LETTERS.streams - 1, Math.floor((j / byX.length) * LETTERS.streams));
-      const c = Math.round(lerp(4, DOOR.cols - 5, LETTERS.streams > 1 ? stream / (LETTERS.streams - 1) : 0.5)) + Math.round((rand(o.k, 8) - 0.5) * 2);
+      // the strings drift only a little toward the door's middle (mostly
+      // they fall straight); where one lands on the door's foot the door
+      // starts there - one landing beside the door seeds its nearest edge
+      const tx = lerp(p.x0, mid, LETTERS.converge);
+      const c = Math.max(0, Math.min(DOOR.cols - 1, Math.round(tx / scene.cell - 0.5 - scene.c0)));
       let r = DOOR.rows - 2;
       while (r > 0 && !DOOR.at[r * DOOR.cols + c]) r--;
-      const land = cellAt(scene, c, r);
+      const land = { x: tx, y: cellAt(scene, c, r).y };
       const y0 = p.y0 - P + 0.5 * g * tm * tm, v0 = g * tm;
       const tau = (-v0 + Math.sqrt(v0 * v0 + 2 * g * Math.max(1, land.y - y0))) / g;
       const tLand = p.tMorph + tau * 1000;

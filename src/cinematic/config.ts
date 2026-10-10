@@ -70,7 +70,7 @@ export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's s
 // The letters let go and fall; the camera tilts down after them, from the
 // keywords to the door's place below. On the way each letter stretches into
 // a streak and turns to water - a string of glyphs (scene.ts) that keeps
-// falling, drifts in toward its column of the door and lands on its foot,
+// falling, drifting only a little toward the door, and lands on its foot,
 // where the door starts to emerge (growFrom).
 export const LETTERS = {
   stepMs: 0, // each letter lets go this long after the one to its left (0: all at once)
@@ -80,7 +80,7 @@ export const LETTERS = {
   morphMs: 220, // the turn: it stretches into a streak and fades into the string
   streak: [0.45, 3] as const, // the streak's scale (x, y)
   tail: [5, 9] as const, // a water string's tail, cells
-  streams: 1, // the strings gather into this many streams onto the door's foot (1: all to its centre)
+  converge: 0.15, // how far a water string drifts toward the door's middle as it falls (0: straight down, 1: all to the middle)
   pan: { dist: 0.95, ms: 2600 }, // the camera's tilt down after the letters: how far (of the height), how long
 };
 

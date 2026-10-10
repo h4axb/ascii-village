@@ -69,6 +69,10 @@ crafting panel B (post-reflec)/ A (clarfication)
 crafting panel BA + intro: https://asciia-bay-2.app-testing.workers.dev/intro/2
 crafting panel alternatives: https://asciia-bay-2.app-testing.workers.dev/intro/3
 
+/2/feedback
+/cinematic
+/intro-old
+
 ## Project structure
 + rendering: vite, water+static assets on canvas
 + libraries: vite, react 

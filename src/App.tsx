@@ -676,10 +676,13 @@ const PATH = window.location.pathname;
 const CRAFT_CLARIFY = LINK === '1';
 const CRAFT_FEEDBACK = LINK === '2';
 const CRAFT_CHOICES = LINK === '3';
-// /cinematic plays the new intro cinematic (src/cinematic/) instead of the
-// laptop/MYLL prologue, then the same wake-up scene; for testing it on its
-// own. ?shot=<id> (or ?t=<ms>) starts it at a shot, see SHOT_LIST.
+// Intro part 1 is the intro cinematic (src/cinematic/: the laptop, the
+// rejections, the falling letters, the door), then the wake-up scene.
+// /cinematic always plays it, for testing; ?shot=<id> (or ?t=<ms>) starts it
+// at a shot, see SHOT_LIST. The previous part 1 (the laptop/MYLL prologue,
+// IntroA.tsx) is kept: /intro-old always plays the intro with it.
 const INTRO_CINEMATIC = /^\/cinematic\/?$/.test(PATH);
+const INTRO_OLD = /^\/intro-old\/?$/.test(PATH);
 const CINEMATIC_START = (() => {
   if (!INTRO_CINEMATIC) return 0;
   const q = new URLSearchParams(window.location.search);
@@ -689,7 +692,7 @@ const CINEMATIC_START = (() => {
 })();
 const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[0-3]\/?$/.test(PATH)
   ? 'skip'
-  : /^\/intro(\/[0-3])?\/?$/.test(PATH) || INTRO_CINEMATIC
+  : /^\/intro(\/[0-3])?\/?$/.test(PATH) || INTRO_CINEMATIC || INTRO_OLD
     ? 'force'
     : 'default';
 
@@ -930,8 +933,8 @@ function Game() {
   );
   const cinematicRef = useRef(cinematic);
   cinematicRef.current = cinematic;
-  // full-screen black cover (not on /cinematic: its portal opens onto the island)
-  const [blackout, setBlackout] = useState(() => !!introBMarkersAtMount && !INTRO_CINEMATIC);
+  // full-screen black cover
+  const [blackout, setBlackout] = useState(() => !!introBMarkersAtMount);
   const [letterboxVisible, setLetterboxVisible] = useState(false);
   const [letterboxOpen, setLetterboxOpen] = useState(false); // bars sliding away (the very end only)
   const [dialogue, setDialogue] = useState<DialogueLine | null>(null);
@@ -965,9 +968,7 @@ function Game() {
     // his ordinary STRUCT_ENTS spot for the one frame before the mount
     // effect below (hidden behind the synchronous `blackout` cover either
     // way) computes a fresh off-camera entrance start.
-    // (/cinematic: the island shows behind the portal before the wake-up
-    // scene starts, so he waits out of sight at his exit spot meanwhile)
-    introBMarkersAtMount ? (INTRO_CINEMATIC ? introBMarkersAtMount.mitchyExit : null) : (saved?.mitchyPos ?? null),
+    introBMarkersAtMount ? null : (saved?.mitchyPos ?? null),
   );
   const mitchyPosRef = useRef(mitchyPos);
   mitchyPosRef.current = mitchyPos;
@@ -5438,10 +5439,10 @@ function Game() {
           black hands off to black, one frame apart, same as the retired
           prototype's own reveal-while-already-black handoff. */}
       {introAActive &&
-        (INTRO_CINEMATIC ? (
+        (!INTRO_OLD ? (
           <IntroCinematic
             ref={introARef}
-            devTimeline={import.meta.env.DEV}
+            devTimeline={import.meta.env.DEV && INTRO_CINEMATIC}
             startAt={CINEMATIC_START}
             // the cinematic ends on 3 s of black: the wake-up starts from black
             onComplete={() => setIntroAActive(false)}

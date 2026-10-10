@@ -12,7 +12,7 @@ A cinematic of about 46 seconds:
 5. After a **2 s hold**, the camera **moves in toward the doorway** (a smooth, linear push in, no bob) and **fades to black**.
 6. After **3 s of black**, the wake-up scene with Mitchy starts (from black).
 
-For now it plays only on **`/cinematic`**. The usual intro (`/`, `/intro`, the laptop/MYLL prologue) is unchanged.
+It is **intro part 1**: it plays wherever the intro does (`/` on a new save, `/intro`, `/intro/0`–`/intro/3`), followed by the wake-up scene. **`/cinematic`** always plays it, with the dev timeline (in dev). The previous part 1, the laptop/MYLL prologue (`src/IntroA.tsx`), is kept: **`/intro-old`** always plays the intro with it.
 
 ## Testing on localhost
 

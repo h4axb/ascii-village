@@ -43,24 +43,25 @@ export const FRAMES: Frame[] = [
 ];
 
 // ---- the timeline (ms) ---------------------------------------------------------
-const FALL = 17800; // the keywords come loose; everything after is relative to it
+const FALL = 22600; // the keywords come loose; everything after is relative to it
 export const T = {
   // the stills (FRAMES[].at); the opened mails' times are in emails.ts
   montageEnd: 13600,
-  // the camera has stopped; everything but the three keywords fades, then they hold 3 s
-  othersOut: [13600, 14200], // the mail app, the other text and the desktop fade
-  frameOut: [13800, 14500], // the last mail's window and other words dissolve
-  dotsIn: [14500, 15100], // "Unfortunately," -> "Unfortunately..."
-  blackIn: [13600, 14800], // the room fades to black
+  // the camera has stopped; slowly (about 6 s) everything but the three
+  // keywords fades away, then they hold alone 3 s
+  othersOut: [13600, 18600], // the mail app, the other text and the desktop fade
+  frameOut: [14600, 19600], // the last mail's window and other words dissolve
+  dotsIn: [19000, 19600], // "Unfortunately," -> "Unfortunately..."
+  blackIn: [13600, 19600], // the room fades to black
   pullBack: [0, 13600], // all the while before, the camera eases slowly back, from the screen to the whole desk
   // falling letters -> the glyph door -> through it (scene.ts), then 3 s of black
   fall: FALL, // the letters fall, the camera following them down; they turn to water (LETTERS)
-  build: [FALL + 2000, FALL + 8800], // the door emerges from the water, slowly, filling its shape
-  open: [FALL + 9300, FALL + 11900], // it opens, slowly, onto the sea and the island
-  beam: [FALL + 9600, FALL + 11900], // light comes out of the doorway
-  walk: [FALL + 13900, FALL + 16300], // after a 2 s hold: the camera walks toward the doorway
-  fadeOut: [FALL + 15100, FALL + 16300], // to black
-  end: FALL + 19300, // 3 s of black, then the wake-up scene
+  build: [FALL + 4800, FALL + 11800], // the door emerges from the water, slowly, filling its shape
+  open: [FALL + 12300, FALL + 14900], // it opens, slowly, onto the sea and the island
+  beam: [FALL + 12600, FALL + 14900], // light comes out of the doorway
+  walk: [FALL + 16900, FALL + 19300], // after a 2 s hold: the camera walks toward the doorway
+  fadeOut: [FALL + 18100, FALL + 19300], // to black
+  end: FALL + 22300, // 3 s of black, then the wake-up scene
 } as const;
 
 export const ENTER_MS = 160; // an email window's entrance
@@ -74,14 +75,14 @@ export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's s
 // where the door starts to emerge (growFrom).
 export const LETTERS = {
   stepMs: 0, // each letter lets go this long after the one to its left (0: all at once)
-  gravity: 0.7, // the fall, letters and water alike, in viewport heights / s² (about 2 s down)
+  gravity: 0.11, // the fall, letters and water alike, in viewport heights / s² (about 5 s down: slow, weightless)
   fallScale: [0.9, 1.15] as const, // stretched while it falls
-  morphAt: [0.45, 0.7] as const, // s into its fall when it turns to water (spread per letter)
+  morphAt: [1.0, 1.6] as const, // s into its fall when it turns to water (spread per letter)
   morphMs: 220, // the turn: it stretches into a streak and fades into the string
   streak: [0.45, 3] as const, // the streak's scale (x, y)
   tail: [5, 9] as const, // a water string's tail, cells
   converge: 0.15, // how far a water string drifts toward the door's middle as it falls (0: straight down, 1: all to the middle)
-  pan: { dist: 0.95, ms: 2600 }, // the camera's tilt down after the letters: how far (of the height), how long
+  pan: { dist: 0.95, ms: 4800 }, // the camera's tilt down after the letters: how far (of the height), how long
 };
 
 // ---- the water-and-door scene (scene.ts) -------------------------------------------------

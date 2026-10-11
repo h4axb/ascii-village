@@ -20,6 +20,7 @@
 import { T, SCENE, clamp01, lerp, smooth, span, easeOutCubic, easeInOutCubic, rand } from './config';
 import { g, pack, NONE, type GlyphCanvas, type RGB } from './glyphCanvas';
 import { DOOR } from './door';
+import { beachAt } from './beach';
 import { themeColor } from '../theme';
 
 const hex = (h: string): RGB => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
@@ -198,54 +199,6 @@ export function growFrom(sc: Scene, seeds: { c: number; r: number; t: number }[]
 export const cellAt = (sc: Scene, c: number, r: number) => ({ x: (sc.c0 + c + 0.5) * sc.cell, y: (sc.r0 + r + 0.5) * sc.cell });
 
 
-// ---- the interior painting (u, v in 0..1 of the doorway) ----------------------------
-function interior(sc: Scene, u: number, v: number, t: number): { ch: number; c: RGB } {
-  const C = sc.col;
-  const hz = 0.6; // the sea's horizon
-  const ts = t / 1000;
-  // island: a soft mound in the part the open leaf leaves in view
-  const iu = (u - 0.76) / 0.15;
-  const top = hz - 0.085 * Math.pow(Math.max(0, 1 - iu * iu), 0.6) - 0.015 * (vnoise(u * 14, 1) - 0.5);
-  if (v < hz + 0.005 && v > top && Math.abs(iu) < 1.05) {
-    const depth = (v - top) / Math.max(0.01, hz - top);
-    const lightK = clamp01(0.75 - depth * 0.7 - iu * 0.25 + (fbm(u * 14, v * 14) - 0.5) * 0.5);
-    const c = lightK > 0.55 ? mixc(C.bushLight, C.grass, (lightK - 0.55) * 1.8) : mixc(C.grassDark, C.bushMid, lightK / 0.55);
-    const glyphs = '§&%¤';
-    return { ch: g(glyphs[Math.floor(hash(Math.floor(u * 80), Math.floor(v * 80)) * glyphs.length)]), c };
-  }
-  if (v < hz) {
-    // sky, clouds, birds
-    const k = v / hz;
-    let c = mixc(C.skyTop, C.skyLow, Math.pow(k, 1.3));
-    // clouds: a few soft puffs, thickest low in the sky
-    const n = fbm(u * 4.2 + ts * 0.02, v * 7) * (0.5 + 0.55 * k);
-    if (n > 0.56) {
-      const dd = clamp01((n - 0.56) * 7);
-      c = mixc(mixc(C.cloudShade, C.cloud, clamp01(1.2 - k * 0.8)), C.cloud, dd * 0.6);
-      return { ch: g(dd > 0.7 ? '@' : dd > 0.45 ? 'O' : dd > 0.2 ? 'o' : ':'), c };
-    }
-    for (const [bu, bv, s] of [
-      [0.66, 0.16, 0],
-      [0.72, 0.12, 1],
-      [0.88, 0.22, 2],
-    ] as const) {
-      const bx = bu + ts * 0.01 * (s % 2 ? 1 : -1);
-      if (Math.abs(u - bx) < 0.018 && Math.abs(v - bv) < 0.012) return { ch: g(Math.sin(ts * 9 + s) > 0 ? 'v' : '^'), c: mul(C.skyTop, 0.45) };
-    }
-    const hs = hash(Math.floor(u * 90), Math.floor(v * 60));
-    return { ch: g(hs > 0.82 ? '·' : hs > 0.5 ? '.' : ' '), c: mixc(c, C.cloud, 0.12) };
-  }
-  // the sea
-  const k = (v - hz) / (1 - hz);
-  let c = mixc(mixc(C.shallow, C.foam, 0.25), C.water, Math.pow(k, 0.8));
-  c = mixc(c, C.deep, clamp01(k - 0.5) * 0.6);
-  const wave = Math.sin(u * 46 + v * 10 - ts * 2.2 + fbm(u * 6, v * 20) * 4);
-  const spark = hash(Math.floor(u * 70 + ts * 3), Math.floor(v * 50)) > 0.93 && k < 0.6;
-  if (v > 0.94) return { ch: g('≈'), c: mixc(c, C.foam, 0.6) };
-  if (spark) return { ch: g('°'), c: mixc(c, C.foam, 0.45) };
-  return { ch: g(wave > 0.55 ? '~' : wave < -0.7 ? '-' : '·'), c: mixc(c, C.foam, wave > 0.55 ? 0.35 : 0) };
-}
-
 // ---- render one frame into the canvas buffer ------------------------------------------
 // The door itself (frame, leaf, foot) can be drawn on a layer of its own,
 // door-sized, so a filter can work on it alone (IntroCinematic's boil): the
@@ -382,14 +335,16 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
   if (!reduced) for (const w of sc.strings) drawString(w);
 
   if (openK <= 0) return;
-  // ---- 3. the doorway: the sea and the island, where the leaf was
+  // ---- 3. the doorway: the beach, where the leaf was
   const lift = clamp01(openK * 8);
   for (let r = D.leafTop; r <= D.leafBottom; r++)
     for (let c = D.hinge; c <= D.leafRight; c++) {
       if (!D.leaf[r * D.cols + c]) continue;
-      const p = interior(sc, (c - D.hinge + 0.5) / W, (r - D.leafTop + 0.5) / (D.leafBottom + 1 - D.leafTop), t);
+      // the beach (beach.ts), its tide pulling in and out
+      const p = beachAt((c - D.hinge + 0.5) / W, (r - D.leafTop + 0.5) / (D.leafBottom + 1 - D.leafTop), t);
+      if (!p) continue;
       const cc = mixc(DARK, p.c, lift);
-      put(sc.c0 + c, r0 + r, p.ch, mixc(cc, WHITE, 0.3 * lift), pack(mul(cc, 0.72)));
+      put(sc.c0 + c, r0 + r, g(p.ch), mixc(cc, WHITE, 0.12 * lift), pack(mul(cc, 0.4)));
     }
   // ---- 4. the leaf, swung toward the viewer: narrower, its free edge taller and darker
   const Wn = W * cosT;

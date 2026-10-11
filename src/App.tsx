@@ -523,6 +523,71 @@ export default function App() {
   return started ? <Game /> : <Landing onStart={() => setStarted(true)} />;
 }
 
+// The start screen's scenery: the player in the bottom-right corner, on the
+// first frame of walking down (as if about to step into the game), and a
+// loose trail of flowers curving from their feet up to the buttons on the
+// left. Positions are in % of the screen; the flowers get a little smaller
+// further away.
+const LANDING_FLOWERS: { x: number; y: number; s: number; pal: 'pink' | 'white' | 'purple' | 'orange' }[] = [
+  { x: 74, y: 93, s: 1.1, pal: 'pink' },
+  { x: 66, y: 91.5, s: 1.05, pal: 'white' },
+  { x: 58, y: 87.5, s: 1, pal: 'orange' },
+  { x: 50.5, y: 82.5, s: 0.95, pal: 'pink' },
+  { x: 43, y: 77, s: 0.9, pal: 'purple' },
+  { x: 36, y: 72, s: 0.85, pal: 'white' },
+  { x: 29.5, y: 67.5, s: 0.8, pal: 'pink' },
+];
+const LANDING_FLOWERS_PORTRAIT: typeof LANDING_FLOWERS = [
+  { x: 56, y: 92, s: 1, pal: 'pink' },
+  { x: 40, y: 88, s: 0.95, pal: 'white' },
+  { x: 25, y: 84, s: 0.9, pal: 'orange' },
+];
+const FLOWER_PALETTES = {
+  pink: S.FLOWER_PLUS_PALETTE,
+  white: S.FLOWER_PLUS_WHITE_PALETTE,
+  purple: S.FLOWER_PLUS_PURPLE_PALETTE,
+  orange: S.FLOWER_PLUS_ORANGE_PALETTE,
+};
+function LandingScenery() {
+  const [size, setSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  useEffect(() => {
+    const on = () => setSize({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  const frame = S.WALK_DOWN_FRAMES[0];
+  // upright screens (phones): a smaller player and a shorter trail, below the buttons
+  const portrait = size.w < size.h * 0.9;
+  const lineH = Math.max(3, Math.round((portrait ? size.w * 0.0085 : size.h * 0.0085) * 4) / 4); // the player about a quarter of the screen tall
+  const flowers = portrait ? LANDING_FLOWERS_PORTRAIT : LANDING_FLOWERS;
+  return (
+    <div className="landing-scenery" aria-hidden>
+      {flowers.map((f, i) => (
+        <ColoredSprite
+          key={i}
+          className="landing-flower"
+          style={{ left: `${f.x}%`, top: `${f.y}%`, fontSize: `${(lineH * 1.7 * f.s).toFixed(2)}px` }}
+          sprite={S.FLOWER_PLUS}
+          colors={S.FLOWER_PLUS_COLORS}
+          palette={FLOWER_PALETTES[f.pal]}
+          perCell
+        />
+      ))}
+      <SolidSpriteCanvas
+        className="landing-player"
+        // its size is in ch / em of its own font: one row = lineH
+        style={{ fontSize: `${lineH}px`, position: 'absolute' }}
+        sprite={frame.sprite}
+        colors={frame.colors}
+        palette={S.WALK_DOWN_PALETTE}
+        charW={lineH * 0.6}
+        lineH={lineH}
+        res={window.devicePixelRatio || 1}
+      />
+    </div>
+  );
+}
+
 function Landing({ onStart }: { onStart: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -577,27 +642,30 @@ function Landing({ onStart }: { onStart: () => void }) {
   }
 
   return (
-    // the background is a real shot of the island's meadow (src/assets)
+    // the background is a real shot of the island's meadow (src/assets); the
+    // title and the buttons share one left edge, the player stands in the
+    // bottom-right corner, and a few flowers lead from them to the buttons
     <div className="landing" style={{ backgroundImage: `url(${startMeadowUrl})` }}>
-      <pre className="title">{S.TITLE.join('\n')}</pre>
-      <div className="subtitle">a tiny monochrome bay</div>
-      {/* design-system buttons (src/ui): the primary action in green */}
-      <div className="ds-actions landing-actions">
-        {hasSave ? (
-          <>
+      <LandingScenery />
+      <div className="landing-col">
+        <pre className="title">{S.TITLE.join('\n')}</pre>
+        <div className="subtitle">a tiny monochrome bay</div>
+        {/* design-system buttons (src/ui), one column: the primary action in green */}
+        <div className="ds-actions landing-actions">
+          {hasSave ? (
+            <>
+              <button className="ds-action go start" onClick={onStart}>
+                <span>Continue</span>
+              </button>
+              <button className="ds-action" onClick={() => setConfirmNewGame(true)}>
+                <span>New Game</span>
+              </button>
+            </>
+          ) : (
             <button className="ds-action go start" onClick={onStart}>
-              <span>Continue</span>
+              <span>Start</span>
             </button>
-            <button className="ds-action" onClick={() => setConfirmNewGame(true)}>
-              <span>New Game</span>
-            </button>
-          </>
-        ) : (
-          <button className="ds-action go start" onClick={onStart}>
-            <span>Start</span>
-          </button>
-        )}
-        <div className="landing-save-row">
+          )}
           <input
             ref={fileRef}
             type="file"
@@ -612,8 +680,8 @@ function Landing({ onStart }: { onStart: () => void }) {
             <span>Export Save</span>
           </button>
         </div>
+        {error && <div className="landing-save-error">{error}</div>}
       </div>
-      {error && <div className="landing-save-error">{error}</div>}
 
       {confirmNewGame && (
         <div className="overlay" onClick={() => setConfirmNewGame(false)}>

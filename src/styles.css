@@ -79,41 +79,55 @@ pre {
 /* ---------- landing ---------- */
 
 .landing {
+  position: relative;
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 28px;
-  padding: 16px;
+  overflow: hidden;
   /* the meadow shot (set inline from src/assets/start-meadow.webp) */
   background-color: #4f6436;
   background-size: cover;
   background-position: center;
 }
 
+/* the title and the buttons: one column on one left edge, vertically centred */
+.landing-col {
+  position: absolute;
+  z-index: 1;
+  left: clamp(24px, 9vw, 160px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
 .title {
+  margin: 0;
   color: #f4f1d4;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
   line-height: 1.1;
   white-space: pre;
   font-weight: 600;
-  font-size: clamp(6px, 2.3vw, 18px);
+  /* the title a little wider than the buttons (42 columns of 0.6em), not
+     too big: about 1.35x the button column */
+  font-size: min(15px, calc(min(405px, 84vw) / 25.2));
   text-align: left;
 }
 
 .subtitle {
+  margin-top: 12px;
   color: var(--ds-text-soft);
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
   letter-spacing: 3px;
   font-size: 13px;
 }
 
-/* Start / Continue, New Game, and the save buttons: design-system actions
-   (.ds-action) in one column */
+/* Start / Continue, New Game, Upload and Export Save: design-system actions
+   (.ds-action), one vertical column under the title */
 .landing-actions {
-  width: min(320px, 86vw);
-  margin-top: 0;
+  width: min(300px, 70vw);
+  margin-top: 52px;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .landing-actions .ds-action {
@@ -137,20 +151,35 @@ pre {
   letter-spacing: 1px;
 }
 
-.landing-save-row {
-  display: flex;
-  gap: 10px;
-}
-
-.landing-save-row .ds-action {
-  flex: 1;
-  padding: 9px 12px;
-  font-size: 13px;
-  color: var(--ds-text-soft);
-}
-
 .landing-file-input {
   display: none;
+}
+
+/* the player in the bottom-right corner and the flower trail to the buttons */
+.landing-scenery {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.landing-player {
+  position: absolute;
+  right: 9vw;
+  bottom: 7vh;
+  color: #fff;
+  filter: saturate(var(--player-sat, 1)) drop-shadow(0 6px 6px rgba(0, 0, 0, 0.25));
+}
+.landing-flower {
+  position: absolute;
+  margin: 0;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+}
+.landing-flower span {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  overflow: hidden;
+  vertical-align: top;
 }
 
 .landing-save-error {

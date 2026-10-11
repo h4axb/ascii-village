@@ -165,7 +165,7 @@ function screenAt() {
 }
 // the inbox, latest arrival on top (among mails arriving together, the later one)
 const ORDER = INBOX.map((it, i) => ({ it, i })).sort((a, b) => b.it.at - a.it.at || b.i - a.i);
-const ROW_H = 13; // a list row, stage px
+const ROW_H = 18; // a list row, stage px
 const PULL_EXP = 3.2; // how sharply the camera's pull back speeds up
 
 // ---- the per-letter plan, fixed once the letters have been measured --------------------

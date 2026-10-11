@@ -77,32 +77,32 @@
   box-shadow: 0 5px 16px rgba(0, 0, 20, 0.35);
   overflow: hidden;
   color: #2a2f38;
-  font-size: 6px;
+  font-size: 8.4px;
 }
 .cin-app-bar {
   display: flex;
   align-items: center;
-  gap: 3px;
-  height: 13px;
-  padding: 0 6px;
+  gap: 4.2px;
+  height: 18.2px;
+  padding: 0 8.4px;
   background: #e9ecf1;
   border-bottom: 0.6px solid rgba(0, 0, 0, 0.08);
   color: #6b7280;
-  font-size: 5.6px;
+  font-size: 7.84px;
 }
 .cin-app-bar i {
-  width: 4.5px;
-  height: 4.5px;
+  width: 6.3px;
+  height: 6.3px;
   border-radius: 50%;
   background: #cfd3da;
 }
 .cin-app-bar span {
-  margin-left: 4px;
+  margin-left: 5.6px;
 }
 .cin-app-bar em {
   margin-left: auto;
   width: 30%;
-  padding: 1.5px 5px;
+  padding: 2.1px 7px;
   border-radius: 6px;
   background: #fff;
   border: 0.6px solid rgba(0, 0, 0, 0.1);
@@ -117,9 +117,9 @@
 .cin-app-side {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5.6px;
   width: 17%;
-  padding: 7px 6px;
+  padding: 9.8px 8.4px;
   background: #eef0f4;
   border-right: 0.6px solid rgba(0, 0, 0, 0.06);
   color: #6b7280;
@@ -130,12 +130,12 @@
   color: #1f3b7a;
 }
 .cin-app-side b span {
-  padding: 0 3px;
+  padding: 0 4.2px;
   border-radius: 4px;
   background: #3b6fd8;
   color: #fff;
-  font-size: 5px;
-  line-height: 7px;
+  font-size: 7px;
+  line-height: 9.8px;
 }
 .cin-app-list {
   position: relative;
@@ -149,8 +149,8 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 7px;
+  gap: 8.4px;
+  padding: 0 14px 0 9.8px;
   border-bottom: 0.6px solid rgba(0, 0, 0, 0.05);
   color: #6b7280;
   background: rgba(255, 214, 102, calc(var(--new, 0) * 0.35));
@@ -169,7 +169,7 @@
 }
 .cin-row-time {
   flex: 0 0 auto;
-  font-size: 5.4px;
+  font-size: 7.56px;
 }
 .cin-row.unread {
   background-color: #fff;
@@ -177,9 +177,9 @@
 .cin-row.unread::before {
   content: '';
   position: absolute;
-  left: 2.5px;
-  width: 2.5px;
-  height: 2.5px;
+  left: 3.5px;
+  width: 3.5px;
+  height: 3.5px;
   border-radius: 50%;
   background: #3b6fd8;
 }
@@ -191,10 +191,10 @@
 }
 .cin-app-track {
   position: absolute;
-  right: 1.5px;
-  top: 2px;
-  bottom: 2px;
-  width: 2.5px;
+  right: 2.1px;
+  top: 2.8px;
+  bottom: 2.8px;
+  width: 3.5px;
 }
 .cin-app-thumb {
   position: absolute;
@@ -209,19 +209,19 @@
   bottom: 3%;
   display: flex;
   flex-direction: column;
-  gap: 1.5px;
+  gap: 2.1px;
   width: 34%;
-  padding: 6px 8px;
+  padding: 8.4px 11.2px;
   border-radius: 4px;
   background: rgba(250, 251, 253, 0.97);
   box-shadow: 0 4px 12px rgba(0, 0, 20, 0.35);
   color: #3a404a;
-  font-size: 6px;
+  font-size: 8.4px;
   opacity: 0;
 }
 .cin-toast b {
   color: #14181f;
-  font-size: 6.4px;
+  font-size: 8.96px;
 }
 /* the taskbar clock, after the tray icons: time over date, both ending on
    one right edge */
@@ -256,7 +256,7 @@
 .cin-win {
   position: absolute;
   opacity: 0;
-  font-size: 6.6px;
+  font-size: 9.24px;
   line-height: 1.45;
   color: #23272f;
   will-change: transform, opacity;
@@ -280,7 +280,7 @@
 }
 .cin-win-in {
   position: relative;
-  padding: 0 8.4px 6px;
+  padding: 0 11.76px 8.4px;
 }
 .cin-win.final .cin-fade {
   opacity: var(--fade, 1);
@@ -288,66 +288,66 @@
 .cin-titlebar {
   display: flex;
   align-items: center;
-  gap: 3px;
-  height: 13.2px;
-  margin: 0 -8.4px 4.8px;
-  padding: 0 6px;
+  gap: 4.2px;
+  height: 18.48px;
+  margin: 0 -11.76px 6.72px;
+  padding: 0 8.4px;
   border-bottom: 0.6px solid rgba(0, 0, 0, 0.08);
-  font-size: 6px;
+  font-size: 8.4px;
   color: #6b7280;
 }
 .cin-titlebar i {
-  width: 4.8px;
-  height: 4.8px;
+  width: 6.72px;
+  height: 6.72px;
   border-radius: 50%;
   background: #cfd3da;
 }
 .cin-titlebar span {
-  margin-left: 3.6px;
+  margin-left: 5.04px;
 }
 .cin-from {
-  font-size: 6.3px;
+  font-size: 8.82px;
   color: #4b5563;
 }
 .cin-from span {
   display: inline-block;
-  min-width: 20.4px;
+  min-width: 28.56px;
   color: #9aa1ab;
 }
 .cin-subject {
-  margin: 1.2px 0 4.8px;
-  font-size: 8.1px;
+  margin: 1.68px 0 6.72px;
+  font-size: 11.34px;
   font-weight: 600;
 }
 .cin-text p {
-  margin: 0 0 3.6px;
+  margin: 0 0 5.04px;
 }
 .cin-sign {
   color: #4b5563;
 }
 .cin-actions {
   display: flex;
-  gap: 3.6px;
-  margin-top: 2.4px;
+  gap: 5.04px;
+  margin-top: 3.36px;
 }
 .cin-actions span {
-  padding: 1.2px 5.4px;
+  padding: 1.68px 7.56px;
   border-radius: 2.4px;
   border: 0.6px solid rgba(0, 0, 0, 0.14);
-  font-size: 5.7px;
+  font-size: 7.98px;
   color: #4b5563;
 }
 .cin-em {
   color: inherit;
   background: rgba(255, 196, 64, calc(var(--em, 0) * 0.45));
   border-radius: 1.2px;
-  padding: 0 0.6px;
+  padding: 0 0.84px;
 }
 
 /* the application-portal look: darker, more compact */
 .cin-portal {
   color: #d5d9e2;
-  font-size: 6.3px;
+  font-size: 8.82px;
 }
 .cin-portal .cin-win-bg {
   background: #2a2f3c;
@@ -384,13 +384,13 @@
 
 /* the last email: a little larger, the phrases that survive */
 .cin-win.final {
-  font-size: 7.2px;
+  font-size: 10.08px;
 }
 .cin-win.final .cin-win-bg {
   box-shadow: 0 9.6px 24px rgba(0, 0, 20, 0.6);
 }
 .cin-win.final .cin-subject {
-  font-size: 9.6px;
+  font-size: 13.44px;
 }
 .cin-kw {
   position: relative;

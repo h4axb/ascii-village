@@ -559,8 +559,8 @@ function LandingScenery() {
   );
 }
 
-// four flowers by the title, two over two (the meadow's own little clusters)
-const TITLE_FLOWERS = [S.FLOWER_PLUS_PALETTE, S.FLOWER_PLUS_WHITE_PALETTE, S.FLOWER_PLUS_ORANGE_PALETTE, S.FLOWER_PLUS_PURPLE_PALETTE];
+// four pink flowers by the title, two over two (the meadow's own little clusters)
+const TITLE_FLOWERS = [S.FLOWER_PLUS_PALETTE, S.FLOWER_PLUS_PALETTE, S.FLOWER_PLUS_PALETTE, S.FLOWER_PLUS_PALETTE];
 
 function Landing({ onStart }: { onStart: () => void }) {
   const [error, setError] = useState<string | null>(null);
@@ -616,7 +616,7 @@ function Landing({ onStart }: { onStart: () => void }) {
   }
 
   return (
-    // the background is a real shot of the island's meadow (src/assets); the
+    // the background is the island's meadow with its shore on the right (src/assets); the
     // title and the buttons share one left edge, the player stands in the
     // bottom-right corner, and a few flowers lead from them to the buttons
     <div className="landing" style={{ backgroundImage: `url(${startMeadowUrl})` }}>

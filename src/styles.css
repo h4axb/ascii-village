@@ -82,10 +82,18 @@ pre {
   position: relative;
   height: 100%;
   overflow: hidden;
-  /* the meadow shot (set inline from src/assets/start-meadow.webp) */
+  /* the meadow with the shore on its right (set inline from
+     src/assets/start-meadow.webp); anchored right so narrow screens still
+     show the coast */
   background-color: #4f6436;
   background-size: cover;
-  background-position: center;
+  background-position: right center;
+}
+/* upright screens: just the edge of the shore on the right */
+@media (max-aspect-ratio: 9/10) {
+  .landing {
+    background-position: 85% center;
+  }
 }
 
 /* the title and the buttons: one column on one left edge, vertically centred */
@@ -179,12 +187,12 @@ pre {
 .landing-player {
   position: absolute;
   right: 9vw;
-  bottom: 17vh;
+  bottom: 26vh;
   color: #fff;
   filter: saturate(var(--player-sat, 1)) brightness(1.08) drop-shadow(0 6px 6px rgba(0, 0, 0, 0.25));
 }
 .landing-player.portrait {
-  bottom: 12vh;
+  bottom: 14vh;
 }
 .landing-flower {
   margin: 0;

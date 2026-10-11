@@ -73,7 +73,7 @@ import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOU
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
-import startMeadowUrl from './assets/start-meadow.webp';
+import startCoastUrl from './assets/start-coast.webp';
 import { onThemeChange, themeRevision } from './theme';
 import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
 import { groundBare } from './ground';
@@ -619,7 +619,7 @@ function Landing({ onStart }: { onStart: () => void }) {
     // the background is the island's meadow with its shore on the right (src/assets); the
     // title and the buttons share one left edge, the player stands in the
     // bottom-right corner, and a few flowers lead from them to the buttons
-    <div className="landing" style={{ backgroundImage: `url(${startMeadowUrl})` }}>
+    <div className="landing" style={{ backgroundImage: `url(${startCoastUrl})` }}>
       <LandingScenery />
       <div className="landing-col">
         <div className="landing-title">

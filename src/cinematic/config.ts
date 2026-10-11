@@ -30,6 +30,7 @@ export interface Frame {
   date: string;
   app: { left: number; top: number; width: number; height: number };
   glow: number;
+  dim?: number; // a dark overlay over the still (0..1): the light going down without a new photo
 }
 
 // The stills were shot a little apart (the laptop sits higher and smaller in
@@ -72,8 +73,10 @@ export const FRAMES: Frame[] = [
   { src: '/intro/cinematic/03-afternoon.webp', at: LEAD + 8300, screen: { x: 468, y: 63, w: 736, h: 429 }, tray: { x: 1121, y: 468.5 }, time: '17:38', date: 'Fri 14 Mar', app: { left: 1.5, top: 3, width: 96, height: 90 }, glow: 0.1 },
   { src: '/intro/cinematic/04-overcast.webp', at: LEAD + 10300, screen: { x: 461, y: 48, w: 739, h: 423 }, tray: { x: 1119, y: 448.5 }, time: '11:07', date: 'Thu 3 Apr', app: { left: 2.5, top: 5, width: 95, height: 88 }, glow: 0.2 },
   { src: '/intro/cinematic/02-midday.webp', at: LEAD + 12300, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '14:22', date: 'Tue 15 Apr', app: { left: 2, top: 5, width: 95, height: 88 }, glow: 0.3 },
-  { src: '/intro/cinematic/03-afternoon.webp', at: LEAD + 14300, screen: { x: 468, y: 63, w: 736, h: 429 }, tray: { x: 1121, y: 468.5 }, time: '18:05', date: 'Thu 17 Apr', app: { left: 2.5, top: 4, width: 95, height: 89 }, glow: 0.35 },
-  { src: '/intro/cinematic/04-overcast.webp', at: LEAD + 16300, screen: { x: 461, y: 48, w: 739, h: 423 }, tray: { x: 1119, y: 448.5 }, time: '10:31', date: 'Mon 21 Apr', app: { left: 1.5, top: 5, width: 96, height: 88 }, glow: 0.45 },
+  // the same desk again, the light going down - faster and faster (an
+  // overlay darkens the still: exponentially less light, see dim)
+  { src: '/intro/cinematic/02-midday.webp', at: LEAD + 14300, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '18:05', date: 'Thu 17 Apr', app: { left: 2.5, top: 4, width: 95, height: 89 }, glow: 0.35, dim: 0.4 },
+  { src: '/intro/cinematic/02-midday.webp', at: LEAD + 16300, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '20:31', date: 'Mon 21 Apr', app: { left: 1.5, top: 5, width: 96, height: 88 }, glow: 0.45, dim: 0.68 },
   { src: '/intro/cinematic/05-night.webp', at: LEAD + 18300, screen: { x: 462, y: 48, w: 738, h: 423 }, tray: { x: 1120, y: 448.5 }, time: '23:51', date: 'Sun 27 Apr', app: { left: 2, top: 4, width: 95, height: 89 }, glow: 0.6 },
   // the last one, deep night, only the screen's cold light
   { src: '/intro/cinematic/06-deep-night.webp', at: LEAD + 20300, screen: { x: 468, y: 63, w: 733, h: 429 }, tray: { x: 1120, y: 468.5 }, time: '02:47', date: 'Mon 28 Apr', app: { left: 3, top: 6, width: 94, height: 87 }, glow: 0.75 },

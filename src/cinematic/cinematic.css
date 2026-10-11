@@ -33,6 +33,15 @@
   will-change: opacity;
 }
 /* the cold light of the screen spilling into the room */
+.cin-dim {
+  /* placed over the laptop's screen (which keeps its own light): the room
+     around it darkens, through a shadow spread out from the screen's edge */
+  position: absolute;
+  box-shadow: 0 0 0 4000px #0b1026;
+  border-radius: 2px;
+  opacity: 0;
+  pointer-events: none;
+}
 .cin-glow {
   position: absolute;
   inset: 0;

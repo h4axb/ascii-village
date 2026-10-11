@@ -197,6 +197,7 @@ export default forwardRef<
   const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, []);
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const dimRef = useRef<HTMLDivElement>(null);
   const glowRef = useRef<HTMLDivElement>(null);
   const blackRef = useRef<HTMLDivElement>(null);
   const frameRefs = useRef<(HTMLImageElement | null)[]>([]);
@@ -449,6 +450,8 @@ export default forwardRef<
     flashRef.current!.style.opacity = String(Math.min(0.5, flash));
     const quiet = 1 - span(t, T.othersOut);
     const glow = FRAMES[fi].glow;
+    // the light going down over a reused still (cut with it)
+    Object.assign(dimRef.current!.style, { left: `${scr.x}px`, top: `${scr.y}px`, width: `${scr.w}px`, height: `${scr.h}px`, opacity: String(FRAMES[fi].dim ?? 0) });
     glowRef.current!.style.opacity = String((glow + 0.9 * flash) * quiet);
     blackRef.current!.style.opacity = String(span(t, T.blackIn));
     applyDesktop(t, fi, quiet);
@@ -706,6 +709,7 @@ export default forwardRef<
             style={{ opacity: k ? 0 : 1, transformOrigin: '0 0', transform: `translate(${fitFrame(k).x}px, ${fitFrame(k).y}px) scale(${fitFrame(k).s})` }}
           />
         ))}
+        <div ref={dimRef} className="cin-dim" />
         <div ref={glowRef} className="cin-glow" />
         <div ref={blackRef} className="cin-black" />
         <div ref={screenRef} className="cin-screen">

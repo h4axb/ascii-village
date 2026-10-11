@@ -100,6 +100,23 @@ pre {
   align-items: flex-start;
 }
 
+.landing-title {
+  position: relative;
+  /* the title a little wider than the buttons (42 columns of 0.6em), not
+     too big: about 1.35x the button column */
+  font-size: min(15px, calc(min(405px, 84vw) / 25.2));
+}
+/* four flowers, two over two, in the space right of "BAY" */
+.landing-flowers {
+  position: absolute;
+  left: 63%;
+  top: 50%;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.8em 1.4em;
+  font-size: 0.95em;
+  pointer-events: none;
+}
 .title {
   margin: 0;
   color: #f4f1d4;
@@ -107,9 +124,7 @@ pre {
   line-height: 1.1;
   white-space: pre;
   font-weight: 600;
-  /* the title a little wider than the buttons (42 columns of 0.6em), not
-     too big: about 1.35x the button column */
-  font-size: min(15px, calc(min(405px, 84vw) / 25.2));
+  font-size: 1em;
   text-align: left;
 }
 
@@ -164,15 +179,16 @@ pre {
 .landing-player {
   position: absolute;
   right: 9vw;
-  bottom: 7vh;
+  bottom: 17vh;
   color: #fff;
-  filter: saturate(var(--player-sat, 1)) drop-shadow(0 6px 6px rgba(0, 0, 0, 0.25));
+  filter: saturate(var(--player-sat, 1)) brightness(1.08) drop-shadow(0 6px 6px rgba(0, 0, 0, 0.25));
+}
+.landing-player.portrait {
+  bottom: 12vh;
 }
 .landing-flower {
-  position: absolute;
   margin: 0;
   line-height: 1;
-  transform: translate(-50%, -50%);
 }
 .landing-flower span {
   display: inline-block;
@@ -1346,7 +1362,7 @@ pre {
 .player-sprite {
   color: #fff;
   /* the Theme tab's player saturation (src/theme.ts) */
-  filter: saturate(var(--player-sat, 1));
+  filter: saturate(var(--player-sat, 1)) brightness(1.08);
   /* pivot the PLAYER_SCALE shrink on the feet, not the sprite's centre —
      same reasoning as the base .ent rule, and the App.tsx offX/offY math
      that keeps this pivot lined up with the player's actual tile position. */

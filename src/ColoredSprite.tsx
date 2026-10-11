@@ -360,6 +360,7 @@ interface SolidCanvasProps {
   res: number; // backing pixels per CSS px (screen scale x devicePixelRatio)
   outline?: string | null; // CSS var holding the outline colour; null = none
   solid?: boolean; // opaque darkened backing per cell (ColoredSprite's solidCells)
+  shade?: number; // how much darker that backing is than the glyph's own colour (0..1)
   onClick?: (e: React.MouseEvent) => void;
   onMouseEnter?: (e: React.MouseEvent) => void;
   onMouseLeave?: (e: React.MouseEvent) => void;
@@ -386,6 +387,7 @@ function renderSolid(
   base: string,
   ring: string | null,
   solid: boolean,
+  shade: number,
 ): HTMLCanvasElement {
   const cols = Math.max(0, ...sprite.map((l) => l.length));
   const rows = sprite.length;
@@ -414,7 +416,7 @@ function renderSolid(
       const x0 = Math.floor(x * charW * r);
       const x1 = Math.floor((x + 1) * charW * r);
       if (solid && (eye || hex)) {
-        ctx.fillStyle = eye ? EYE_BG : darken(hex!, 0.55);
+        ctx.fillStyle = eye ? EYE_BG : darken(hex!, shade);
         ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
       }
       if (!eye && ch !== ' ') glyphs.push([ch, (x0 + x1) / 2, (y0 + y1) / 2, hex ?? base]);
@@ -450,6 +452,7 @@ export function SolidSpriteCanvas({
   res,
   outline = '--player-outline',
   solid = true,
+  shade = 0.55,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -466,7 +469,7 @@ export function SolidSpriteCanvas({
     const base = cs.color || '#fff';
     const ring = outline ? cs.getPropertyValue(outline).trim() || '#000' : null;
     const font = cs.fontFamily || 'monospace';
-    const key = `${r}|${charW}|${lineH}|${eyeRow}|${font}|${base}|${ring}|${solid}`;
+    const key = `${r}|${charW}|${lineH}|${eyeRow}|${font}|${base}|${ring}|${solid}|${shade}`;
     let byColors = solidCache.get(sprite);
     if (!byColors) solidCache.set(sprite, (byColors = new WeakMap()));
     let byPalette = byColors.get(colors);
@@ -474,7 +477,7 @@ export function SolidSpriteCanvas({
     let look = byPalette.get(palette);
     if (!look || look.key !== key) {
       if (look) look.img.width = look.img.height = 0; // old resolution: free it now
-      look = { key, img: renderSolid(sprite, colors, palette, eyeRow, charW, lineH, r, font, base, ring, solid) };
+      look = { key, img: renderSolid(sprite, colors, palette, eyeRow, charW, lineH, r, font, base, ring, solid, shade) };
       byPalette.set(palette, look);
     }
     const { img } = look;
@@ -483,7 +486,7 @@ export function SolidSpriteCanvas({
       c.height = img.height;
     } else ctx.clearRect(0, 0, c.width, c.height);
     ctx.drawImage(img, 0, 0);
-  }, [sprite, colors, palette, eyeRow, charW, lineH, r, outline, solid]);
+  }, [sprite, colors, palette, eyeRow, charW, lineH, r, outline, solid, shade]);
   return (
     <canvas
       ref={ref}

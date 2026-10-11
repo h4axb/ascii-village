@@ -68,30 +68,31 @@ export const FRAMES: Frame[] = [
   { src: '/intro/cinematic/01-morning.webp', at: LEAD, screen: { x: 468, y: 63, w: 736, h: 429 }, tray: { x: 1120, y: 468.5 }, time: '08:12', date: 'Mon 3 Mar', app: { left: 2, top: 4, width: 95, height: 88 }, glow: 0 },
   // then a rejection a shot, each already open when the shot cuts in: the
   // days go by, the light goes from harsh afternoon to overcast to night
-  { src: '/intro/cinematic/02-midday.webp', at: LEAD + 4500, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '13:46', date: 'Wed 5 Mar', app: { left: 3, top: 6, width: 94, height: 86 }, glow: 0.05 },
-  { src: '/intro/cinematic/03-afternoon.webp', at: LEAD + 6500, screen: { x: 468, y: 63, w: 736, h: 429 }, tray: { x: 1121, y: 468.5 }, time: '17:38', date: 'Fri 14 Mar', app: { left: 1.5, top: 3, width: 96, height: 90 }, glow: 0.1 },
-  { src: '/intro/cinematic/04-overcast.webp', at: LEAD + 8500, screen: { x: 461, y: 48, w: 739, h: 423 }, tray: { x: 1119, y: 448.5 }, time: '11:07', date: 'Thu 3 Apr', app: { left: 2.5, top: 5, width: 95, height: 88 }, glow: 0.2 },
-  { src: '/intro/cinematic/02-midday.webp', at: LEAD + 10500, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '14:22', date: 'Tue 15 Apr', app: { left: 2, top: 5, width: 95, height: 88 }, glow: 0.3 },
-  { src: '/intro/cinematic/05-night.webp', at: LEAD + 12500, screen: { x: 462, y: 48, w: 738, h: 423 }, tray: { x: 1120, y: 448.5 }, time: '23:51', date: 'Sun 27 Apr', app: { left: 2, top: 4, width: 95, height: 89 }, glow: 0.6 },
+  { src: '/intro/cinematic/02-midday.webp', at: LEAD + 6300, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '13:46', date: 'Wed 5 Mar', app: { left: 3, top: 6, width: 94, height: 86 }, glow: 0.05 },
+  { src: '/intro/cinematic/03-afternoon.webp', at: LEAD + 8300, screen: { x: 468, y: 63, w: 736, h: 429 }, tray: { x: 1121, y: 468.5 }, time: '17:38', date: 'Fri 14 Mar', app: { left: 1.5, top: 3, width: 96, height: 90 }, glow: 0.1 },
+  { src: '/intro/cinematic/04-overcast.webp', at: LEAD + 10300, screen: { x: 461, y: 48, w: 739, h: 423 }, tray: { x: 1119, y: 448.5 }, time: '11:07', date: 'Thu 3 Apr', app: { left: 2.5, top: 5, width: 95, height: 88 }, glow: 0.2 },
+  { src: '/intro/cinematic/02-midday.webp', at: LEAD + 12300, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '14:22', date: 'Tue 15 Apr', app: { left: 2, top: 5, width: 95, height: 88 }, glow: 0.3 },
+  { src: '/intro/cinematic/03-afternoon.webp', at: LEAD + 14300, screen: { x: 468, y: 63, w: 736, h: 429 }, tray: { x: 1121, y: 468.5 }, time: '18:05', date: 'Thu 17 Apr', app: { left: 2.5, top: 4, width: 95, height: 89 }, glow: 0.35 },
+  { src: '/intro/cinematic/04-overcast.webp', at: LEAD + 16300, screen: { x: 461, y: 48, w: 739, h: 423 }, tray: { x: 1119, y: 448.5 }, time: '10:31', date: 'Mon 21 Apr', app: { left: 1.5, top: 5, width: 96, height: 88 }, glow: 0.45 },
+  { src: '/intro/cinematic/05-night.webp', at: LEAD + 18300, screen: { x: 462, y: 48, w: 738, h: 423 }, tray: { x: 1120, y: 448.5 }, time: '23:51', date: 'Sun 27 Apr', app: { left: 2, top: 4, width: 95, height: 89 }, glow: 0.6 },
   // the last one, deep night, only the screen's cold light
-  { src: '/intro/cinematic/06-deep-night.webp', at: LEAD + 14500, screen: { x: 468, y: 63, w: 733, h: 429 }, tray: { x: 1120, y: 468.5 }, time: '02:47', date: 'Mon 28 Apr', app: { left: 3, top: 6, width: 94, height: 87 }, glow: 0.75 },
+  { src: '/intro/cinematic/06-deep-night.webp', at: LEAD + 20300, screen: { x: 468, y: 63, w: 733, h: 429 }, tray: { x: 1120, y: 468.5 }, time: '02:47', date: 'Mon 28 Apr', app: { left: 3, top: 6, width: 94, height: 87 }, glow: 0.75 },
 ];
 // the clock's right edge, this far right of the battery icon's (px of the stills)
 export const CLOCK_GAP = 62;
 
 // ---- the timeline (ms) ---------------------------------------------------------
-const FALL = LEAD + 25900; // the keywords come loose; everything after is relative to it
+const FALL = LEAD + 31700; // the keywords come loose; everything after is relative to it
 export const T = {
   // the stills (FRAMES[].at); the opened mails' times are in emails.ts
   fadeIn: [LEAD, LEAD + 900], // out of the opening black
-  montageEnd: LEAD + 16900,
+  montageEnd: LEAD + 22700,
   // the camera has stopped; slowly (about 6 s) everything but the three
   // keywords fades away, then they hold alone 3 s
-  othersOut: [LEAD + 16900, LEAD + 21900], // the mail app, the other text and the desktop fade
-  frameOut: [LEAD + 17900, LEAD + 22900], // the last mail's window and other words dissolve
-  dotsIn: [LEAD + 22300, LEAD + 22900], // "Unfortunately," -> "Unfortunately..."
-  blackIn: [LEAD + 16900, LEAD + 22900], // the room fades to black
-  pullBack: [LEAD + 4100, LEAD + 16900], // the camera holds on the first mail, then pulls back from the screen to the whole desk, slowly at first, faster and faster
+  othersOut: [LEAD + 22700, LEAD + 27700], // the mail app, the other text and the desktop fade
+  frameOut: [LEAD + 23700, LEAD + 28700], // the last mail's window and other words dissolve
+  blackIn: [LEAD + 22700, LEAD + 28700], // the room fades to black
+  pullBack: [LEAD + 5900, LEAD + 22700], // the camera holds on the first mail, then pulls back from the screen to the whole desk, slowly at first, faster and faster
   // falling letters -> the glyph door -> through it (scene.ts), then 3 s of black
   fall: FALL, // the letters fall, the camera following them down; they turn to water (LETTERS)
   build: [FALL + 4800, FALL + 11800], // the door emerges from the water, slowly, filling its shape

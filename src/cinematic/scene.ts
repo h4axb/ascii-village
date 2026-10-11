@@ -308,18 +308,20 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
     const x = driftAt(y);
     const hc = Math.floor(x / cellPx), hr = Math.floor(y / cellPx) + shift;
     const drain = t > w.tLand ? clamp01((t - w.tLand) / 300) : 0;
-    const len = Math.max(0, Math.round(w.len * (1 - drain)));
+    const lenF = w.len * (1 - drain); // drains away smoothly once landed
     const appear = clamp01((t - w.t0) / 160);
+    // the falling water is drawn off the grid, at its exact place, so it
+    // moves smoothly (the grid would step it a whole cell at a time)
+    const oy = shift * cellPx;
     // the tail follows the path it came down (the drift bends it)
-    for (let k = len; k >= 1; k--) {
+    for (let k = Math.ceil(lenF); k >= 1; k--) {
       const yk = y - k * cellPx;
       if (yk < w.y0 - cellPx) continue;
-      const ck = Math.floor(driftAt(yk) / cellPx);
-      const f = 1 - k / (len + 1);
+      const f = 1 - k / (w.len + 1);
       const gl = k <= 1 ? '|' : k <= 3 ? '¦' : k <= 5 ? ':' : '.';
-      put(ck, Math.floor(yk / cellPx) + shift, g(gl), mixc(DARK, mixc(C.shallow, C.foam, 0.5 * f), (0.35 + 0.65 * f) * appear));
+      gc.free.push({ x: driftAt(yk), y: yk + oy, ch: gl, rgb: mixc(DARK, mixc(C.shallow, C.foam, 0.5 * f), (0.35 + 0.65 * f) * appear), a: Math.min(1, lenF - k + 1) });
     }
-    if (drain < 1) put(hc, hr, g(t > w.tLand ? '°' : 'o'), mixc(DARK, C.foam, appear * (1 - drain)));
+    if (drain < 1) gc.free.push({ x, y: y + oy, ch: t > w.tLand ? '°' : 'o', rgb: mixc(DARK, C.foam, appear), a: 1 - drain });
     if (t > w.tLand) {
       // the splash
       const sp = clamp01((t - w.tLand) / 320);

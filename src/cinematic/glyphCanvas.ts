@@ -47,6 +47,11 @@ export class GlyphCanvas {
   // one pixel per cell: backings and glyph colours, scaled up without smoothing
   private small = document.createElement('canvas');
   private smallImg: ImageData | null = null;
+  private font = 0.75;
+  // glyphs off the grid: at exact positions (CSS px, the glyph's centre), for
+  // things that move smoothly (the falling water); drawn over the grid, under
+  // the same camera
+  free: { x: number; y: number; ch: string; rgb: RGB; a: number }[] = [];
 
   constructor(cv: HTMLCanvasElement) {
     this.cv = cv;
@@ -58,6 +63,7 @@ export class GlyphCanvas {
     if (vw === this.vw && vh === this.vh && cell === this.cw) return;
     this.vw = vw;
     this.vh = vh;
+    this.font = font;
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.cw = Math.max(5, cell);
     this.ch = this.cw;
@@ -96,6 +102,7 @@ export class GlyphCanvas {
   clear() {
     this.glyph.fill(0);
     this.bg.fill(NONE);
+    this.free.length = 0;
   }
 
   // paint the buffer over a base colour (the scene's darkness); cam scales
@@ -165,6 +172,17 @@ export class GlyphCanvas {
     tctx.drawImage(this.mask, 0, 0);
     ctx.imageSmoothingEnabled = cam.s !== 1;
     ctx.drawImage(this.tint, 0, 0);
+    // 4. the free glyphs, at their exact positions
+    if (this.free.length) {
+      ctx.font = `${this.ch * dpr * this.font}px ${GLYPH_FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (const f of this.free) {
+        ctx.globalAlpha = opacity * f.a;
+        ctx.fillStyle = `rgb(${f.rgb[0] | 0},${f.rgb[1] | 0},${f.rgb[2] | 0})`;
+        ctx.fillText(f.ch, f.x * dpr, (f.y + this.ch * 0.04) * dpr);
+      }
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
   }

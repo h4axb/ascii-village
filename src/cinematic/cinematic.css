@@ -399,13 +399,6 @@
 .cin-ch {
   display: inline-block;
 }
-.cin-dots {
-  position: absolute;
-  left: 100%;
-  top: 0;
-  white-space: nowrap;
-  opacity: var(--dots, 0);
-}
 
 /* ---- the door scene (scene.ts, drawn in glyphs) ---- */
 .cin-scene {

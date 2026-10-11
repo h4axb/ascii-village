@@ -95,6 +95,28 @@ export const EMAILS: Email[] = [
     ],
     sign: ['Warm regards,', 'Northstar Games Recruitment Team'],
   },
+  {
+    from: 'Brightloop',
+    subject: 'Your application to Brightloop',
+    body: [
+      'Hi,',
+      'Thank you for applying for the 2D Artist role.',
+      'We have decided to *go with another candidate* whose experience more closely matches our needs.',
+      'Best of luck with your next steps.',
+    ],
+    sign: ['The Brightloop Team'],
+  },
+  {
+    from: 'Glasswing Studio',
+    subject: 'Application status: closed',
+    body: [
+      'Dear Applicant,',
+      'Thank you for your patience during our hiring process.',
+      '*Regrettably*, we will not be inviting you to the next round.',
+      'We appreciate the time you put into your application.',
+    ],
+    sign: ['Glasswing Studio Talent Team'],
+  },
 ];
 
 // An opened mail on the laptop screen: which email, its style, its place (in %
@@ -134,7 +156,7 @@ export const WINDOWS: WindowShot[] = [
     left: 26,
     top: 12,
     width: 52,
-    appear: F[0] + 1600,
+    appear: F[0] + 3400,
     hide: F[1],
     from: { x: 0, y: 8 },
   },
@@ -143,7 +165,9 @@ export const WINDOWS: WindowShot[] = [
   rejection(2, 1, 'portal', 24, 14, 54),
   rejection(3, 3, 'standard', 27, 9, 52),
   rejection(4, 4, 'standard', 22, 13, 54),
-  rejection(5, 5, 'portal', 29, 11, 52),
+  rejection(5, 7, 'standard', 26, 12, 52),
+  rejection(6, 8, 'portal', 23, 10, 54),
+  rejection(7, 5, 'portal', 29, 11, 52),
   // the last one, prominent (it arrived in the night), set right of centre
   // so its keywords sit straight above the door's place (the screen's
   // middle), and their letters fall straight down onto it
@@ -153,7 +177,7 @@ export const WINDOWS: WindowShot[] = [
     left: 31.3,
     top: 8,
     width: 60,
-    appear: F[6],
+    appear: F[8],
     from: { x: 0, y: 0 },
     open: true,
     final: true,
@@ -166,7 +190,7 @@ export const FLASH = 0.05; // the flash when the thank-you opens
 // the thank-you's notification (above the taskbar, bottom right)
 export const TOAST = {
   at: F[0] + 900,
-  hide: F[0] + 1600, // clicked: the mail opens
+  hide: F[0] + 3400, // it stays 2.5 s, then it is clicked: the mail opens
   from: 'Northstar Games',
   text: 'Thank you for your application to Northstar Games.',
 };
@@ -329,14 +353,16 @@ export const INBOX: InboxItem[] = [
   ...routine.reverse(),
   { at: F[3], from: 'Pixelvale Studio', subject: 'Your application status', time: '11:02', unread: true, readAt: WINDOWS[3].appear },
   { at: F[4], from: 'Tidewater Games', subject: 'Re: Junior UI Artist', time: '14:15', unread: true, readAt: WINDOWS[4].appear },
-  { at: F[5], from: 'Ember & Ash', subject: 'Application outcome', time: '23:40', unread: true, readAt: WINDOWS[5].appear },
+  { at: F[5], from: 'Brightloop', subject: 'Your application to Brightloop', time: '17:58', unread: true, readAt: WINDOWS[5].appear },
+  { at: F[6], from: 'Glasswing Studio', subject: 'Application status: closed', time: '10:12', unread: true, readAt: WINDOWS[6].appear },
+  { at: F[7], from: 'Ember & Ash', subject: 'Application outcome', time: '23:40', unread: true, readAt: WINDOWS[7].appear },
   // the last one
   {
-    at: F[6],
+    at: F[8],
     from: 'Northstar Games',
     subject: 'Application Update',
     time: '02:31',
     unread: true,
-    readAt: WINDOWS[6].appear,
+    readAt: WINDOWS[8].appear,
   },
 ];

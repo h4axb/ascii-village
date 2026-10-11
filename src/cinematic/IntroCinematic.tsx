@@ -56,7 +56,6 @@ export type IntroCinematicHandle = { skip: () => void };
 // ---- the surviving phrases, parsed from the last email -----------------------------
 interface Letter {
   ch: string;
-  dot: boolean; // one of the "..." added to "Unfortunately"
 }
 const FINAL = WINDOWS.findIndex((w) => w.final);
 const LETTER_LIST: Letter[] = (() => {
@@ -64,8 +63,7 @@ const LETTER_LIST: Letter[] = (() => {
   const e = EMAILS[WINDOWS[FINAL].email];
   for (const s of [e.subject, ...e.body])
     for (const m of s.matchAll(/\[([^\]]+)\]/g)) {
-      for (const ch of m[1]) if (ch !== ' ') out.push({ ch, dot: false });
-      if (m[1] === 'Unfortunately') for (let i = 0; i < 3; i++) out.push({ ch: '.', dot: true });
+      for (const ch of m[1]) if (ch !== ' ') out.push({ ch });
     }
   return out;
 })();
@@ -85,13 +83,6 @@ function Rich({ text, final, next }: { text: string; final: boolean; next: () =>
       parts.push(
         <span key={key++} className="cin-kw">
           {[...word].map((ch, i) => (ch === ' ' ? ' ' : <span key={i} className="cin-ch" data-k={next()}>{ch}</span>))}
-          {word === 'Unfortunately' && (
-            <span className="cin-dots">
-              {[0, 1, 2].map((i) => (
-                <span key={i} className="cin-ch" data-k={next()}>.</span>
-              ))}
-            </span>
-          )}
         </span>,
       );
     } else parts.push(<span key={key++}>{tok.slice(1, -1)}</span>);
@@ -486,7 +477,6 @@ export default forwardRef<
         el.style.setProperty('--frame', String(1 - span(t, T.frameOut)));
         el.style.setProperty('--fade', String(1 - span(t, T.frameOut)));
         el.style.setProperty('--kw', mix('#23272f', '#e9eef6', span(t, T.frameOut)));
-        el.style.setProperty('--dots', String(span(t, T.dotsIn)));
       }
     });
   }

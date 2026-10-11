@@ -1,5 +1,5 @@
 {
-  "source": "Parsed exactly from D:/ASCIIA_BAY/PLAYER/all-cycles.svg's up section. shirtMask/shortsMask derived from group membership + colour at bake time; the boundary row where the last shorts row and a shirt hem share the SAME row (different columns) is now correctly included for shirt (rowMin condition changed from \"row < shortsTop\" to \"row <= shortsTop\" after finding a real missed-white-row bug there) — only rows STRICTLY below that boundary (the shoe-highlight cluster, also near-white) stay excluded. Palette: 58-colour k-means++ shared across all 4 frames. Columns doubled.",
+  "source": "Parsed exactly from D:/ASCIIA_BAY/PLAYER/all-cycles.svg's up section. shirtMask/shortsMask derived from group membership + colour at bake time; the boundary row where the last shorts row and a shirt hem share the SAME row (different columns) is now correctly included for shirt (rowMin condition changed from \"row < shortsTop\" to \"row <= shortsTop\" after finding a real missed-white-row bug there) — only rows STRICTLY below that boundary (the shoe-highlight cluster, also near-white) stay excluded. Palette: 58-colour k-means++ shared across all 4 frames. Columns doubled. Cleaned: 6 near-black leftover cells (background specks darker than luminance 60) were filled from a neighbour inside the figure or removed at its edge.",
   "palette": {
     "0": "#deccc3",
     "1": "#ffd3be",
@@ -210,7 +210,7 @@
         "    ¬¬::::¬¬==%%%%¬¬======::======::::::  ",
         "    ¬¬::::¬¬==%%%%¬¬======::======::::::  ",
         "    ¬¬::::¬¬==%%%%¬¬======::======::::::  ",
-        "      ::::··==@@@@@@····++ØØ::::  ::::    ",
+        "      ::::::==@@@@@@····++ØØ::::  ::::    ",
         "            &&††††······@@%%              ",
         "            ‡‡::::··****¤¤††              ",
         "            ‡‡::::··****¤¤††              ",
@@ -241,7 +241,7 @@
         "    HHKKKKHHPPQQQQHHnnnn2255nnnn22GGGGbb  ",
         "    HHKKKKHHPPQQQQHHnnnn2255nnnn22GGGGbb  ",
         "    HHKKKKHHPPQQQQHHnnnn2255nnnn22GGGGbb  ",
-        "      5555ssggooooooBBBBSShhWWWW  WWWW    ",
+        "      555555ggooooooBBBBSShhWWWW  WWWW    ",
         "            11JJJJOOzzzzooQQ              ",
         "            FFvvvvzzuuuuLLCC              ",
         "            FFvvvvzzuuuuLLCC              ",
@@ -340,10 +340,10 @@
         "            %%====······@@%%              ",
         "            **::::::‡‡‡‡‡‡**++++          ",
         "            **::::::‡‡‡‡‡‡**++++          ",
-        "            ··::::**====%%%%····          ",
-        "              %%%%§§++++%%··              ",
-        "              %%%%§§++++%%··              ",
-        "                    &&&&@@··              ",
+        "            ··::::**====%%%%              ",
+        "              %%%%§§++++%%                ",
+        "              %%%%§§++++%%                ",
+        "                    &&&&@@                ",
         "                        ØØ                "
       ],
       "colors": [
@@ -371,10 +371,10 @@
         "            XXrrrrzzzzzzooaa              ",
         "            ffvvvvddIIIIIIiicccc          ",
         "            ffvvvvddIIIIIIiicccc          ",
-        "            BBEEEEUUNNNNXX11kkkk          ",
-        "              YYYY00rrrrXXss              ",
-        "              YYYY00rrrrXXss              ",
-        "                    YYYYookk              ",
+        "            BBEEEEUUNNNNXX11              ",
+        "              YYYY00rrrrXX                ",
+        "              YYYY00rrrrXX                ",
+        "                    YYYYoo                ",
         "                        oo                "
       ],
       "shirtMask": [

@@ -1,5 +1,5 @@
 {
-  "source": "Reverted to D:/ASCIIA_BAY/PLAYER/walk-down-cycle.svg's own <g class=\"body|head|armL|armR|legL|legR|shoeL|shoeR\"> structure — the design this session's earlier all-cycles.svg rebake had accidentally replaced with all-cycles.svg's simpler merged-body-groups pattern (matching left/right/up), changing the face and arm animation. This 8-group per-limb structure is the one that shipped before that switch (see walkDown.json.bak) — each group independently translateY-shifted per quarter-step via its own @keyframes, shoeL/shoeR also toggling opacity to tuck a shoe behind the leg mid-stride, composited in the SVG's own paint order (body -> head -> armL -> armR -> legL -> legR -> shoeL -> shoeR). shirtMask/shortsMask are NEW this session (the old .bak predates the mask feature): classified by GROUP membership (only 'body' cells can be shirt/shorts) rather than the row-boundary heuristic all-cycles.svg's merged pattern needed — this source keeps the torso cleanly separate from the near-white shoe highlights and skin-toned limbs, so no row heuristic is needed to avoid leaking either way. Palette: 40-colour k-means++ shared across all 4 frames, matching the original bake's own count. Columns doubled.",
+  "source": "Reverted to D:/ASCIIA_BAY/PLAYER/walk-down-cycle.svg's own <g class=\"body|head|armL|armR|legL|legR|shoeL|shoeR\"> structure — the design this session's earlier all-cycles.svg rebake had accidentally replaced with all-cycles.svg's simpler merged-body-groups pattern (matching left/right/up), changing the face and arm animation. This 8-group per-limb structure is the one that shipped before that switch (see walkDown.json.bak) — each group independently translateY-shifted per quarter-step via its own @keyframes, shoeL/shoeR also toggling opacity to tuck a shoe behind the leg mid-stride, composited in the SVG's own paint order (body -> head -> armL -> armR -> legL -> legR -> shoeL -> shoeR). shirtMask/shortsMask are NEW this session (the old .bak predates the mask feature): classified by GROUP membership (only 'body' cells can be shirt/shorts) rather than the row-boundary heuristic all-cycles.svg's merged pattern needed — this source keeps the torso cleanly separate from the near-white shoe highlights and skin-toned limbs, so no row heuristic is needed to avoid leaking either way. Palette: 40-colour k-means++ shared across all 4 frames, matching the original bake's own count. Columns doubled. Fixed: on the lifted-leg frames (1 and 3) the planted leg gets one more row under the shorts so it stays attached after the body bob, and the lifted leg keeps its shoe, drawn one row higher.",
   "palette": {
     "a": "#bf594a",
     "b": "#ffc78e",
@@ -196,10 +196,10 @@
         "            ++&&¥¥==******::::%%  ==            ",
         "              %%==****==**==++¥¥%%              ",
         "                ==%%%%==%%%%::::%%              ",
-        "                        &&%%¬¬                  ",
-        "                  &&&&                          ",
-        "                  ¤¤@@§§                        ",
-        "                  @@%%@@                        ",
+        "                  &&&&  &&%%¬¬                  ",
+        "                  &&&&  §§@@¤¤                  ",
+        "                  ¤¤@@§§@@%%@@                  ",
+        "                  @@%%@@¤¤¤¤¤¤                  ",
         "                  ¤¤¤¤¤¤                        "
       ],
       "colors": [
@@ -227,10 +227,10 @@
         "            uuNNNNggjjjjFFvvvvCC  II            ",
         "              CCggjjjjggjjgguuiiCC              ",
         "                ggffffggffffvvvvCC              ",
-        "                        ddCCss                  ",
-        "                  dddd                          ",
-        "                  zzhhll                        ",
-        "                  hhBBhh                        ",
+        "                  dddd  ddCCss                  ",
+        "                  dddd  llhhzz                  ",
+        "                  zzhhllhhBBhh                  ",
+        "                  hhBBhhzzzzzz                  ",
         "                  zzzzzz                        "
       ],
       "shirtMask": [
@@ -448,10 +448,10 @@
         "            ++  %%==******::::¥¥%%==            ",
         "              &&¥¥****==**==++::%%              ",
         "              %%==%%%%==%%%%::::                ",
-        "                  &&&&                          ",
-        "                        &&%%¬¬                  ",
-        "                        §§@@¤¤                  ",
-        "                        @@%%@@                  ",
+        "                  &&&&  &&%%¬¬                  ",
+        "                  ¤¤@@§§&&%%¬¬                  ",
+        "                  @@%%@@§§@@¤¤                  ",
+        "                  ¤¤¤¤¤¤@@%%@@                  ",
         "                        ¤¤¤¤¤¤                  "
       ],
       "colors": [
@@ -479,10 +479,10 @@
         "            uu  CCggjjjjFFvvvviiCCII            ",
         "              NNNNjjjjggjjgguuvvCC              ",
         "              CCggffffggffffvvvv                ",
-        "                  dddd                          ",
-        "                        ddCCss                  ",
-        "                        llhhzz                  ",
-        "                        hhBBhh                  ",
+        "                  dddd  ddCCss                  ",
+        "                  zzhhllddCCss                  ",
+        "                  hhBBhhllhhzz                  ",
+        "                  zzzzzzhhBBhh                  ",
         "                        zzzzzz                  "
       ],
       "shirtMask": [

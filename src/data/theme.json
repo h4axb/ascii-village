@@ -59,6 +59,11 @@
         "grassTuft.tip": "#f0f8b4",
         "grassTuft.mid": "#cddd87",
         "grassTuft.base": "#a9c25a",
+        "stoneAsset.light": "#e1c8a8",
+        "stoneAsset.mid": "#9b8b73",
+        "stoneAsset.shadow": "#553f43",
+        "stoneAsset.moss": "#3c6b50",
+        "stoneAsset.grass": "#84b068",
         "ground.dirt": "#b08d5f",
         "ground.dirtRim": "#8e7048",
         "ground.dirtPebble": "#dcc8a0",
@@ -146,7 +151,12 @@
         "ground.slab": "#c6c3b5",
         "ground.slabRim": "#94928a",
         "ground.slabGlyph": "#e6e3d6",
-        "grassTuft.mid": "#62793e"
+        "grassTuft.mid": "#62793e",
+        "stoneAsset.light": "#e1c8a8",
+        "stoneAsset.mid": "#9b8b73",
+        "stoneAsset.shadow": "#553f43",
+        "stoneAsset.moss": "#3c6b50",
+        "stoneAsset.grass": "#84b068"
       },
       "characters": {
         "player": 1.45,

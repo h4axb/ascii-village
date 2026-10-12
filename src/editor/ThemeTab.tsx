@@ -18,6 +18,7 @@ import {
   revertTheme,
   selectPreset,
   setCharacterSaturation,
+  setStoneLook,
   setGrade,
   setSwatch,
   themeColor,
@@ -163,8 +164,27 @@ export function ThemeTab() {
         })}
       </div>
 
+      <div className="wed-group">
+        <div className="wed-group-name">
+          Stones
+          <button className="wed-theme-reset" onClick={() => setStoneLook({ saturation: 1, brightness: 1 })}>
+            reset
+          </button>
+        </div>
+        {(['saturation', 'brightness'] as const).map((key) => {
+          const v = preset.stones?.[key] ?? 1;
+          return (
+            <label key={key} className="wed-theme-slider">
+              <span>{`stone ${key}`}</span>
+              <input type="range" min={0} max={2} step={0.01} value={v} onChange={(ev) => setStoneLook({ [key]: Number(ev.target.value) })} />
+              <span className="wed-dim">{v.toFixed(2)}</span>
+            </label>
+          );
+        })}
+      </div>
+
       {SWATCH_GROUPS.map((grp) => (
-        <details key={grp.title} className="wed-group" open={grp.title === 'Grass' || grp.title === 'Grass halm' || grp.title === 'Water'}>
+        <details key={grp.title} className="wed-group" open={grp.title === 'Grass' || grp.title === 'Grass halm' || grp.title === 'Stones' || grp.title === 'Water'}>
           <summary className="wed-group-name">{grp.title}</summary>
           {grp.swatches.map(([name, label]) => (
             <label key={name} className="wed-theme-swatch" title={name}>

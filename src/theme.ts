@@ -32,6 +32,13 @@ export interface ThemePreset {
   // the characters keep their own colours (the grade never touches them);
   // only how saturated they are can be tuned (1 = as drawn)
   characters?: { player: number; mitchy: number };
+  // the stone assets (src/data/assets/*stone-*.json): their colours follow
+  // the stoneAsset.* swatches, then this saturation / brightness (1 = as drawn)
+  stones?: StoneLook;
+}
+export interface StoneLook {
+  saturation: number;
+  brightness: number;
 }
 export type Character = 'player' | 'mitchy';
 export interface ThemeDoc {
@@ -59,6 +66,18 @@ export const SWATCH_GROUPS: { title: string; swatches: [string, string][] }[] = 
       ['grassTuft.tip', 'blade tips (lightest)'],
       ['grassTuft.mid', 'blade middle'],
       ['grassTuft.base', 'blade base (darkest)'],
+    ],
+  },
+  {
+    // the stone assets: each colour of their drawings moves with the swatch
+    // of its kind (assets.ts); saturation and brightness are sliders below
+    title: 'Stones',
+    swatches: [
+      ['stoneAsset.light', 'lit stone'],
+      ['stoneAsset.mid', 'stone'],
+      ['stoneAsset.shadow', 'stone in shadow'],
+      ['stoneAsset.moss', 'moss'],
+      ['stoneAsset.grass', 'grass at the foot'],
     ],
   },
   {
@@ -175,6 +194,7 @@ function presetOf(d: ThemeDoc, name: string): ThemePreset {
     grade: { ...NEUTRAL_GRADE, ...p.grade },
     swatches: { ...SAVED.presets[SAVED.active]?.swatches, ...p.swatches },
     characters: { player: 1, mitchy: 1, ...p.characters },
+    stones: { saturation: 1, brightness: 1, ...p.stones },
   };
 }
 
@@ -223,6 +243,10 @@ export function themeColor(name: string): string {
   return c;
 }
 export const themeRgb = (name: string): RGB => hexToRgb(themeColor(name));
+
+// A swatch as set, without the grade (for colours the grade never touches)
+export const themeSwatch = (name: string): string => cur.swatches[name] ?? '#ff00ff';
+export const stoneLook = (): StoneLook => ({ saturation: 1, brightness: 1, ...cur.stones });
 
 // A colour between two swatches (0 = a, 1 = b), graded
 export function themeMix(a: string, b: string, t: number): string {
@@ -288,6 +312,11 @@ export function setSwatch(name: string, hex: string) {
 }
 export function setCharacterSaturation(who: Character, v: number) {
   cur.characters = { player: 1, mitchy: 1, ...cur.characters, [who]: v };
+  doc.presets[doc.active] = cur;
+  changed();
+}
+export function setStoneLook(patch: Partial<StoneLook>) {
+  cur.stones = { saturation: 1, brightness: 1, ...cur.stones, ...patch };
   doc.presets[doc.active] = cur;
   changed();
 }

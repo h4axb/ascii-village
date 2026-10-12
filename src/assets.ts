@@ -21,6 +21,7 @@
 import * as S from './sprites';
 import type { EntityKind } from './world';
 import metaData from './data/assets.meta.json';
+import { onThemeChange, stoneLook, themeSwatch } from './theme';
 
 export interface AssetDef {
   slug: string;
@@ -124,6 +125,47 @@ function withMeta(a: AssetDef): AssetDef {
 export const RAW_ASSETS: AssetDef[] = [...CODE_ASSETS, ...fileAssets()];
 export const ASSETS: AssetDef[] = RAW_ASSETS.map(withMeta);
 const BY_SLUG = new Map([...ASSETS, ...FIXED_ASSETS.map(withMeta)].map((a) => [a.slug, a]));
+
+// ---- the stones' colours (the editor's Theme tab, "Stones") ------------------
+// Every colour of a stone asset's drawing (src/data/assets/*stone-*.json) is
+// one of five kinds: lit stone, stone, stone in shadow, moss, grass at its
+// foot. It moves with its kind's theme swatch (stoneAsset.*: the shift from
+// the swatch's default is added to it), then the stones' saturation and
+// brightness apply. At the defaults every colour is exactly as drawn. The
+// palettes are refilled in place, like the palm's (sprites.ts): every placed
+// stone shares its asset's palette object.
+type StoneKind = 'light' | 'mid' | 'shadow' | 'moss' | 'grass';
+// the swatches' defaults: the mean colour of each kind over all the stones
+const STONE_DEFAULT: Record<StoneKind, string> = { light: '#e1c8a8', mid: '#9b8b73', shadow: '#553f43', moss: '#3c6b50', grass: '#84b068' };
+const rgbOf = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+function stoneKind(hex: string): StoneKind {
+  const [r, g, b] = rgbOf(hex);
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+  if (g > r + 12 && g >= b - 8) return lum >= 130 ? 'grass' : 'moss';
+  return lum >= 165 ? 'light' : lum >= 110 ? 'mid' : 'shadow';
+}
+const STONES = [...ASSETS, ...RAW_ASSETS]
+  .filter((a) => /^(standing-)?stone-/.test(a.slug) && a.palette)
+  .map((a) => a.palette!)
+  .filter((p, i, all) => all.indexOf(p) === i)
+  .map((palette) => ({ palette, orig: Object.entries(palette).map(([k, hex]) => ({ k, rgb: rgbOf(hex), kind: stoneKind(hex) })) }));
+function themeStones() {
+  const look = stoneLook();
+  const shift = {} as Record<StoneKind, number[]>;
+  for (const kind of Object.keys(STONE_DEFAULT) as StoneKind[]) {
+    const to = rgbOf(themeSwatch(`stoneAsset.${kind}`)), from = rgbOf(STONE_DEFAULT[kind]);
+    shift[kind] = to.map((v, i) => v - from[i]);
+  }
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  for (const { palette, orig } of STONES)
+    for (const { k, rgb, kind } of orig) {
+      const c = rgb.map((v, i) => v + shift[kind][i]);
+      const lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+      palette[k] = '#' + c.map((v) => ch((lum + (v - lum) * look.saturation) * look.brightness)).join('');
+    }
+}
+themeStones();
+onThemeChange(themeStones);
 
 export function assetOf(slug: string | undefined): AssetDef | undefined {
   return slug ? BY_SLUG.get(slug) : undefined;

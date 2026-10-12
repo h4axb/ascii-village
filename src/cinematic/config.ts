@@ -40,8 +40,8 @@ export const LEAD = 1000;
 export const FIRST = { toast: LEAD + 1500, inbox: LEAD + 3500, select: LEAD + 3750, open: LEAD + 4300 };
 export const M = LEAD + 8800;
 // the montage: cuts faster and faster, as weeks and months go by (ms from M)
-const CUT = [0, 1800, 3000, 4000, 4800, 5500, 6100, 6600];
-export const CUTS_END = M + 8000; // the last still holds from here
+const CUT = [0, 1800, 3200, 4400, 5500, 6500, 7400, 8300];
+export const CUTS_END = M + 9800; // the last still holds from here
 const QUADS: Quad[] = [
   [[515.6, 56.7], [1116.0, 56.7], [1125.0, 409.5], [502.9, 409.5]],
   [[523.9, 64.2], [1120.1, 64.2], [1129.0, 413.4], [509.3, 413.4]],
@@ -62,7 +62,7 @@ const CLOCK: [string, string][] = [
   ['23:51', 'Sat 23 Aug'], // almost dark
   ['02:47', 'Tue 2 Sep'], // deep night: only the screen's light
 ];
-const FADES = [0, 120, 120, 120, 60, 60, 30, 30];
+const FADES = [0, 140, 140, 140, 120, 120, 100, 100];
 export const FRAMES: Frame[] = QUADS.map((quad, i) => ({
   src: `/intro/cinematic/${String(i + 1).padStart(2, '0')}-shot.webp`,
   at: i ? M + CUT[i] : LEAD,
@@ -150,13 +150,13 @@ export const CAMERA = {
   scale: [
     [0, 1.5],
     [1800, 1.46],
-    [3000, 1.4],
-    [4000, 1.32],
-    [4800, 1.23],
-    [5500, 1.14],
-    [6100, 1.07],
-    [6600, 1.02],
-    [8000, 1.0],
+    [3200, 1.4],
+    [4400, 1.32],
+    [5500, 1.23],
+    [6500, 1.14],
+    [7400, 1.07],
+    [8300, 1.02],
+    [9800, 1.0],
   ] as [number, number][],
   origin: null as null | { x: number; y: number },
   tune: { zoom: 1, ox: 0, oy: 0 },

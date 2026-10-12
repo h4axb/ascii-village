@@ -353,9 +353,13 @@ export default forwardRef<
     // it always aims at the screen, as far as the stills still cover the
     // frame (the band between the bars, the whole width): the laptop stays
     // where it is in the frame while the room opens up around it
-    const hx = vw / 2 / S, hy = band / 2 / S;
+    // (the aim for the closest and the widest framing, each kept inside the
+    // stills; in between, a straight line from one to the other, eased like
+    // the zoom - one smooth move, and it stays inside: the limit is convex)
     const clampTo = (v: number, h: number, size: number) => (2 * h >= size ? size / 2 : Math.max(h, Math.min(size - h, v)));
-    const q = { x: clampTo(focus.x, hx, STAGE_W), y: clampTo(focus.y, hy, STAGE_H) };
+    const aim = (Z: number) => ({ x: clampTo(focus.x, vw / 2 / Z, STAGE_W), y: clampTo(focus.y, band / 2 / Z, STAGE_H) });
+    const qs = aim(s * zStart), qe = aim(s * zEnd);
+    const q = { x: lerp(qe.x, qs.x, k), y: lerp(qe.y, qs.y, k) };
     return { S, x: vw / 2 - q.x * S, y: vh / 2 - q.y * S };
   }
 

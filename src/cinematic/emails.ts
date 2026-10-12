@@ -99,6 +99,17 @@ export const EMAILS: Email[] = [
     ],
     sign: ['The Brightloop Team'],
   },
+  {
+    from: 'Glasswing Studio',
+    subject: 'Application status: closed',
+    body: [
+      'Dear Applicant,',
+      'Thank you for your patience during our hiring process.',
+      '*Regrettably*, we will not be inviting you to the next round.',
+      'We appreciate the time you put into your application.',
+    ],
+    sign: ['Glasswing Studio Talent Team'],
+  },
 ];
 
 // An opened mail on the laptop screen: which email, its style, its place (in %
@@ -117,7 +128,7 @@ export interface WindowShot {
 }
 
 const F = FRAMES.map((f) => f.at);
-// a mail opening shortly after its notification (it slides in a little)
+// a mail opening from the inbox (it slides in a little)
 const opens = (email: number, variant: Variant, left: number, top: number, width: number, appear: number, hide: number): WindowShot => ({
   email,
   variant,
@@ -141,49 +152,43 @@ const cutIn = (shot: number, email: number, variant: Variant, left: number, top:
   open: true,
 });
 export const WINDOWS: WindowShot[] = [
-  // the first: opened from the inbox, read while the camera holds
+  // the first: opened from its notification and the inbox, read while the camera holds
   opens(0, 'standard', 17, 6, 66, FIRST.open, F[1]),
-  // then quicker: a notification, the mail opens
-  opens(1, 'standard', 18, 7, 66, F[1] + 450, F[2]),
-  opens(3, 'portal', 15, 9, 68, F[2] + 330, F[3]),
-  // then already open as the shot cuts in, replacing the one before
+  // then each one already open as its shot cuts in, replacing the one before
+  // (no more notifications: the mails are simply there)
+  cutIn(1, 1, 'standard', 18, 7, 66),
+  cutIn(2, 3, 'portal', 15, 9, 68),
   cutIn(3, 4, 'standard', 17, 6, 66),
   cutIn(4, 6, 'standard', 14, 9, 68),
   cutIn(5, 5, 'portal', 18, 8, 66),
-  // (shot 7: only a notification flashes by)
-  // the last one: its notification, then it opens and stays. Set right of
-  // centre so its keywords sit straight above the door's place (the screen's
-  // middle), and their letters fall straight down onto it
+  cutIn(6, 7, 'standard', 16, 7, 67),
+  // the last one, open from its cut and staying. Set right of centre so its
+  // keywords sit straight above the door's place (the screen's middle), and
+  // their letters fall straight down onto it
   {
     email: 2,
     variant: 'standard',
     left: 23.8,
     top: 6,
     width: 74,
-    appear: F[7] + 750,
-    from: { x: 0, y: 6 },
+    appear: F[7],
+    from: { x: 0, y: 0 },
+    open: true,
     final: true,
   },
 ];
 
-// The notifications (above the taskbar, bottom right): one element, shown
-// for each in turn, with the sender and the subject
+// The notification (above the taskbar, bottom right): only the first mail
+// gets one; it stays 2 s, then it is clicked and the inbox opens
 export interface Toast {
   at: number;
   hide: number;
   from: string;
   text: string;
 }
-export const TOASTS: Toast[] = [
-  // the first stays 2 s, then it is clicked: the inbox opens
-  { at: FIRST.toast, hide: FIRST.inbox, from: 'Northstar Games', text: 'Your Application — Junior Game Designer' },
-  { at: F[1] + 100, hide: F[1] + 450, from: 'Moss & Moon Games', text: 'Update regarding your application' },
-  { at: F[2] + 80, hide: F[2] + 330, from: 'Pixelvale Studio', text: 'Your application status' },
-  { at: F[6] + 40, hide: F[7], from: 'Glasswing Studio', text: 'Application status: closed — Regrettably, we will not be inviting you…' },
-  { at: F[7] + 150, hide: F[7] + 750, from: 'Cloverbyte Studio', text: 'Application Update' },
-];
-// the chime: every notification, and every mail that cuts in already open
-export const CHIMES: number[] = [...TOASTS.map((t) => t.at), ...WINDOWS.filter((w) => w.open).map((w) => w.appear)].sort((a, b) => a - b);
+export const TOASTS: Toast[] = [{ at: FIRST.toast, hide: FIRST.inbox, from: 'Northstar Games', text: 'Your Application — Junior Game Designer' }];
+// the chime: the notification's sound
+export const CHIMES: number[] = TOASTS.map((t) => t.at);
 
 // ---- the inbox ---------------------------------------------------------------------------
 // Every mail the list shows, with the moment it arrives (ms; < 0 = already
@@ -241,15 +246,15 @@ export const INBOX: InboxItem[] = [
   // the first rejection: selected, then opened
   { at: TOASTS[0].at, from: 'Northstar Games', subject: 'Your Application — Junior Game Designer', time: '08:11', unread: true, readAt: WINDOWS[0].appear, select: [FIRST.select, WINDOWS[0].appear + 200] },
   { at: F[1], from: 'Pixel Weekly', subject: 'Issue #209: colour for UI', time: 'Tue' },
-  { at: TOASTS[1].at, from: 'Moss & Moon Games', subject: 'Update regarding your application', time: '13:41', unread: true, readAt: WINDOWS[1].appear },
+  { at: F[1], from: 'Moss & Moon Games', subject: 'Update regarding your application', time: '13:41', unread: true, readAt: WINDOWS[1].appear },
   { at: F[2], from: 'Mom', subject: 'Did you eat?', time: 'Tue', unread: true },
-  { at: TOASTS[2].at, from: 'Pixelvale Studio', subject: 'Your application status', time: '16:18', unread: true, readAt: WINDOWS[2].appear },
+  { at: F[2], from: 'Pixelvale Studio', subject: 'Your application status', time: '16:18', unread: true, readAt: WINDOWS[2].appear },
   // the routine: a sea of unread status updates, rejections in between
   ...routine.reverse(),
   { at: F[3], from: 'Tidewater Games', subject: 'Re: Junior UI Artist', time: '15:02', unread: true, readAt: WINDOWS[3].appear },
   { at: F[4], from: 'Brightloop', subject: 'Your application to Brightloop', time: '19:40', unread: true, readAt: WINDOWS[4].appear },
   { at: F[5], from: 'Ember & Ash', subject: 'Application outcome', time: '21:15', unread: true, readAt: WINDOWS[5].appear },
-  { at: TOASTS[3].at, from: 'Glasswing Studio', subject: 'Application status: closed', time: '23:50', unread: true },
+  { at: F[6], from: 'Glasswing Studio', subject: 'Application status: closed', time: '23:50', unread: true, readAt: WINDOWS[6].appear },
   // the last one
-  { at: TOASTS[4].at, from: 'Cloverbyte Studio', subject: 'Application Update', time: '02:46', unread: true, readAt: WINDOWS[6].appear },
+  { at: F[7], from: 'Cloverbyte Studio', subject: 'Application Update', time: '02:46', unread: true, readAt: WINDOWS[7].appear },
 ];

@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
-// THE INTRO CINEMATIC (about 26 s): six rejection emails pile up on the
-// laptop -> three phrases are left in the dark -> their letters fall into
+// THE INTRO CINEMATIC: "Six months earlier" -> eight stills of one desk,
+// morning to deep night, while rejection mails arrive faster and faster on
+// the laptop and the camera pulls back -> three phrases are left in the dark -> their letters fall into
 // the foot of a glyph door, which builds itself up from there -> it opens
 // onto the sea and an island, light pours out -> a slow walk toward it, into
 // black -> 3 s of black -> the wake-up scene (App.tsx's runIntro) takes over.
@@ -12,8 +13,11 @@
 // opacities and a few colours on elements rendered once.
 //
 // Layers, back to front:
-//   stage    the reference photo (scaled to cover), the room glow, a black
-//            fade, and the laptop screen with the HTML email windows
+//   stage    the stills (stacked, crossfading; scaled to cover), a black
+//            fade, and the laptop's desktop in HTML (icons, taskbar, clock,
+//            mail app, notifications, email windows), laid out once and
+//            mapped onto the screen's four corners - the camera moves the
+//            whole stage, so it stays on the screen in every still
 //   scene    the glyph canvas (scene.ts): the door (door-glyphs.svg, door.ts)
 //            building bottom up, opening onto the island, the beam; the walk
 //            toward it is a camera move in the canvas's draw
@@ -28,12 +32,17 @@ import {
   STAGE_H,
   FRAMES,
   fitFrame,
-  screenFit,
-  CLOCK_GAP,
+  screenQuad,
+  screenBox,
+  rectToQuad,
+  SCREEN,
   TASKBAR,
+  TITLE,
+  FIRST,
+  CAMERA,
+  cameraZoom,
   T,
   ENTER_MS,
-  ZOOM_START,
   LETTERS,
   SCENE,
   SHOT_LIST,
@@ -44,7 +53,8 @@ import {
   easeOutCubic,
   rand,
 } from './config';
-import { EMAILS, WINDOWS, FLASH, INBOX, TOAST, type WindowShot } from './emails';
+import { EMAILS, WINDOWS, INBOX, TOASTS, CHIMES, type WindowShot } from './emails';
+import { chime } from './sound';
 import { GlyphCanvas } from './glyphCanvas';
 import { buildScene, renderScene, cellAt, growFrom, sceneCell, DOOR_PAD, type Scene } from './scene';
 import { DOOR } from './door';
@@ -140,6 +150,77 @@ function EmailWindow({ w, final, next, winRef }: { w: WindowShot; final: boolean
   );
 }
 
+// ---- the desktop's icons (simple shapes, no brands) ----------------------------------------
+const svg = (children: ReactNode, vb = '0 0 24 24') => (
+  <svg viewBox={vb} aria-hidden="true">
+    {children}
+  </svg>
+);
+const ICON = {
+  launch: svg(
+    <>
+      <rect x="4" y="4" width="7" height="7" rx="2" />
+      <rect x="13" y="4" width="7" height="7" rx="2" />
+      <rect x="4" y="13" width="7" height="7" rx="2" />
+      <rect x="13" y="13" width="7" height="7" rx="2" />
+    </>,
+  ),
+  files: svg(<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#f2c25b" />),
+  browser: svg(
+    <>
+      <circle cx="12" cy="12" r="8.5" fill="#5aa6e8" />
+      <path d="M3.5 12h17M12 3.5c3 3 3 14 0 17M12 3.5c-3 3-3 14 0 17" fill="none" stroke="#e8f3ff" strokeWidth="1.3" />
+    </>,
+  ),
+  mail: svg(
+    <>
+      <rect x="3" y="5.5" width="18" height="13" rx="2.5" fill="#4f7fe0" />
+      <path d="M4 7.5l8 6 8-6" fill="none" stroke="#eaf1ff" strokeWidth="1.6" />
+    </>,
+  ),
+  notes: svg(
+    <>
+      <rect x="5" y="3.5" width="14" height="17" rx="2" fill="#f4e48a" />
+      <path d="M8 9h8M8 12.5h8M8 16h5" stroke="#9b8a3a" strokeWidth="1.3" />
+    </>,
+  ),
+  portfolio: svg(
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" fill="#e88f7a" />
+      <circle cx="9" cy="10" r="2" fill="#fff4ee" />
+      <path d="M4 18l6-5 4 3 3-2 4 4" fill="#fff4ee" />
+    </>,
+  ),
+  trash: svg(
+    <>
+      <path d="M6 7h12l-1 13H7z" fill="#cfd6e0" />
+      <rect x="4.5" y="4.5" width="15" height="2.5" rx="1" fill="#e6ebf1" />
+    </>,
+  ),
+  wifi: svg(<path d="M3 9.5a13 13 0 0 1 18 0M6 13a8.5 8.5 0 0 1 12 0M9 16.4a4 4 0 0 1 6 0M12 19.5h.01" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />),
+  volume: svg(
+    <>
+      <path d="M4 9.5h4l5-4v13l-5-4H4z" fill="currentColor" />
+      <path d="M16 9a4 4 0 0 1 0 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </>,
+  ),
+  battery: svg(
+    <>
+      <rect x="2.5" y="7" width="17" height="10" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="5" y="9.5" width="9" height="5" rx="1" fill="currentColor" />
+      <rect x="20.5" y="10" width="2" height="4" rx="1" fill="currentColor" />
+    </>,
+  ),
+};
+const DESK_ICONS: [string, ReactNode][] = [
+  ['Files', ICON.files],
+  ['Portfolio', ICON.portfolio],
+  ['Browser', ICON.browser],
+  ['Mail', ICON.mail],
+  ['Notes', ICON.notes],
+  ['Trash', ICON.trash],
+];
+
 // ---- colour helpers ------------------------------------------------------------------------
 const hexRgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 const mix = (a: string, b: string, k: number) => {
@@ -159,14 +240,19 @@ function frameAt(t: number) {
   });
   return i;
 }
-// the laptop screen's place (every still is fitted to put its screen there)
-function screenAt() {
-  return screenFit();
-}
 // the inbox, latest arrival on top (among mails arriving together, the later one)
 const ORDER = INBOX.map((it, i) => ({ it, i })).sort((a, b) => b.it.at - a.it.at || b.i - a.i);
 const ROW_H = 18; // a list row, stage px
-const PULL_EXP = 3.2; // how sharply the camera's pull back speeds up
+// the desktop's px -> stage px (about: the screen is a little wider at the bottom)
+const SCREEN_K = screenBox().w / SCREEN.w;
+// the stills' crossfade: still i's opacity at t (each fades in over its `fade` from its cut)
+function stillOpacity(i: number, t: number) {
+  const f = FRAMES[i], next = FRAMES[i + 1];
+  const inK = i === 0 ? 1 : clamp01((t - f.at) / Math.max(1, f.fade));
+  // under the next one until that one is fully in (no dark gap between them)
+  const outK = next && t >= next.at + next.fade ? 0 : 1;
+  return t >= f.at ? inK * outK : 0;
+}
 
 // ---- the per-letter plan, fixed once the letters have been measured --------------------
 interface Plan {
@@ -197,8 +283,6 @@ export default forwardRef<
   const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, []);
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const dimRef = useRef<HTMLDivElement>(null);
-  const glowRef = useRef<HTMLDivElement>(null);
   const blackRef = useRef<HTMLDivElement>(null);
   const frameRefs = useRef<(HTMLImageElement | null)[]>([]);
   const screenRef = useRef<HTMLDivElement>(null);
@@ -209,10 +293,13 @@ export default forwardRef<
   const unreadRef = useRef<HTMLSpanElement>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const toastRef = useRef<HTMLDivElement>(null);
-  const clockRef = useRef<HTMLDivElement>(null);
   const clockTimeRef = useRef<HTMLSpanElement>(null);
   const clockDateRef = useRef<HTMLSpanElement>(null);
-  const flashRef = useRef<HTMLDivElement>(null);
+  const taskbarRef = useRef<HTMLDivElement>(null);
+  const badgeRef = useRef<HTMLSpanElement>(null);
+  const toastFromRef = useRef<HTMLElement>(null);
+  const toastTextRef = useRef<HTMLSpanElement>(null);
+  const titleRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glyphs = useRef<GlyphCanvas | null>(null);
   // the door on a layer of its own, boiling (the SVG filter below)
@@ -244,26 +331,31 @@ export default forwardRef<
     const s = Math.max(vw / STAGE_W, vh / STAGE_H);
     return { s, ox: (vw - STAGE_W * s) / 2, oy: (vh - STAGE_H * s) / 2 };
   };
-  // the stage transform at time t: cover, starting close on the laptop's
-  // screen and slowly pulling back to the whole desk through all the stills;
-  // after them the camera stays
-  const first = screenFit();
-  const focus = { x: first.x + first.w / 2, y: first.y + first.h / 2 };
+  // the stage transform at time t: cover, close on the laptop's screen, then
+  // one continuous pull back over all eight stills (CAMERA, cameraZoom),
+  // toward the screen (CAMERA.origin); after them the camera stays
+  const box = screenBox();
   function stageTransform(t: number, vw: number, vh: number) {
-    const { s, ox, oy } = cover(vw, vh);
-    // framed for the letterbox: the band between the bars. Close, the whole
-    // screen (taskbar and clock too) fits in it; wide, the desk still fills
-    // it (and the viewport's width)
+    const { s } = cover(vw, vh);
+    // framed for the letterbox: the band between the bars. Wide (zoom 1),
+    // the desk fills it (and the viewport's width); close, the whole screen
+    // (taskbar and clock too) still fits in it
     const band = vh * (1 - (2 * LETTERBOX_BAR_VH) / 100);
     const zEnd = Math.max(band / (STAGE_H * s), vw / (STAGE_W * s)) * 1.01;
-    const zStart = Math.max(zEnd, Math.min(ZOOM_START, (0.96 * band) / (first.h * s)));
-    // it holds on the first mail, then pulls back - slowly at first, faster
-    // and faster (exponential)
-    const u = clamp01((t - T.pullBack[0]) / (T.pullBack[1] - T.pullBack[0]));
-    const k = reduced ? 0 : 1 - (Math.exp(PULL_EXP * u) - 1) / (Math.exp(PULL_EXP) - 1);
+    const zFit = (0.96 * band) / (box.h * s);
+    const zStart = Math.max(zEnd, Math.min(CAMERA.scale[0][1] * zEnd * CAMERA.tune.zoom, zFit));
+    const z0 = CAMERA.scale[0][1], z1 = CAMERA.scale[CAMERA.scale.length - 1][1];
+    // 1 while close, 0 at the end of the pull back
+    const k = reduced ? 1 : clamp01((cameraZoom(t) - z1) / (z0 - z1));
     const S = s * lerp(zEnd, zStart, k);
-    const q0 = { x: (vw / 2 - ox) / s, y: (vh / 2 - oy) / s };
-    const q = { x: lerp(q0.x, focus.x, k), y: lerp(q0.y, focus.y, k) };
+    const o = CAMERA.origin ?? box;
+    const focus = { x: o.x + CAMERA.tune.ox, y: o.y + CAMERA.tune.oy };
+    // it always aims at the screen, as far as the stills still cover the
+    // frame (the band between the bars, the whole width): the laptop stays
+    // where it is in the frame while the room opens up around it
+    const hx = vw / 2 / S, hy = band / 2 / S;
+    const clampTo = (v: number, h: number, size: number) => (2 * h >= size ? size / 2 : Math.max(h, Math.min(size - h, v)));
+    const q = { x: clampTo(focus.x, hx, STAGE_W), y: clampTo(focus.y, hy, STAGE_H) };
     return { S, x: vw / 2 - q.x * S, y: vh / 2 - q.y * S };
   }
 
@@ -280,10 +372,10 @@ export default forwardRef<
       const r = el.getBoundingClientRect();
       const cs = getComputedStyle(el);
       font.push({
-        size: parseFloat(cs.fontSize) * S,
+        size: parseFloat(cs.fontSize) * S * SCREEN_K,
         family: cs.fontFamily,
         weight: cs.fontWeight,
-        spacing: cs.letterSpacing === 'normal' ? 'normal' : `${parseFloat(cs.letterSpacing) * S}px`,
+        spacing: cs.letterSpacing === 'normal' ? 'normal' : `${parseFloat(cs.letterSpacing) * S * SCREEN_K}px`,
       });
       plan.push({
         x0: r.left + r.width / 2,
@@ -385,24 +477,21 @@ export default forwardRef<
     return { x: p.x0, y: fallY(p, m.P, t) + pan, sx: lerp(lerp(1, fx, k), qx, mk), sy: lerp(lerp(1, fy, k), qy, mk), m: mk };
   }
 
-  // ---- the desktop: clock, mail app, inbox, notification ------------------------------------
+  // ---- the desktop: clock, mail app, inbox, notifications ------------------------------------
   function applyDesktop(t: number, fi: number, quiet: number) {
     const f = FRAMES[fi];
-    // the clock: beside each still's own battery icon (stage px within the
-    // screen), so it is on the same spot of the laptop in every still; it
-    // jumps there with the cut, never slides
-    const scr = screenAt(), ff = fitFrame(fi);
-    Object.assign(clockRef.current!.style, { left: `${ff.x + ff.s * (f.tray.x + CLOCK_GAP) - scr.x}px`, top: `${ff.y + ff.s * f.tray.y - scr.y}px` });
-    // the desktop and taskbar clock fade with everything but the keywords
+    // the desktop and the taskbar fade with everything but the keywords
     deskRef.current!.style.opacity = String(quiet);
-    clockRef.current!.style.opacity = String(quiet);
+    taskbarRef.current!.style.opacity = String(quiet);
     if (clockTimeRef.current!.textContent !== f.time) {
       clockTimeRef.current!.textContent = f.time;
       clockDateRef.current!.textContent = f.date;
     }
-    // the mail app: a little elsewhere each shot
-    Object.assign(appRef.current!.style, { left: `${f.app.left}%`, top: `${f.app.top}%`, width: `${f.app.width}%`, height: `${f.app.height}%` });
-    // the inbox: mails arrive on top, unread ones bold until read
+    // the mail app: closed until the first notification is clicked, then it opens (and stays)
+    const ak = easeOutCubic(clamp01((t - FIRST.inbox) / 220));
+    appRef.current!.style.opacity = String(t >= FIRST.inbox ? ak : 0);
+    appRef.current!.style.transform = `scale(${reduced ? 1 : lerp(0.96, 1, ak)})`;
+    // the inbox: mails arrive on top; the first one is selected before it opens
     let unread = 0, shown = 0;
     ORDER.forEach(({ it }, k) => {
       const el = rowRefs.current[k];
@@ -411,19 +500,33 @@ export default forwardRef<
       el.style.display = here ? '' : 'none';
       if (!here) return;
       shown++;
-      const isUnread = !!it.unread && !(it.readAt !== undefined && t >= it.readAt);
-      if (isUnread) unread++;
-      // (the list's rows stay plain: no bold, dot or flash for unread or new mail)
+      if (it.unread && !(it.readAt !== undefined && t >= it.readAt)) unread++;
+      const sel = it.select && t >= it.select[0] && t < it.select[1] ? clamp01((t - it.select[0]) / 120) : 0;
+      el.style.setProperty('--sel', String(sel));
     });
     unreadRef.current!.textContent = String(unread + 2);
+    badgeRef.current!.textContent = String(unread + 2);
+    badgeRef.current!.style.opacity = t >= FIRST.toast ? '1' : '0';
     const view = appRef.current!.clientHeight || 1;
     const total = Math.max(view, shown * ROW_H + 24);
     thumbRef.current!.style.height = `${(100 * view) / total}%`;
     thumbRef.current!.style.top = '0%';
-    // the thank-you's notification
-    const tin = easeOutCubic(clamp01((t - TOAST.at) / 320)), tout = clamp01((TOAST.hide - t) / 320);
-    toastRef.current!.style.opacity = String(t >= TOAST.at && t < TOAST.hide ? Math.min(tin, tout) : 0);
-    toastRef.current!.style.transform = `translateY(${reduced ? 0 : (1 - tin) * 14}px)`;
+    // the notification showing now (one element, its text swapped)
+    const ti = TOASTS.findIndex((o) => t >= o.at && t < o.hide);
+    const toast = toastRef.current!;
+    if (ti < 0) {
+      toast.style.opacity = '0';
+      return;
+    }
+    const o = TOASTS[ti];
+    if (toast.dataset.i !== String(ti)) {
+      toast.dataset.i = String(ti);
+      toastFromRef.current!.textContent = o.from;
+      toastTextRef.current!.textContent = o.text;
+    }
+    const tin = easeOutCubic(clamp01((t - o.at) / 260)), tout = clamp01((o.hide - t) / 200);
+    toast.style.opacity = String(Math.min(tin, tout) * quiet);
+    toast.style.transform = `translateY(${reduced ? 0 : (1 - tin) * 14}px)`;
   }
 
   // ---- apply: everything at time t ----------------------------------------------------------
@@ -433,27 +536,20 @@ export default forwardRef<
     stageRef.current!.style.visibility = t >= T.fall && t >= 0 && measured.current ? 'hidden' : 'visible';
     // it opens on black, then fades in on the first shot
     stageRef.current!.style.opacity = String(span(t, T.fadeIn));
-    // the stills, a hard cut from one to the next; the screen overlay is on the laptop's screen
+    // the stills: each crossfades in over the one before (short early on,
+    // near-instant at the end); the desktop stays where it is, on the screen
     const fi = frameAt(t);
-    FRAMES.forEach((f, k) => {
+    FRAMES.forEach((_, k) => {
       const el = frameRefs.current[k];
-      if (el) el.style.opacity = k === fi ? '1' : '0';
+      if (el) el.style.opacity = String(stillOpacity(k, t));
     });
-    const scr = screenAt();
-    Object.assign(screenRef.current!.style, { left: `${scr.x}px`, top: `${scr.y}px`, width: `${scr.w}px`, height: `${scr.h}px` });
-    // lighting: a flash as each mail opens; the screen's glow in the room grows toward night
-    let flash = 0;
-    WINDOWS.forEach((w) => {
-      if (!w.open && t >= w.appear && t < T.montageEnd) flash += FLASH * Math.exp(-(t - w.appear) / 110);
-    });
-    if (reduced) flash *= 0.3;
-    flashRef.current!.style.opacity = String(Math.min(0.5, flash));
     const quiet = 1 - span(t, T.othersOut);
-    const glow = FRAMES[fi].glow;
-    // the light going down over a reused still (cut with it)
-    Object.assign(dimRef.current!.style, { left: `${scr.x}px`, top: `${scr.y}px`, width: `${scr.w}px`, height: `${scr.h}px`, opacity: String(FRAMES[fi].dim ?? 0) });
-    glowRef.current!.style.opacity = String((glow + 0.9 * flash) * quiet);
     blackRef.current!.style.opacity = String(span(t, T.blackIn));
+    // the title, over the opening black
+    if (titleRef.current) {
+      const [a, b] = TITLE.at;
+      titleRef.current.style.opacity = String(TITLE.enabled ? Math.min(clamp01((t - a) / TITLE.fade), clamp01((b - t) / TITLE.fade)) : 0);
+    }
     applyDesktop(t, fi, quiet);
     // the windows
     WINDOWS.forEach((w, i) => {
@@ -468,7 +564,7 @@ export default forwardRef<
       const ee = easeOutCubic(e);
       const dx = reduced ? 0 : w.from.x * (1 - ee), dy = reduced ? 0 : w.from.y * (1 - ee);
       // already open: it is there from its still's cut
-      let op = w.open ? 1 : i === 0 ? ee : Math.min(1, e * 2.5);
+      let op = w.open ? 1 : ee;
       if (!w.final) op *= 1 - span(t, T.othersOut);
       el.style.opacity = String(op);
       el.style.transform = `translate(${dx}px, ${dy}px)`;
@@ -590,7 +686,10 @@ export default forwardRef<
       const c = clock.current;
       if (c.done) return;
       if (c.playing) {
+        const before = c.t;
         c.t += dt * c.speed;
+        // a chime for each notification crossed while playing (never while scrubbing)
+        if (CHIMES.some((at) => before < at && c.t >= at)) chime();
         if (c.stopAt !== null && c.t >= c.stopAt) {
           c.t = c.stopAt;
           c.stopAt = null;
@@ -627,7 +726,6 @@ export default forwardRef<
     const onResize = () => (clock.current.dirty = true);
     window.addEventListener('resize', onResize);
     // start once the reference picture is in (or after a short wait)
-    const img = new Image();
     let started = false;
     const start = () => {
       if (started || clock.current.done) return;
@@ -635,11 +733,16 @@ export default forwardRef<
       clock.current.playing = true;
       setPlaying(true);
     };
-    img.onload = start;
-    img.onerror = start;
-    img.src = FRAMES[0].src;
-    FRAMES.slice(1).forEach((f) => (new Image().src = f.src));
-    const fallback = window.setTimeout(start, 2500);
+    // start once all eight stills are in (or after a short wait): no flash of a missing one
+    let left = FRAMES.length;
+    const one = () => --left <= 0 && start();
+    FRAMES.forEach((f) => {
+      const im = new Image();
+      im.onload = one;
+      im.onerror = one;
+      im.src = f.src;
+    });
+    const fallback = window.setTimeout(start, 4000);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', onResize);
@@ -709,11 +812,19 @@ export default forwardRef<
             style={{ opacity: k ? 0 : 1, transformOrigin: '0 0', transform: `translate(${fitFrame(k).x}px, ${fitFrame(k).y}px) scale(${fitFrame(k).s})` }}
           />
         ))}
-        <div ref={dimRef} className="cin-dim" />
-        <div ref={glowRef} className="cin-glow" />
         <div ref={blackRef} className="cin-black" />
-        <div ref={screenRef} className="cin-screen">
+        {/* the desktop: laid out flat in its own SCREEN px, put onto the
+            laptop's screen (its four corners) by one perspective transform */}
+        <div ref={screenRef} className="cin-screen" style={{ width: SCREEN.w, height: SCREEN.h, transform: rectToQuad(SCREEN.w, SCREEN.h, screenQuad()) }}>
           <div ref={deskRef} className="cin-desk" style={{ height: `${100 * (1 - TASKBAR)}%` }}>
+            <div className="cin-icons">
+              {DESK_ICONS.map(([name, icon]) => (
+                <div key={name} className="cin-icon">
+                  {icon}
+                  <span>{name}</span>
+                </div>
+              ))}
+            </div>
             <div ref={appRef} className="cin-app">
               <div className="cin-app-bar">
                 <i />
@@ -750,18 +861,37 @@ export default forwardRef<
               </div>
             </div>
             <div ref={toastRef} className="cin-toast">
-              <b>{TOAST.from}</b>
-              <span>{TOAST.text}</span>
+              <b ref={toastFromRef}>{TOASTS[0].from}</b>
+              <span ref={toastTextRef}>{TOASTS[0].text}</span>
             </div>
           </div>
           {WINDOWS.map((w, i) => (
             <EmailWindow key={i} w={w} final={i === FINAL} next={next} winRef={(el) => (winRefs.current[i] = el)} />
           ))}
-          <div ref={clockRef} className="cin-clock" style={{ height: `${100 * TASKBAR}%` }}>
-            <span ref={clockTimeRef}>{FRAMES[0].time}</span>
-            <span ref={clockDateRef}>{FRAMES[0].date}</span>
+          {/* the taskbar: a launcher, pinned apps, the tray and the clock (no brands) */}
+          <div ref={taskbarRef} className="cin-taskbar" style={{ height: `${100 * TASKBAR}%` }}>
+            <div className="cin-tb-apps">
+              <i className="cin-tb-launch">{ICON.launch}</i>
+              <i>{ICON.files}</i>
+              <i>{ICON.browser}</i>
+              <i className="cin-tb-mail">
+                {ICON.mail}
+                <span ref={badgeRef} className="cin-tb-badge">
+                  2
+                </span>
+              </i>
+              <i>{ICON.notes}</i>
+            </div>
+            <div className="cin-tb-tray">
+              {ICON.wifi}
+              {ICON.volume}
+              {ICON.battery}
+              <div className="cin-clock">
+                <span ref={clockTimeRef}>{FRAMES[0].time}</span>
+                <span ref={clockDateRef}>{FRAMES[0].date}</span>
+              </div>
+            </div>
           </div>
-          <div ref={flashRef} className="cin-flash" />
         </div>
       </div>
       <canvas ref={canvasRef} className="cin-scene" />
@@ -793,6 +923,11 @@ export default forwardRef<
   return (
     <div ref={rootRef} className="cin-root">
       {scene}
+      {TITLE.enabled && (
+        <div ref={titleRef} className="cin-title">
+          {TITLE.text}
+        </div>
+      )}
       {/* letterbox bars, the same as the wake-up scene's (Letterbox.tsx) */}
       <div className="cin-bar" style={{ top: 0, height: `${LETTERBOX_BAR_VH}vh` }} />
       <div className="cin-bar" style={{ bottom: 0, height: `${LETTERBOX_BAR_VH}vh` }} />
@@ -845,6 +980,33 @@ export default forwardRef<
             </label>
             <button onClick={skip} title="end the cinematic now (like Skip Intro)">skip → game</button>
             <button onClick={() => setBarOpen(false)} title="hide (T)">×</button>
+          </div>
+          <div className="cin-dev-row">
+            {/* the camera, for tuning by eye: a zoom multiplier and the origin's shift (stage px) */}
+            {(
+              [
+                ['zoom', 'zoom ×', 0.7, 1.3, 0.01],
+                ['ox', 'origin x', -300, 300, 1],
+                ['oy', 'origin y', -200, 200, 1],
+              ] as const
+            ).map(([key, label, min, max, step]) => (
+              <label key={key} title="camera tuning (not saved: copy the value into CAMERA in config.ts)">
+                {label}{' '}
+                <input
+                  type="range"
+                  min={min}
+                  max={max}
+                  step={step}
+                  defaultValue={CAMERA.tune[key]}
+                  onInput={(e) => {
+                    CAMERA.tune[key] = Number((e.target as HTMLInputElement).value);
+                    ((e.target as HTMLElement).nextSibling as HTMLElement).textContent = String(CAMERA.tune[key]);
+                    clock.current.dirty = true;
+                  }}
+                />
+                <span>{CAMERA.tune[key]}</span>
+              </label>
+            ))}
           </div>
           <div className="cin-dev-shots">
             {SHOT_LIST.map((s, i) => (

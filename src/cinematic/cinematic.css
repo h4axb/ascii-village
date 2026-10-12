@@ -32,23 +32,6 @@
 .cin-bg {
   will-change: opacity;
 }
-/* the cold light of the screen spilling into the room */
-.cin-dim {
-  /* placed over the laptop's screen (which keeps its own light): the room
-     around it darkens, through a shadow spread out from the screen's edge */
-  position: absolute;
-  box-shadow: 0 0 0 4000px #0b1026;
-  border-radius: 2px;
-  opacity: 0;
-  pointer-events: none;
-}
-.cin-glow {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(48% 52% at 50% 46%, rgba(90, 150, 255, 0.32), rgba(40, 80, 200, 0.1) 55%, transparent 75%);
-  mix-blend-mode: screen;
-  pointer-events: none;
-}
 .cin-black {
   position: absolute;
   inset: 0;
@@ -56,20 +39,17 @@
   opacity: 0;
 }
 .cin-screen {
+  /* laid out flat (SCREEN px), mapped onto the laptop's screen by a matrix3d */
   position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
   overflow: hidden;
   font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
 }
-.cin-flash {
-  position: absolute;
-  inset: 0;
-  background: #dfe9ff;
-  opacity: 0;
-  pointer-events: none;
-}
 
-/* ---- the desktop over the stills: mail app, inbox, notification, clock ----
-   (sizes in stage px: the stills are 643 px tall, scaled up to cover) */
+/* ---- the desktop over the stills: icons, mail app, inbox, notification,
+   taskbar, clock (sizes in the desktop's own px: SCREEN, 736 x 426) ---- */
 .cin-desk {
   position: absolute;
   left: 0;
@@ -78,6 +58,12 @@
 }
 .cin-app {
   position: absolute;
+  left: 13%;
+  top: 4%;
+  width: 84%;
+  height: 90%;
+  opacity: 0;
+  transform-origin: 50% 60%;
   display: flex;
   flex-direction: column;
   border-radius: 4px;
@@ -162,7 +148,8 @@
   padding: 0 14px 0 9.8px;
   border-bottom: 0.6px solid rgba(0, 0, 0, 0.05);
   color: #6b7280;
-  background: rgba(255, 214, 102, calc(var(--new, 0) * 0.35));
+  /* selected (just before the first mail opens): a soft blue */
+  background: rgba(59, 111, 216, calc(var(--sel, 0) * 0.16));
   white-space: nowrap;
 }
 .cin-row-from {
@@ -232,33 +219,117 @@
   color: #14181f;
   font-size: 8.96px;
 }
-/* the taskbar clock, after the tray icons: time over date, both ending on
-   one right edge */
-.cin-clock {
-  /* left/top: its right edge and middle, beside the still's battery icon (set per still) */
+/* the desktop icons, a column on the left */
+.cin-icons {
   position: absolute;
+  left: 1.4%;
+  top: 3%;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 9.5%;
+}
+.cin-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: #fff;
+  font-size: 7.6px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+.cin-icon svg {
+  width: 27px;
+  height: 27px;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3));
+}
+/* the taskbar: dark glass along the bottom */
+.cin-taskbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  background: rgba(18, 22, 34, 0.62);
+  border-top: 0.6px solid rgba(255, 255, 255, 0.12);
+  color: #eef2f8;
+}
+.cin-tb-apps,
+.cin-tb-tray {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 100%;
+}
+.cin-tb-apps i {
+  position: relative;
+  display: flex;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+}
+.cin-tb-apps i svg {
+  width: 100%;
+  height: 100%;
+}
+.cin-tb-launch {
+  fill: #dfe6f2;
+  opacity: 0.85;
+}
+.cin-tb-badge {
+  position: absolute;
+  right: -3px;
+  top: -2px;
+  min-width: 9px;
+  padding: 0 2px;
+  border-radius: 5px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 6.2px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 9px;
+  text-align: center;
+}
+.cin-tb-tray svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0.9;
+}
+/* the clock: time over date, ending on the taskbar's right edge */
+.cin-clock {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  justify-content: center;
-  /* the tray icons' blue, so it reads as part of the desktop */
-  color: #0b45c6;
+  margin-left: 3px;
   font-size: 9.6px;
   font-weight: 600;
-  line-height: 1.18;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  /* its own layer, rastered once and scaled with the stage: re-laying the
-     text out at every zoom step snapped it to different pixels (it shook) */
-  will-change: transform;
-  transform: translate(-100%, -50%) translateZ(0);
-  text-rendering: geometricPrecision;
 }
 .cin-clock span + span {
-  margin-top: 2.5px;
-  font-size: 8.4px;
+  font-size: 7.8px;
   font-weight: 500;
   opacity: 0.8;
+}
+/* the title over the opening black */
+.cin-title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f1ece2;
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  font-size: clamp(18px, 2.1vw, 34px);
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ---- opened mails ---- */

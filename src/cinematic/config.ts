@@ -8,43 +8,97 @@
 //
 // Coordinates inside the laptop scene are in the stills' own 1672 x 643
 // pixels (public/intro/cinematic/); the scene is scaled to cover the viewport.
+// The desktop on the laptop's screen is in its own SCREEN px.
 // ---------------------------------------------------------------------------
 
 export const STAGE_W = 1672;
 export const STAGE_H = 643;
 
-// The shots, one still each (morning to deep night; a still can serve more
-// than one day): when each cuts in (a hard cut: the clock and the open mail appear at
-// their new place with it), where
-// the laptop's screen is in it (measured from its pixels; the bottom 10 % of
-// the screen is the taskbar), where its taskbar's battery icon is (its right
-// edge and middle, measured: the clock sits beside it, so it is on the same
-// spot of the laptop in every still), the desktop clock, the mail app's place
-// (% of the desktop above the taskbar) and the screen's glow in the room.
+// ---- the shots ---------------------------------------------------------------------
+// Eight stills of the same desk, six months apart, morning to deep night
+// (public/intro/cinematic/, never edited: the light and the clutter are in
+// them). Each one: when it cuts in (ms), how long it crossfades from the one
+// before, where the laptop screen is in it (its four corners, measured from
+// the pixels: the screen is a little wider at the bottom) and the desktop's
+// clock and date.
+type Pt = readonly [number, number];
+export type Quad = readonly [Pt, Pt, Pt, Pt]; // top left, top right, bottom right, bottom left
 export interface Frame {
   src: string;
   at: number;
-  screen: { x: number; y: number; w: number; h: number };
-  tray: { x: number; y: number };
+  fade: number; // ms: the crossfade from the still before
+  quad: Quad;
   time: string;
   date: string;
-  app: { left: number; top: number; width: number; height: number };
-  glow: number;
-  dim?: number; // a dark overlay over the still (0..1): the light going down without a new photo
 }
 
-// The stills were shot a little apart (the laptop sits higher and smaller in
-// some), so each is placed on the stage to put its screen exactly on the
-// first still's - plus one small zoom for all, so none leaves a gap at an
-// edge. fitFrame(i): where still i goes (stage px, scale about its top
-// left); SCREEN_FIT: the laptop screen's place, the same in every still.
+// the cinematic opens on black (the title), then fades in on the first shot
+export const TITLE = { enabled: true, text: 'Six months earlier', at: [0, 1000] as const, fade: 260 };
+export const LEAD = 1000;
+// the first rejection, the whole interaction: notification, the inbox opens
+// on the new mail, the mail opens; then the montage (M) starts
+export const FIRST = { toast: LEAD + 1500, inbox: LEAD + 3500, select: LEAD + 3750, open: LEAD + 4300 };
+export const M = LEAD + 8800;
+// the montage: cuts faster and faster, as weeks and months go by (ms from M)
+const CUT = [0, 1800, 3000, 4000, 4800, 5500, 6100, 6600];
+export const CUTS_END = M + 8000; // the last still holds from here
+const QUADS: Quad[] = [
+  [[515.6, 56.7], [1116.0, 56.7], [1125.0, 409.5], [502.9, 409.5]],
+  [[523.9, 64.2], [1120.1, 64.2], [1129.0, 413.4], [509.3, 413.4]],
+  [[524.5, 64.3], [1120.5, 64.3], [1129.4, 413.4], [509.6, 413.4]],
+  [[524.7, 63.9], [1120.8, 63.9], [1129.5, 413.1], [510.0, 413.1]],
+  [[524.3, 63.6], [1120.6, 63.6], [1129.6, 412.3], [510.4, 412.3]],
+  [[524.8, 63.3], [1121.2, 63.3], [1131.0, 413.1], [510.4, 413.1]],
+  [[525.5, 62.4], [1122.1, 62.4], [1131.1, 412.7], [511.0, 412.7]],
+  [[526.9, 62.3], [1122.9, 62.3], [1131.4, 412.4], [512.1, 412.4]],
+];
+const CLOCK: [string, string][] = [
+  ['08:12', 'Mon 3 Mar'], // warm morning, a tidy desk
+  ['13:46', 'Fri 21 Mar'], // bright midday
+  ['16:20', 'Wed 16 Apr'], // afternoon, a juice can
+  ['15:05', 'Tue 13 May'], // cloudy, an energy drink, the sketchbook shut
+  ['19:42', 'Thu 19 Jun'], // evening, application lists, crumpled notes
+  ['21:18', 'Mon 21 Jul'], // blue hour, more cans
+  ['23:51', 'Sat 23 Aug'], // almost dark
+  ['02:47', 'Tue 2 Sep'], // deep night: only the screen's light
+];
+const FADES = [0, 120, 120, 120, 60, 60, 30, 30];
+export const FRAMES: Frame[] = QUADS.map((quad, i) => ({
+  src: `/intro/cinematic/${String(i + 1).padStart(2, '0')}-shot.webp`,
+  at: i ? M + CUT[i] : LEAD,
+  fade: FADES[i],
+  quad,
+  time: CLOCK[i][0],
+  date: CLOCK[i][1],
+}));
+
+// The desktop (HTML over the stills) is laid out once, in a screen of its
+// own size, and mapped onto the laptop's screen by one perspective
+// transform: icons, taskbar, clock, mail sit on the same spot of the laptop
+// in every still, whatever the camera does.
+export const SCREEN = { w: 736, h: 426 };
+export const TASKBAR = 0.075; // of the screen's height
+
+// The stills were shot a little apart, so each is placed on the stage to put
+// its screen on the first still's (a scale and a shift, least squares over
+// the corners) - plus one small zoom for all, so none leaves a gap at an
+// edge. fitFrame(i): where still i goes (stage px, scale about its top left);
+// screenQuad(): the laptop screen's corners on the stage, the same in every still.
+const centre = (q: Quad) => [q.reduce((a, p) => a + p[0], 0) / 4, q.reduce((a, p) => a + p[1], 0) / 4];
 const fits = () => {
-  const ref = FRAMES[0].screen;
-  const base = FRAMES.map((f) => {
-    const a = (ref.w / f.screen.w + ref.h / f.screen.h) / 2;
-    return { a, bx: ref.x - a * f.screen.x, by: ref.y - a * f.screen.y };
+  const ref = QUADS[0];
+  const [rx, ry] = centre(ref);
+  const base = QUADS.map((q) => {
+    const [px, py] = centre(q);
+    let num = 0, den = 0;
+    q.forEach((p, k) => {
+      num += (p[0] - px) * (ref[k][0] - rx) + (p[1] - py) * (ref[k][1] - ry);
+      den += (p[0] - px) ** 2 + (p[1] - py) ** 2;
+    });
+    const a = num / den;
+    return { a, bx: rx - a * px, by: ry - a * py };
   });
-  const cx = ref.x + ref.w / 2, cy = ref.y + ref.h / 2;
+  const cx = rx, cy = ry;
   let k = 1;
   for (const { a, bx, by } of base) {
     if (bx > 0) k = Math.max(k, cx / (cx - bx));
@@ -55,47 +109,101 @@ const fits = () => {
   k *= 1.002; // a hair more, against rounding
   return {
     frames: base.map(({ a, bx, by }) => ({ s: k * a, x: cx + k * (bx - cx), y: cy + k * (by - cy) })),
-    screen: { x: cx + k * (ref.x - cx), y: cy + k * (ref.y - cy), w: k * ref.w, h: k * ref.h },
+    quad: ref.map(([x, y]) => [cx + k * (x - cx), cy + k * (y - cy)] as const) as unknown as Quad,
   };
 };
 let fitCache: ReturnType<typeof fits> | null = null;
 export const fitFrame = (i: number) => (fitCache ??= fits()).frames[i];
-export const screenFit = () => (fitCache ??= fits()).screen;
-export const TASKBAR = 0.1; // of the screen's height
-// the cinematic opens on black this long, then fades in on the first shot
-export const LEAD = 2500;
-export const FRAMES: Frame[] = [
-  // the thank-you: bright morning, fresh coffee (a notification, then it opens)
-  { src: '/intro/cinematic/01-morning.webp', at: LEAD, screen: { x: 468, y: 63, w: 736, h: 429 }, tray: { x: 1120, y: 468.5 }, time: '08:12', date: 'Mon 3 Mar', app: { left: 2, top: 4, width: 95, height: 88 }, glow: 0 },
-  // then a rejection a shot, each already open when the shot cuts in: the
-  // days go by, the light goes from harsh afternoon to overcast to night
-  { src: '/intro/cinematic/02-midday.webp', at: LEAD + 6300, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '13:46', date: 'Wed 5 Mar', app: { left: 3, top: 6, width: 94, height: 86 }, glow: 0.05 },
-  { src: '/intro/cinematic/03-afternoon.webp', at: LEAD + 8300, screen: { x: 468, y: 63, w: 736, h: 429 }, tray: { x: 1121, y: 468.5 }, time: '17:38', date: 'Fri 14 Mar', app: { left: 1.5, top: 3, width: 96, height: 90 }, glow: 0.1 },
-  { src: '/intro/cinematic/04-overcast.webp', at: LEAD + 10300, screen: { x: 461, y: 48, w: 739, h: 423 }, tray: { x: 1119, y: 448.5 }, time: '11:07', date: 'Thu 3 Apr', app: { left: 2.5, top: 5, width: 95, height: 88 }, glow: 0.2 },
-  { src: '/intro/cinematic/02-midday.webp', at: LEAD + 12300, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '14:22', date: 'Tue 15 Apr', app: { left: 2, top: 5, width: 95, height: 88 }, glow: 0.3 },
-  // the same desk again, the light going down - faster and faster (an
-  // overlay darkens the still: exponentially less light, see dim)
-  { src: '/intro/cinematic/02-midday.webp', at: LEAD + 14300, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '18:05', date: 'Thu 17 Apr', app: { left: 2.5, top: 4, width: 95, height: 89 }, glow: 0.35, dim: 0.4 },
-  { src: '/intro/cinematic/02-midday.webp', at: LEAD + 16300, screen: { x: 468, y: 63, w: 736, h: 425 }, tray: { x: 1121, y: 465 }, time: '20:31', date: 'Mon 21 Apr', app: { left: 1.5, top: 5, width: 96, height: 88 }, glow: 0.45, dim: 0.68 },
-  { src: '/intro/cinematic/05-night.webp', at: LEAD + 18300, screen: { x: 462, y: 48, w: 738, h: 423 }, tray: { x: 1120, y: 448.5 }, time: '23:51', date: 'Sun 27 Apr', app: { left: 2, top: 4, width: 95, height: 89 }, glow: 0.6 },
-  // the last one, deep night, only the screen's cold light
-  { src: '/intro/cinematic/06-deep-night.webp', at: LEAD + 20300, screen: { x: 468, y: 63, w: 733, h: 429 }, tray: { x: 1120, y: 468.5 }, time: '02:47', date: 'Mon 28 Apr', app: { left: 3, top: 6, width: 94, height: 87 }, glow: 0.75 },
-];
-// the clock's right edge, this far right of the battery icon's (px of the stills)
-export const CLOCK_GAP = 62;
+export const screenQuad = () => (fitCache ??= fits()).quad;
+// the screen's centre and size on the stage
+export function screenBox() {
+  const q = screenQuad();
+  const [x, y] = centre(q);
+  const w = (q[1][0] - q[0][0] + q[2][0] - q[3][0]) / 2, h = (q[3][1] - q[0][1] + q[2][1] - q[1][1]) / 2;
+  return { x, y, w, h, top: q[0][1] };
+}
+// CSS matrix3d mapping a w x h box (from its top left) onto a quad: the
+// desktop drawn flat, put onto the laptop's screen in its perspective
+export function rectToQuad(w: number, h: number, q: Quad): string {
+  const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
+  const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+  const dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+  let g = 0, hh = 0;
+  if (Math.abs(dx3) > 1e-9 || Math.abs(dy3) > 1e-9) {
+    const det = dx1 * dy2 - dx2 * dy1;
+    g = (dx3 * dy2 - dx2 * dy3) / det;
+    hh = (dx1 * dy3 - dx3 * dy1) / det;
+  }
+  const a = x1 - x0 + g * x1, b = x3 - x0 + hh * x3, c = x0;
+  const d = y1 - y0 + g * y1, e = y3 - y0 + hh * y3, f = y0;
+  return `matrix3d(${a / w},${d / w},0,${g / w},${b / h},${e / h},0,${hh / h},0,0,1,0,${c},${f},0,1)`;
+}
+
+// ---- the camera -----------------------------------------------------------------------
+// One camera over all eight stills: close on the laptop's screen, then one
+// continuous pull back through the montage, slow at first and faster and
+// faster as the cuts speed up. scale: [ms from M, zoom] (1 = the whole desk
+// filling the frame); it holds the first zoom until M. It zooms toward
+// `origin` (stage px; null = the screen's centre). `tune` is for the dev
+// bar: a multiplier on the zoom and a shift of the origin.
+export const CAMERA = {
+  scale: [
+    [0, 1.5],
+    [1800, 1.46],
+    [3000, 1.4],
+    [4000, 1.32],
+    [4800, 1.23],
+    [5500, 1.14],
+    [6100, 1.07],
+    [6600, 1.02],
+    [8000, 1.0],
+  ] as [number, number][],
+  origin: null as null | { x: number; y: number },
+  tune: { zoom: 1, ox: 0, oy: 0 },
+};
+
+// the camera's zoom at time t: CAMERA.scale through a monotone cubic
+// (Fritsch-Carlson), so it never overshoots or jumps between keys
+export function cameraZoom(t: number): number {
+  const K = CAMERA.scale, u = t - M;
+  if (u <= K[0][0]) return K[0][1];
+  if (u >= K[K.length - 1][0]) return K[K.length - 1][1];
+  const n = K.length;
+  const d = K.slice(1).map(([x, y], i) => (y - K[i][1]) / (x - K[i][0]));
+  const m = K.map((_, i) => (i === 0 ? d[0] : i === n - 1 ? d[n - 2] : d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2));
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) m[i] = m[i + 1] = 0;
+    else {
+      const a = m[i] / d[i], b = m[i + 1] / d[i], h = a * a + b * b;
+      if (h > 9) {
+        const k = 3 / Math.sqrt(h);
+        m[i] = k * a * d[i];
+        m[i + 1] = k * b * d[i];
+      }
+    }
+  }
+  let i = 0;
+  while (u > K[i + 1][0]) i++;
+  const h = K[i + 1][0] - K[i][0], s = (u - K[i][0]) / h;
+  const s2 = s * s, s3 = s2 * s;
+  return (2 * s3 - 3 * s2 + 1) * K[i][1] + (s3 - 2 * s2 + s) * h * m[i] + (-2 * s3 + 3 * s2) * K[i + 1][1] + (s3 - s2) * h * m[i + 1];
+}
+
+// the notification chime (sound.ts): no sound files, a soft synthesized tone
+export const SOUND = { enabled: true, volume: 0.18, minGap: 300 };
 
 // ---- the timeline (ms) ---------------------------------------------------------
-const FALL = LEAD + 31700; // the keywords come loose; everything after is relative to it
+const END = CUTS_END + 1500; // the last mail holds, then everything but its keywords fades
+const FALL = END + 9000; // the keywords come loose; everything after is relative to it
 export const T = {
-  // the stills (FRAMES[].at); the opened mails' times are in emails.ts
-  fadeIn: [LEAD, LEAD + 900], // out of the opening black
-  montageEnd: LEAD + 22700,
-  // the camera has stopped; slowly (about 6 s) everything but the three
-  // keywords fades away, then they hold alone 3 s
-  othersOut: [LEAD + 22700, LEAD + 27700], // the mail app, the other text and the desktop fade
-  frameOut: [LEAD + 23700, LEAD + 28700], // the last mail's window and other words dissolve
-  blackIn: [LEAD + 22700, LEAD + 28700], // the room fades to black
-  pullBack: [LEAD + 5900, LEAD + 22700], // the camera holds on the first mail, then pulls back from the screen to the whole desk, slowly at first, faster and faster
+  // the stills (FRAMES[].at); the mails' times are in emails.ts
+  fadeIn: [LEAD, LEAD + 1000], // out of the opening black
+  montageEnd: END,
+  // slowly (about 6 s) everything but the three keywords fades away, then
+  // they hold alone 3 s
+  othersOut: [END, END + 5000], // the mail app, the other text and the desktop fade
+  frameOut: [END + 1000, END + 6000], // the last mail's window and other words dissolve
+  blackIn: [END, END + 6000], // the room fades to black
   // falling letters -> the glyph door -> through it (scene.ts), then 3 s of black
   fall: FALL, // the letters fall, the camera following them down; they turn to water (LETTERS)
   build: [FALL + 4800, FALL + 11800], // the door emerges from the water, slowly, filling its shape
@@ -107,7 +215,6 @@ export const T = {
 } as const;
 
 export const ENTER_MS = 160; // an email window's entrance
-export const ZOOM_START = 1.35; // how near the camera starts, on the laptop's screen (it pulls back to the full desk, then stays)
 
 // ---- falling letters ---------------------------------------------------------------
 // The letters let go (in a few waves) and fall; the camera follows them, keeping them at the centre of the frame, from the
@@ -141,9 +248,10 @@ export const GLYPH_FONT = "'Sarasa Mono', 'Cascadia Code', 'Courier New', ui-mon
 
 // ---- the shots, as the dev timeline lists them ----------------------------------------
 export const SHOT_LIST: { id: string; label: string; at: number; end: number }[] = [
-  { id: 'start', label: 'Opening black', at: 0, end: FRAMES[0].at },
-  { id: 'optimism', label: '1 Thank-you', at: FRAMES[0].at, end: FRAMES[1].at },
-  ...FRAMES.slice(1).map((f, i) => ({ id: `reject${i + 1}`, label: `${i + 2} Rejection ${i + 1}`, at: f.at, end: FRAMES[i + 2]?.at ?? T.montageEnd })),
+  { id: 'start', label: 'Title', at: 0, end: FRAMES[0].at },
+  { id: 'first', label: '1 First mail', at: FRAMES[0].at, end: M },
+  { id: 'shot1', label: '1', at: M, end: FRAMES[1].at },
+  ...FRAMES.slice(1).map((f, i) => ({ id: `shot${i + 2}`, label: `${i + 2}`, at: f.at, end: FRAMES[i + 2]?.at ?? T.montageEnd })),
   { id: 'keywords', label: 'Keywords', at: T.montageEnd, end: T.fall },
   { id: 'fall', label: 'Letters fall', at: T.fall, end: T.build[0] },
   { id: 'build', label: 'Door builds', at: T.build[0], end: T.open[0] },

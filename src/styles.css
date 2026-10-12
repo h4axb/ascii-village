@@ -4411,3 +4411,12 @@ pre {
 .dev-marker-dot.wed-marker-on .dev-marker-dot-circle {
   background: #9adcc4;
 }
+
+/* Start: the landing fades to black before the game (and the intro) take over */
+.landing-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  background: #000;
+  pointer-events: none;
+}

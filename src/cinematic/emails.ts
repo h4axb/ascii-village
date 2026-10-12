@@ -1,11 +1,14 @@
 // The mail on the laptop (src/cinematic/): the inbox's history, the mails
-// opened on top of it shot by shot, and the notification of the first shot.
+// opened on top of it shot by shot, and the notifications. Six months of
+// rejections, coming faster and faster: the first one gets the whole
+// interaction (notification, inbox, the mail opening), the next ones open
+// quicker and quicker, then only a notification flashes by, then the last.
 //
 // Body text of an opened mail is written with two markers:
 //   *words*  the visual emphasis (a soft highlight after the window opens)
 //   [words]  a keyword that survives and falls apart into letters (only the
 //            final mail has these)
-import { FRAMES } from './config';
+import { FRAMES, FIRST } from './config';
 
 export type Variant = 'standard' | 'portal' | 'stacked';
 
@@ -19,15 +22,15 @@ export interface Email {
 // the mails that get opened
 export const EMAILS: Email[] = [
   {
-    from: 'Lumen Forge Games',
-    subject: 'Your application — Junior Game Artist',
+    from: 'Northstar Games',
+    subject: 'Your Application — Junior Game Designer',
     body: [
       'Dear Applicant,',
-      'Thank you for your interest in joining Lumen Forge Games.',
-      '*We regret to inform you* that we will not be moving forward with your application at this time.',
-      'We wish you every success in your search.',
+      'Thank you for your interest in joining Northstar Games.',
+      'After careful consideration, *we regret to inform you* that we will not be moving forward with your application at this time.',
+      'We appreciate the time and effort you put into applying and wish you all the best in your future endeavors.',
     ],
-    sign: ['Kind regards,', 'Lumen Forge Recruiting'],
+    sign: ['Best regards,', 'Northstar Games Recruitment Team'],
   },
   {
     from: 'Moss & Moon Games',
@@ -41,8 +44,8 @@ export const EMAILS: Email[] = [
     sign: ['Moss & Moon Games'],
   },
   {
-    from: 'Northstar Games',
-    // [..] = the keywords that survive; "Unfortunately" gains its "..." later
+    from: 'Cloverbyte Studio',
+    // [..] = the keywords that survive and fall apart into letters
     subject: '[Application Update]',
     body: [
       'Dear Applicant,',
@@ -50,7 +53,7 @@ export const EMAILS: Email[] = [
       'While your background is impressive, we have decided to move forward with other candidates.',
       'We wish you success in your future endeavors.',
     ],
-    sign: ['Northstar Games Recruitment Team'],
+    sign: ['Cloverbyte Studio Recruitment Team'],
   },
   {
     from: 'Pixelvale Studio',
@@ -86,16 +89,6 @@ export const EMAILS: Email[] = [
     sign: ['Ember & Ash Recruiting'],
   },
   {
-    from: 'Northstar Games',
-    subject: 'Thank you for your application',
-    body: [
-      'Dear Applicant,',
-      'Thank you for your application for the UI Artist position at Northstar Games. We have received it, and our team will review it carefully.',
-      "We'll be in touch *soon*.",
-    ],
-    sign: ['Warm regards,', 'Northstar Games Recruitment Team'],
-  },
-  {
     from: 'Brightloop',
     subject: 'Your application to Brightloop',
     body: [
@@ -105,17 +98,6 @@ export const EMAILS: Email[] = [
       'Best of luck with your next steps.',
     ],
     sign: ['The Brightloop Team'],
-  },
-  {
-    from: 'Glasswing Studio',
-    subject: 'Application status: closed',
-    body: [
-      'Dear Applicant,',
-      'Thank you for your patience during our hiring process.',
-      '*Regrettably*, we will not be inviting you to the next round.',
-      'We appreciate the time you put into your application.',
-    ],
-    sign: ['Glasswing Studio Talent Team'],
   },
 ];
 
@@ -130,14 +112,24 @@ export interface WindowShot {
   appear: number; // ms
   hide?: number; // ms; absent = stays until the montage ends
   from: { x: number; y: number }; // entrance offset, px
-  open?: boolean; // already open when its shot cuts in (appears with the still, no flash)
+  open?: boolean; // already open when its shot cuts in (appears with the still)
   final?: boolean; // the last mail: its keywords fall apart
 }
 
 const F = FRAMES.map((f) => f.at);
-// a rejection, already open when its shot cuts in (it appears with the
-// still, in the same cut)
-const rejection = (shot: number, email: number, variant: Variant, left: number, top: number, width: number): WindowShot => ({
+// a mail opening shortly after its notification (it slides in a little)
+const opens = (email: number, variant: Variant, left: number, top: number, width: number, appear: number, hide: number): WindowShot => ({
+  email,
+  variant,
+  left,
+  top,
+  width,
+  appear,
+  hide,
+  from: { x: 0, y: 6 },
+});
+// a mail already open when its shot cuts in (it replaces the one before, in the same cut)
+const cutIn = (shot: number, email: number, variant: Variant, left: number, top: number, width: number): WindowShot => ({
   email,
   variant,
   left,
@@ -149,27 +141,18 @@ const rejection = (shot: number, email: number, variant: Variant, left: number, 
   open: true,
 });
 export const WINDOWS: WindowShot[] = [
-  // the thank-you, opened from its notification (the camera holds)
-  {
-    email: 6,
-    variant: 'standard',
-    left: 16,
-    top: 8,
-    width: 68,
-    appear: F[0] + 3400,
-    hide: F[1],
-    from: { x: 0, y: 8 },
-  },
-  // then a rejection a shot, a little elsewhere each time
-  rejection(1, 0, 'standard', 18, 7, 66),
-  rejection(2, 1, 'portal', 15, 10, 68),
-  rejection(3, 3, 'standard', 17, 6, 66),
-  rejection(4, 4, 'standard', 14, 9, 68),
-  rejection(5, 7, 'standard', 18, 8, 66),
-  rejection(6, 8, 'portal', 15, 7, 68),
-  rejection(7, 5, 'portal', 17, 9, 66),
-  // the last one, prominent (it arrived in the night), set right of centre
-  // so its keywords sit straight above the door's place (the screen's
+  // the first: opened from the inbox, read while the camera holds
+  opens(0, 'standard', 17, 6, 66, FIRST.open, F[1]),
+  // then quicker: a notification, the mail opens
+  opens(1, 'standard', 18, 7, 66, F[1] + 450, F[2]),
+  opens(3, 'portal', 15, 9, 68, F[2] + 330, F[3]),
+  // then already open as the shot cuts in, replacing the one before
+  cutIn(3, 4, 'standard', 17, 6, 66),
+  cutIn(4, 6, 'standard', 14, 9, 68),
+  cutIn(5, 5, 'portal', 18, 8, 66),
+  // (shot 7: only a notification flashes by)
+  // the last one: its notification, then it opens and stays. Set right of
+  // centre so its keywords sit straight above the door's place (the screen's
   // middle), and their letters fall straight down onto it
   {
     email: 2,
@@ -177,30 +160,37 @@ export const WINDOWS: WindowShot[] = [
     left: 23.8,
     top: 6,
     width: 74,
-    appear: F[8],
-    from: { x: 0, y: 0 },
-    open: true,
+    appear: F[7] + 750,
+    from: { x: 0, y: 6 },
     final: true,
   },
 ];
 
-// the flash strength when a mail opens (a little stronger each time)
-export const FLASH = 0.05; // the flash when the thank-you opens
-
-// the thank-you's notification (above the taskbar, bottom right)
-export const TOAST = {
-  at: F[0] + 900,
-  hide: F[0] + 3400, // it stays 2.5 s, then it is clicked: the mail opens
-  from: 'Northstar Games',
-  text: 'Thank you for your application to Northstar Games.',
-};
+// The notifications (above the taskbar, bottom right): one element, shown
+// for each in turn, with the sender and the subject
+export interface Toast {
+  at: number;
+  hide: number;
+  from: string;
+  text: string;
+}
+export const TOASTS: Toast[] = [
+  // the first stays 2 s, then it is clicked: the inbox opens
+  { at: FIRST.toast, hide: FIRST.inbox, from: 'Northstar Games', text: 'Your Application — Junior Game Designer' },
+  { at: F[1] + 100, hide: F[1] + 450, from: 'Moss & Moon Games', text: 'Update regarding your application' },
+  { at: F[2] + 80, hide: F[2] + 330, from: 'Pixelvale Studio', text: 'Your application status' },
+  { at: F[6] + 40, hide: F[7], from: 'Glasswing Studio', text: 'Application status: closed — Regrettably, we will not be inviting you…' },
+  { at: F[7] + 150, hide: F[7] + 750, from: 'Cloverbyte Studio', text: 'Application Update' },
+];
+// the chime: every notification, and every mail that cuts in already open
+export const CHIMES: number[] = [...TOASTS.map((t) => t.at), ...WINDOWS.filter((w) => w.open).map((w) => w.appear)].sort((a, b) => a - b);
 
 // ---- the inbox ---------------------------------------------------------------------------
 // Every mail the list shows, with the moment it arrives (ms; < 0 = already
 // there). The list shows the latest arrival on top (among mails arriving
-// together, the later one in this list); the blocks below are written
-// newest first and reversed. Rejections, and the ordinary mail of a life in
-// between. unread until readAt (if ever).
+// together, the later one in this list). Rejections, and the ordinary mail
+// of a life in between. unread until readAt (if ever); `select`: the row is
+// selected (a soft blue) in that window, just before the mail opens.
 export interface InboxItem {
   at: number;
   from: string;
@@ -208,161 +198,58 @@ export interface InboxItem {
   time: string; // the list's date column
   unread?: boolean;
   readAt?: number;
+  select?: [number, number];
 }
 
 // a sea of unread status updates, with life in between
 const STATUS_FROM = [
-  'Pixelvale Studio',
   'Paper Lantern Interactive',
-  'Cloverbyte Studio',
   'Driftwood Interactive',
-  'Tidewater Games',
-  'Ember & Ash',
   'Quietfox Studio',
-  'Brightloop',
   'Hollow Pine Games',
   'Saltmarsh Interactive',
   'Kitebird Studio',
   'Orbit Nine',
   'Foxglove Interactive',
   'Cinder Lane Games',
-  'Glasswing Studio',
   'Little Lantern',
 ];
 const LIFE: Omit<InboxItem, 'at'>[] = [
-  { from: 'JobBoard', subject: '41 new jobs for "game artist"', time: '2 Apr' },
-  {
-    from: 'Mom',
-    subject: 'Call me when you can?',
-    time: '1 Apr',
-    unread: true,
-  },
-  { from: 'Bank of Lindenhall', subject: 'Payment reminder', time: '31 Mar' },
-  {
-    from: 'Pixel Weekly',
-    subject: 'Issue #212: finding your style',
-    time: '28 Mar',
-  },
-  {
-    from: 'Parcel Post',
-    subject: 'Your parcel could not be delivered',
-    time: '26 Mar',
-  },
+  { from: 'JobBoard', subject: '41 new jobs for "game designer"', time: '12 May' },
+  { from: 'Mom', subject: 'Call me when you can?', time: '10 May', unread: true },
+  { from: 'Bank of Lindenhall', subject: 'Payment reminder', time: '8 May' },
 ];
 const routine: InboxItem[] = [];
 STATUS_FROM.forEach((from, i) => {
-  routine.push({
-    at: F[3],
-    from,
-    subject: 'Update on your status',
-    time: i < 2 ? ['10:52', '09:14'][i] : `${Math.max(1, 3 - Math.floor(i / 5))} Apr`,
-    unread: true,
-  });
+  routine.push({ at: F[3], from, subject: 'Update on your status', time: `${Math.max(1, 12 - i)} May`, unread: true });
   if (i % 3 === 2 && LIFE[(i - 2) / 3]) routine.push({ at: F[3], ...LIFE[(i - 2) / 3] });
 });
 
 export const INBOX: InboxItem[] = [
   // already there on the first morning
   ...[
-    {
-      at: -1,
-      from: 'JobBoard',
-      subject: '23 new jobs for "game artist"',
-      time: 'Sun',
-    },
+    { at: -1, from: 'JobBoard', subject: '23 new jobs for "game designer"', time: 'Sun' },
     { at: -1, from: 'Mom', subject: 'Sunday dinner?', time: 'Sat' },
-    {
-      at: -1,
-      from: 'Parcel Post',
-      subject: 'Your package is on its way',
-      time: 'Sat',
-    },
+    { at: -1, from: 'Parcel Post', subject: 'Your package is on its way', time: 'Sat' },
     { at: -1, from: 'ArtStation', subject: 'Your weekly digest', time: 'Fri' },
-    {
-      at: -1,
-      from: 'Northstar Careers',
-      subject: 'Application received — UI Artist',
-      time: 'Fri',
-    },
-    {
-      at: -1,
-      from: 'Bank of Lindenhall',
-      subject: 'Your statement is ready',
-      time: 'Thu',
-    },
-    {
-      at: -1,
-      from: 'Calendar',
-      subject: 'Reminder: portfolio review with Jo',
-      time: 'Wed',
-    },
-    {
-      at: -1,
-      from: 'Pixel Weekly',
-      subject: 'Issue #208: 12 tips for better portfolios',
-      time: 'Tue',
-    },
-    {
-      at: -1,
-      from: 'Tidewater Games',
-      subject: 'Thanks for applying!',
-      time: '27 Feb',
-    },
-    {
-      at: -1,
-      from: 'Steam',
-      subject: 'A game on your wishlist is on sale',
-      time: '26 Feb',
-    },
+    { at: -1, from: 'Northstar Careers', subject: 'Application received — Junior Game Designer', time: 'Fri' },
+    { at: -1, from: 'Bank of Lindenhall', subject: 'Your statement is ready', time: 'Thu' },
+    { at: -1, from: 'Calendar', subject: 'Reminder: portfolio review with Jo', time: 'Wed' },
+    { at: -1, from: 'Pixel Weekly', subject: 'Issue #208: 12 tips for better portfolios', time: 'Tue' },
+    { at: -1, from: 'Tidewater Games', subject: 'Thanks for applying!', time: '27 Feb' },
   ].reverse(),
-  // the thank-you
-  {
-    at: TOAST.at,
-    from: 'Northstar Games',
-    subject: 'Thank you for your application',
-    time: '08:11',
-    unread: true,
-    readAt: WINDOWS[0].appear,
-  },
-  // the first rejections
-  {
-    at: F[1],
-    from: 'Pixel Weekly',
-    subject: 'Issue #209: colour for UI',
-    time: 'Tue',
-  },
-  {
-    at: F[1],
-    from: 'Lumen Forge Games',
-    subject: 'Your application — Junior Game Artist',
-    time: '13:41',
-    unread: true,
-    readAt: WINDOWS[1].appear,
-  },
-  { at: F[2], from: 'Steam', subject: 'Your wishlist is on sale', time: 'Thu' },
-  { at: F[2], from: 'Mom', subject: 'Did you eat?', time: 'Thu', unread: true },
-  {
-    at: F[2],
-    from: 'Moss & Moon Games',
-    subject: 'Update regarding your application',
-    time: '17:35',
-    unread: true,
-    readAt: WINDOWS[2].appear,
-  },
+  // the first rejection: selected, then opened
+  { at: TOASTS[0].at, from: 'Northstar Games', subject: 'Your Application — Junior Game Designer', time: '08:11', unread: true, readAt: WINDOWS[0].appear, select: [FIRST.select, WINDOWS[0].appear + 200] },
+  { at: F[1], from: 'Pixel Weekly', subject: 'Issue #209: colour for UI', time: 'Tue' },
+  { at: TOASTS[1].at, from: 'Moss & Moon Games', subject: 'Update regarding your application', time: '13:41', unread: true, readAt: WINDOWS[1].appear },
+  { at: F[2], from: 'Mom', subject: 'Did you eat?', time: 'Tue', unread: true },
+  { at: TOASTS[2].at, from: 'Pixelvale Studio', subject: 'Your application status', time: '16:18', unread: true, readAt: WINDOWS[2].appear },
   // the routine: a sea of unread status updates, rejections in between
   ...routine.reverse(),
-  { at: F[3], from: 'Pixelvale Studio', subject: 'Your application status', time: '11:02', unread: true, readAt: WINDOWS[3].appear },
-  { at: F[4], from: 'Tidewater Games', subject: 'Re: Junior UI Artist', time: '14:15', unread: true, readAt: WINDOWS[4].appear },
-  { at: F[5], from: 'Brightloop', subject: 'Your application to Brightloop', time: '17:58', unread: true, readAt: WINDOWS[5].appear },
-  { at: F[6], from: 'Glasswing Studio', subject: 'Application status: closed', time: '10:12', unread: true, readAt: WINDOWS[6].appear },
-  { at: F[7], from: 'Ember & Ash', subject: 'Application outcome', time: '23:40', unread: true, readAt: WINDOWS[7].appear },
+  { at: F[3], from: 'Tidewater Games', subject: 'Re: Junior UI Artist', time: '15:02', unread: true, readAt: WINDOWS[3].appear },
+  { at: F[4], from: 'Brightloop', subject: 'Your application to Brightloop', time: '19:40', unread: true, readAt: WINDOWS[4].appear },
+  { at: F[5], from: 'Ember & Ash', subject: 'Application outcome', time: '21:15', unread: true, readAt: WINDOWS[5].appear },
+  { at: TOASTS[3].at, from: 'Glasswing Studio', subject: 'Application status: closed', time: '23:50', unread: true },
   // the last one
-  {
-    at: F[8],
-    from: 'Northstar Games',
-    subject: 'Application Update',
-    time: '02:31',
-    unread: true,
-    readAt: WINDOWS[8].appear,
-  },
+  { at: TOASTS[4].at, from: 'Cloverbyte Studio', subject: 'Application Update', time: '02:46', unread: true, readAt: WINDOWS[6].appear },
 ];

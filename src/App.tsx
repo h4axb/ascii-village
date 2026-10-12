@@ -520,8 +520,23 @@ export default function App() {
   useEffect(() => {
     if (CRAFT_FEEDBACK || CRAFT_CLARIFY || QUEST_ENABLED) flushFeedbackOutbox();
   }, []);
-  return started ? <Game /> : <Landing onStart={() => setStarted(true)} />;
+  // Start fades the landing to black (0.5 s), then the game (and the intro
+  // cinematic, which opens on black) takes over: no hard cut
+  const [leaving, setLeaving] = useState(false);
+  const leave = () => {
+    if (leaving) return;
+    setLeaving(true);
+    window.setTimeout(() => setStarted(true), LANDING_FADE_MS);
+  };
+  if (started) return <Game />;
+  return (
+    <>
+      <Landing onStart={leave} />
+      <div className="landing-fade" style={{ opacity: leaving ? 1 : 0, transition: `opacity ${LANDING_FADE_MS}ms ease` }} />
+    </>
+  );
 }
+const LANDING_FADE_MS = 500;
 
 // The player's backing under each glyph: this much darker than the glyph's
 // own colour (other sprites use 0.55) - lighter, so the character reads

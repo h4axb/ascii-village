@@ -560,6 +560,41 @@
       "x": 47,
       "y": 38,
       "scale": 0.1
+    },
+    {
+      "id": "stone-flat-slab-1",
+      "asset": "stone-flat-slab",
+      "x": 60,
+      "y": 54,
+      "scale": 0.11
+    },
+    {
+      "id": "stone-split-boulder-1",
+      "asset": "stone-split-boulder",
+      "x": 49,
+      "y": 58,
+      "scale": 0.11
+    },
+    {
+      "id": "stone-leaning-shard-1",
+      "asset": "stone-leaning-shard",
+      "x": 52,
+      "y": 57,
+      "scale": 0.11
+    },
+    {
+      "id": "stone-tall-monolith-1",
+      "asset": "stone-tall-monolith",
+      "x": 49,
+      "y": 52,
+      "scale": 0.11
+    },
+    {
+      "id": "stone-stacked-blocks-1",
+      "asset": "stone-stacked-blocks",
+      "x": 52,
+      "y": 55,
+      "scale": 0.11
     }
   ],
   "colliders": {

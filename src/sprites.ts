@@ -449,7 +449,8 @@ export const GRASS_HALM_COLORS = [
 // Light, slightly yellow greens, tips brightest, so the tufts stand out on
 // the olive ground instead of fading into it.
 // how far each key sits from the tip (0) to the base (6) of the blade;
-// the colours run between the theme's grassTuft.tip and grassTuft.base
+// the colours run from the theme's grassTuft.tip through grassTuft.mid to
+// grassTuft.base (editor: Theme tab, "Grass halm")
 const GRASS_HALM_LEVEL: Record<string, number> = {
   a: 0, b: 1, c: 0, d: 1, e: 2, f: 1, g: 2, h: 3, i: 2, j: 3, k: 3,
   l: 4, m: 3, n: 4, o: 4, p: 5, q: 4, r: 5, s: 5, t: 6, u: 5, v: 6,
@@ -823,7 +824,9 @@ function themeSprites() {
     pal.a = themeColor(petal);
     pal.b = themeColor('flower.centre');
   }
-  for (const [k, lvl] of Object.entries(GRASS_HALM_LEVEL)) GRASS_HALM_PALETTE[k] = themeMix('grassTuft.tip', 'grassTuft.base', lvl / 6);
+  // tip -> middle over levels 0-3, middle -> base over 3-6
+  for (const [k, lvl] of Object.entries(GRASS_HALM_LEVEL))
+    GRASS_HALM_PALETTE[k] = lvl <= 3 ? themeMix('grassTuft.tip', 'grassTuft.mid', lvl / 3) : themeMix('grassTuft.mid', 'grassTuft.base', (lvl - 3) / 3);
 }
 themeSprites();
 onThemeChange(themeSprites);

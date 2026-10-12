@@ -164,7 +164,7 @@ export function ThemeTab() {
       </div>
 
       {SWATCH_GROUPS.map((grp) => (
-        <details key={grp.title} className="wed-group" open={grp.title === 'Grass' || grp.title === 'Water'}>
+        <details key={grp.title} className="wed-group" open={grp.title === 'Grass' || grp.title === 'Grass halm' || grp.title === 'Water'}>
           <summary className="wed-group-name">{grp.title}</summary>
           {grp.swatches.map(([name, label]) => (
             <label key={name} className="wed-theme-swatch" title={name}>

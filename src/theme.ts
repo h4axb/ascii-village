@@ -52,6 +52,16 @@ export const SWATCH_GROUPS: { title: string; swatches: [string, string][] }[] = 
     ],
   },
   {
+    // the grass halm asset (the small grass tufts): each blade runs from its
+    // tip through the middle colour to its base
+    title: 'Grass halm',
+    swatches: [
+      ['grassTuft.tip', 'blade tips (lightest)'],
+      ['grassTuft.mid', 'blade middle'],
+      ['grassTuft.base', 'blade base (darkest)'],
+    ],
+  },
+  {
     title: 'Bushes',
     swatches: [
       ['bush.dark', 'shadow'],

@@ -1,0 +1,62 @@
+{
+  "generated": {
+    "source": "stylized-stone-plant.svg",
+    "transcribedBy": "claude",
+    "note": "Stone 7 of the ten on stylized-stone-plant.svg (81 by 39 glyphs, 20px cells), cut out at the empty rows and columns: 13 by 9 glyphs by their <text> coordinates, colours reduced to 23 tones (one key per cell), columns doubled and rows stretched 1.22x to keep the proportions on the 4ch x 2ln tile. Kind boulder: an opaque backing per cell; it blocks at its foot."
+  },
+  "label": "Mossy stone 7",
+  "kind": "boulder",
+  "scale": 0.3,
+  "interactable": false,
+  "palette": {
+    "0": "#3ca862",
+    "1": "#bfb496",
+    "2": "#1f987b",
+    "3": "#606f66",
+    "4": "#3b6d60",
+    "5": "#b5a487",
+    "6": "#aeab95",
+    "7": "#b7ce9d",
+    "8": "#7ecc8a",
+    "9": "#50e083",
+    "a": "#809488",
+    "b": "#f1dbb4",
+    "c": "#17725d",
+    "d": "#5eb55a",
+    "e": "#138a62",
+    "f": "#a2977a",
+    "g": "#7fbf58",
+    "h": "#ffefc8",
+    "i": "#d0bba0",
+    "j": "#65bf55",
+    "k": "#b6ed91",
+    "l": "#4e9281",
+    "m": "#d8c9a2"
+  },
+  "sprite": [
+    "        @@@@@@@@          ",
+    "        @@@@@@@@          ",
+    "    @@@@@@@@@@@@@@@@¤¤    ",
+    "¥¥@@@@@@@@@@@@@@@@@@%%¤¤  ",
+    "§§§§¥¥@@@@@@¤¤@@@@¥¥‡‡==  ",
+    "§§§§§§§§§§==‡‡§§¤¤======  ",
+    "§§§§§§§§§§==‡‡§§¤¤======  ",
+    "‡‡§§§§¤¤==‡‡§§¤¤====::::··",
+    "&&‡‡‡‡‡‡¤¤§§@@¥¥==::······",
+    "¤¤¤¤``__‡‡%%§§¤¤::··‡‡%%%%",
+    "          %%%%      %%    "
+  ],
+  "colors": [
+    "........11111111..........",
+    "........11111111..........",
+    "....1111hhhhhhhh1111dd....",
+    "5511hhhhhhhhhhhhhhhhkkdd..",
+    "ffmmbbhhhhhhiihhhhbb6633..",
+    "ffmmmmmmmmaa66mmiiaaaa33..",
+    "ffmmmmmmmmaa66mmiiaaaa33..",
+    "0077mmiiaa8877iiaaaallllcc",
+    "gg998866iimmhhbbaall2222cc",
+    "jj00eeee00kkmm3344cc99jjjj",
+    "..........jjjj......jj...."
+  ]
+}

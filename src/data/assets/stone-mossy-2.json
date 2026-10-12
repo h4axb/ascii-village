@@ -1,0 +1,62 @@
+{
+  "generated": {
+    "source": "stylized-stone-plant.svg",
+    "transcribedBy": "claude",
+    "note": "Stone 2 of the ten on stylized-stone-plant.svg (81 by 39 glyphs, 20px cells), cut out at the empty rows and columns: 13 by 9 glyphs by their <text> coordinates, colours reduced to 23 tones (one key per cell), columns doubled and rows stretched 1.22x to keep the proportions on the 4ch x 2ln tile. Kind boulder: an opaque backing per cell; it blocks at its foot."
+  },
+  "label": "Mossy stone 2",
+  "kind": "boulder",
+  "scale": 0.3,
+  "interactable": false,
+  "palette": {
+    "0": "#348b63",
+    "1": "#bfb496",
+    "2": "#1ab983",
+    "3": "#5eb55a",
+    "4": "#1f987b",
+    "5": "#839589",
+    "6": "#828070",
+    "7": "#b5a487",
+    "8": "#65bf55",
+    "9": "#4e9281",
+    "a": "#7fbf58",
+    "b": "#f1dbb4",
+    "c": "#17725d",
+    "d": "#50e083",
+    "e": "#138a62",
+    "f": "#809488",
+    "g": "#7ecc8a",
+    "h": "#ffefc8",
+    "i": "#d0bba0",
+    "j": "#606f66",
+    "k": "#aeab95",
+    "l": "#3ca862",
+    "m": "#d8c9a2"
+  },
+  "sprite": [
+    "          ________        ",
+    "          ________        ",
+    "        @@@@@@@@@@¥¥      ",
+    "      ¥¥@@@@@@@@@@¤¤‡‡    ",
+    "  ¥¥@@@@@@@@@@§§¤¤‡‡==    ",
+    "  @@@@@@@@¥¥‡‡¤¤‡‡====··  ",
+    "  @@@@@@@@¥¥‡‡¤¤‡‡====··  ",
+    "  @@¥¥¥¥¥¥¤¤==‡‡‡‡==::····",
+    "&&§§§§§§§§====::¤¤······¬¬",
+    "%%‡‡¤¤‡‡‡‡====····¬¬‡‡    ",
+    "  ¤¤  ¤¤%%____··==%%%%    "
+  ],
+  "colors": [
+    "..........11111111........",
+    "..........11111111........",
+    "........11hhhhhhhh77......",
+    "......77hhhhhhhhhhii66....",
+    "..7711hhhhhhhhmmiikkjj....",
+    "..11hhhhhhbbkkiikkffffcc..",
+    "..11hhhhhhbbkkiikkffffcc..",
+    "..11bbbbbbiiffkkkkff9944cc",
+    "aammmmmmmmffff99554444ccee",
+    "88dd33ggggffff444422ll....",
+    "..33..338888cccc008888...."
+  ]
+}

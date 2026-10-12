@@ -132,8 +132,8 @@
         "flower.whitePetal": "#ece4d2",
         "flower.purplePetal": "#a98bc0",
         "flower.orangePetal": "#e39a5c",
-        "grassTuft.tip": "#6b9a6a",
-        "grassTuft.base": "#2d6a0c",
+        "grassTuft.tip": "#6ea03b",
+        "grassTuft.base": "#3e7321",
         "ground.dirt": "#b08d5f",
         "ground.dirtRim": "#8e7048",
         "ground.dirtPebble": "#dcc8a0",
@@ -145,7 +145,8 @@
         "ground.stoneGlyph": "#d6d4c6",
         "ground.slab": "#c6c3b5",
         "ground.slabRim": "#94928a",
-        "ground.slabGlyph": "#e6e3d6"
+        "ground.slabGlyph": "#e6e3d6",
+        "grassTuft.mid": "#62793e"
       },
       "characters": {
         "player": 1.45,

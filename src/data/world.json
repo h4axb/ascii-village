@@ -89,14 +89,14 @@
     {
       "id": "grasshalm-1",
       "asset": "grasshalm",
-      "x": 59,
-      "y": 27
+      "x": 68,
+      "y": 30
     },
     {
       "id": "grasshalm-2",
       "asset": "grasshalm",
-      "x": 58,
-      "y": 27
+      "x": 68,
+      "y": 29
     },
     {
       "id": "grasshalm-3",
@@ -452,8 +452,8 @@
     {
       "id": "palm-4",
       "asset": "palm",
-      "x": 63,
-      "y": 24,
+      "x": 60,
+      "y": 23,
       "scale": 1
     },
     {
@@ -466,8 +466,8 @@
     {
       "id": "bush-simple-2",
       "asset": "bush-simple",
-      "x": 56,
-      "y": 21,
+      "x": 54,
+      "y": 27,
       "scale": 0.3
     },
     {

@@ -441,15 +441,18 @@ function paintGround(fx: number, fy: number) {
 // (craft/materials.ts RAMP_DEFAULT, from glyphify.py), light → heavy, so the
 // ground reads as one art style with the house, player and items on top.
 const RAMP = [...RAMP_DEFAULT.slice(1)]; // drop the leading space
-export const GLYPHS = ['', ...RAMP, '∘', 'o', 'O', '"', "'", ',', 'v', '0', '8', 'x', '.'];
+export const GLYPHS = ['', ...RAMP, '∘', 'o', 'O', '"', "'", ',', 'v', '0', '8', 'x', '.', '`', '^'];
 const G_DOT = RAMP.length + 11; // .
 const G_COMMA = RAMP.length + 6; // ,
-const G_PEBBLE = [G_DOT, G_COMMA, RAMP.length + 1, RAMP.length + 2, G_DOT]; // . , ∘ o .
 const G_RING = RAMP.length + 1; // ∘
 const G_O = RAMP.length + 2; // o
 const G_BIG_O = RAMP.length + 3; // O
 const G_TUFT = [RAMP.length + 4, RAMP.length + 7, RAMP.length + 4, RAMP.length + 7, 9, 5]; // " v " v * +
 const G_EIGHT = RAMP.length + 9; // 8
+// Each painted ground has its own signs (the grass island keeps G_TUFT):
+const G_DIRT = [G_DOT, G_COMMA, 2, G_DOT]; // . , : .
+const G_MEADOW = [RAMP.length + 5, RAMP.length + 12, RAMP.length + 13]; // ' ` ^
+const G_STONEGROUND = [G_RING, 4, G_RING]; // ∘ = ∘
 const G_X = RAMP.length + 10; // x
 // Leafy marks: mostly round shapes (like the reference foliage and the
 // house art's o 0 @ & % runs), a few heavier ramp marks for weight.
@@ -537,15 +540,9 @@ function computeCell(F: TerrainField, x: number, y: number) {
     tb = fb + (P.fringeGlyph[2] - fb) * fringe;
     m = 0.8 + 0.18 * Math.max(lit, fringe);
   } else if (out.kind === KIND_DIRT) {
-    // scattered pebbles; grass creeping in at the border
-    if (out.edge < 0.45 && h2 < 0.45) {
-      g = G_TUFT[Math.floor(h * 97) % G_TUFT.length];
-      tr = P.grassGlyph[0];
-      tg = P.grassGlyph[1];
-      tb = P.grassGlyph[2];
-      m = 0.55 + 0.25 * tex;
-    } else if (h < 0.24) {
-      g = G_PEBBLE[Math.floor(h2 * G_PEBBLE.length)];
+    // a few scattered pebbles and crumbs
+    if (h < 0.1) {
+      g = G_DIRT[Math.floor(h2 * G_DIRT.length)];
       const pe = h2 < 0.6 ? P.dirtPebble : P.dirtRim;
       tr = pe[0];
       tg = pe[1];
@@ -553,15 +550,9 @@ function computeCell(F: TerrainField, x: number, y: number) {
       m = 0.55 + 0.35 * h2;
     }
   } else if (out.kind === KIND_MEADOW) {
-    // light tufts, a few cream flower specks
-    if (h2 < 0.055) {
-      g = h < 0.5 ? 1 : G_DOT;
-      tr = P.meadowFlower[0];
-      tg = P.meadowFlower[1];
-      tb = P.meadowFlower[2];
-      m = 0.9;
-    } else if (h < 0.17) {
-      g = G_TUFT[Math.floor(h2 * 97) % G_TUFT.length];
+    // a few light, soft blades
+    if (h < 0.07) {
+      g = G_MEADOW[Math.floor(h2 * 97) % G_MEADOW.length];
       tr = P.meadowGlyph[0];
       tg = P.meadowGlyph[1];
       tb = P.meadowGlyph[2];
@@ -569,8 +560,8 @@ function computeCell(F: TerrainField, x: number, y: number) {
     }
   } else if (out.kind === KIND_STONEGROUND) {
     // a few pebbles and stones, light marks on calm grey
-    if (h < 0.22) {
-      g = h2 < 0.5 ? G_PEBBLE[Math.floor(h * 97) % G_PEBBLE.length] : G_ROCK[Math.floor(h2 * 2) % 2];
+    if (h < 0.09) {
+      g = G_STONEGROUND[Math.floor(h2 * 97) % G_STONEGROUND.length];
       tr = P.stoneGroundGlyph[0];
       tg = P.stoneGroundGlyph[1];
       tb = P.stoneGroundGlyph[2];
@@ -578,8 +569,8 @@ function computeCell(F: TerrainField, x: number, y: number) {
     }
   } else if (out.kind === KIND_SLAB) {
     // smooth flat stone: a rare speck, nothing on the rim
-    if (out.edge > 0 && h < 0.09) {
-      g = h2 < 0.5 ? G_DOT : 1;
+    if (out.edge > 0 && h < 0.04) {
+      g = 1; // ·
       tr = P.slabGlyph[0];
       tg = P.slabGlyph[1];
       tb = P.slabGlyph[2];

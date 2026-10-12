@@ -104,7 +104,6 @@ export const SWATCH_GROUPS: { title: string; swatches: [string, string][] }[] = 
       ['ground.dirtPebble', 'dirt pebbles'],
       ['ground.meadow', 'meadow'],
       ['ground.meadowGlyph', 'meadow grass'],
-      ['ground.meadowFlower', 'meadow flowers'],
       ['ground.stone', 'stone ground'],
       ['ground.stoneRim', 'stone ground edge'],
       ['ground.stoneGlyph', 'stone ground glyphs'],
@@ -139,15 +138,13 @@ export const SWATCH_GROUPS: { title: string; swatches: [string, string][] }[] = 
     ],
   },
   {
-    title: 'Flowers & tufts',
+    title: 'Flowers',
     swatches: [
       ['flower.petal', 'flower petals'],
       ['flower.centre', 'flower centre'],
       ['flower.whitePetal', 'white flower petals'],
       ['flower.purplePetal', 'purple flower petals'],
       ['flower.orangePetal', 'orange flower petals'],
-      ['grassTuft.tip', 'grass tuft tips'],
-      ['grassTuft.base', 'grass tuft base'],
     ],
   },
 ];

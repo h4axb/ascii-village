@@ -553,6 +553,13 @@
       "x": 30,
       "y": 76,
       "scale": 0.2
+    },
+    {
+      "id": "wayfinder-1",
+      "asset": "wayfinder",
+      "x": 47,
+      "y": 38,
+      "scale": 0.1
     }
   ],
   "colliders": {

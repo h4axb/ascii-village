@@ -89,6 +89,7 @@ import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOU
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
+import { SPEECH_BUBBLE, SPEECH_BUBBLE_COLORS, SPEECH_BUBBLE_PALETTE } from './speechBubble';
 import { onThemeChange, themeRevision } from './theme';
 import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
 import { groundBare } from './ground';
@@ -489,6 +490,11 @@ type Modal =
   | null;
 
 // the big ones: offered from a little further away
+// Mitchy's "!" bubble: shown within this many tiles of him; its drawn height
+// in em (the .mitchy-bubble-art scale x its rows), for lifting his label over it
+const MITCHY_BUBBLE_TILES = 6;
+const MITCHY_BUBBLE_SCALE = 0.3;
+const MITCHY_BUBBLE_H = SPEECH_BUBBLE.length * MITCHY_BUBBLE_SCALE + 0.4;
 const PROMPT_WIDE_KINDS = new Set<EntityKind>(['cat', 'house', 'shop', 'hotspot']);
 
 // Settings > Controls: every key the game listens to (the handler is
@@ -4108,6 +4114,17 @@ function Game() {
     }
     return best;
   })();
+  // Mitchy's "!" bubble: while something with him is still open (the intro's
+  // part C, bringing him the gathered things, reporting back) and the player
+  // is within a few tiles of him - the same states openDialog branches on.
+  const mitchyWaiting =
+    introStage === 'partC:explore' || introStage === 'partC:payment' || isStep(quest, 'mitchy') || isStep(quest, 'report');
+  const bubbleCat = (() => {
+    if (!mitchyWaiting || modal || cinematic || mapOpen || editorOpen) return null;
+    const cat = ents.find((e) => e.id === 'cat');
+    if (!cat || nearestIsland(player.x, player.y).idx !== nearestIsland(cat.x, cat.y).idx) return null;
+    return near(cat, player) <= MITCHY_BUBBLE_TILES ? cat : null;
+  })();
   const interactActions: InteractActions = {
     collect,
     shakeTree,
@@ -5710,6 +5727,24 @@ function Game() {
                 </div>
               )}
 
+              {bubbleCat && (
+                <div
+                  className="mitchy-bubble"
+                  style={{
+                    left: `${bubbleCat.x * TILE_CH + ((bubbleCat.scale ?? 1) * Math.max(...bubbleCat.sprite.map((l) => l.length))) / 2}ch`,
+                    top: `${bubbleCat.y * TILE_LN - mitchyHopEm - 0.4}em`,
+                  }}
+                >
+                  <ColoredSprite
+                    className="mitchy-bubble-art"
+                    sprite={SPEECH_BUBBLE}
+                    colors={SPEECH_BUBBLE_COLORS}
+                    palette={SPEECH_BUBBLE_PALETTE}
+                    perCell
+                  />
+                </div>
+              )}
+
               {/* the name over what the mouse is on - or, walking up to
                   something, over the nearest thing in reach, with the F key
                   that does it (see promptTarget / pressF) */}
@@ -5727,12 +5762,14 @@ function Game() {
                         : { x: plot.door.c0, y: plot.rect.y1 }; // the one gate, in the near rail
                   if (!pos) return null;
                   const withF = !!promptTarget && JSON.stringify(promptTarget.ref) === JSON.stringify(ref);
+                  // over Mitchy's "!" bubble, not on it
+                  const lift = bubbleCat && ref.kind === 'entity' && ref.id === 'cat' ? MITCHY_BUBBLE_H : 0;
                   return (
                     <div
                       className={'fpop' + (withF ? ' with-f' : '')}
                       style={{
                         left: `${pos.x * TILE_CH + 1}ch`,
-                        top: `${Math.max(0, pos.y * TILE_LN - 1.6)}em`,
+                        top: `${Math.max(0, pos.y * TILE_LN - 1.6 - lift)}em`,
                       }}
                     >
                       {withF && <kbd className="fpop-key">F</kbd>}

@@ -4517,3 +4517,37 @@ pre {
   pointer-events: none;
 }
 
+
+/* Mitchy's "!" bubble over his head while he's waiting for the player (see
+   App.tsx's bubbleCat). The box sits at his head's centre; the art hangs up
+   from it, scaled to about three tiles across (MITCHY_BUBBLE_SCALE). */
+.mitchy-bubble {
+  position: absolute;
+  z-index: 499;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.mitchy-bubble-art {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  margin: 0;
+  line-height: 1;
+  transform-origin: 50% 100%;
+  transform: translateX(-50%) scale(0.3);
+  animation:
+    mitchy-bubble-in 0.22s ease-out both,
+    mitchy-bubble-bob 1.6s ease-in-out 0.22s infinite;
+}
+@keyframes mitchy-bubble-in {
+  from { transform: translateX(-50%) scale(0); opacity: 0; }
+  to { transform: translateX(-50%) scale(0.3); opacity: 1; }
+}
+@keyframes mitchy-bubble-bob {
+  0%, 100% { transform: translateX(-50%) translateY(0) scale(0.3); }
+  50% { transform: translateX(-50%) translateY(-0.6em) scale(0.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mitchy-bubble-art { animation: none; }
+}

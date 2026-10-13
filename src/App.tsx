@@ -820,6 +820,44 @@ function Landing({ onStart }: { onStart: () => void }) {
     reader.readAsText(file);
   }
 
+  // the start screen's choices, top to bottom
+  const actions: { label: string; run: () => void; disabled?: boolean }[] = [
+    ...(hasSave
+      ? [
+          { label: 'Continue', run: onStart },
+          { label: 'New Game', run: () => setConfirmNewGame(true) },
+        ]
+      : [{ label: 'Start', run: onStart }]),
+    { label: 'Upload Save', run: () => fileRef.current?.click() },
+    { label: 'Export Save', run: () => handleExport(), disabled: !hasSave },
+  ];
+  const [sel, setSel] = useState(0);
+  const keysRef = useRef({ actions, sel, confirmNewGame });
+  keysRef.current = { actions, sel, confirmNewGame };
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      const k = keysRef.current;
+      if (k.confirmNewGame) return;
+      const step = ev.key === 'ArrowDown' ? 1 : ev.key === 'ArrowUp' ? -1 : 0;
+      if (step) {
+        ev.preventDefault();
+        // the next choice that can be picked
+        let i = k.sel;
+        for (let n = 0; n < k.actions.length; n++) {
+          i = (i + step + k.actions.length) % k.actions.length;
+          if (!k.actions[i].disabled) break;
+        }
+        setSel(i);
+      } else if (ev.key === 'Enter' || ev.key === ' ') {
+        if (document.activeElement instanceof HTMLButtonElement) return; // its own click
+        ev.preventDefault();
+        k.actions[k.sel]?.run();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   function handleExport() {
     const s = loadSave();
     if (s) downloadSaveFile(s);
@@ -869,35 +907,29 @@ function Landing({ onStart }: { onStart: () => void }) {
       >
         {portrait && <img className="landing-logo portrait" src={titleSrc} alt="ASCII Bay" draggable={false} />}
         <div className="subtitle">a tiny monochrome bay</div>
-        {/* design-system buttons (src/ui), one column: the primary action in green */}
-        <div className="ds-actions landing-actions">
-          {hasSave ? (
-            <>
-              <button className="ds-action go start" onClick={onStart}>
-                <span>Continue</span>
-              </button>
-              <button className="ds-action" onClick={() => setConfirmNewGame(true)}>
-                <span>New Game</span>
-              </button>
-            </>
-          ) : (
-            <button className="ds-action go start" onClick={onStart}>
-              <span>Start</span>
+        {/* the in-game dialogue choices' look (src/ui .ds-option): one
+            highlighted (the ▸), moved by hovering or ↑/↓, Enter picks it */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,application/json"
+          className="landing-file-input"
+          onChange={(e) => e.target.files?.[0] && handleUploadFile(e.target.files[0])}
+        />
+        <div className="ds-options landing-actions" role="listbox">
+          {actions.map((a, i) => (
+            <button
+              key={a.label}
+              role="option"
+              aria-selected={i === sel}
+              className={'ds-option landing-option' + (i === 0 ? ' start' : '') + (i === sel ? ' sel' : '')}
+              disabled={a.disabled}
+              onMouseEnter={() => !a.disabled && setSel(i)}
+              onClick={a.run}
+            >
+              {a.label}
             </button>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".json,application/json"
-            className="landing-file-input"
-            onChange={(e) => e.target.files?.[0] && handleUploadFile(e.target.files[0])}
-          />
-          <button className="ds-action" onClick={() => fileRef.current?.click()}>
-            <span>Upload Save</span>
-          </button>
-          <button className="ds-action" onClick={handleExport} disabled={!hasSave}>
-            <span>Export Save</span>
-          </button>
+          ))}
         </div>
         {error && <div className="landing-save-error">{error}</div>}
       </div>

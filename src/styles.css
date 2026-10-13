@@ -137,29 +137,20 @@ pre {
   /* a 1920-wide screen's size: the column scales with the window (App.tsx) */
   width: 300px;
   margin-top: 52px;
+  gap: 10px;
   flex-direction: column;
   align-items: stretch;
 }
 
-.landing-actions .ds-action {
-  justify-content: center;
-  color: var(--ds-text);
-  /* solid over the meadow: no grass glyphs showing through */
-  background: rgb(31, 36, 23);
-}
-.landing-actions .ds-action:hover:not(:disabled) {
-  background: rgb(43, 49, 33);
-}
-.landing-actions .ds-action.go:not(:disabled) {
-  background: rgb(36, 54, 29);
-}
-.landing-actions .ds-action.go:hover:not(:disabled) {
-  background: rgb(46, 69, 37);
-}
-
-.landing-actions .start {
+/* the choices: the in-game dialogue choices (src/ui .ds-option), taller */
+.landing-option {
+  padding: 19px 30px;
   font-size: 17px;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
+}
+.landing-option:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .landing-file-input {
@@ -864,15 +855,19 @@ pre {
   letter-spacing: 0.2em;
   white-space: nowrap;
 }
+/* the start screen's choices in miniature (one per 58 px button of the
+   276 px column: 21 %), in the in-game choices' look */
 .wed-start-btn {
-  height: 7%;
-  width: 66%;
-  background: rgb(31, 36, 23);
-  border-radius: 2px;
+  height: 21%;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--ds-line, rgba(255, 255, 255, 0.25));
+  border-radius: 3px;
+  background: var(--ds-dialogue, rgba(28, 32, 20, 0.85));
 }
 .wed-start-btn.go {
-  margin-top: 12%;
-  background: rgb(36, 54, 29);
+  margin-top: 6%;
+  border-color: var(--ds-line-strong, rgba(255, 255, 255, 0.6));
 }
 .wed-start-player .player-sprite {
   position: absolute;

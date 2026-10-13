@@ -899,7 +899,7 @@ export const clampCam = (focus: number, view: number, ground: number) =>
 // the title. Shared by the editor's Start screen tab (drawing and dragging)
 // and the start screen itself.
 export const START_REF = { w: 1920, h: 1080 };
-export const START_UI_PX = { w: 300, h: 234 };
+export const START_UI_PX = { w: 300, h: 276 };
 export function startScreenSize(): { w: number; h: number } {
   return typeof window === 'undefined' ? START_REF : { w: window.innerWidth, h: window.innerHeight };
 }

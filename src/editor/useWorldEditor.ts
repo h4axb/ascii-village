@@ -747,7 +747,7 @@ export function useWorldEditor(opts: {
     const stuck = notes.filter((n) => n.startsWith('!')).map((n) => n.slice(1));
     const assets = [...new Set(notes.filter((n) => !n.startsWith('!')))];
     if (stuck.length) {
-      setStatus({ kind: 'info', text: `${stuck.join(', ')} still blocks here (${stuck.includes('cat') ? 'Mitchy blocks by his feet' : 'rotated objects and the house stairs block as a whole'}).` });
+      setStatus({ kind: 'info', text: `${stuck.join(', ')} still blocks here (${stuck.includes('cat') ? 'Mitchy blocks by his feet' : 'rotated objects block as a whole'}).` });
     } else if (assets.length && record) {
       setStatus({ kind: 'info', text: `Changed the collider of every ${assets.join(', ')} — reset it in this tab if that's not what you wanted.` });
     }

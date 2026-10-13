@@ -1542,6 +1542,21 @@ pre {
   font-weight: bold;
   animation: bob 1s infinite;
 }
+/* in reach: the F key that does it, before the name */
+.fpop.with-f {
+  display: flex;
+  align-items: center;
+  gap: 0.5ch;
+  white-space: nowrap;
+}
+.fpop-key {
+  padding: 0 0.4ch;
+  border: 1px solid #0a0a0a;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  font: inherit;
+  line-height: 1.1;
+}
 
 @keyframes bob {
   0%,

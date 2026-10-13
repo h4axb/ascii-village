@@ -4420,3 +4420,12 @@ pre {
   background: #000;
   pointer-events: none;
 }
+
+/* the player's pixel shadow on the ground (App.tsx PlayerShadow): under the
+   sprite, multiplied onto the ground so it darkens whatever is beneath */
+.player-shadow {
+  position: absolute;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  transform-origin: 50% 50%;
+}

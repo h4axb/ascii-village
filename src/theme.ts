@@ -69,6 +69,10 @@ export const SWATCH_GROUPS: { title: string; swatches: [string, string][] }[] = 
     ],
   },
   {
+    title: 'Player',
+    swatches: [['player.shadow', 'shadow under the player']],
+  },
+  {
     // the stone assets: each colour of their drawings moves with the swatch
     // of its kind (assets.ts); saturation and brightness are sliders below
     title: 'Stones',

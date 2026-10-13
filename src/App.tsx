@@ -74,7 +74,7 @@ import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
 import startCoastUrl from './assets/start-coast.webp';
-import { onThemeChange, themeRevision } from './theme';
+import { onThemeChange, themeRevision, themeSwatch } from './theme';
 import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
 import { groundBare } from './ground';
 import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, IconClose, type Slot, type Action } from './ui';
@@ -541,6 +541,41 @@ const LANDING_FADE_MS = 500;
 // The player's backing under each glyph: this much darker than the glyph's
 // own colour (other sprites use 0.55) - lighter, so the character reads
 // clean rather than grimy, in the game and on the start screen
+// The player's shadow: a flat pixel ellipse on the ground under the feet
+// (12 x 4 pixels, hard edges), multiplied onto whatever is under it, so it
+// reads as a darker patch of that ground. Colour: the theme's player.shadow.
+const PLAYER_SHADOW = { width: 0.8, opacity: 0.55 };
+const SHADOW_ROWS: [number, number][] = [
+  [3, 6], // row: first column, width (of 12)
+  [1, 10],
+  [1, 10],
+  [3, 6],
+];
+function PlayerShadow({ cx, footEm, w, lift }: { cx: number; footEm: number; w: number; lift: number }) {
+  const h = w / 3; // ch: 12 x 4 pixels
+  return (
+    <svg
+      className="player-shadow"
+      viewBox="0 0 12 4"
+      preserveAspectRatio="none"
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      style={{
+        left: `${cx - w / 2}ch`,
+        top: `calc(${footEm}em - ${h * 0.55}ch)`,
+        width: `${w}ch`,
+        height: `${h}ch`,
+        opacity: PLAYER_SHADOW.opacity,
+        transform: lift ? `scale(${Math.max(0.6, 1 - lift * 0.25)})` : undefined,
+      }}
+    >
+      {SHADOW_ROWS.map(([x, n], y) => (
+        <rect key={y} x={x} y={y} width={n} height={1} fill={themeSwatch('player.shadow')} />
+      ))}
+    </svg>
+  );
+}
+
 const PLAYER_SHADE = 0.3;
 
 // The start screen's scenery: the player in the bottom-right corner, mid-step
@@ -5386,6 +5421,17 @@ function Game() {
                     color={rideBoat.color}
                     texture={rideBoat.textureModifier}
                     solidCells
+                  />
+                )}
+                {/* a small pixel shadow on the ground under the feet (not
+                    while on the boat); it stays on the ground during a hop,
+                    a little smaller */}
+                {!rideBoat && (
+                  <PlayerShadow
+                    cx={(playerK * playerW) / 2}
+                    footEm={playerK * displaySprite.length}
+                    w={PLAYER_SHADOW.width * playerK * playerW}
+                    lift={hopEm}
                   />
                 )}
                 <SolidSpriteCanvas

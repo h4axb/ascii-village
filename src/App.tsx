@@ -5239,6 +5239,7 @@ function Game() {
                     // background to begin with — this just stops terrain
                     // showing through its own glyph gaps, same principle.
                     sway={e.sway}
+                    blend={e.blend}
                     solidCells={
                       e.kind === 'house' ||
                       e.kind === 'bridge' ||

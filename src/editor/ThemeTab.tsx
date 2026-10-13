@@ -20,6 +20,7 @@ import {
   setCharacterSaturation,
   setStoneLook,
   setGroundShadow,
+  setPondLook,
   setGrade,
   setSwatch,
   themeColor,
@@ -163,6 +164,30 @@ export function ThemeTab() {
             </label>
           );
         })}
+      </div>
+
+      <div className="wed-group">
+        <div className="wed-group-name">
+          Pond
+          <button className="wed-theme-reset" onClick={() => setPondLook({ saturation: 1, brightness: 1, tintAmount: 0 })}>
+            reset
+          </button>
+        </div>
+        {(['saturation', 'brightness', 'tintAmount'] as const).map((key) => {
+          const v = preset.pond?.[key] ?? (key === 'tintAmount' ? 0 : 1);
+          return (
+            <label key={key} className="wed-theme-slider">
+              <span>{key === 'tintAmount' ? 'pond tint' : `pond ${key}`}</span>
+              <input type="range" min={0} max={key === 'tintAmount' ? 1 : 2} step={0.01} value={v} onChange={(ev) => setPondLook({ [key]: Number(ev.target.value) })} />
+              <span className="wed-dim">{v.toFixed(2)}</span>
+            </label>
+          );
+        })}
+        <label className="wed-theme-slider">
+          <span>pond tint colour</span>
+          <input type="color" value={preset.pond?.tint ?? '#5aa0c8'} onChange={(ev) => setPondLook({ tint: ev.target.value })} />
+          <span className="wed-dim">{preset.pond?.tint ?? '#5aa0c8'}</span>
+        </label>
       </div>
 
       <div className="wed-group">

@@ -76,6 +76,9 @@ interface Props {
   // palette keys whose glyphs sway left and right (solidCells only): the
   // glyph moves, its cell's backing stays, so no gap opens
   sway?: string;
+  // palette keys drawn without a backing (solidCells only): the ground shows
+  // between those glyphs, so an edge melts into it
+  blend?: string;
   onClick?: (e: React.MouseEvent) => void;
   onMouseEnter?: (e: React.MouseEvent) => void;
   onMouseLeave?: (e: React.MouseEvent) => void;
@@ -97,6 +100,7 @@ function ColoredSpriteImpl({
   solidCells,
   eyeRow,
   sway,
+  blend,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -143,7 +147,7 @@ function ColoredSpriteImpl({
               continue;
             }
             cells.push(
-              <span key={x} style={hex ? { color: hex, background: darken(hex, 0.55) } : undefined}>
+              <span key={x} style={hex ? (blend && key && blend.includes(key) ? { color: hex } : { color: hex, background: darken(hex, 0.55) }) : undefined}>
                 {sway && key && sway.includes(key) ? <i className={`sway sw${(x >> 1) % 12}`}>{ch}</i> : ch}
               </span>,
             );
@@ -337,6 +341,7 @@ function propsAreEqual(prev: Props, next: Props): boolean {
     prev.solidCells === next.solidCells &&
     prev.eyeRow === next.eyeRow &&
     prev.sway === next.sway &&
+    prev.blend === next.blend &&
     prev.texture === next.texture &&
     !prev.onClick === !next.onClick &&
     !prev.onMouseEnter === !next.onMouseEnter &&

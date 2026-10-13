@@ -4429,29 +4429,29 @@ pre {
 }
 
 /* an animated pond's water (ColoredSprite sway): each water glyph sways
-   left and right inside its cell, the columns a little out of step, like
-   the source SVG (7 s, +-4 px of a 20 px cell) */
+   left and right inside its cell and shimmers (a little brighter and back),
+   the columns out of step so ripples run across the pond (7 s loop) */
 .sway {
   display: inline-block;
   font-style: normal;
   animation: sway 7s ease-in-out infinite;
 }
 @keyframes sway {
-  0%, 100% { transform: translateX(-0.2ch); }
-  50% { transform: translateX(0.2ch); }
+  0%, 100% { transform: translateX(-0.35ch); opacity: 0.7; }
+  50% { transform: translateX(0.35ch); opacity: 1; }
 }
 .sw0 { animation-delay: -0.00s; }
-.sw1 { animation-delay: -0.55s; }
-.sw2 { animation-delay: -1.10s; }
-.sw3 { animation-delay: -1.65s; }
-.sw4 { animation-delay: -2.20s; }
-.sw5 { animation-delay: -2.75s; }
-.sw6 { animation-delay: -3.30s; }
-.sw7 { animation-delay: -3.85s; }
-.sw8 { animation-delay: -4.40s; }
-.sw9 { animation-delay: -4.95s; }
-.sw10 { animation-delay: -5.50s; }
-.sw11 { animation-delay: -6.05s; }
+.sw1 { animation-delay: -0.58s; }
+.sw2 { animation-delay: -1.16s; }
+.sw3 { animation-delay: -1.74s; }
+.sw4 { animation-delay: -2.32s; }
+.sw5 { animation-delay: -2.90s; }
+.sw6 { animation-delay: -3.48s; }
+.sw7 { animation-delay: -4.06s; }
+.sw8 { animation-delay: -4.64s; }
+.sw9 { animation-delay: -5.22s; }
+.sw10 { animation-delay: -5.80s; }
+.sw11 { animation-delay: -6.38s; }
 @media (prefers-reduced-motion: reduce) {
   .sway { animation: none; }
 }

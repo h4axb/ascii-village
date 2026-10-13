@@ -226,6 +226,8 @@ export interface Ent {
   colors?: string[];
   // palette keys whose glyphs sway left and right (an animated pond's water)
   sway?: string;
+  // palette keys drawn without a backing (a pond's outer grass, see assets.ts)
+  blend?: string;
   // Optional CSS render scale. The generated palm keeps its full character grid
   // — every glyph and tone of the reference — and is simply DRAWN smaller, which
   // is the only way to shrink it without changing its shape. spriteTiles() and
@@ -933,6 +935,7 @@ export function buildStructEnts(doc: WorldDoc): Ent[] {
       colors: def.colors,
       palette: def.palette,
       sway: def.sway,
+      blend: def.blend,
       scale: a.scale ?? def.scale,
       rotation: a.rotation,
       interactable: a.interactable ?? def.interactable,

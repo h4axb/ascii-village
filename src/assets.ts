@@ -21,7 +21,7 @@
 import * as S from './sprites';
 import type { EntityKind } from './world';
 import metaData from './data/assets.meta.json';
-import { onThemeChange, stoneLook, themeSwatch } from './theme';
+import { onThemeChange, stoneLook, themeSwatch, pondLook, themeColor } from './theme';
 
 export interface AssetDef {
   slug: string;
@@ -42,6 +42,9 @@ export interface AssetDef {
   headRows?: number;
   // palette keys whose glyphs sway left and right (an animated pond's water)
   sway?: string;
+  // palette keys drawn without a backing and tinted toward the ground's
+  // grass (a pond's outer grass, so its edge melts into the ground)
+  blend?: string;
 }
 
 export interface AssetMeta {
@@ -89,8 +92,21 @@ interface AssetFile extends AssetMeta {
   solid?: string[];
   headRows?: number;
   sway?: string;
+  blend?: string;
 }
 const FILES = import.meta.glob<{ default: AssetFile }>('./data/assets/*.json', { eager: true });
+
+// a palette's water: the clearly blue colours
+function waterKeys(palette: Record<string, string>): string | undefined {
+  const keys = Object.entries(palette)
+    .filter(([, h]) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+      return b > r + 30 && b >= g - 8;
+    })
+    .map(([k]) => k)
+    .join('');
+  return keys || undefined;
+}
 
 function fileAssets(): AssetDef[] {
   const out: AssetDef[] = [];
@@ -113,7 +129,9 @@ function fileAssets(): AssetDef[] {
       interactable: d.interactable ?? false,
       file,
       headRows: d.headRows,
-      sway: d.sway,
+      // a pond without its own sway keys: its blue colours are its water
+      sway: d.sway ?? (/^pond/.test(slug) && d.palette ? waterKeys(d.palette) : undefined),
+      blend: d.blend,
     });
   }
   return out;
@@ -170,6 +188,31 @@ function themeStones() {
 }
 themeStones();
 onThemeChange(themeStones);
+
+// ---- the ponds' look (the editor's Theme tab, "Pond") -----------------------
+// Every pond asset's colours go through the pond's saturation, brightness and
+// tint; its outer grass ('blend' keys) is pulled halfway toward the ground's
+// own grass glyphs first, so its edge melts into the ground. Refilled in
+// place on a theme change, like the stones.
+const PONDS = [...ASSETS, ...RAW_ASSETS]
+  .filter((a) => /^pond/.test(a.slug) && a.palette)
+  .filter((a, i, all) => all.findIndex((b) => b.palette === a.palette) === i)
+  .map((a) => ({ palette: a.palette!, blend: a.blend ?? '', orig: Object.entries(a.palette!).map(([k, hex]) => ({ k, rgb: rgbOf(hex) })) }));
+function themePonds() {
+  const look = pondLook();
+  const tint = rgbOf(look.tint);
+  const grass = rgbOf(themeColor('grass.glyph'));
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  for (const { palette, blend, orig } of PONDS)
+    for (const { k, rgb } of orig) {
+      let c = blend.includes(k) ? rgb.map((v, i) => v + (grass[i] - v) * 0.5) : rgb;
+      const lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+      c = c.map((v, i) => ((lum + (v - lum) * look.saturation) * look.brightness) * (1 - look.tintAmount) + tint[i] * look.tintAmount * (lum / 160));
+      palette[k] = '#' + c.map(ch).join('');
+    }
+}
+themePonds();
+onThemeChange(themePonds);
 
 export function assetOf(slug: string | undefined): AssetDef | undefined {
   return slug ? BY_SLUG.get(slug) : undefined;

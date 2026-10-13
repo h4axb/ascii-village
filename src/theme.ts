@@ -37,7 +37,16 @@ export interface ThemePreset {
   stones?: StoneLook;
   // how dark the ground shade around objects is (terrain.ts AO; 0 = none, 1 = as designed)
   groundShadow?: number;
+  // the ponds (src/data/assets/pond-*.json): saturation, brightness and a tint
+  pond?: PondLook;
 }
+export interface PondLook {
+  saturation: number;
+  brightness: number;
+  tint: string;
+  tintAmount: number;
+}
+const POND_DEFAULT: PondLook = { saturation: 1, brightness: 1, tint: '#5aa0c8', tintAmount: 0 };
 export interface StoneLook {
   saturation: number;
   brightness: number;
@@ -202,6 +211,7 @@ function presetOf(d: ThemeDoc, name: string): ThemePreset {
     characters: { player: 1, mitchy: 1, ...p.characters },
     stones: { saturation: 1, brightness: 1, ...p.stones },
     groundShadow: p.groundShadow ?? 1,
+    pond: { ...POND_DEFAULT, ...p.pond },
   };
 }
 
@@ -254,6 +264,12 @@ export const themeRgb = (name: string): RGB => hexToRgb(themeColor(name));
 // A swatch as set, without the grade (for colours the grade never touches)
 export const themeSwatch = (name: string): string => cur.swatches[name] ?? '#ff00ff';
 export const groundShadow = (): number => cur.groundShadow ?? 1;
+export const pondLook = (): PondLook => ({ ...POND_DEFAULT, ...cur.pond });
+export function setPondLook(patch: Partial<PondLook>) {
+  cur.pond = { ...POND_DEFAULT, ...cur.pond, ...patch };
+  doc.presets[doc.active] = cur;
+  changed();
+}
 export const stoneLook = (): StoneLook => ({ saturation: 1, brightness: 1, ...cur.stones });
 
 // A colour between two swatches (0 = a, 1 = b), graded

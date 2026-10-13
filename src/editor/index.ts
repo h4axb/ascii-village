@@ -1,7 +1,7 @@
 // The world editor is a dev tool: in a production build useWorldEditor is a
 // stub that edits nothing and reports the world exactly as saved, so none of
 // the editor (or its panel, gated on `enabled` in App.tsx) ships.
-import { STRUCT_ENTS, WORLD_DOC } from '../world';
+import { STRUCT_ENTS, WORLD_DOC, startScreenOf } from '../world';
 import markerData from '../data/sceneMarkers.json';
 import { useWorldEditor as useWorldEditorDev } from './useWorldEditor';
 import type { WorldEditor } from './useWorldEditor';
@@ -45,6 +45,9 @@ const OFF: WorldEditor = {
   clearBlockedTiles: noop,
   mitchyLook: WORLD_DOC.mitchyLook ?? 'mitchy',
   setMitchyLook: noop,
+  startScreen: startScreenOf(WORLD_DOC),
+  setStartScreen: noop,
+  setStartOnly: noop,
   undo: noop,
   redo: noop,
   canUndo: false,

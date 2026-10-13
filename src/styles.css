@@ -795,6 +795,78 @@ pre {
   border-radius: 3px;
   white-space: nowrap;
 }
+/* The editor's Start screen tab (EditorLayers.tsx StartLayer): the start
+   screen's frame on the map, the title + buttons box and the player in it.
+   Above every entity; the editor's capture layer takes the pointer. */
+.wed-start-dim,
+.wed-start-frame,
+.wed-start-ui,
+.wed-start-player {
+  position: absolute;
+  pointer-events: none;
+  z-index: 200000;
+}
+.wed-start-dim {
+  background: rgba(8, 10, 14, 0.5);
+}
+.wed-start-frame {
+  box-sizing: border-box;
+  border: 2px dashed #ffd84a;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+.wed-start-handle {
+  position: absolute;
+  left: -2px;
+  top: -2.2em;
+  height: 2em;
+  padding: 0 0.8ch;
+  display: flex;
+  align-items: center;
+  font-size: 1em;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #1a1606;
+  background: #ffd84a;
+  white-space: nowrap;
+}
+.wed-start-corner {
+  position: absolute;
+  right: -1.2ch;
+  bottom: -0.6em;
+  width: 2ch;
+  height: 1.2em;
+  background: #ffd84a;
+  border: 1px solid #1a1606;
+}
+.wed-start-ui {
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 216, 74, 0.9);
+  background: rgba(20, 24, 14, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 4%;
+  overflow: hidden;
+}
+.wed-start-title {
+  margin: 0;
+  line-height: 1.1;
+  white-space: pre;
+  color: #fbf8e4;
+  font-weight: 600;
+}
+.wed-start-btn {
+  height: 7%;
+  width: 66%;
+  background: rgb(31, 36, 23);
+  border-radius: 2px;
+}
+.wed-start-btn.go {
+  margin-top: 8%;
+  background: rgb(36, 54, 29);
+}
+.wed-start-player .player-sprite {
+  position: absolute;
+}
 .dev-asset-head {
   font-weight: 600;
   letter-spacing: 1px;

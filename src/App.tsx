@@ -11,7 +11,17 @@ import {
   isWater,
   isOpenWater,
   STRUCT_ENTS,
-  liveStructEnts,
+  setLiveStructEnts,
+  START_ONLY_ENTS,
+  WORLD_DOC,
+  startScreenOf,
+  VIEW_W,
+  VIEW_H,
+  clampCam,
+  type StartScreen,
+  START_PLAYER_FRAME,
+  START_PLAYER_K,
+  startFrame,
   wildSpawns,
   PLAYER_SPAWN,
   PLAYER_T,
@@ -27,6 +37,8 @@ import {
   GARDEN_BED_SCALE,
 } from './world';
 import TerrainCanvas from './TerrainCanvas';
+import { resetTerrainStructs } from './terrain';
+import { PlayerShadow } from './PlayerShadow';
 import type { Ent, ItemType, EntityKind } from './world';
 import {
   getFunFact,
@@ -74,7 +86,7 @@ import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOU
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
-import { onThemeChange, themeRevision, themeSwatch } from './theme';
+import { onThemeChange, themeRevision } from './theme';
 import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
 import { groundBare } from './ground';
 import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, IconClose, type Slot, type Action } from './ui';
@@ -401,8 +413,7 @@ const ORBIT_ARCS = ORBIT_ANGLES.slice(0, -1).map((a, i) => {
 // whole viewport, cropping whatever overflows on the longer axis. So every
 // player sees the same amount of world (never more), the game always runs
 // edge-to-edge, and no black letterbox bars are ever drawn.
-const VIEW_W = 112;
-const VIEW_H = 40;
+// (the design view, VIEW_W x VIEW_H, and clampCam live in world.ts)
 const MAX_ZOOM = 1;
 // Zoom is MULTIPLICATIVE (z *= e^(-delta*k)) rather than a fixed +/- step, so
 // each notch changes the view by the same PERCENTAGE at any zoom level — that
@@ -416,13 +427,6 @@ const ZOOM_MS = 110; // tween length for the camera transform
 // (1 = jump straight there, 0 = ignore the mouse entirely).
 const ZOOM_RECENTRE = 0.45;
 const RECENTRE_MS = 280; // glide back to the player (Space / double-tap)
-
-// Follow a focus point, clamped to the map edges. When the viewport is LARGER
-// than the map on an axis (possible on very wide/short screens), there's
-// nothing to scroll — centre the map on that axis instead of letting the
-// clamp go negative and shove it against one side.
-const clampCam = (focus: number, view: number, ground: number) =>
-  view >= ground ? (ground - view) / 2 : Math.min(Math.max(focus - view / 2, 0), ground - view);
 
 type StorEntry = { where: 'store' | 'inv'; item: ItemType };
 
@@ -614,42 +618,6 @@ function entPlacement(e: Ent): React.CSSProperties {
 // The player's backing under each glyph: this much darker than the glyph's
 // own colour (other sprites use 0.55) - lighter, so the character reads
 // clean rather than grimy, in the game and on the start screen
-// The player's shadow: a flat pixel oval on the ground under the feet, in
-// pixels of half a ground square (the terrain's background blocks are 1ch x
-// 1ch from the world's origin: each holds 2 x 2 of them), so it sits exactly
-// on the ground's pixel grid and still steps round at its ends. A
-// slightly transparent dark grey: over grass it reads as darker grass, over
-// the path as darker earth. Colour: the theme's player.shadow.
-const PLAYER_SHADOW = { opacity: 0.3 };
-const SHADOW_ROWS: [number, number][] = [
-  [3, 6], // row: first pixel, width (of 12 half-squares)
-  [1, 10],
-  [1, 10],
-  [3, 6],
-];
-// x, y: the rig's place (tiles); cx, footEm: the feet in the rig (ch, em)
-function PlayerShadow({ x, y, cx, footEm }: { x: number; y: number; cx: number; footEm: number }) {
-  const rigX = x * TILE_CH, rigY = y * TILE_LN * CELL_ASPECT; // the rig, in ground blocks
-  // centred on the feet, the feet about two thirds of the way down it,
-  // snapped to the half-square grid
-  const half = (v: number) => Math.round(v * 2) / 2;
-  const bx0 = half(rigX + cx - 3);
-  const by0 = half(rigY + footEm * CELL_ASPECT - 1.35);
-  return (
-    <svg
-      className="player-shadow"
-      viewBox="0 0 12 4"
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-      style={{ left: `${bx0 - rigX}ch`, top: `${by0 - rigY}ch`, width: '6ch', height: '2ch', opacity: PLAYER_SHADOW.opacity }}
-    >
-      {SHADOW_ROWS.map(([x0, n], row) => (
-        <rect key={row} x={x0} y={row} width={n} height={1} fill={themeSwatch('player.shadow')} />
-      ))}
-    </svg>
-  );
-}
-
 const PLAYER_SHADE = 0.3;
 
 // The start screen's backdrop: a live view of the island's east coast, drawn
@@ -658,12 +626,29 @@ const PLAYER_SHADE = 0.3;
 // show up here too; animated ponds keep moving), and the player standing on
 // the grass by the shore with their pixel shadow. A fixed camera, the game's
 // own cover fit of the design view, nothing clickable. Mitchy wanders in the
-// game, so he isn't pinned here.
-const LANDING_VIEW = { x: 68, y: 58 }; // the tile the camera centres on
-const LANDING_PLAYER = { x: 72, y: 61 }; // where the player stands (tiles)
+// game, so he isn't pinned here. The layout (camera, zoom, the player's spot,
+// the title's place and size) and the start-screen-only objects come from
+// world.json, laid out in the editor's Start screen tab.
+const START_SCREEN: StartScreen = startScreenOf(WORLD_DOC);
 const LANDING_SKIP = new Set(['hotspot', 'blocker', 'cat']);
-function LandingWorld() {
+function LandingWorld({ portrait }: { portrait: boolean }) {
+  const L = START_SCREEN;
   const fieldRef = useRef<HTMLDivElement>(null);
+  // its own objects shape the ground too (glyphs kept clear, the shade under
+  // plants) while it's showing; the game gets its own layout back after
+  useState(() => {
+    if (!START_ONLY_ENTS.length) return;
+    setLiveStructEnts([...STRUCT_ENTS, ...START_ONLY_ENTS]);
+    resetTerrainStructs();
+  });
+  useEffect(
+    () => () => {
+      if (!START_ONLY_ENTS.length) return;
+      setLiveStructEnts(STRUCT_ENTS);
+      resetTerrainStructs();
+    },
+    [],
+  );
   const [dims, setDims] = useState({ w: 940, h: 560, scale: 1, viewW: VIEW_W, viewH: VIEW_H, charW: 8.4, lineH: 14 });
   useLayoutEffect(() => {
     // the same measuring and COVER fit as the game's (see Game's dims)
@@ -691,15 +676,16 @@ function LandingWorld() {
   }, []);
   // upright screens (phones) see only a narrow strip: centre it on the player
   // and the shore beside them, the player low, below the buttons
-  const view = dims.w < dims.h ? { x: LANDING_PLAYER.x + 2, y: LANDING_PLAYER.y - 6 } : LANDING_VIEW;
-  const camX = clampCam(view.x * TILE_CH, dims.viewW, GROUND_W);
-  const camY = clampCam(view.y * TILE_LN, dims.viewH, GROUND_H);
-  const res = dims.scale * (window.devicePixelRatio || 1);
-  const ents = liveStructEnts().filter((e) => !LANDING_SKIP.has(e.kind));
-  // the player mid-step in the walk-down cycle (as if about to step into the
-  // game), sized like the game's walking player
-  const frame = S.WALK_DOWN_FRAMES[1];
-  const playerK = (PLAYER_SCALE * S.PLAYER.length) / (frame.sprite.length - S.WALK_DOWN_PAD_TOP);
+  const zoom = portrait ? 1 : L.zoom;
+  const view = portrait ? { x: L.player.x + 2, y: L.player.y - 6 } : L.view;
+  const viewW = dims.viewW / zoom;
+  const viewH = dims.viewH / zoom;
+  const camX = clampCam(view.x * TILE_CH, viewW, GROUND_W);
+  const camY = clampCam(view.y * TILE_LN, viewH, GROUND_H);
+  const res = dims.scale * zoom * (window.devicePixelRatio || 1);
+  const ents = [...STRUCT_ENTS, ...START_ONLY_ENTS].filter((e) => !LANDING_SKIP.has(e.kind));
+  const frame = START_PLAYER_FRAME; // the player mid-step (world.ts)
+  const playerK = START_PLAYER_K;
   const playerW = Math.max(...frame.sprite.map((l) => l.length));
   return (
     <div className="landing-world" aria-hidden>
@@ -708,14 +694,18 @@ function LandingWorld() {
           <div className="sky-bg" />
           <div
             className="world"
-            style={{ width: `${GROUND_W}ch`, height: `${GROUND_H}em`, transform: `translate3d(${-camX}ch, ${-camY}em, 0)` }}
+            style={{
+              width: `${GROUND_W}ch`,
+              height: `${GROUND_H}em`,
+              transform: `translate3d(${-camX * zoom}ch, ${-camY * zoom}em, 0) scale(${zoom})`,
+            }}
           >
             <TerrainCanvas
               camX={camX}
               camY={camY}
-              viewW={dims.viewW}
-              viewH={dims.viewH}
-              zoom={1}
+              viewW={viewW}
+              viewH={viewH}
+              zoom={zoom}
               scale={dims.scale}
               charW={dims.charW}
               lineH={dims.lineH}
@@ -746,16 +736,11 @@ function LandingWorld() {
             <div
               className="player-rig"
               style={{
-                transform: `translate3d(${LANDING_PLAYER.x * TILE_CH}ch, ${LANDING_PLAYER.y * TILE_LN}em, 0)`,
+                transform: `translate3d(${L.player.x * TILE_CH}ch, ${L.player.y * TILE_LN}em, 0)`,
                 zIndex: PLAYER_Z_INDEX,
               }}
             >
-              <PlayerShadow
-                x={LANDING_PLAYER.x}
-                y={LANDING_PLAYER.y}
-                cx={(playerK * playerW) / 2}
-                footEm={playerK * frame.sprite.length}
-              />
+              <PlayerShadow x={L.player.x} y={L.player.y} cx={(playerK * playerW) / 2} footEm={playerK * frame.sprite.length} />
               <SolidSpriteCanvas
                 className="player-sprite"
                 style={{
@@ -779,6 +764,19 @@ function LandingWorld() {
   );
 }
 
+// upright screens (phones): the start screen keeps its own phone layout
+function usePortrait(): boolean {
+  const q = '(max-aspect-ratio: 9/10)';
+  const [portrait, setPortrait] = useState(() => window.matchMedia(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia(q);
+    const on = () => setPortrait(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return portrait;
+}
+
 function Landing({ onStart }: { onStart: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -789,6 +787,8 @@ function Landing({ onStart }: { onStart: () => void }) {
   // New Game is destructive (deletes the persistent save), so it's gated
   // behind an explicit confirmation rather than firing on the first click.
   const [confirmNewGame, setConfirmNewGame] = useState(false);
+  const portrait = usePortrait();
+  const ui = START_SCREEN.ui;
 
   function handleUploadFile(file: File) {
     setError(null);
@@ -836,8 +836,12 @@ function Landing({ onStart }: { onStart: () => void }) {
     // behind it a live view of the island's east coast (LandingWorld); the
     // title and the buttons share one left edge
     <div className="landing">
-      <LandingWorld />
-      <div className="landing-col">
+      <LandingWorld portrait={portrait} />
+      <div
+        className="landing-col"
+        // where the editor's Start screen tab put it (phones keep their own)
+        style={portrait ? undefined : { left: `${ui.x * 100}%`, top: `${ui.y * 100}%`, transform: `translateY(-50%) scale(${ui.scale})` }}
+      >
         <div className="landing-title">
           <pre className="title">{S.TITLE.join('\n')}</pre>
         </div>
@@ -1483,7 +1487,17 @@ function Game() {
   function focusEditorTarget(id: string) {
     let cx: number;
     let cy: number;
-    if (id.startsWith('marker:')) {
+    if (id === 'start') {
+      // the Start screen tab's frame, zoomed out until it fits with a margin
+      // in the part of the screen the editor panel leaves free (its right)
+      const f = startFrame(editor.startScreen);
+      const panel = document.querySelector('.wed-panel')?.getBoundingClientRect().width ?? 0;
+      const free = Math.max(0.4, 1 - panel / Math.max(1, window.innerWidth));
+      const z = Math.min(MAX_ZOOM, Math.max(minZoom, Math.min((dims.viewW * free) / (f.w * 1.15), dims.viewH / (f.h * 1.2))));
+      setZoom(z);
+      cx = f.x + f.w / 2 + ((1 - free) / 2) * (dims.viewW / z);
+      cy = f.y + f.h / 2;
+    } else if (id.startsWith('marker:')) {
       const p = editor.markers[id.slice(7)];
       if (!p) return;
       cx = (p.x + 0.5) * TILE_CH;

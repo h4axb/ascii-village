@@ -213,6 +213,7 @@ const COAST = {
 
 export interface Ent {
   id: string;
+  startOnly?: true; // a start-screen-only object (WorldAdded.startOnly)
   kind: EntityKind;
   x: number; // tile x of sprite top-left
   y: number; // tile y of sprite top-left
@@ -827,7 +828,83 @@ export interface WorldAdded extends WorldPose {
   asset: string;
   kind?: EntityKind; // default: the asset's kind
   interactable?: boolean; // default: the asset's
+  // drawn on the start screen only, never in the game (the editor's Start
+  // screen tab places these)
+  startOnly?: true;
 }
+// The start screen's layout (the editor's Start screen tab): the live view of
+// the island behind the title, the player standing in it, and the title +
+// buttons column.
+export interface StartScreenDoc {
+  view: { x: number; y: number }; // the tile the camera centres on
+  zoom?: number; // 1 = the game's view; >1 closer, <1 wider
+  player: { x: number; y: number }; // where the player stands (tiles)
+  // the title + buttons: its left edge and vertical centre, as fractions of
+  // the screen, and a size multiplier
+  ui?: { x: number; y: number; scale?: number };
+}
+export interface StartScreen {
+  view: { x: number; y: number };
+  zoom: number;
+  player: { x: number; y: number };
+  ui: { x: number; y: number; scale: number };
+}
+export const START_SCREEN_DEFAULT: StartScreen = {
+  view: { x: 68, y: 58 },
+  zoom: 1,
+  player: { x: 72, y: 61 },
+  ui: { x: 0.09, y: 0.5, scale: 1 },
+};
+export function startScreenOf(doc: WorldDoc): StartScreen {
+  const s = doc.startScreen;
+  const d = START_SCREEN_DEFAULT;
+  return {
+    view: s?.view ?? d.view,
+    zoom: s?.zoom ?? d.zoom,
+    player: s?.player ?? d.player,
+    ui: { x: s?.ui?.x ?? d.ui.x, y: s?.ui?.y ?? d.ui.y, scale: s?.ui?.scale ?? d.ui.scale },
+  };
+}
+// The game's design view (world ch x lines), fitted to any screen with a
+// COVER rule - see Game's dims in App.tsx. The start screen uses the same.
+export const VIEW_W = 112;
+export const VIEW_H = 40;
+// how much of the world (ch x lines) a w x h px screen shows, at a zoom
+export function coverView(w: number, h: number, charW: number, lineH: number, zoom = 1) {
+  const scale = Math.max(w / (VIEW_W * charW), h / (VIEW_H * lineH));
+  return { scale, viewW: w / scale / charW / zoom, viewH: h / scale / lineH / zoom };
+}
+// Follow a focus point, clamped to the map edges. When the viewport is LARGER
+// than the map on an axis (possible on very wide/short screens), there's
+// nothing to scroll — centre the map on that axis instead of letting the
+// clamp go negative and shove it against one side.
+export const clampCam = (focus: number, view: number, ground: number) =>
+  view >= ground ? (ground - view) / 2 : Math.min(Math.max(focus - view / 2, 0), ground - view);
+// The start screen's frame on the map (world ch / lines), as a reference
+// 1920 x 1080 screen shows it: the view, and the title + buttons column in it
+// (START_UI_PX: the column's size on that screen, at scale 1). Shared by the
+// editor's Start screen tab (drawing and dragging) - the start screen itself
+// fits any screen the same way.
+export const START_REF = { w: 1920, h: 1080 };
+export const START_UI_PX = { w: 380, h: 450 };
+export function startFrame(ss: StartScreen) {
+  // the field's cell (14px font, a 0.6em glyph): only its aspect matters here
+  const { viewW, viewH } = coverView(START_REF.w, START_REF.h, 8.4, 14, ss.zoom);
+  const x = clampCam(ss.view.x * TILE_CH, viewW, GROUND_W);
+  const y = clampCam(ss.view.y * TILE_LN, viewH, GROUND_H);
+  const uw = (START_UI_PX.w / START_REF.w) * viewW * ss.ui.scale;
+  const uh = (START_UI_PX.h / START_REF.h) * viewH * ss.ui.scale;
+  return { x, y, w: viewW, h: viewH, ui: { x: x + ss.ui.x * viewW, y: y + ss.ui.y * viewH - uh / 2, w: uw, h: uh } };
+}
+// The player on the start screen: mid-step in the walk-down cycle (as if
+// about to step into the game), sized like the game's walking player; its box
+// on the map (ch x lines) from its tile's top-left
+export const START_PLAYER_FRAME = S.WALK_DOWN_FRAMES[1];
+export const START_PLAYER_K = (PLAYER_SCALE * S.PLAYER.length) / (START_PLAYER_FRAME.sprite.length - S.WALK_DOWN_PAD_TOP);
+export const START_PLAYER_BOX = {
+  w: START_PLAYER_K * Math.max(...START_PLAYER_FRAME.sprite.map((l) => l.length)),
+  h: START_PLAYER_K * START_PLAYER_FRAME.sprite.length,
+};
 export interface WorldDoc {
   version: 2;
   moved: Record<string, WorldPose>; // built-in (STRUCT_ENTS_BASE) objects, by id
@@ -841,6 +918,7 @@ export interface WorldDoc {
   // Mitchy's look: the slug of an asset of kind 'cat' (src/data/assets/),
   // chosen in the editor's Assets tab. Absent = his original art ('mitchy').
   mitchyLook?: string;
+  startScreen?: StartScreenDoc;
 }
 
 export const WORLD_DOC: WorldDoc = worldDocData as unknown as WorldDoc;
@@ -890,11 +968,13 @@ function colliderFor(doc: WorldDoc, asset: string | undefined, sprite: string[])
   return fitMask(m, sprite);
 }
 
-export function buildStructEnts(doc: WorldDoc): Ent[] {
+// which: 'world' = what the game has (no start-screen-only objects), 'start'
+// = only those, 'all' = both (the editor, while it's open)
+export function buildStructEnts(doc: WorldDoc, which: 'world' | 'start' | 'all' = 'world'): Ent[] {
   const removed = new Set(doc.removed);
   const house = doc.moved.house;
   const out: Ent[] = [];
-  for (const base of BASE_ENTS) {
+  for (const base of which === 'start' ? [] : BASE_ENTS) {
     if (removed.has(base.id)) continue;
     let e: Ent = base;
     if (base.id === 'cat') {
@@ -920,6 +1000,7 @@ export function buildStructEnts(doc: WorldDoc): Ent[] {
     out.push(painted ? { ...e, solidMask: painted } : e);
   }
   for (const a of doc.added) {
+    if (which === 'world' ? a.startOnly : which === 'start' && !a.startOnly) continue;
     const def = assetOf(a.asset);
     if (!def) {
       if (import.meta.env.DEV) console.warn(`[world] "${a.id}" uses unknown asset "${a.asset}" — skipped`);
@@ -940,6 +1021,7 @@ export function buildStructEnts(doc: WorldDoc): Ent[] {
       rotation: a.rotation,
       interactable: a.interactable ?? def.interactable,
       solidMask: colliderFor(doc, def.slug, def.sprite) ?? def.solid,
+      ...(a.startOnly ? { startOnly: true as const } : {}),
     });
   }
   return out;
@@ -947,6 +1029,8 @@ export function buildStructEnts(doc: WorldDoc): Ent[] {
 
 // The array every other module imports: the world as saved.
 export const STRUCT_ENTS: Ent[] = buildStructEnts(WORLD_DOC);
+// The objects only the start screen draws.
+export const START_ONLY_ENTS: Ent[] = buildStructEnts(WORLD_DOC, 'start');
 
 // The structures as they stand RIGHT NOW: STRUCT_ENTS, except while the world
 // editor is changing them. Read by what's derived from the layout rather than

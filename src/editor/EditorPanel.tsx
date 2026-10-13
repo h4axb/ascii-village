@@ -24,6 +24,7 @@ const TABS: { id: EditorTab | 'image' | 'theme'; label: string }[] = [
   { id: 'intro', label: 'Intro' },
   { id: 'ground', label: 'Ground' },
   { id: 'theme', label: 'Theme' },
+  { id: 'start', label: 'Start screen' },
 ];
 
 // thumbnails: shrink a sprite to fit a 64x44 box (6.6 x 11 px per cell at
@@ -166,6 +167,14 @@ function Inspector({ ed, e }: { ed: WorldEditor; e: Ent }) {
           </label>
         </div>
       )}
+      {added && (
+        <div className="wed-row">
+          <label className="wed-check" title="drawn on the start screen only, never in the game">
+            <input type="checkbox" checked={!!added.startOnly} onChange={(ev) => ed.setStartOnly(e.id, ev.target.checked)} />
+            start screen only
+          </label>
+        </div>
+      )}
       {added && /^pond/.test(added.asset) && (
         <div className="wed-group">
           <div className="wed-group-name">Pond design</div>
@@ -282,7 +291,7 @@ function ObjectsTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): voi
   );
 }
 
-function AssetsTab({ ed }: { ed: WorldEditor }) {
+function AssetsTab({ ed, startScreen }: { ed: WorldEditor; startScreen?: boolean }) {
   const [q, setQ] = useState('');
   const [image, setImage] = useState(false);
   const groups = useMemo(() => {
@@ -301,11 +310,17 @@ function AssetsTab({ ed }: { ed: WorldEditor }) {
   return (
     <div>
       <div className="wed-hint">
-        Click an asset, then click the map to place it (Shift+click keeps placing). New asset files in{' '}
-        <code>src/data/assets/</code> show up here under <b>New</b> after a reload.
+        {startScreen ? (
+          <>Click an asset, then click inside the frame: it's placed on the start screen only (Shift+click keeps placing).</>
+        ) : (
+          <>
+            Click an asset, then click the map to place it (Shift+click keeps placing). New asset files in{' '}
+            <code>src/data/assets/</code> show up here under <b>New</b> after a reload.
+          </>
+        )}
       </div>
       <input className="wed-search" placeholder="filter assets…" value={q} onChange={(ev) => setQ(ev.target.value)} />
-      <div className="wed-group">
+      {!startScreen && <div className="wed-group">
         <div className="wed-group-name">Mitchy's look</div>
         <div className="wed-hint">
           There is only one Mitchy: click a look to give it to him, in the world, his chat portrait, the map and the menus.
@@ -324,7 +339,7 @@ function AssetsTab({ ed }: { ed: WorldEditor }) {
             </button>
           ))}
         </div>
-      </div>
+      </div>}
       {groups.map(([group, list]) => (
         <div key={group} className="wed-group">
           <div className="wed-group-name">{group}</div>
@@ -343,10 +358,87 @@ function AssetsTab({ ed }: { ed: WorldEditor }) {
           </div>
         </div>
       ))}
-      <button className="wed-link" onClick={() => setImage((v) => !v)}>
-        {image ? '▾' : '▸'} make an asset from an image
-      </button>
-      {image && <DevImageTab />}
+      {!startScreen && (
+        <button className="wed-link" onClick={() => setImage((v) => !v)}>
+          {image ? '▾' : '▸'} make an asset from an image
+        </button>
+      )}
+      {image && !startScreen && <DevImageTab />}
+    </div>
+  );
+}
+
+// The start screen's layout: the frame on the map (what it shows), the
+// player, the title + buttons, and the objects only it has. Everything here
+// is saved with the world (Save / Ctrl+S); reload the start screen to see it.
+function StartTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): void }) {
+  const ss = ed.startScreen;
+  const own = ed.structEnts.filter((e) => e.startOnly);
+  const slider = (label: string, value: number, min: number, max: number, set: (v: number) => void) => (
+    <label className="wed-theme-slider">
+      <span>{label}</span>
+      <input type="range" min={min} max={max} step={0.01} value={value} onChange={(ev) => set(Number(ev.target.value))} />
+      <span className="wed-dim">{value.toFixed(2)}</span>
+    </label>
+  );
+  return (
+    <div>
+      <div className="wed-hint">
+        The yellow frame is what the start screen shows. Drag its label to move it and its corner to zoom; drag the title box
+        and the player inside it. Objects placed here are on the start screen only.
+      </div>
+      <div className="wed-row wed-btns">
+        <button onClick={() => onFocus('start')}>go to frame</button>
+        <button onClick={() => window.open('/', '_blank')} title="save first: the start screen reads the saved world">
+          open start screen
+        </button>
+      </div>
+      <div className="wed-group">
+        <div className="wed-group-name">View</div>
+        {slider('zoom', ss.zoom, 0.4, 3, (zoom) => ed.setStartScreen({ zoom }))}
+        <div className="wed-row">
+          <Num label="centre x" value={ss.view.x} step={1} onChange={(x) => ed.setStartScreen({ view: { ...ss.view, x } })} />
+          <Num label="centre y" value={ss.view.y} step={1} onChange={(y) => ed.setStartScreen({ view: { ...ss.view, y } })} />
+        </div>
+      </div>
+      <div className="wed-group">
+        <div className="wed-group-name">Player</div>
+        <div className="wed-row">
+          <Num label="x" value={ss.player.x} step={1} onChange={(x) => ed.setStartScreen({ player: { ...ss.player, x } })} />
+          <Num label="y" value={ss.player.y} step={1} onChange={(y) => ed.setStartScreen({ player: { ...ss.player, y } })} />
+        </div>
+      </div>
+      <div className="wed-group">
+        <div className="wed-group-name">Title + buttons</div>
+        {slider('size', ss.ui.scale, 0.5, 2, (scale) => ed.setStartScreen({ ui: { ...ss.ui, scale } }))}
+        {slider('left', ss.ui.x, 0, 0.95, (x) => ed.setStartScreen({ ui: { ...ss.ui, x } }))}
+        {slider('middle', ss.ui.y, 0.05, 0.95, (y) => ed.setStartScreen({ ui: { ...ss.ui, y } }))}
+        <div className="wed-hint">Phones keep their own layout: the title on top, the player below the buttons.</div>
+      </div>
+      {own.length > 0 && (
+        <div className="wed-group">
+          <div className="wed-group-name">On the start screen only</div>
+          <div className="wed-list">
+            {own.map((e) => (
+              <div
+                key={e.id}
+                className={'wed-list-row' + (ed.selected === e.id ? ' on' : '')}
+                onClick={() => {
+                  ed.select(e.id);
+                  onFocus(e.id);
+                }}
+              >
+                <span>{e.id}</span>
+                <span className="wed-dim">scale {Math.round((e.scale ?? 1) * 100) / 100}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="wed-group">
+        <div className="wed-group-name">Add</div>
+        <AssetsTab ed={ed} startScreen />
+      </div>
     </div>
   );
 }
@@ -508,7 +600,7 @@ export function EditorPanel({
               ids
             </label>
           </div>
-          {(tab === 'objects' || tab === 'colliders' || tab === 'assets') && selEnt && <Inspector ed={ed} e={selEnt} />}
+          {(tab === 'objects' || tab === 'colliders' || tab === 'assets' || tab === 'start') && selEnt && <Inspector ed={ed} e={selEnt} />}
           <div className="wed-body">
             {tab === 'objects' && <ObjectsTab ed={ed} onFocus={onFocus} />}
             {tab === 'assets' && <AssetsTab ed={ed} />}
@@ -517,6 +609,7 @@ export function EditorPanel({
             {tab === 'intro' && <DevIntroTab tool={introTool} />}
             {tab === 'ground' && <GroundTab />}
             {tab === 'theme' && <ThemeTab />}
+            {tab === 'start' && <StartTab ed={ed} onFocus={onFocus} />}
           </div>
           <div className="wed-keys">
             click select · drag move (Shift: ¼ tile) · empty drag / WASD pan · arrows nudge · R rotate · +/− or Alt+wheel

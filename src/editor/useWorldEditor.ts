@@ -35,8 +35,11 @@ import {
   setLiveStructEnts,
   fitMask,
   applyMitchyLook,
+  startScreenOf,
+  startFrame,
+  START_PLAYER_BOX,
 } from '../world';
-import type { Ent, EntityKind, WorldDoc, WorldPose, WorldAdded } from '../world';
+import type { Ent, EntityKind, WorldDoc, WorldPose, WorldAdded, StartScreen } from '../world';
 import { RAW_ASSETS, FIXED_ASSETS, ASSET_META, assetOf } from '../assets';
 import type { AssetDef, AssetMeta } from '../assets';
 import { resetTerrainStructs } from '../terrain';
@@ -47,7 +50,7 @@ import type { MarkerPositions } from '../sceneMarkers';
 import type { CamSnapshot } from '../coords';
 import { docHash } from './docHash';
 
-export type EditorTab = 'objects' | 'assets' | 'markers' | 'colliders' | 'intro' | 'ground';
+export type EditorTab = 'objects' | 'assets' | 'markers' | 'colliders' | 'intro' | 'ground' | 'start';
 
 // The kinds a placed asset can be given in the inspector, with what each
 // one does in the game. (Built-in kinds like 'palm' or 'pond' carry
@@ -154,6 +157,10 @@ export interface WorldEditor {
   // Mitchy's look: an asset of kind 'cat' ('mitchy' = his original art)
   mitchyLook: string;
   setMitchyLook(slug: string): void;
+  // the start screen's layout (Start screen tab) and its own objects
+  startScreen: StartScreen;
+  setStartScreen(patch: Partial<StartScreen>): void;
+  setStartOnly(id: string, on: boolean): void;
 
   undo(): void;
   redo(): void;
@@ -203,8 +210,8 @@ function resolveAssets(meta: Record<string, AssetMeta>): Map<string, AssetDef> {
 
 // buildStructEnts resolves assets through the saved meta; re-apply the live
 // meta on top so a kind/label change in the inspector shows at once.
-function buildLive(doc: WorldDoc, assets: Map<string, AssetDef>): Ent[] {
-  const ents = buildStructEnts(doc);
+function buildLive(doc: WorldDoc, assets: Map<string, AssetDef>, which: 'world' | 'all'): Ent[] {
+  const ents = buildStructEnts(doc, which);
   const addedById = new Map(doc.added.map((a) => [a.id, a]));
   return ents.map((e) => {
     const a = addedById.get(e.id);
@@ -330,7 +337,13 @@ type Drag =
   | { type: 'marker'; id: string; moved: boolean }
   | { type: 'pan'; px0: number; py0: number; pan0: { x: number; y: number } }
   | { type: 'paint'; solid: boolean; done: Set<string> }
-  | { type: 'ground' };
+  | { type: 'ground' }
+  // the Start screen tab's frame: moved by its handle, zoomed by its corner;
+  // the title + buttons box and the player dragged inside it
+  | { type: 'startView'; wx0: number; wy0: number; view0: { x: number; y: number }; moved: boolean }
+  | { type: 'startZoom'; left: number; top: number; moved: boolean }
+  | { type: 'startUi'; dx: number; dy: number; moved: boolean }
+  | { type: 'startPlayer'; dx: number; dy: number; moved: boolean };
 
 export function useWorldEditor(opts: {
   fieldRef: React.RefObject<HTMLElement | null>;
@@ -374,9 +387,15 @@ export function useWorldEditor(opts: {
   }, []);
 
   const assetMap = useMemo(() => resolveAssets(state.meta), [state.meta]);
+  // the start screen's own objects are on the map only in its tab (the game
+  // never has them)
+  const withStart = open && tab === 'start' && state.doc.added.some((a) => a.startOnly);
   const structEnts = useMemo(
-    () => (state.doc === LOADED.doc && state.meta === LOADED.meta ? STRUCT_ENTS : buildLive(state.doc, assetMap)),
-    [state.doc, state.meta, assetMap],
+    () =>
+      state.doc === LOADED.doc && state.meta === LOADED.meta && !withStart
+        ? STRUCT_ENTS
+        : buildLive(state.doc, assetMap, withStart ? 'all' : 'world'),
+    [state.doc, state.meta, assetMap, withStart],
   );
   const structRef = useRef(structEnts);
   structRef.current = structEnts;
@@ -563,9 +582,38 @@ export function useWorldEditor(opts: {
     let newId = '';
     updateDoc((d) => {
       newId = nextId(slug, d);
-      d.added.push({ id: newId, asset: slug, x, y, scale: def.scale });
+      // placed in the Start screen tab: the start screen's own
+      d.added.push({ id: newId, asset: slug, x, y, scale: def.scale, ...(tab === 'start' ? { startOnly: true as const } : {}) });
     });
     setSelected(newId);
+  }
+
+  // ---- the start screen ----
+  const startScreen = useMemo(() => startScreenOf(state.doc), [state.doc]);
+  function setStartScreen(patch: Partial<StartScreen>, record = true) {
+    updateDoc((d) => {
+      const cur = startScreenOf(d);
+      d.startScreen = { ...cur, ...patch, ui: { ...cur.ui, ...patch.ui } };
+    }, record);
+  }
+  function setStartOnly(id: string, on: boolean) {
+    updateDoc((d) => {
+      const a = d.added.find((x) => x.id === id);
+      if (!a) return;
+      if (on) a.startOnly = true;
+      else delete a.startOnly;
+    });
+  }
+  // what the pointer is over in the Start screen tab, checked before objects
+  function hitStart(wx: number, wy: number): 'view' | 'zoom' | 'ui' | 'player' | null {
+    const f = startFrame(startScreen);
+    if (wx >= f.x - 1 && wx <= f.x + 26 && wy >= f.y - 2.5 && wy <= f.y + 0.5) return 'view';
+    if (Math.abs(wx - (f.x + f.w)) <= 2.5 && Math.abs(wy - (f.y + f.h)) <= 1.5) return 'zoom';
+    const p = startScreen.player;
+    const px = p.x * TILE_CH, py = p.y * TILE_LN; // the sprite's top-left
+    if (wx >= px && wx <= px + START_PLAYER_BOX.w && wy >= py && wy <= py + START_PLAYER_BOX.h) return 'player';
+    if (wx >= f.ui.x && wx <= f.ui.x + f.ui.w && wy >= f.ui.y && wy <= f.ui.y + f.ui.h) return 'ui';
+    return null;
   }
 
   function setMarker(id: string, pos: { x: number; y: number } | null, record = true) {
@@ -949,6 +997,30 @@ export function useWorldEditor(opts: {
         toggleTile(tx, ty, solid, true);
         return;
       }
+      if (tab === 'start') {
+        const h = hitStart(w.wx, w.wy);
+        const ss = startScreen;
+        if (h === 'view') {
+          dragRef.current = { type: 'startView', wx0: w.wx, wy0: w.wy, view0: ss.view, moved: false };
+          return;
+        }
+        if (h === 'zoom') {
+          const f = startFrame(ss);
+          dragRef.current = { type: 'startZoom', left: f.x, top: f.y, moved: false };
+          return;
+        }
+        if (h === 'player') {
+          dragRef.current = { type: 'startPlayer', dx: w.wx / TILE_CH - ss.player.x, dy: w.wy / TILE_LN - ss.player.y, moved: false };
+          return;
+        }
+        // objects in front of the title box win the click
+        const e = hitObject(w.wx, w.wy);
+        if (h === 'ui' && !e) {
+          const f = startFrame(ss);
+          dragRef.current = { type: 'startUi', dx: (w.wx - f.x) / f.w - ss.ui.x, dy: (w.wy - f.y) / f.h - ss.ui.y, moved: false };
+          return;
+        }
+      }
       const m = tab === 'markers' || tab === 'objects' ? hitMarker(w.wx, w.wy) : null;
       if (m) {
         setSelected(`marker:${m}`);
@@ -995,6 +1067,36 @@ export function useWorldEditor(opts: {
         if (p && p.x === tx && p.y === ty) return;
         setMarker(d.id, { x: tx, y: ty }, !d.moved);
         d.moved = true;
+      } else if (d.type === 'startView') {
+        const q = ev.shiftKey ? 4 : 1;
+        const dx = Math.round(((w.wx - d.wx0) / TILE_CH) * q) / q;
+        const dy = Math.round(((w.wy - d.wy0) / TILE_LN) * q) / q;
+        if (!d.moved && dx === 0 && dy === 0) return;
+        setStartScreen({ view: { x: d.view0.x + dx, y: d.view0.y + dy } }, !d.moved);
+        d.moved = true;
+      } else if (d.type === 'startZoom') {
+        // the corner follows the pointer, the top-left corner stays put
+        const z1 = startFrame({ ...startScreen, zoom: 1 }).w;
+        const zoom = Math.round(Math.min(3, Math.max(0.4, z1 / Math.max(8, w.wx - d.left))) * 100) / 100;
+        const f = startFrame({ ...startScreen, zoom });
+        setStartScreen({ zoom, view: { x: round2((d.left + f.w / 2) / TILE_CH), y: round2((d.top + f.h / 2) / TILE_LN) } }, !d.moved);
+        d.moved = true;
+      } else if (d.type === 'startPlayer') {
+        const q = ev.shiftKey ? 4 : 1;
+        const x = Math.round((w.wx / TILE_CH - d.dx) * q) / q;
+        const y = Math.round((w.wy / TILE_LN - d.dy) * q) / q;
+        const p = startScreen.player;
+        if (p.x === x && p.y === y) return;
+        setStartScreen({ player: { x, y } }, !d.moved);
+        d.moved = true;
+      } else if (d.type === 'startUi') {
+        const f = startFrame(startScreen);
+        const r = (v: number) => Math.round(Math.min(0.95, Math.max(0, v)) * 200) / 200;
+        const x = r((w.wx - f.x) / f.w - d.dx);
+        const y = r((w.wy - f.y) / f.h - d.dy);
+        if (x === startScreen.ui.x && y === startScreen.ui.y) return;
+        setStartScreen({ ui: { ...startScreen.ui, x, y } }, !d.moved);
+        d.moved = true;
       } else if (d.type === 'ground') {
         strokeTo(w.wx, w.wy);
       } else if (d.type === 'paint') {
@@ -1012,7 +1114,7 @@ export function useWorldEditor(opts: {
         endStroke();
         return;
       }
-      if (d && d.type !== 'pan') {
+      if (d && d.type !== 'pan' && !d.type.startsWith('start')) {
         // the layout settled: let the terrain catch up
         setLiveStructEnts(structRef.current);
         resetTerrainStructs();
@@ -1069,6 +1171,9 @@ export function useWorldEditor(opts: {
     resetCollider,
     clearBlockedTiles,
     mitchyLook: state.doc.mitchyLook ?? 'mitchy',
+    startScreen,
+    setStartScreen: (patch) => setStartScreen(patch),
+    setStartOnly,
     setMitchyLook: (slug) =>
       updateDoc((d) => {
         if (slug === 'mitchy') delete d.mitchyLook;

@@ -4,7 +4,9 @@
 // the objects they point at.
 import { ColoredSprite } from '../ColoredSprite';
 import { MARKER_REGISTRY } from '../sceneMarkers';
-import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint } from '../world';
+import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint, startFrame, START_PLAYER_FRAME, START_PLAYER_K, START_PLAYER_BOX } from '../world';
+import { PlayerShadow } from '../PlayerShadow';
+import * as S from '../sprites';
 import type { Ent } from '../world';
 import { isEditable } from './useWorldEditor';
 import { brushRadiusCells } from '../ground';
@@ -47,12 +49,60 @@ function Colliders({ e, withEmpty }: { e: Ent; withEmpty: boolean }) {
   return <>{cells}</>;
 }
 
+// The Start screen tab: what the start screen shows, as a frame on the map
+// (a 1920 x 1080 screen), the map around it dimmed. Its handle (top-left)
+// moves it, its corner zooms it; the title + buttons box and the player
+// inside it are dragged where they should stand. See useWorldEditor's
+// hitStart for the hit areas, which match these boxes.
+function StartLayer({ ed }: { ed: WorldEditor }) {
+  const ss = ed.startScreen;
+  const f = startFrame(ss);
+  const p = ss.player;
+  const k = START_PLAYER_K;
+  const fr = START_PLAYER_FRAME;
+  const cols = Math.max(...fr.sprite.map((l) => l.length));
+  const box = (x: number, y: number, w: number, h: number) => ({ left: `${x}ch`, top: `${y}em`, width: `${w}ch`, height: `${h}em` });
+  return (
+    <>
+      {/* the map outside the frame, dimmed: four bands round it */}
+      <div className="wed-start-dim" style={box(0, 0, GROUND_W, f.y)} />
+      <div className="wed-start-dim" style={box(0, f.y + f.h, GROUND_W, GROUND_H - f.y - f.h)} />
+      <div className="wed-start-dim" style={box(0, f.y, f.x, f.h)} />
+      <div className="wed-start-dim" style={box(f.x + f.w, f.y, GROUND_W - f.x - f.w, f.h)} />
+      <div className="wed-start-frame" style={box(f.x, f.y, f.w, f.h)}>
+        <div className="wed-start-handle">⤧ START SCREEN · drag to move</div>
+        <div className="wed-start-corner" title="drag to zoom" />
+      </div>
+      <div className="wed-start-ui" style={box(f.ui.x, f.ui.y, f.ui.w, f.ui.h)}>
+        <pre className="wed-start-title" style={{ fontSize: `${f.ui.w / 42}em` /* 42 columns wide */ }}>
+          {S.TITLE.join('\n')}
+        </pre>
+        <div className="wed-start-btn go" />
+        <div className="wed-start-btn" />
+        <div className="wed-start-btn" />
+      </div>
+      <div className="wed-start-player" style={{ left: `${p.x * TILE_CH}ch`, top: `${p.y * TILE_LN}em` }}>
+        <PlayerShadow x={p.x} y={p.y} cx={START_PLAYER_BOX.w / 2} footEm={START_PLAYER_BOX.h} />
+        <ColoredSprite
+          className="player-sprite"
+          style={{ position: 'absolute', left: `${-((1 - k) * cols) / 2}ch`, top: `${-(1 - k) * fr.sprite.length}em`, scale: `${k}` }}
+          sprite={fr.sprite}
+          colors={fr.colors}
+          palette={S.WALK_DOWN_PALETTE}
+          solidCells
+        />
+      </div>
+    </>
+  );
+}
+
 export function EditorWorldLayers({ ed, ents }: { ed: WorldEditor; ents: Ent[] }) {
   const sel = ed.selected && !ed.selected.startsWith('marker:') ? ents.find((e) => e.id === ed.selected) : undefined;
   const g = ed.ghost;
   return (
     <>
       <div className="dev-tile-grid" style={{ width: `${GROUND_W}ch`, height: `${GROUND_H}em` }} />
+      {ed.tab === 'start' && <StartLayer ed={ed} />}
 
       {/* the Ground tab's brush */}
       {ed.tab === 'ground' && ed.pointerAt && (

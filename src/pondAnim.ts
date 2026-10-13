@@ -69,3 +69,48 @@ export function pondFrame(
   }
   return { sprite: outG, colors: outC };
 }
+
+// The same water, for any glyph pond (the editor's pond assets): every cell
+// whose colour is one of `water` (its tones, darkest first) takes its glyph
+// and tone from the same two drifting currents as the old pond, so all
+// ponds move alike. Everything else is drawn as it is.
+export function waterFrame(
+  sprite: string[],
+  colors: string[],
+  water: string,
+  glyphs: string[],
+  t: number,
+): { sprite: string[]; colors: string[] } {
+  const pondScroll = t * POND_SCROLL_RATE;
+  const cols = Math.max(1, ...sprite.map((l) => l.length));
+  const rows = Math.max(1, sprite.length);
+  const n = water.length;
+  const outG: string[] = [];
+  const outC: string[] = [];
+  for (let y = 0; y < sprite.length; y++) {
+    const crow = colors[y] ?? '';
+    let any = false;
+    for (let x = 0; x < crow.length && !any; x++) any = water.includes(crow[x]);
+    if (!any) {
+      outG.push(sprite[y]);
+      outC.push(crow);
+      continue;
+    }
+    const g = [...sprite[y]];
+    const c = [...crow];
+    const ny = (y / rows) * 0.6; // the old pond's proportions: ~16 noise rows over its height
+    for (let x = 0; x < g.length; x++) {
+      if (!water.includes(c[x]) || g[x] === ' ') continue;
+      const nx = (x / cols) * 0.9;
+      const goRight = vnoise(nx * 9 - pondScroll, ny * 16, 30);
+      const goLeft = vnoise(nx * 11 + pondScroll * 0.75, ny * 14, 31);
+      const bias = 0.5 + 0.42 * Math.sin(ny * 70);
+      const v = goRight * bias + goLeft * (1 - bias);
+      c[x] = water[Math.max(0, Math.min(n - 1, Math.floor(((v - 0.22) / 0.56) * n)))];
+      g[x] = glyphs[Math.floor(v * glyphs.length) % glyphs.length];
+    }
+    outG.push(g.join(''));
+    outC.push(c.join(''));
+  }
+  return { sprite: outG, colors: outC };
+}

@@ -269,20 +269,20 @@
     {
       "id": "flowerplus-7",
       "asset": "flowerplus",
-      "x": 63,
-      "y": 57
+      "x": 69,
+      "y": 64
     },
     {
       "id": "flowerplus-8",
       "asset": "flowerplus",
-      "x": 62,
-      "y": 57
+      "x": 68,
+      "y": 65
     },
     {
       "id": "flowerplus-9",
       "asset": "flowerplus",
-      "x": 61,
-      "y": 56
+      "x": 67,
+      "y": 65
     },
     {
       "id": "flowerplus-10",
@@ -312,8 +312,8 @@
     {
       "id": "palm-1",
       "asset": "palm",
-      "x": 55,
-      "y": 64,
+      "x": 65,
+      "y": 35,
       "scale": 1
     },
     {
@@ -697,5 +697,21 @@
     "95,23",
     "96,23"
   ],
-  "mitchyLook": "mitchy-cat8"
+  "mitchyLook": "mitchy-cat8",
+  "startScreen": {
+    "view": {
+      "x": 72.67,
+      "y": 61.42
+    },
+    "zoom": 1.54,
+    "player": {
+      "x": 73,
+      "y": 61
+    },
+    "ui": {
+      "x": 0.09,
+      "y": 0.5,
+      "scale": 1
+    }
+  }
 }

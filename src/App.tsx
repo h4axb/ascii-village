@@ -488,13 +488,22 @@ type Modal =
   | { t: 'pay'; sel: ItemType | null; offer: Partial<Record<ItemType, number>>; help: boolean }
   | null;
 
+// The [F] prompt's words, from the confirm's question: "Do you want to
+// collect this flower?" -> "Collect this flower"
+function promptLabel(question: string): string {
+  const s = question.replace(/^Do you want to\s+/i, '').replace(/\?\s*$/, '');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+// the big ones: offered from a little further away
+const PROMPT_WIDE_KINDS = new Set<EntityKind>(['cat', 'house', 'shop', 'hotspot']);
+
 // Settings > Controls: every key the game listens to (the handler is
 // handlerRef further down), in the order a new player needs them.
 const CONTROLS: [string, string[]][] = [
   ['Move', ['W', 'A', 'S', 'D']],
   ['Interact / menus', ['Click']],
   ['Dash', ['Shift']],
-  ['Interact / yes', ['F']],
+  ['Interact (when near) / yes', ['F']],
   ['Inventory', ['I']],
   ['Map', ['M']],
   ['Back to the player', ['Space']],
@@ -4060,14 +4069,19 @@ function Game() {
   }
 
   // Shared by the keyboard [F] handler and TouchControls' on-screen F button:
-  // "yes" while an interact confirm is open, otherwise just dismiss a
-  // speech bubble — see the keydown handler below for why there's no
-  // "nearest target" case any more.
+  // "yes" while an interact confirm is open; otherwise do what the prompt
+  // offers (the nearest thing in reach, see promptTarget), or dismiss a
+  // speech bubble.
   function pressF() {
     if (cinematic || mapOpen) return;
     if (modal && modal.t === 'interact') {
       const oi = optInfo(modal);
       if (oi) oi.go(0);
+      return;
+    }
+    if (!modal && promptTarget) {
+      setBubble(null);
+      runInteraction(promptTarget.ref, interactCtx, interactActions);
       return;
     }
     if (bubble) setBubble(null);
@@ -4079,6 +4093,28 @@ function Game() {
   // memoizing) and used by the hover tooltip, the confirm modal's question
   // text, and the confirm modal's Yes handler.
   const interactCtx: InteractCtx = { ents, crops, wt, fxFor, doors, lineColors };
+
+  // The thing in reach, offered by the [F] prompt: every interactable within
+  // a tile of the player's feet (2 for Mitchy and the buildings), the nearest
+  // one winning - by tile gap, then by the distance between the two feet.
+  const promptTarget = (() => {
+    if (modal || cinematic || mapOpen || editorOpen || placing || riding) return null;
+    const pcx = player.x + PLAYER_T.wT / 2;
+    const pcy = player.y + PLAYER_T.hT;
+    let best: { ref: InteractRef; label: string; gap: number; dist: number } | null = null;
+    for (const e of ents) {
+      if (!canInteract(e)) continue;
+      const gap = near(e, player);
+      if (gap > (PROMPT_WIDE_KINDS.has(e.kind) ? 2 : 1)) continue;
+      const ref: InteractRef = { kind: 'entity', id: e.id };
+      const copy = describeInteraction(ref, interactCtx);
+      if (!copy) continue;
+      const f = footprint(e);
+      const dist = Math.hypot((f.x0 + f.x1 + 1) / 2 - pcx, f.row + 1 - pcy);
+      if (!best || gap < best.gap || (gap === best.gap && dist < best.dist)) best = { ref, label: promptLabel(copy.question), gap, dist };
+    }
+    return best;
+  })();
   const interactActions: InteractActions = {
     collect,
     shakeTree,
@@ -5724,6 +5760,14 @@ function Game() {
           </div>
         </div>
       </div>
+
+      {/* the thing in reach: [F] and what it does (click = the same) */}
+      {promptTarget && (
+        <button key={promptTarget.label} className="ds-interact-prompt" onClick={pressF}>
+          <kbd className="ds-kbd">F</kbd>
+          <span>{promptTarget.label}</span>
+        </button>
+      )}
 
       {!cinematic && <TouchControls onHold={holdStart} onRelease={holdEnd} onF={pressF} onI={toggleInventory} />}
 

@@ -6,8 +6,11 @@
 //   GET  /__ref/work        the batch in progress (refs/work/*.json)
 //   POST /__ref/work        { id, item } -> refs/work/<id>.json (autosave)
 //   POST /__ref/work-delete { id }
-//   POST /__ref/send-asset  { slug, asset, overwrite? } -> src/data/assets/<slug>.json
-//   POST /__ref/send-ref    { id, ref, art, overwrite? } -> src/data/refs/<id>/ref.json + art.png
+//   POST /__ref/send-asset  { slug, asset } -> src/data/assets/<slug>.json
+//   POST /__ref/send-ref    { id, ref, art } -> src/data/refs/<id>/ref.json + art.png
+//
+// Nothing is overwritten: when the name is taken, the next free one is used
+// (<name>-2, <name>-3, ...) and the reply says which.
 //
 // Writes only under tools/glyph-ref/refs/, src/data/assets/ and src/data/refs/.
 import { defineConfig, loadEnv, type Plugin } from 'vite';
@@ -22,6 +25,13 @@ const GAME_ASSETS = path.join(REPO, 'src/data/assets');
 const GAME_REFS = path.join(REPO, 'src/data/refs');
 const safe = (s: unknown): s is string => typeof s === 'string' && /^[\w-]+$/.test(s);
 const exists = (p: string) => access(p).then(() => true, () => false);
+// the first of name, name-2, name-3, ... whose path is free
+async function freeName(name: string, pathOf: (n: string) => string): Promise<{ name: string; n: number }> {
+  for (let n = 1; ; n++) {
+    const cand = n === 1 ? name : `${name}-${n}`;
+    if (!(await exists(pathOf(cand)))) return { name: cand, n };
+  }
+}
 
 function body(req: import('node:http').IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
@@ -127,20 +137,24 @@ function refFiles(env: Record<string, string>): Plugin {
           if (url === '/__ref/send-asset' && req.method === 'POST') {
             const b = await body(req);
             if (!safe(b.slug)) return send(400, { error: 'bad name' });
-            const file = path.join(GAME_ASSETS, `${b.slug}.json`);
-            if (!b.overwrite && (await exists(file))) return send(409, { error: 'exists', file: `src/data/assets/${b.slug}.json` });
-            await writeFile(file, JSON.stringify(b.asset, null, 2) + '\n');
-            return send(200, { saved: `src/data/assets/${b.slug}.json` });
+            const { name, n } = await freeName(b.slug, (c) => path.join(GAME_ASSETS, `${c}.json`));
+            const asset = b.asset as Record<string, unknown>;
+            // a second copy reads as one in the editor's list too
+            if (n > 1 && typeof asset?.label === 'string') asset.label = `${asset.label} ${n}`;
+            await writeFile(path.join(GAME_ASSETS, `${name}.json`), JSON.stringify(asset, null, 2) + '\n');
+            return send(200, { saved: `src/data/assets/${name}.json`, renamed: n > 1 });
           }
           if (url === '/__ref/send-ref' && req.method === 'POST') {
             const b = await body(req);
             if (!safe(b.id) || typeof b.art !== 'string') return send(400, { error: 'bad id' });
-            const dir = path.join(GAME_REFS, b.id);
-            if (!b.overwrite && (await exists(dir))) return send(409, { error: 'exists', file: `src/data/refs/${b.id}/` });
+            const { name, n } = await freeName(b.id, (c) => path.join(GAME_REFS, c));
+            const ref = b.ref as Record<string, unknown>;
+            if (n > 1 && ref && typeof ref === 'object' && 'id' in ref) ref.id = name;
+            const dir = path.join(GAME_REFS, name);
             await mkdir(dir, { recursive: true });
-            await writeFile(path.join(dir, 'ref.json'), JSON.stringify(b.ref) + '\n');
+            await writeFile(path.join(dir, 'ref.json'), JSON.stringify(ref) + '\n');
             await writeFile(path.join(dir, 'art.png'), Buffer.from(b.art.split(',')[1], 'base64'));
-            return send(200, { saved: `src/data/refs/${b.id}/` });
+            return send(200, { saved: `src/data/refs/${name}/`, renamed: n > 1 });
           }
         } catch (err) {
           return send(500, { error: String(err) });

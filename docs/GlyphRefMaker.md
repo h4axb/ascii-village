@@ -60,7 +60,7 @@ The checkboxes on the cards decide what goes where, so one batch can split. For 
 - **Send to editor assets** → `src/data/assets/<category>-<title>.json`. Reload the game to see them in the world editor under **New**. Asset kind (boulder or decor) and scale are set here.
 - **Send to crafting library** → `src/data/refs/<id>/` (`art.png` + `ref.json`). The in-game crafting builds items from these.
 
-Existing names ask before overwriting. The batch is autosaved to `tools/glyph-ref/refs/work/` (gitignored), so a reload keeps your work. **remove** clears selected images from the batch.
+Nothing is overwritten: when a name is taken, the item is saved under the next free one (`<name>-2`, `<name>-3`, …; its label gets the number too) and the status line says so. The batch is autosaved to `tools/glyph-ref/refs/work/` (gitignored), so a reload keeps your work. **remove** clears selected images from the batch.
 
 ## Crafting from references (in the game)
 

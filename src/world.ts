@@ -847,6 +847,10 @@ export interface StartScreenDoc {
   // screen's width, a turn in degrees, its height / width, and a version
   // that changes with every upload (so browsers fetch the new picture)
   title?: { x: number; y: number; width?: number; rotation?: number; aspect?: number; v?: string };
+  // the subtitle under the title: its centre as fractions of the screen, its
+  // font size in px on a 1920-wide screen (it scales with the window), and
+  // its words
+  subtitle?: { x: number; y: number; size?: number; text?: string };
 }
 export interface StartScreen {
   view: { x: number; y: number };
@@ -854,6 +858,7 @@ export interface StartScreen {
   player: { x: number; y: number };
   ui: { x: number; y: number; scale: number };
   title: { x: number; y: number; width: number; rotation: number; aspect: number; v: string };
+  subtitle: { x: number; y: number; size: number; text: string };
 }
 export const START_SCREEN_DEFAULT: StartScreen = {
   view: { x: 68, y: 58 },
@@ -861,6 +866,7 @@ export const START_SCREEN_DEFAULT: StartScreen = {
   player: { x: 72, y: 61 },
   ui: { x: 0.09, y: 0.62, scale: 1 },
   title: { x: 0.22, y: 0.235, width: 0.27, rotation: 0, aspect: 0.507, v: '' },
+  subtitle: { x: 0.2, y: 0.43, size: 13, text: 'a tiny monochrome bay' },
 };
 // where the title image is served from (public/), with its upload version
 export const START_TITLE_FILE = 'start-title.png';
@@ -874,6 +880,7 @@ export function startScreenOf(doc: WorldDoc): StartScreen {
     player: s?.player ?? d.player,
     ui: { x: s?.ui?.x ?? d.ui.x, y: s?.ui?.y ?? d.ui.y, scale: s?.ui?.scale ?? d.ui.scale },
     title: { ...d.title, ...s?.title },
+    subtitle: { ...d.subtitle, ...s?.subtitle },
   };
 }
 // The game's design view (world ch x lines), fitted to any screen with a
@@ -899,7 +906,14 @@ export const clampCam = (focus: number, view: number, ground: number) =>
 // the title. Shared by the editor's Start screen tab (drawing and dragging)
 // and the start screen itself.
 export const START_REF = { w: 1920, h: 1080 };
-export const START_UI_PX = { w: 300, h: 276 };
+export const START_UI_PX = { w: 300, h: 197 };
+// the subtitle's letters: a monospace glyph (0.6em) plus its letter spacing
+// (0.23em, START_SUB_SPACING), and its line height
+export const START_SUB_SPACING = 0.23;
+export const startSubtitleBox = (ss: StartScreen, screenW: number) => {
+  const px = ss.subtitle.size * (screenW / START_REF.w);
+  return { px, w: ss.subtitle.text.length * px * (0.6 + START_SUB_SPACING), h: px * 1.3 };
+};
 export function startScreenSize(): { w: number; h: number } {
   return typeof window === 'undefined' ? START_REF : { w: window.innerWidth, h: window.innerHeight };
 }
@@ -926,6 +940,10 @@ export function startFrame(ss: StartScreen, scr: { w: number; h: number } = star
     h: viewH,
     ui: { x: x + ss.ui.x * viewW, y: y + ss.ui.y * viewH - uh / 2, w: uw, h: uh },
     title: { cx: x + ss.title.x * viewW, cy: y + ss.title.y * viewH, w: twPx * kx, h: twPx * ss.title.aspect * ky },
+    sub: (() => {
+      const b = startSubtitleBox(ss, scr.w);
+      return { cx: x + ss.subtitle.x * viewW, cy: y + ss.subtitle.y * viewH, w: b.w * kx, h: b.h * ky, px: b.px * kx };
+    })(),
   };
 }
 // The player on the start screen: mid-step in the walk-down cycle (as if

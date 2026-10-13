@@ -443,7 +443,7 @@ function StartTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): void 
     <div>
       <div className="wed-hint">
         The yellow frame is what the start screen shows. Drag its label to move it and its corner to zoom; drag the title, the
-        buttons box and the player inside it. Objects placed here are on the start screen only.
+        subtitle, the buttons box and the player inside it. Objects placed here are on the start screen only.
       </div>
       <div className="wed-row wed-btns">
         <button onClick={() => onFocus('start')}>go to frame</button>
@@ -499,7 +499,33 @@ function StartTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): void 
         {slider('centre y', ss.title.y, 0, 1, (y) => ed.setStartScreen({ title: { ...ss.title, y } }))}
       </div>
       <div className="wed-group">
-        <div className="wed-group-name">Subtitle + buttons</div>
+        <div className="wed-group-name">Subtitle</div>
+        <div className="wed-hint">Drag it on the map to move it.</div>
+        <label className="wed-field wed-grow">
+          <span>words</span>
+          <input
+            value={ss.subtitle.text}
+            placeholder="a tiny monochrome bay"
+            onChange={(ev) => ed.setStartScreen({ subtitle: { ...ss.subtitle, text: ev.target.value } })}
+          />
+        </label>
+        <label className="wed-theme-slider">
+          <span>size</span>
+          <input
+            type="range"
+            min={6}
+            max={60}
+            step={0.5}
+            value={ss.subtitle.size}
+            onChange={(ev) => ed.setStartScreen({ subtitle: { ...ss.subtitle, size: Number(ev.target.value) } })}
+          />
+          <span className="wed-dim">{ss.subtitle.size}px</span>
+        </label>
+        {slider('centre x', ss.subtitle.x, 0, 1, (x) => ed.setStartScreen({ subtitle: { ...ss.subtitle, x } }))}
+        {slider('centre y', ss.subtitle.y, 0, 1, (y) => ed.setStartScreen({ subtitle: { ...ss.subtitle, y } }))}
+      </div>
+      <div className="wed-group">
+        <div className="wed-group-name">Buttons</div>
         {slider('size', ss.ui.scale, 0.5, 2, (scale) => ed.setStartScreen({ ui: { ...ss.ui, scale } }))}
         {slider('left', ss.ui.x, 0, 0.95, (x) => ed.setStartScreen({ ui: { ...ss.ui, x } }))}
         {slider('middle', ss.ui.y, 0.05, 0.95, (y) => ed.setStartScreen({ ui: { ...ss.ui, y } }))}

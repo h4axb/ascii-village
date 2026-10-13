@@ -710,7 +710,7 @@
     },
     "ui": {
       "x": 0.07,
-      "y": 0.57,
+      "y": 0.6113,
       "scale": 1.13
     },
     "title": {
@@ -720,6 +720,12 @@
       "rotation": 0,
       "aspect": 0.5274,
       "v": "mv6u5zpq"
+    },
+    "subtitle": {
+      "x": 0.1367,
+      "y": 0.446,
+      "size": 14.69,
+      "text": "a tiny monochrome bay"
     }
   }
 }

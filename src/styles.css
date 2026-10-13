@@ -87,6 +87,7 @@ pre {
 }
 @media (max-aspect-ratio: 9/10) {
   .landing-actions {
+    margin-top: 52px;
     width: min(300px, 70vw);
   }
 }
@@ -121,6 +122,20 @@ pre {
 .landing-col {
   transform-origin: left center;
 }
+/* the subtitle on its own (desktop): centred on its place, sized in px */
+.landing-subtitle {
+  position: absolute;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  white-space: pre;
+  line-height: 1.3;
+  letter-spacing: 0.23em; /* START_SUB_SPACING in world.ts */
+  color: #f4f1d4;
+  text-shadow:
+    0 0 2px rgba(20, 28, 12, 0.95),
+    0 0 6px rgba(20, 28, 12, 0.6);
+  pointer-events: none;
+}
 .subtitle {
   margin-top: 12px;
   color: #f4f1d4;
@@ -136,7 +151,6 @@ pre {
 .landing-actions {
   /* a 1920-wide screen's size: the column scales with the window (App.tsx) */
   width: 300px;
-  margin-top: 52px;
   gap: 10px;
   flex-direction: column;
   align-items: stretch;
@@ -145,6 +159,7 @@ pre {
 /* the choices: the in-game dialogue choices (src/ui .ds-option), taller */
 .landing-option {
   padding: 19px 30px;
+  text-align: center;
   font-size: 17px;
   letter-spacing: 0.5px;
 }
@@ -827,7 +842,7 @@ pre {
   background: rgba(20, 24, 14, 0.35);
   display: flex;
   flex-direction: column;
-  gap: 4%;
+  gap: 5%;
   overflow: hidden;
 }
 .wed-btn-file {
@@ -851,14 +866,23 @@ pre {
   outline: 1px dashed rgba(255, 216, 74, 0.9);
 }
 .wed-start-sub {
+  position: absolute;
+  z-index: 200001;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #f4f1d4;
-  letter-spacing: 0.2em;
-  white-space: nowrap;
+  letter-spacing: 0.23em; /* START_SUB_SPACING in world.ts */
+  line-height: 1.3;
+  white-space: pre;
+  outline: 1px dashed rgba(255, 216, 74, 0.9);
+  pointer-events: none;
 }
 /* the start screen's choices in miniature (one per 58 px button of the
-   276 px column: 21 %), in the in-game choices' look */
+   197 px column: 29.5 %, 10 px gaps), in the in-game choices' look */
 .wed-start-btn {
-  height: 21%;
+  height: 29.5%;
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--ds-line, rgba(255, 255, 255, 0.25));
@@ -866,7 +890,7 @@ pre {
   background: var(--ds-dialogue, rgba(28, 32, 20, 0.85));
 }
 .wed-start-btn.go {
-  margin-top: 6%;
+  margin-top: 0;
   border-color: var(--ds-line-strong, rgba(255, 255, 255, 0.6));
 }
 .wed-start-player .player-sprite {

@@ -90,10 +90,12 @@ function StartLayer({ ed }: { ed: WorldEditor }) {
           rotate: `${ss.title.rotation}deg`,
         }}
       />
+      {/* the subtitle: its real words, its font size in lines (1 line = 1em) */}
+      <div className="wed-start-sub" style={box(f.sub.cx - f.sub.w / 2, f.sub.cy - f.sub.h / 2, f.sub.w, f.sub.h)}>
+        {/* the font size on the words, not the box: it would change the box's em */}
+        <span style={{ fontSize: `${f.sub.h / 1.3}em` }}>{ss.subtitle.text}</span>
+      </div>
       <div className="wed-start-ui" style={box(f.ui.x, f.ui.y, f.ui.w, f.ui.h)}>
-        <div className="wed-start-sub" style={{ fontSize: `${f.ui.w / 30}em` }}>
-          a tiny monochrome bay
-        </div>
         <div className="wed-start-btn go" />
         <div className="wed-start-btn" />
         <div className="wed-start-btn" />

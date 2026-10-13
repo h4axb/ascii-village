@@ -24,6 +24,7 @@ import {
   startFrame,
   startTitleUrl,
   startUiScale,
+  startSubtitleBox,
   wildSpawns,
   PLAYER_SPAWN,
   PLAYER_T,
@@ -793,6 +794,7 @@ function Landing({ onStart }: { onStart: () => void }) {
   const { w: screenW, portrait } = useScreen();
   const ui = START_SCREEN.ui;
   const title = START_SCREEN.title;
+  const sub = START_SCREEN.subtitle;
   const titleSrc = startTitleUrl(title);
 
   function handleUploadFile(file: File) {
@@ -895,6 +897,19 @@ function Landing({ onStart }: { onStart: () => void }) {
           }}
         />
       )}
+      {!portrait && (
+        // the subtitle, placed and sized on its own (the editor's Start screen tab)
+        <div
+          className="landing-subtitle"
+          style={{
+            left: `${sub.x * 100}%`,
+            top: `${sub.y * 100}%`,
+            fontSize: `${startSubtitleBox(START_SCREEN, screenW).px}px`,
+          }}
+        >
+          {sub.text}
+        </div>
+      )}
       <div
         className="landing-col"
         // laid out for a 1920-wide screen, scaled with the window like the
@@ -906,7 +921,7 @@ function Landing({ onStart }: { onStart: () => void }) {
         }
       >
         {portrait && <img className="landing-logo portrait" src={titleSrc} alt="ASCII Bay" draggable={false} />}
-        <div className="subtitle">a tiny monochrome bay</div>
+        {portrait && <div className="subtitle">{sub.text}</div>}
         {/* the in-game dialogue choices' look (src/ui .ds-option): one
             highlighted (the ▸), moved by hovering or ↑/↓, Enter picks it */}
         <input

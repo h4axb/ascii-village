@@ -344,6 +344,7 @@ type Drag =
   | { type: 'startZoom'; left: number; top: number; moved: boolean }
   | { type: 'startUi'; dx: number; dy: number; moved: boolean }
   | { type: 'startTitle'; dx: number; dy: number; moved: boolean }
+  | { type: 'startSub'; dx: number; dy: number; moved: boolean }
   | { type: 'startPlayer'; dx: number; dy: number; moved: boolean };
 
 export function useWorldEditor(opts: {
@@ -594,7 +595,13 @@ export function useWorldEditor(opts: {
   function setStartScreen(patch: Partial<StartScreen>, record = true) {
     updateDoc((d) => {
       const cur = startScreenOf(d);
-      d.startScreen = { ...cur, ...patch, ui: { ...cur.ui, ...patch.ui }, title: { ...cur.title, ...patch.title } };
+      d.startScreen = {
+        ...cur,
+        ...patch,
+        ui: { ...cur.ui, ...patch.ui },
+        title: { ...cur.title, ...patch.title },
+        subtitle: { ...cur.subtitle, ...patch.subtitle },
+      };
     }, record);
   }
   function setStartOnly(id: string, on: boolean) {
@@ -606,13 +613,15 @@ export function useWorldEditor(opts: {
     });
   }
   // what the pointer is over in the Start screen tab, checked before objects
-  function hitStart(wx: number, wy: number): 'view' | 'zoom' | 'ui' | 'title' | 'player' | null {
+  function hitStart(wx: number, wy: number): 'view' | 'zoom' | 'ui' | 'title' | 'sub' | 'player' | null {
     const f = startFrame(startScreen);
     if (wx >= f.x - 1 && wx <= f.x + 26 && wy >= f.y - 2.5 && wy <= f.y + 0.5) return 'view';
     if (Math.abs(wx - (f.x + f.w)) <= 2.5 && Math.abs(wy - (f.y + f.h)) <= 1.5) return 'zoom';
     const p = startScreen.player;
     const px = p.x * TILE_CH, py = p.y * TILE_LN; // the sprite's top-left
     if (wx >= px && wx <= px + START_PLAYER_BOX.w && wy >= py && wy <= py + START_PLAYER_BOX.h) return 'player';
+    // the subtitle (a thin line: a little slack round it)
+    if (Math.abs(wx - f.sub.cx) <= f.sub.w / 2 + 1 && Math.abs(wy - f.sub.cy) <= f.sub.h / 2 + 0.5) return 'sub';
     if (wx >= f.ui.x && wx <= f.ui.x + f.ui.w && wy >= f.ui.y && wy <= f.ui.y + f.ui.h) return 'ui';
     // the title picture (its unturned box)
     const t = f.title;
@@ -1019,6 +1028,11 @@ export function useWorldEditor(opts: {
         }
         // objects in front of the title box win the click
         const e = hitObject(w.wx, w.wy);
+        if (h === 'sub' && !e) {
+          const f = startFrame(ss);
+          dragRef.current = { type: 'startSub', dx: (w.wx - f.x) / f.w - ss.subtitle.x, dy: (w.wy - f.y) / f.h - ss.subtitle.y, moved: false };
+          return;
+        }
         if (h === 'title' && !e) {
           const f = startFrame(ss);
           dragRef.current = { type: 'startTitle', dx: (w.wx - f.x) / f.w - ss.title.x, dy: (w.wy - f.y) / f.h - ss.title.y, moved: false };
@@ -1105,6 +1119,14 @@ export function useWorldEditor(opts: {
         const y = r((w.wy - f.y) / f.h - d.dy);
         if (x === startScreen.ui.x && y === startScreen.ui.y) return;
         setStartScreen({ ui: { ...startScreen.ui, x, y } }, !d.moved);
+        d.moved = true;
+      } else if (d.type === 'startSub') {
+        const f = startFrame(startScreen);
+        const r = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 400) / 400;
+        const x = r((w.wx - f.x) / f.w - d.dx);
+        const y = r((w.wy - f.y) / f.h - d.dy);
+        if (x === startScreen.subtitle.x && y === startScreen.subtitle.y) return;
+        setStartScreen({ subtitle: { ...startScreen.subtitle, x, y } }, !d.moved);
         d.moved = true;
       } else if (d.type === 'startTitle') {
         const f = startFrame(startScreen);

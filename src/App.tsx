@@ -140,7 +140,7 @@ import { screenToTile } from './coords';
 import { ownedToPlaced, placedToOwned, placedToEnt, placementFits, waterPlacementFits } from './placement';
 import type { PlacedItem } from './placement';
 import { palmFrame, bundleLandingX, SHAKE_FRAMES, SHAKE_FRAME_MS, SHAKE_MS } from './palmAnim';
-import { pondFrame, POND_FRAME_MS } from './pondAnim';
+import { pondFrame, waterFrame, POND_FRAME_MS } from './pondAnim';
 import CraftModal from './CraftModal';
 import { flushFeedbackOutbox, newFeedbackId, playerId, sendFeedback, SESSION } from './feedback/client';
 import { CraftPrefsSettings } from './CraftFeedback';
@@ -6794,7 +6794,7 @@ function PlacedItemView({
 // 'cat': Mitchy is drawn like the player — solid per-cell backing plus the
 // player's outline ring (every other canvas kind has no ring). 'boulder': the
 // editor's solid assets (stones, bushes, the glyph ponds) — hundreds of cells
-// each, so a canvas too (except a sprite whose water sways: spans, see sway).
+// each, so a canvas too.
 const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder']);
 function EntSprite({
   kind,
@@ -6803,8 +6803,27 @@ function EntSprite({
   res,
   ...p
 }: React.ComponentProps<typeof ColoredSprite> & { kind: string; charW: number; lineH: number; res: number }) {
-  // (an animated sprite - swaying water - keeps its spans: the canvas can't sway)
-  if (CANVAS_KINDS.has(kind) && p.colors && p.palette && !p.texture && !p.sway) {
+  // a sprite with water (a glyph pond): the old pond's animated water, on a canvas
+  if (p.sway && p.colors && p.palette) {
+    return (
+      <WaterSprite
+        className={p.className}
+        style={p.style}
+        sprite={p.sprite}
+        colors={p.colors}
+        palette={p.palette}
+        water={p.sway}
+        bare={p.blend}
+        charW={charW}
+        lineH={lineH}
+        res={res}
+        onClick={p.onClick}
+        onMouseEnter={p.onMouseEnter}
+        onMouseLeave={p.onMouseLeave}
+      />
+    );
+  }
+  if (CANVAS_KINDS.has(kind) && p.colors && p.palette && !p.texture) {
     return (
       <SolidSpriteCanvas
         className={p.className}
@@ -6917,6 +6936,35 @@ function PondLayer({
       }}
     />
   );
+}
+
+// A glyph pond's water, animated like the old pond (pondAnim.ts waterFrame):
+// a new frame every POND_FRAME_MS, drawn by the same canvas as every solid
+// sprite. Its water tones are its `water` keys, darkest first; its glyphs are
+// the old pond's.
+function WaterSprite({
+  water,
+  sprite,
+  colors,
+  palette,
+  ...p
+}: Omit<React.ComponentProps<typeof SolidSpriteCanvas>, 'outline' | 'solid'> & { water: string }) {
+  const [t, setT] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const iv = window.setInterval(() => setT((v) => v + 1), POND_FRAME_MS);
+    return () => window.clearInterval(iv);
+  }, []);
+  // the water keys, darkest first (they map the currents' low to high)
+  const tones = useMemo(() => {
+    const lum = (k: string) => {
+      const h = palette[k] ?? '#000000';
+      return 0.299 * parseInt(h.slice(1, 3), 16) + 0.587 * parseInt(h.slice(3, 5), 16) + 0.114 * parseInt(h.slice(5, 7), 16);
+    };
+    return [...water].sort((a, b) => lum(a) - lum(b)).join('');
+  }, [water, palette]);
+  const frame = useMemo(() => waterFrame(sprite, colors, tones, S.POND_ANIM.pondG, t), [sprite, colors, tones, t]);
+  return <SolidSpriteCanvas {...p} sprite={frame.sprite} colors={frame.colors} palette={palette} outline={null} solid />;
 }
 
 function TouchControls({

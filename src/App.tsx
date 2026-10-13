@@ -5731,22 +5731,35 @@ function Game() {
                   const ref = (hovered ?? promptTarget?.ref)!;
                   const copy = describeInteraction(ref, interactCtx);
                   if (!copy) return null;
-                  const pos =
-                    ref.kind === 'entity'
-                      ? ents.find((e) => e.id === ref.id)
-                      : ref.kind === 'crop'
-                        ? plot.slots[ref.slot]
-                        : { x: plot.door.c0, y: plot.rect.y1 }; // the one gate, in the near rail
-                  if (!pos) return null;
+                  // its top-right corner: an object's drawn box, a crop or the gate
+                  // one tile
+                  const ent = ref.kind === 'entity' ? ents.find((e) => e.id === ref.id) : undefined;
+                  const tile =
+                    ref.kind === 'crop' ? plot.slots[ref.slot] : ref.kind === 'entity' ? undefined : { x: plot.door.c0, y: plot.rect.y1 }; // the one gate, in the near rail
+                  if (!ent && !tile) return null;
+                  let right: number; // ch
+                  let top: number; // em
+                  if (ent) {
+                    const k = ent.scale ?? 1;
+                    right = ent.rotation
+                      ? (ent.x + spriteTiles(ent.sprite, k, ent.rotation).wT) * TILE_CH
+                      : ent.x * TILE_CH + k * Math.max(...ent.sprite.map((l) => l.length));
+                    top = ent.y * TILE_LN;
+                  } else {
+                    right = (tile!.x + 1) * TILE_CH;
+                    top = tile!.y * TILE_LN;
+                  }
                   const withF = !!promptTarget && JSON.stringify(promptTarget.ref) === JSON.stringify(ref);
                   // over Mitchy's "!" bubble, not on it
                   const lift = bubbleCat && ref.kind === 'entity' && ref.id === 'cat' ? MITCHY_BUBBLE_H : 0;
                   return (
                     <div
                       className={'fpop' + (withF ? ' with-f' : '')}
+                      // the label's bottom-left on the object's top-right corner
+                      // (transform in .fpop), so it never covers the object
                       style={{
-                        left: `${pos.x * TILE_CH + 1}ch`,
-                        top: `${Math.max(0, pos.y * TILE_LN - 1.6 - lift)}em`,
+                        left: `${right}ch`,
+                        top: `${Math.max(0, top - lift)}em`,
                       }}
                     >
                       {withF && <kbd className="fpop-key">F</kbd>}

@@ -11,6 +11,7 @@ import {
   isWater,
   isOpenWater,
   STRUCT_ENTS,
+  liveStructEnts,
   wildSpawns,
   PLAYER_SPAWN,
   PLAYER_T,
@@ -73,7 +74,6 @@ import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOU
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
-import startCoastUrl from './assets/start-coast.webp';
 import { onThemeChange, themeRevision, themeSwatch } from './theme';
 import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
 import { groundBare } from './ground';
@@ -538,6 +538,79 @@ export default function App() {
 }
 const LANDING_FADE_MS = 500;
 
+// Where a structure is drawn and how it's stacked: its box (a scaled sprite
+// shrinks about its bottom-centre, so the offsets keep (x, y) the top-left of
+// what you actually SEE, which is what every footprint and collision test
+// assumes; a rotated one turns about the art's own centre on the centre of its
+// rotated tile box, the box collision and footprint use) and its depth. Used
+// by the game's entity map and the start screen's live view alike.
+function entPlacement(e: Ent): React.CSSProperties {
+  const k = e.scale ?? 1;
+  const cw = Math.max(...e.sprite.map((l) => l.length));
+  const offX = ((1 - k) * cw) / 2;
+  const offY = (1 - k) * e.sprite.length;
+  const rot = e.rotation ?? 0;
+  const rotBox = rot ? spriteTiles(e.sprite, k, rot) : null;
+  return {
+    left: rotBox ? `${(e.x + rotBox.wT / 2) * TILE_CH - cw / 2}ch` : `${e.x * TILE_CH - offX}ch`,
+    top: rotBox ? `${(e.y + rotBox.hT / 2) * TILE_LN - e.sprite.length / 2}em` : `${e.y * TILE_LN - offY}em`,
+    ...(rotBox ? { rotate: `${rot * 90}deg`, transformOrigin: '50% 50%' } : {}),
+    // A bridge is meant to read as sitting OVER whatever
+    // water/pond it straddles regardless of its own
+    // (typically short) footprint row, so it's forced to a
+    // flat +1000 bump above the normal depth sort rather
+    // than competing on row alone.
+    //
+    // z-index only accepts integers — footprint(e).row is
+    // fractional for anything sub-tile-aligned (the house
+    // sits at x 27.85), so every branch here must round or
+    // the browser silently drops the whole property (falls
+    // back to `auto`, which then loses to any sibling that
+    // DOES have an integer z-index).
+    //
+    // `grasshalm` (ambient ground decoration — the "signs on
+    // the ground") is clamped to a small POSITIVE floor
+    // rather than pushed negative: `.ground` has no z-index
+    // of its own (computed `auto`, i.e. stacking level 0), so
+    // a negative value would sink it BELOW the grass/sand
+    // layer — invisible, not just "behind everything". 1
+    // stays under every other ent (all positive footprint
+    // rows) while still beating ground's level 0.
+    //
+    // 'hotspot' is forced in front so its invisible hit-box
+    // still wins the click over the house picture it covers.
+    zIndex:
+      e.kind === 'bridge'
+        ? Math.round(footprint(e).row) + 1000
+        : // The cliff is LANDSCAPE, not an object standing in
+          // it: everything on the bluff — the cottage above,
+          // any decor on the grass crown, the player — has to
+          // draw over it, so it takes the lowest level that
+          // still beats `.ground` (level 0) rather than its
+          // own footprint row. By row it would be the
+          // FURTHEST-forward thing in the village (its base is
+          // ~9 tiles below the house's) and would paint right
+          // over the building it's supposed to be underneath.
+          e.kind === 'cliff'
+          ? 1
+          : e.kind === 'grasshalm'
+            ? // 2, not 1: ground tufts still lose to every
+              // real entity (all positive footprint rows) but
+              // must beat the cliff, which they sit on top of.
+              Math.max(2, Math.round(footprint(e).row) - 500)
+            : e.kind === 'hotspot'
+              ? Math.round(footprint(e).row) + 500
+              : // Mitchy is a character like the player: always
+                // drawn (and clickable) above the scenery he
+                // stands in, e.g. palm3, which covers his
+                // east-coast waiting spot (MITCHY EXIT)
+                e.kind === 'cat'
+                ? Math.round(footprint(e).row) + 200
+                : Math.round(footprint(e).row),
+    ...(k !== 1 ? { scale: `${k}` } : {}),
+  };
+}
+
 // The player's backing under each glyph: this much darker than the glyph's
 // own colour (other sprites use 0.55) - lighter, so the character reads
 // clean rather than grimy, in the game and on the start screen
@@ -579,39 +652,132 @@ function PlayerShadow({ x, y, cx, footEm }: { x: number; y: number; cx: number; 
 
 const PLAYER_SHADE = 0.3;
 
-// The start screen's scenery: the player in the bottom-right corner, mid-step
-// in the walk-down cycle (as if about to step into the game)
-function LandingScenery() {
-  const [size, setSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
-  useEffect(() => {
-    const on = () => setSize({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener('resize', on);
-    return () => window.removeEventListener('resize', on);
+// The start screen's backdrop: a live view of the island's east coast, drawn
+// by the game's own layers - the terrain (its ocean shimmers and its foam
+// rolls), the structures as world.json has them now (moved or added objects
+// show up here too; animated ponds keep moving), and the player standing on
+// the grass by the shore with their pixel shadow. A fixed camera, the game's
+// own cover fit of the design view, nothing clickable. Mitchy wanders in the
+// game, so he isn't pinned here.
+const LANDING_VIEW = { x: 68, y: 58 }; // the tile the camera centres on
+const LANDING_PLAYER = { x: 72, y: 61 }; // where the player stands (tiles)
+const LANDING_SKIP = new Set(['hotspot', 'blocker', 'cat']);
+function LandingWorld() {
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const [dims, setDims] = useState({ w: 940, h: 560, scale: 1, viewW: VIEW_W, viewH: VIEW_H, charW: 8.4, lineH: 14 });
+  useLayoutEffect(() => {
+    // the same measuring and COVER fit as the game's (see Game's dims)
+    const compute = () => {
+      const el = fieldRef.current;
+      const box = el?.parentElement?.parentElement;
+      if (!el || !box) return;
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:absolute;visibility:hidden;top:0;left:0;width:100ch;height:100em;line-height:1;';
+      el.appendChild(probe);
+      const charW = probe.offsetWidth / 100;
+      const lineH = probe.offsetHeight / 100;
+      el.removeChild(probe);
+      const availW = box.clientWidth;
+      const availH = box.clientHeight;
+      if (!charW || !lineH || !availW || !availH) return;
+      const scale = Math.max(availW / (VIEW_W * charW), availH / (VIEW_H * lineH));
+      const w = availW / scale;
+      const h = availH / scale;
+      setDims({ w, h, scale, viewW: w / charW, viewH: h / lineH, charW, lineH });
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    return () => window.removeEventListener('resize', compute);
   }, []);
-  const frame = S.WALK_DOWN_FRAMES[1]; // one foot forward
-  // upright screens (phones): a smaller player, by the width
-  const portrait = size.w < size.h * 0.9;
-  const lineH = Math.max(3, Math.round((portrait ? size.w : size.h) * 0.0085 * 4) / 4); // the player about a quarter of the screen tall
+  // upright screens (phones) see only a narrow strip: centre it on the player
+  // and the shore beside them, the player low, below the buttons
+  const view = dims.w < dims.h ? { x: LANDING_PLAYER.x + 2, y: LANDING_PLAYER.y - 6 } : LANDING_VIEW;
+  const camX = clampCam(view.x * TILE_CH, dims.viewW, GROUND_W);
+  const camY = clampCam(view.y * TILE_LN, dims.viewH, GROUND_H);
+  const res = dims.scale * (window.devicePixelRatio || 1);
+  const ents = liveStructEnts().filter((e) => !LANDING_SKIP.has(e.kind));
+  // the player mid-step in the walk-down cycle (as if about to step into the
+  // game), sized like the game's walking player
+  const frame = S.WALK_DOWN_FRAMES[1];
+  const playerK = (PLAYER_SCALE * S.PLAYER.length) / (frame.sprite.length - S.WALK_DOWN_PAD_TOP);
+  const playerW = Math.max(...frame.sprite.map((l) => l.length));
   return (
-    <div className="landing-scenery" aria-hidden>
-      <SolidSpriteCanvas
-        className={'landing-player' + (portrait ? ' portrait' : '')}
-        // its size is in ch / em of its own font: one row = lineH
-        style={{ fontSize: `${lineH}px`, position: 'absolute' }}
-        sprite={frame.sprite}
-        colors={frame.colors}
-        palette={S.WALK_DOWN_PALETTE}
-        shade={PLAYER_SHADE}
-        charW={lineH * 0.6}
-        lineH={lineH}
-        res={window.devicePixelRatio || 1}
-      />
+    <div className="landing-world" aria-hidden>
+      <div style={{ transform: `scale(${dims.scale})`, transformOrigin: '0 0' }}>
+        <div className="field" ref={fieldRef} style={{ width: dims.w, height: dims.h }}>
+          <div className="sky-bg" />
+          <div
+            className="world"
+            style={{ width: `${GROUND_W}ch`, height: `${GROUND_H}em`, transform: `translate3d(${-camX}ch, ${-camY}em, 0)` }}
+          >
+            <TerrainCanvas
+              camX={camX}
+              camY={camY}
+              viewW={dims.viewW}
+              viewH={dims.viewH}
+              zoom={1}
+              scale={dims.scale}
+              charW={dims.charW}
+              lineH={dims.lineH}
+              growthWindow={0}
+            />
+            {ents.map((e) =>
+              e.kind === 'pond' ? (
+                <PondLayer key={e.id} ent={e} charW={dims.charW} lineH={dims.lineH} res={res} />
+              ) : (
+                <EntSprite
+                  key={e.id}
+                  kind={e.kind}
+                  charW={dims.charW}
+                  lineH={dims.lineH}
+                  res={res * (e.scale ?? 1)}
+                  className={'ent ' + e.kind}
+                  style={entPlacement(e)}
+                  sprite={e.sprite}
+                  colors={e.colors}
+                  palette={e.palette}
+                  perCell={e.kind === 'flowerplus' || e.kind === 'house' || e.kind === 'cliff'}
+                  sway={e.sway}
+                  blend={e.blend}
+                  solidCells={['house', 'bridge', 'shop', 'palm', 'boulder'].includes(e.kind)}
+                />
+              ),
+            )}
+            <div
+              className="player-rig"
+              style={{
+                transform: `translate3d(${LANDING_PLAYER.x * TILE_CH}ch, ${LANDING_PLAYER.y * TILE_LN}em, 0)`,
+                zIndex: PLAYER_Z_INDEX,
+              }}
+            >
+              <PlayerShadow
+                x={LANDING_PLAYER.x}
+                y={LANDING_PLAYER.y}
+                cx={(playerK * playerW) / 2}
+                footEm={playerK * frame.sprite.length}
+              />
+              <SolidSpriteCanvas
+                className="player-sprite"
+                style={{
+                  left: `${-((1 - playerK) * playerW) / 2}ch`,
+                  top: `${-(1 - playerK) * frame.sprite.length}em`,
+                  scale: `${playerK}`,
+                }}
+                sprite={frame.sprite}
+                colors={frame.colors}
+                palette={S.WALK_DOWN_PALETTE}
+                shade={PLAYER_SHADE}
+                charW={dims.charW}
+                lineH={dims.lineH}
+                res={res * playerK}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-
-// four pink flowers by the title, two over two (the meadow's own little clusters)
-const TITLE_FLOWERS = [S.FLOWER_PLUS_PALETTE, S.FLOWER_PLUS_PALETTE, S.FLOWER_PLUS_PALETTE, S.FLOWER_PLUS_PALETTE];
 
 function Landing({ onStart }: { onStart: () => void }) {
   const [error, setError] = useState<string | null>(null);
@@ -667,19 +833,13 @@ function Landing({ onStart }: { onStart: () => void }) {
   }
 
   return (
-    // the background is the island's meadow with its shore on the right (src/assets); the
-    // title and the buttons share one left edge, the player stands in the
-    // bottom-right corner, and a few flowers lead from them to the buttons
-    <div className="landing" style={{ backgroundImage: `url(${startCoastUrl})` }}>
-      <LandingScenery />
+    // behind it a live view of the island's east coast (LandingWorld); the
+    // title and the buttons share one left edge
+    <div className="landing">
+      <LandingWorld />
       <div className="landing-col">
         <div className="landing-title">
           <pre className="title">{S.TITLE.join('\n')}</pre>
-          <div className="landing-flowers" aria-hidden>
-            {TITLE_FLOWERS.map((pal, i) => (
-              <ColoredSprite key={i} className="landing-flower" sprite={S.FLOWER_PLUS} colors={S.FLOWER_PLUS_COLORS} palette={pal} perCell />
-            ))}
-          </div>
         </div>
         <div className="subtitle">a tiny monochrome bay</div>
         {/* design-system buttons (src/ui), one column: the primary action in green */}
@@ -5106,15 +5266,8 @@ function Game() {
                 // `scale` is the standalone CSS property, not transform:
                 // scale(). Individual transform properties compose with
                 // `transform`, so the shake and fall animations still work.
+                // (the box and depth: entPlacement, shared with the start screen)
                 const k = e.scale ?? 1;
-                const cw = Math.max(...e.sprite.map((l) => l.length));
-                const offX = ((1 - k) * cw) / 2;
-                const offY = (1 - k) * e.sprite.length;
-                // Rotated (by the world editor): turn about the art's own
-                // centre, placed on the centre of its rotated tile box — the
-                // same box collision and footprint use.
-                const rot = e.rotation ?? 0;
-                const rotBox = rot ? spriteTiles(e.sprite, k, rot) : null;
                 // A shaking palm draws a live frame instead of its baked one.
                 // Same grid size either way, so nothing about its footprint,
                 // offset or z-order changes mid-animation.
@@ -5142,62 +5295,7 @@ function Game() {
                       (e.fallFrom ? ' falling' : '')
                     }
                     style={{
-                      left: rotBox ? `${(e.x + rotBox.wT / 2) * TILE_CH - cw / 2}ch` : `${e.x * TILE_CH - offX}ch`,
-                      top: rotBox ? `${(e.y + rotBox.hT / 2) * TILE_LN - e.sprite.length / 2}em` : `${e.y * TILE_LN - offY}em`,
-                      ...(rotBox ? { rotate: `${rot * 90}deg`, transformOrigin: '50% 50%' } : {}),
-                      // A bridge is meant to read as sitting OVER whatever
-                      // water/pond it straddles regardless of its own
-                      // (typically short) footprint row, so it's forced to a
-                      // flat +1000 bump above the normal depth sort rather
-                      // than competing on row alone.
-                      //
-                      // z-index only accepts integers — footprint(e).row is
-                      // fractional for anything sub-tile-aligned (the house
-                      // sits at x 27.85), so every branch here must round or
-                      // the browser silently drops the whole property (falls
-                      // back to `auto`, which then loses to any sibling that
-                      // DOES have an integer z-index).
-                      //
-                      // `grasshalm` (ambient ground decoration — the "signs on
-                      // the ground") is clamped to a small POSITIVE floor
-                      // rather than pushed negative: `.ground` has no z-index
-                      // of its own (computed `auto`, i.e. stacking level 0), so
-                      // a negative value would sink it BELOW the grass/sand
-                      // layer — invisible, not just "behind everything". 1
-                      // stays under every other ent (all positive footprint
-                      // rows) while still beating ground's level 0.
-                      //
-                      // 'hotspot' is forced in front so its invisible hit-box
-                      // still wins the click over the house picture it covers.
-                      zIndex:
-                        e.kind === 'bridge'
-                          ? Math.round(footprint(e).row) + 1000
-                          : // The cliff is LANDSCAPE, not an object standing in
-                            // it: everything on the bluff — the cottage above,
-                            // any decor on the grass crown, the player — has to
-                            // draw over it, so it takes the lowest level that
-                            // still beats `.ground` (level 0) rather than its
-                            // own footprint row. By row it would be the
-                            // FURTHEST-forward thing in the village (its base is
-                            // ~9 tiles below the house's) and would paint right
-                            // over the building it's supposed to be underneath.
-                            e.kind === 'cliff'
-                            ? 1
-                            : e.kind === 'grasshalm'
-                              ? // 2, not 1: ground tufts still lose to every
-                                // real entity (all positive footprint rows) but
-                                // must beat the cliff, which they sit on top of.
-                                Math.max(2, Math.round(footprint(e).row) - 500)
-                              : e.kind === 'hotspot'
-                                ? Math.round(footprint(e).row) + 500
-                                : // Mitchy is a character like the player: always
-                                  // drawn (and clickable) above the scenery he
-                                  // stands in, e.g. palm3, which covers his
-                                  // east-coast waiting spot (MITCHY EXIT)
-                                  e.kind === 'cat'
-                                  ? Math.round(footprint(e).row) + 200
-                                  : Math.round(footprint(e).row),
-                      ...(k !== 1 ? { scale: `${k}` } : {}),
+                      ...entPlacement(e),
                       ...(e.fallFrom
                         ? ({ '--fall-from': `${-e.fallFrom}em` } as React.CSSProperties)
                         : {}),

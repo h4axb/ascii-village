@@ -82,19 +82,10 @@ pre {
   position: relative;
   height: 100%;
   overflow: hidden;
-  /* the island's meadow and its shore on the right, an in-game shot (set
-     inline from src/assets/start-coast.webp); anchored right so narrow
-     screens still show the coast */
+  /* the meadow's colour until the live view (.landing-world) has drawn */
   background-color: #4f6436;
-  background-size: cover;
-  background-position: right center;
 }
-/* upright screens (phones) are too narrow for the palm and the shore beside
-   the title: they show the meadow side of the shot */
 @media (max-aspect-ratio: 9/10) {
-  .landing {
-    background-position: left center;
-  }
   .landing-actions {
     width: min(300px, 70vw);
   }
@@ -123,17 +114,6 @@ pre {
   .landing-title {
     font-size: min(15px, calc(84vw / 25.2));
   }
-}
-/* four flowers, two over two, in the space right of "BAY" */
-.landing-flowers {
-  position: absolute;
-  left: 63%;
-  top: 50%;
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 0.8em 1.4em;
-  font-size: 0.95em;
-  pointer-events: none;
 }
 .title {
   margin: 0;
@@ -194,34 +174,12 @@ pre {
   display: none;
 }
 
-/* the player in the bottom-right corner and the flower trail to the buttons */
-.landing-scenery {
+/* the live view of the east coast behind the title (LandingWorld in App.tsx) */
+.landing-world {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-}
-.landing-player {
-  position: absolute;
-  /* on the grass, just left of the shore */
-  right: 30vw;
-  bottom: 22vh;
-  color: #fff;
-  filter: saturate(var(--player-sat, 1)) brightness(1.08) drop-shadow(0 6px 6px rgba(0, 0, 0, 0.25));
-}
-.landing-player.portrait {
-  right: 22vw;
-  bottom: 12vh;
-}
-.landing-flower {
-  margin: 0;
-  line-height: 1;
-}
-.landing-flower span {
-  display: inline-block;
-  width: 1ch;
-  text-align: center;
   overflow: hidden;
-  vertical-align: top;
+  pointer-events: none;
 }
 
 .landing-save-error {

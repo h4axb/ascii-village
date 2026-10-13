@@ -582,6 +582,12 @@ onThemeChange(() => {
 // a character cell's height / width (14px line / 8.4px char, see App.tsx)
 const CELL_ASPECT = 14 / 8.4;
 
+// How many signs the base grass carries (chances per cell): the tufts in
+// their clusters over the darker patches, the marks thickening toward the
+// coast (at the shore), the stray marks everywhere, and the coastal shrub
+// band's foliage marks
+const GRASS_SIGNS = { tuft: 0.3, rim: 0.35, scatter: 0.004, bush: 0.5 };
+
 function computeCell(F: TerrainField, x: number, y: number) {
   const { ndv, kind, glyph, color } = F;
   const fy = (y + 0.5) / TILE_LN;
@@ -607,8 +613,8 @@ function computeCell(F: TerrainField, x: number, y: number) {
   if (land && glyphMask()[idx]) {
     g = 0;
   } else if (out.kind === KIND_BUSH) {
-    // foliage texture: every cell a heavy mark, randomly brighter or
-    // darker yellow-olive, yellowing toward the sand edge
+    // foliage texture: heavy marks on about half the cells, randomly
+    // brighter or darker yellow-olive, yellowing toward the sand edge
     const lit = h2 * h2;
     const fringe = smooth(0.975, 1.01, out.ndv);
     // mostly heavy ramp marks, some round o / ¤ for the leafy mix
@@ -620,6 +626,7 @@ function computeCell(F: TerrainField, x: number, y: number) {
     tg = fg + (P.fringeGlyph[1] - fg) * fringe;
     tb = fb + (P.fringeGlyph[2] - fb) * fringe;
     m = 0.8 + 0.18 * Math.max(lit, fringe);
+    if (h >= GRASS_SIGNS.bush) g = 0; // bare on the other half
   } else if (out.kind === KIND_DIRT) {
     // a few scattered pebbles and crumbs
     if (h < 0.1) {
@@ -666,8 +673,8 @@ function computeCell(F: TerrainField, x: number, y: number) {
     // grass texture without being covered in signs.
     const tuftCluster = smooth(0.35, 0.72, vnoise(fx * 0.3, fy * 0.3, 91));
     const inland = 1 - smooth(0.8, 0.9, out.ndv);
-    const tuftP = 0.7 * (1 - smooth(0.25, 0.6, out.patch)) * tuftCluster * inland;
-    if (h < 0.012 + 0.8 * rim * rim) {
+    const tuftP = GRASS_SIGNS.tuft * (1 - smooth(0.25, 0.6, out.patch)) * tuftCluster * inland;
+    if (h < GRASS_SIGNS.scatter + GRASS_SIGNS.rim * rim * rim) {
       g = G_LEAF[Math.floor(h2 * G_LEAF.length)];
       const fringe = smooth(0.965, 1.005, out.ndv);
       tr = P.foliageGlyph[0] + (P.fringeGlyph[0] - P.foliageGlyph[0]) * fringe;

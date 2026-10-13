@@ -76,7 +76,7 @@
         "ground.slab": "#c6c3b5",
         "ground.slabRim": "#94928a",
         "ground.slabGlyph": "#e6e3d6",
-        "player.shadow": "#2e5a24"
+        "player.shadow": "#1c1c26"
       },
       "characters": {
         "player": 1.45,
@@ -158,7 +158,7 @@
         "stoneAsset.shadow": "#553f43",
         "stoneAsset.moss": "#6d9d6c",
         "stoneAsset.grass": "#92b77b",
-        "player.shadow": "#2e5a24"
+        "player.shadow": "#1c1c26"
       },
       "characters": {
         "player": 1.28,

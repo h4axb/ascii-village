@@ -541,36 +541,33 @@ const LANDING_FADE_MS = 500;
 // The player's backing under each glyph: this much darker than the glyph's
 // own colour (other sprites use 0.55) - lighter, so the character reads
 // clean rather than grimy, in the game and on the start screen
-// The player's shadow: a flat pixel ellipse on the ground under the feet
-// (12 x 4 pixels, hard edges), multiplied onto whatever is under it, so it
-// reads as a darker patch of that ground. Colour: the theme's player.shadow.
-const PLAYER_SHADOW = { width: 0.8, opacity: 0.55 };
+// The player's shadow: a flat pixel oval on the ground under the feet, made
+// of whole ground squares (the terrain's background blocks, 1ch x 1ch from
+// the world's origin) so it sits exactly on the ground's pixel grid. A
+// slightly transparent dark grey: over grass it reads as darker grass, over
+// the path as darker earth. Colour: the theme's player.shadow.
+const PLAYER_SHADOW = { opacity: 0.3 };
 const SHADOW_ROWS: [number, number][] = [
-  [3, 6], // row: first column, width (of 12)
-  [1, 10],
-  [1, 10],
-  [3, 6],
+  [1, 5], // row: first block, width (of 7)
+  [0, 7],
+  [1, 5],
 ];
-function PlayerShadow({ cx, footEm, w, lift }: { cx: number; footEm: number; w: number; lift: number }) {
-  const h = w / 3; // ch: 12 x 4 pixels
+// x, y: the rig's place (tiles); cx, footEm: the feet in the rig (ch, em)
+function PlayerShadow({ x, y, cx, footEm }: { x: number; y: number; cx: number; footEm: number }) {
+  const rigX = x * TILE_CH, rigY = y * TILE_LN * CELL_ASPECT; // the rig, in ground blocks
+  // centred on the feet, the feet two thirds of the way down it
+  const bx0 = Math.round(rigX + cx - 3.5);
+  const by0 = Math.floor(rigY + footEm * CELL_ASPECT) - 1;
   return (
     <svg
       className="player-shadow"
-      viewBox="0 0 12 4"
-      preserveAspectRatio="none"
+      viewBox="0 0 7 3"
       shapeRendering="crispEdges"
       aria-hidden="true"
-      style={{
-        left: `${cx - w / 2}ch`,
-        top: `calc(${footEm}em - ${h * 0.55}ch)`,
-        width: `${w}ch`,
-        height: `${h}ch`,
-        opacity: PLAYER_SHADOW.opacity,
-        transform: lift ? `scale(${Math.max(0.6, 1 - lift * 0.25)})` : undefined,
-      }}
+      style={{ left: `${bx0 - rigX}ch`, top: `${by0 - rigY}ch`, width: '7ch', height: '3ch', opacity: PLAYER_SHADOW.opacity }}
     >
-      {SHADOW_ROWS.map(([x, n], y) => (
-        <rect key={y} x={x} y={y} width={n} height={1} fill={themeSwatch('player.shadow')} />
+      {SHADOW_ROWS.map(([x0, n], row) => (
+        <rect key={row} x={x0} y={row} width={n} height={1} fill={themeSwatch('player.shadow')} />
       ))}
     </svg>
   );
@@ -5423,16 +5420,10 @@ function Game() {
                     solidCells
                   />
                 )}
-                {/* a small pixel shadow on the ground under the feet (not
-                    while on the boat); it stays on the ground during a hop,
-                    a little smaller */}
+                {/* a small pixel shadow on the ground under the feet, on the
+                    ground's own squares (not while on the boat) */}
                 {!rideBoat && (
-                  <PlayerShadow
-                    cx={(playerK * playerW) / 2}
-                    footEm={playerK * displaySprite.length}
-                    w={PLAYER_SHADOW.width * playerK * playerW}
-                    lift={hopEm}
-                  />
+                  <PlayerShadow x={player.x} y={player.y} cx={(playerK * playerW) / 2} footEm={playerK * displaySprite.length} />
                 )}
                 <SolidSpriteCanvas
                   className="player-sprite"

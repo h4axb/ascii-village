@@ -4520,7 +4520,7 @@ pre {
 
 /* Mitchy's "!" bubble over his head while he's waiting for the player (see
    App.tsx's bubbleCat). The box sits at his head's centre; the art hangs up
-   from it, scaled to about three tiles across (MITCHY_BUBBLE_SCALE). */
+   from it, scaled to about three tiles across (the scale below). */
 .mitchy-bubble {
   position: absolute;
   z-index: 499;

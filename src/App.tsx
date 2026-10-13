@@ -490,11 +490,8 @@ type Modal =
   | null;
 
 // the big ones: offered from a little further away
-// Mitchy's "!" bubble: shown within this many tiles of him; its drawn height
-// in em (the .mitchy-bubble-art scale x its rows), for lifting his label over it
+// Mitchy's "!" bubble: shown within this many tiles of him
 const MITCHY_BUBBLE_TILES = 6;
-const MITCHY_BUBBLE_SCALE = 0.3;
-const MITCHY_BUBBLE_H = SPEECH_BUBBLE.length * MITCHY_BUBBLE_SCALE + 0.4;
 const PROMPT_WIDE_KINDS = new Set<EntityKind>(['cat', 'house', 'shop', 'hotspot']);
 
 // Settings > Controls: every key the game listens to (the handler is
@@ -5752,6 +5749,8 @@ function Game() {
                 (hovered ?? promptTarget?.ref) &&
                 (() => {
                   const ref = (hovered ?? promptTarget?.ref)!;
+                  // no name over Mitchy: his "!" bubble (or nothing) is enough; F still talks to him
+                  if (ref.kind === 'entity' && ref.id === 'cat') return null;
                   const copy = describeInteraction(ref, interactCtx);
                   if (!copy) return null;
                   const pos =
@@ -5762,14 +5761,12 @@ function Game() {
                         : { x: plot.door.c0, y: plot.rect.y1 }; // the one gate, in the near rail
                   if (!pos) return null;
                   const withF = !!promptTarget && JSON.stringify(promptTarget.ref) === JSON.stringify(ref);
-                  // over Mitchy's "!" bubble, not on it
-                  const lift = bubbleCat && ref.kind === 'entity' && ref.id === 'cat' ? MITCHY_BUBBLE_H : 0;
                   return (
                     <div
                       className={'fpop' + (withF ? ' with-f' : '')}
                       style={{
                         left: `${pos.x * TILE_CH + 1}ch`,
-                        top: `${Math.max(0, pos.y * TILE_LN - 1.6 - lift)}em`,
+                        top: `${Math.max(0, pos.y * TILE_LN - 1.6)}em`,
                       }}
                     >
                       {withF && <kbd className="fpop-key">F</kbd>}

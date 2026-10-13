@@ -53,7 +53,8 @@ a message instead of overwriting it: reload to get the new version.
 - **Ground** — paint dirt, meadow, stone ground and stepping stones onto the land (its own save button). See docs/Theme.md.
 - **Theme** — the environment colours (grass, sand, water, palms, flowers) and a colour grade, live, with presets; its own save button. See docs/Theme.md.
 - **Start screen** — lays out the start screen, a live view of the island.
-  The yellow frame on the map is what it shows (a 1920×1080 screen): drag its
+  The yellow frame on the map is what it shows in this browser window (its
+  size is on the frame's label; the layout scales with the window): drag its
   label to move it, its corner to zoom (or use the zoom slider). Inside it,
   drag the title picture, the subtitle + buttons box and the player where
   they should stand. The title has sliders for size, rotation and place, and

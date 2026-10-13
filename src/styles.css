@@ -134,7 +134,8 @@ pre {
 /* Start / Continue, New Game, Upload and Export Save: design-system actions
    (.ds-action), one vertical column under the title */
 .landing-actions {
-  width: clamp(200px, 15.6vw, 300px);
+  /* a 1920-wide screen's size: the column scales with the window (App.tsx) */
+  width: 300px;
   margin-top: 52px;
   flex-direction: column;
   align-items: stretch;

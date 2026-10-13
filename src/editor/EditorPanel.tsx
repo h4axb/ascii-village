@@ -368,6 +368,40 @@ function AssetsTab({ ed, startScreen }: { ed: WorldEditor; startScreen?: boolean
   );
 }
 
+// A PNG cropped to its visible pixels (plus a small margin), so the title's
+// box on the map hugs the logo rather than its empty canvas; and its shape.
+async function trimTransparent(file: File): Promise<{ blob: Blob; aspect: number }> {
+  const bmp = await createImageBitmap(file);
+  const c = document.createElement('canvas');
+  c.width = bmp.width;
+  c.height = bmp.height;
+  const ctx = c.getContext('2d')!;
+  ctx.drawImage(bmp, 0, 0);
+  bmp.close();
+  const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+  let x0 = width, y0 = height, x1 = -1, y1 = -1;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+      if (data[(y * width + x) * 4 + 3] > 8) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+  if (x1 < 0) throw new Error('the image is empty (fully transparent)');
+  const pad = 6;
+  x0 = Math.max(0, x0 - pad);
+  y0 = Math.max(0, y0 - pad);
+  x1 = Math.min(width - 1, x1 + pad);
+  y1 = Math.min(height - 1, y1 + pad);
+  const out = document.createElement('canvas');
+  out.width = x1 - x0 + 1;
+  out.height = y1 - y0 + 1;
+  out.getContext('2d')!.drawImage(c, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  const blob = await new Promise<Blob>((ok, no) => out.toBlob((b) => (b ? ok(b) : no(new Error('could not encode the PNG'))), 'image/png'));
+  return { blob, aspect: Math.round((out.height / out.width) * 10000) / 10000 };
+}
+
 // The start screen's layout: the frame on the map (what it shows), the
 // player, the title + buttons, and the objects only it has. Everything here
 // is saved with the world (Save / Ctrl+S); reload the start screen to see it.
@@ -384,10 +418,8 @@ function StartTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): void 
     }
     setUpload('Uploading…');
     try {
-      const bmp = await createImageBitmap(file);
-      const aspect = Math.round((bmp.height / bmp.width) * 10000) / 10000;
-      bmp.close();
-      const res = await fetch('/__dev/save-title', { method: 'POST', body: file });
+      const { blob, aspect } = await trimTransparent(file);
+      const res = await fetch('/__dev/save-title', { method: 'POST', body: blob });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         setUpload(res.status === 404 ? 'Uploading only works under `pnpm dev`.' : `Not uploaded: ${body.error ?? res.statusText}`);

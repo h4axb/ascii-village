@@ -4,7 +4,7 @@
 // the objects they point at.
 import { ColoredSprite } from '../ColoredSprite';
 import { MARKER_REGISTRY } from '../sceneMarkers';
-import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint, startFrame, startTitleUrl, START_PLAYER_FRAME, START_PLAYER_K, START_PLAYER_BOX } from '../world';
+import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint, startFrame, startScreenSize, startTitleUrl, START_PLAYER_FRAME, START_PLAYER_K, START_PLAYER_BOX } from '../world';
 import { PlayerShadow } from '../PlayerShadow';
 import * as S from '../sprites';
 import type { Ent } from '../world';
@@ -50,13 +50,15 @@ function Colliders({ e, withEmpty }: { e: Ent; withEmpty: boolean }) {
 }
 
 // The Start screen tab: what the start screen shows, as a frame on the map
-// (a 1920 x 1080 screen), the map around it dimmed. Its handle (top-left)
+// (in this browser window's shape), the map around it dimmed. Its handle (top-left)
 // moves it, its corner zooms it; the title + buttons box and the player
 // inside it are dragged where they should stand. See useWorldEditor's
 // hitStart for the hit areas, which match these boxes.
 function StartLayer({ ed }: { ed: WorldEditor }) {
   const ss = ed.startScreen;
-  const f = startFrame(ss);
+  // what the start screen shows in this browser window
+  const scr = startScreenSize();
+  const f = startFrame(ss, scr);
   const p = ss.player;
   const k = START_PLAYER_K;
   const fr = START_PLAYER_FRAME;
@@ -70,7 +72,9 @@ function StartLayer({ ed }: { ed: WorldEditor }) {
       <div className="wed-start-dim" style={box(0, f.y, f.x, f.h)} />
       <div className="wed-start-dim" style={box(f.x + f.w, f.y, GROUND_W - f.x - f.w, f.h)} />
       <div className="wed-start-frame" style={box(f.x, f.y, f.w, f.h)}>
-        <div className="wed-start-handle">⤧ START SCREEN · drag to move</div>
+        <div className="wed-start-handle">
+          ⤧ START SCREEN · {scr.w}×{scr.h} · drag to move
+        </div>
         <div className="wed-start-corner" title="drag to zoom" />
       </div>
       <img

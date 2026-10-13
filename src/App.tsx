@@ -23,6 +23,7 @@ import {
   START_PLAYER_K,
   startFrame,
   startTitleUrl,
+  startUiScale,
   wildSpawns,
   PLAYER_SPAWN,
   PLAYER_T,
@@ -765,17 +766,18 @@ function LandingWorld({ portrait }: { portrait: boolean }) {
   );
 }
 
-// upright screens (phones): the start screen keeps its own phone layout
-function usePortrait(): boolean {
+// the window's width, and whether it's upright (phones: the start screen
+// keeps its own phone layout)
+function useScreen(): { w: number; portrait: boolean } {
   const q = '(max-aspect-ratio: 9/10)';
-  const [portrait, setPortrait] = useState(() => window.matchMedia(q).matches);
+  const read = () => ({ w: window.innerWidth, portrait: window.matchMedia(q).matches });
+  const [scr, setScr] = useState(read);
   useEffect(() => {
-    const m = window.matchMedia(q);
-    const on = () => setPortrait(m.matches);
-    m.addEventListener('change', on);
-    return () => m.removeEventListener('change', on);
+    const on = () => setScr(read());
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
   }, []);
-  return portrait;
+  return scr;
 }
 
 function Landing({ onStart }: { onStart: () => void }) {
@@ -788,7 +790,7 @@ function Landing({ onStart }: { onStart: () => void }) {
   // New Game is destructive (deletes the persistent save), so it's gated
   // behind an explicit confirmation rather than firing on the first click.
   const [confirmNewGame, setConfirmNewGame] = useState(false);
-  const portrait = usePortrait();
+  const { w: screenW, portrait } = useScreen();
   const ui = START_SCREEN.ui;
   const title = START_SCREEN.title;
   const titleSrc = startTitleUrl(title);
@@ -857,7 +859,13 @@ function Landing({ onStart }: { onStart: () => void }) {
       )}
       <div
         className="landing-col"
-        style={portrait ? undefined : { left: `${ui.x * 100}%`, top: `${ui.y * 100}%`, transform: `translateY(-50%) scale(${ui.scale})` }}
+        // laid out for a 1920-wide screen, scaled with the window like the
+        // title, so it keeps the proportions the editor shows
+        style={
+          portrait
+            ? undefined
+            : { left: `${ui.x * 100}%`, top: `${ui.y * 100}%`, transform: `translateY(-50%) scale(${startUiScale(START_SCREEN, screenW)})` }
+        }
       >
         {portrait && <img className="landing-logo portrait" src={titleSrc} alt="ASCII Bay" draggable={false} />}
         <div className="subtitle">a tiny monochrome bay</div>

@@ -891,31 +891,41 @@ export function coverView(w: number, h: number, charW: number, lineH: number, zo
 // clamp go negative and shove it against one side.
 export const clampCam = (focus: number, view: number, ground: number) =>
   view >= ground ? (ground - view) / 2 : Math.min(Math.max(focus - view / 2, 0), ground - view);
-// The start screen's frame on the map (world ch / lines), as a reference
-// 1920 x 1080 screen shows it: the view, and the title + buttons column in it
-// (START_UI_PX: the subtitle + buttons column's size on that screen, at
-// scale 1), and the title image. Shared by the editor's Start screen tab
-// (drawing and dragging) - the start screen itself fits any screen the same way.
+// The start screen's frame on the map (world ch / lines), as a screen of the
+// given size shows it - the editor passes this browser window's size, which
+// is what the start screen fills - with the view, the subtitle + buttons
+// column and the title image in it. The column is laid out for a 1920-wide
+// screen (START_UI_PX at scale 1) and scales with the screen's width, like
+// the title. Shared by the editor's Start screen tab (drawing and dragging)
+// and the start screen itself.
 export const START_REF = { w: 1920, h: 1080 };
-export const START_UI_PX = { w: 300, h: 250 };
-export function startFrame(ss: StartScreen) {
+export const START_UI_PX = { w: 300, h: 234 };
+export function startScreenSize(): { w: number; h: number } {
+  return typeof window === 'undefined' ? START_REF : { w: window.innerWidth, h: window.innerHeight };
+}
+// the column's scale on a screen this wide
+export const startUiScale = (ss: StartScreen, screenW: number) => ss.ui.scale * (screenW / START_REF.w);
+export function startFrame(ss: StartScreen, scr: { w: number; h: number } = startScreenSize()) {
   // the field's cell (14px font, a 0.6em glyph): only its aspect matters here
-  const { viewW, viewH } = coverView(START_REF.w, START_REF.h, 8.4, 14, ss.zoom);
+  const { viewW, viewH } = coverView(scr.w, scr.h, 8.4, 14, ss.zoom);
   const x = clampCam(ss.view.x * TILE_CH, viewW, GROUND_W);
   const y = clampCam(ss.view.y * TILE_LN, viewH, GROUND_H);
-  const uw = (START_UI_PX.w / START_REF.w) * viewW * ss.ui.scale;
-  const uh = (START_UI_PX.h / START_REF.h) * viewH * ss.ui.scale;
+  // screen px -> ch / lines
+  const kx = viewW / scr.w;
+  const ky = viewH / scr.h;
+  const k = startUiScale(ss, scr.w);
+  const uw = START_UI_PX.w * k * kx;
+  const uh = START_UI_PX.h * k * ky;
   // the title: its width is a share of the screen's, its height follows the
-  // picture (in screen px, then back to ch x lines)
-  const tw = ss.title.width * viewW;
-  const th = ((ss.title.width * START_REF.w * ss.title.aspect) / START_REF.h) * viewH;
+  // picture
+  const twPx = ss.title.width * scr.w;
   return {
     x,
     y,
     w: viewW,
     h: viewH,
     ui: { x: x + ss.ui.x * viewW, y: y + ss.ui.y * viewH - uh / 2, w: uw, h: uh },
-    title: { cx: x + ss.title.x * viewW, cy: y + ss.title.y * viewH, w: tw, h: th },
+    title: { cx: x + ss.title.x * viewW, cy: y + ss.title.y * viewH, w: twPx * kx, h: twPx * ss.title.aspect * ky },
   };
 }
 // The player on the start screen: mid-step in the walk-down cycle (as if

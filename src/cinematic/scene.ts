@@ -337,11 +337,15 @@ export function renderScene(sc: Scene, gc: GlyphCanvas, t: number, reduced: bool
   if (openK <= 0) return;
   // ---- 3. the doorway: the beach, where the leaf was
   const lift = clamp01(openK * 8);
+  // the picture fills what the open leaf leaves free (scaled down to it),
+  // not the whole doorway, so nearly all of its right half shows
+  const free0 = D.hinge + W * SCENE.door.open;
+  const freeW = W * (1 - SCENE.door.open);
   for (let r = D.leafTop; r <= D.leafBottom; r++)
     for (let c = D.hinge; c <= D.leafRight; c++) {
       if (!D.leaf[r * D.cols + c]) continue;
       // the beach (beach.ts), its tide pulling in and out
-      const p = beachAt((c - D.hinge + 0.5) / W, (r - D.leafTop + 0.5) / (D.leafBottom + 1 - D.leafTop), t);
+      const p = beachAt(Math.max(0, (c - free0 + 0.5) / freeW), (r - D.leafTop + 0.5) / (D.leafBottom + 1 - D.leafTop), t);
       if (!p) continue;
       const cc = mixc(DARK, p.c, lift);
       put(sc.c0 + c, r0 + r, g(p.ch), mixc(cc, WHITE, 0.12 * lift), pack(mul(cc, 0.4)));

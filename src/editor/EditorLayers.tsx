@@ -4,7 +4,7 @@
 // the objects they point at.
 import { ColoredSprite } from '../ColoredSprite';
 import { MARKER_REGISTRY } from '../sceneMarkers';
-import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint, startFrame, START_PLAYER_FRAME, START_PLAYER_K, START_PLAYER_BOX } from '../world';
+import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint, startFrame, startTitleUrl, START_PLAYER_FRAME, START_PLAYER_K, START_PLAYER_BOX } from '../world';
 import { PlayerShadow } from '../PlayerShadow';
 import * as S from '../sprites';
 import type { Ent } from '../world';
@@ -73,10 +73,23 @@ function StartLayer({ ed }: { ed: WorldEditor }) {
         <div className="wed-start-handle">⤧ START SCREEN · drag to move</div>
         <div className="wed-start-corner" title="drag to zoom" />
       </div>
+      <img
+        className="wed-start-logo"
+        src={startTitleUrl(ss.title)}
+        alt=""
+        draggable={false}
+        style={{
+          left: `${f.title.cx - f.title.w / 2}ch`,
+          top: `${f.title.cy - f.title.h / 2}em`,
+          width: `${f.title.w}ch`,
+          height: `${f.title.h}em`,
+          rotate: `${ss.title.rotation}deg`,
+        }}
+      />
       <div className="wed-start-ui" style={box(f.ui.x, f.ui.y, f.ui.w, f.ui.h)}>
-        <pre className="wed-start-title" style={{ fontSize: `${f.ui.w / 42}em` /* 42 columns wide */ }}>
-          {S.TITLE.join('\n')}
-        </pre>
+        <div className="wed-start-sub" style={{ fontSize: `${f.ui.w / 30}em` }}>
+          a tiny monochrome bay
+        </div>
         <div className="wed-start-btn go" />
         <div className="wed-start-btn" />
         <div className="wed-start-btn" />

@@ -103,33 +103,24 @@ pre {
   align-items: flex-start;
 }
 
-.landing-title {
-  position: relative;
-  /* the title a little wider than the buttons (42 columns of 0.6em), not
-     too big: about 1.35x the button column */
-  /* scales with the screen like the background does (15px at 1920 wide) */
-  font-size: clamp(8px, 0.78vw, 15px);
+/* the title image (public/start-title.png, uploaded in the editor's Start
+   screen tab): placed, sized and turned from world.json's startScreen.title */
+.landing-logo {
+  position: absolute;
+  z-index: 1;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 3px 10px rgba(20, 28, 12, 0.35));
 }
-@media (max-aspect-ratio: 9/10) {
-  .landing-title {
-    font-size: min(15px, calc(84vw / 25.2));
-  }
+.landing-logo.portrait {
+  position: static;
+  width: min(84vw, 420px);
+  margin-bottom: 4px;
 }
-.title {
-  margin: 0;
-  color: #fbf8e4;
-  /* the grass is light: a dark rim and a soft shadow keep it legible */
-  text-shadow:
-    0 0 2px rgba(20, 28, 12, 0.9),
-    0 0 6px rgba(20, 28, 12, 0.55),
-    0 2px 12px rgba(0, 0, 0, 0.35);
-  line-height: 1.1;
-  white-space: pre;
-  font-weight: 600;
-  font-size: 1em;
-  text-align: left;
+.landing-col {
+  transform-origin: left center;
 }
-
 .subtitle {
   margin-top: 12px;
   color: #f4f1d4;
@@ -847,12 +838,30 @@ pre {
   gap: 4%;
   overflow: hidden;
 }
-.wed-start-title {
-  margin: 0;
-  line-height: 1.1;
-  white-space: pre;
-  color: #fbf8e4;
-  font-weight: 600;
+.wed-btn-file {
+  display: inline-block;
+  margin: 2px 0 6px;
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.wed-btn-file:hover {
+  border-color: #ffd84a;
+}
+.wed-btn-file input {
+  display: none;
+}
+.wed-start-logo {
+  position: absolute;
+  z-index: 200001;
+  pointer-events: none;
+  outline: 1px dashed rgba(255, 216, 74, 0.9);
+}
+.wed-start-sub {
+  color: #f4f1d4;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
 }
 .wed-start-btn {
   height: 7%;
@@ -861,7 +870,7 @@ pre {
   border-radius: 2px;
 }
 .wed-start-btn.go {
-  margin-top: 8%;
+  margin-top: 12%;
   background: rgb(36, 54, 29);
 }
 .wed-start-player .player-sprite {

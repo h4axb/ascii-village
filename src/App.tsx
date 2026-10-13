@@ -22,6 +22,7 @@ import {
   START_PLAYER_FRAME,
   START_PLAYER_K,
   startFrame,
+  startTitleUrl,
   wildSpawns,
   PLAYER_SPAWN,
   PLAYER_T,
@@ -789,6 +790,8 @@ function Landing({ onStart }: { onStart: () => void }) {
   const [confirmNewGame, setConfirmNewGame] = useState(false);
   const portrait = usePortrait();
   const ui = START_SCREEN.ui;
+  const title = START_SCREEN.title;
+  const titleSrc = startTitleUrl(title);
 
   function handleUploadFile(file: File) {
     setError(null);
@@ -834,17 +837,29 @@ function Landing({ onStart }: { onStart: () => void }) {
 
   return (
     // behind it a live view of the island's east coast (LandingWorld); the
-    // title and the buttons share one left edge
+    // title image and the buttons where the editor's Start screen tab put
+    // them (phones: one column, the title on top)
     <div className="landing">
       <LandingWorld portrait={portrait} />
+      {!portrait && (
+        <img
+          className="landing-logo"
+          src={titleSrc}
+          alt="ASCII Bay"
+          draggable={false}
+          style={{
+            left: `${title.x * 100}%`,
+            top: `${title.y * 100}%`,
+            width: `${title.width * 100}%`,
+            transform: `translate(-50%, -50%) rotate(${title.rotation}deg)`,
+          }}
+        />
+      )}
       <div
         className="landing-col"
-        // where the editor's Start screen tab put it (phones keep their own)
         style={portrait ? undefined : { left: `${ui.x * 100}%`, top: `${ui.y * 100}%`, transform: `translateY(-50%) scale(${ui.scale})` }}
       >
-        <div className="landing-title">
-          <pre className="title">{S.TITLE.join('\n')}</pre>
-        </div>
+        {portrait && <img className="landing-logo portrait" src={titleSrc} alt="ASCII Bay" draggable={false} />}
         <div className="subtitle">a tiny monochrome bay</div>
         {/* design-system buttons (src/ui), one column: the primary action in green */}
         <div className="ds-actions landing-actions">

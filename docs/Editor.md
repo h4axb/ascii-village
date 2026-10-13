@@ -55,8 +55,12 @@ a message instead of overwriting it: reload to get the new version.
 - **Start screen** — lays out the start screen, a live view of the island.
   The yellow frame on the map is what it shows (a 1920×1080 screen): drag its
   label to move it, its corner to zoom (or use the zoom slider). Inside it,
-  drag the title + buttons box and the player where they should stand; the
-  box's size has a slider. Assets placed from this tab are **start screen
+  drag the title picture, the subtitle + buttons box and the player where
+  they should stand. The title has sliders for size, rotation and place, and
+  *upload PNG…* replaces the picture: it's written to
+  `public/start-title.png` at once (any size; a transparent background looks
+  best), and its shape and a new version go into the layout. The buttons box
+  has a size slider. Assets placed from this tab are **start screen
   only** (`startOnly` in `world.json`): they're drawn on the start screen,
   never in the game, and only show on the map while this tab is open. Move,
   scale (+/−, Alt+wheel) and rotate them like any object; the inspector's

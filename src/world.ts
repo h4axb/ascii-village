@@ -839,22 +839,32 @@ export interface StartScreenDoc {
   view: { x: number; y: number }; // the tile the camera centres on
   zoom?: number; // 1 = the game's view; >1 closer, <1 wider
   player: { x: number; y: number }; // where the player stands (tiles)
-  // the title + buttons: its left edge and vertical centre, as fractions of
-  // the screen, and a size multiplier
+  // the subtitle + buttons: its left edge and vertical centre, as fractions
+  // of the screen, and a size multiplier
   ui?: { x: number; y: number; scale?: number };
+  // the title image (public/start-title.png, uploaded in the editor): its
+  // centre as fractions of the screen, its width as a fraction of the
+  // screen's width, a turn in degrees, its height / width, and a version
+  // that changes with every upload (so browsers fetch the new picture)
+  title?: { x: number; y: number; width?: number; rotation?: number; aspect?: number; v?: string };
 }
 export interface StartScreen {
   view: { x: number; y: number };
   zoom: number;
   player: { x: number; y: number };
   ui: { x: number; y: number; scale: number };
+  title: { x: number; y: number; width: number; rotation: number; aspect: number; v: string };
 }
 export const START_SCREEN_DEFAULT: StartScreen = {
   view: { x: 68, y: 58 },
   zoom: 1,
   player: { x: 72, y: 61 },
-  ui: { x: 0.09, y: 0.5, scale: 1 },
+  ui: { x: 0.09, y: 0.62, scale: 1 },
+  title: { x: 0.22, y: 0.235, width: 0.27, rotation: 0, aspect: 0.507, v: '' },
 };
+// where the title image is served from (public/), with its upload version
+export const START_TITLE_FILE = 'start-title.png';
+export const startTitleUrl = (t: StartScreen['title']) => `/${START_TITLE_FILE}${t.v ? `?v=${t.v}` : ''}`;
 export function startScreenOf(doc: WorldDoc): StartScreen {
   const s = doc.startScreen;
   const d = START_SCREEN_DEFAULT;
@@ -863,6 +873,7 @@ export function startScreenOf(doc: WorldDoc): StartScreen {
     zoom: s?.zoom ?? d.zoom,
     player: s?.player ?? d.player,
     ui: { x: s?.ui?.x ?? d.ui.x, y: s?.ui?.y ?? d.ui.y, scale: s?.ui?.scale ?? d.ui.scale },
+    title: { ...d.title, ...s?.title },
   };
 }
 // The game's design view (world ch x lines), fitted to any screen with a
@@ -882,11 +893,11 @@ export const clampCam = (focus: number, view: number, ground: number) =>
   view >= ground ? (ground - view) / 2 : Math.min(Math.max(focus - view / 2, 0), ground - view);
 // The start screen's frame on the map (world ch / lines), as a reference
 // 1920 x 1080 screen shows it: the view, and the title + buttons column in it
-// (START_UI_PX: the column's size on that screen, at scale 1). Shared by the
-// editor's Start screen tab (drawing and dragging) - the start screen itself
-// fits any screen the same way.
+// (START_UI_PX: the subtitle + buttons column's size on that screen, at
+// scale 1), and the title image. Shared by the editor's Start screen tab
+// (drawing and dragging) - the start screen itself fits any screen the same way.
 export const START_REF = { w: 1920, h: 1080 };
-export const START_UI_PX = { w: 380, h: 450 };
+export const START_UI_PX = { w: 300, h: 250 };
 export function startFrame(ss: StartScreen) {
   // the field's cell (14px font, a 0.6em glyph): only its aspect matters here
   const { viewW, viewH } = coverView(START_REF.w, START_REF.h, 8.4, 14, ss.zoom);
@@ -894,7 +905,18 @@ export function startFrame(ss: StartScreen) {
   const y = clampCam(ss.view.y * TILE_LN, viewH, GROUND_H);
   const uw = (START_UI_PX.w / START_REF.w) * viewW * ss.ui.scale;
   const uh = (START_UI_PX.h / START_REF.h) * viewH * ss.ui.scale;
-  return { x, y, w: viewW, h: viewH, ui: { x: x + ss.ui.x * viewW, y: y + ss.ui.y * viewH - uh / 2, w: uw, h: uh } };
+  // the title: its width is a share of the screen's, its height follows the
+  // picture (in screen px, then back to ch x lines)
+  const tw = ss.title.width * viewW;
+  const th = ((ss.title.width * START_REF.w * ss.title.aspect) / START_REF.h) * viewH;
+  return {
+    x,
+    y,
+    w: viewW,
+    h: viewH,
+    ui: { x: x + ss.ui.x * viewW, y: y + ss.ui.y * viewH - uh / 2, w: uw, h: uh },
+    title: { cx: x + ss.title.x * viewW, cy: y + ss.title.y * viewH, w: tw, h: th },
+  };
 }
 // The player on the start screen: mid-step in the walk-down cycle (as if
 // about to step into the game), sized like the game's walking player; its box

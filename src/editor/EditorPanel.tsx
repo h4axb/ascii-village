@@ -373,6 +373,32 @@ function AssetsTab({ ed, startScreen }: { ed: WorldEditor; startScreen?: boolean
 // is saved with the world (Save / Ctrl+S); reload the start screen to see it.
 function StartTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): void }) {
   const ss = ed.startScreen;
+  const [upload, setUpload] = useState<string | null>(null);
+  // a new title picture: written to public/start-title.png at once (vite's
+  // dev server); its shape and a new version go into the layout, saved with
+  // the world
+  async function uploadTitle(file: File) {
+    if (file.type !== 'image/png') {
+      setUpload('Pick a PNG file.');
+      return;
+    }
+    setUpload('Uploading…');
+    try {
+      const bmp = await createImageBitmap(file);
+      const aspect = Math.round((bmp.height / bmp.width) * 10000) / 10000;
+      bmp.close();
+      const res = await fetch('/__dev/save-title', { method: 'POST', body: file });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setUpload(res.status === 404 ? 'Uploading only works under `pnpm dev`.' : `Not uploaded: ${body.error ?? res.statusText}`);
+        return;
+      }
+      ed.setStartScreen({ title: { ...ss.title, aspect, v: Date.now().toString(36) } });
+      setUpload('New title saved to public/start-title.png. Save the world (Ctrl+S) to keep its size and place.');
+    } catch (err) {
+      setUpload(`Not uploaded: ${String(err)}`);
+    }
+  }
   const own = ed.structEnts.filter((e) => e.startOnly);
   const slider = (label: string, value: number, min: number, max: number, set: (v: number) => void) => (
     <label className="wed-theme-slider">
@@ -384,8 +410,8 @@ function StartTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): void 
   return (
     <div>
       <div className="wed-hint">
-        The yellow frame is what the start screen shows. Drag its label to move it and its corner to zoom; drag the title box
-        and the player inside it. Objects placed here are on the start screen only.
+        The yellow frame is what the start screen shows. Drag its label to move it and its corner to zoom; drag the title, the
+        buttons box and the player inside it. Objects placed here are on the start screen only.
       </div>
       <div className="wed-row wed-btns">
         <button onClick={() => onFocus('start')}>go to frame</button>
@@ -409,7 +435,39 @@ function StartTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): void 
         </div>
       </div>
       <div className="wed-group">
-        <div className="wed-group-name">Title + buttons</div>
+        <div className="wed-group-name">Title</div>
+        <div className="wed-hint">Drag the title on the map to move it.</div>
+        <label className="wed-btn-file">
+          upload PNG…
+          <input
+            type="file"
+            accept="image/png"
+            onChange={(ev) => {
+              const file = ev.target.files?.[0];
+              ev.target.value = '';
+              if (file) void uploadTitle(file);
+            }}
+          />
+        </label>
+        {upload && <div className="wed-hint">{upload}</div>}
+        {slider('size', ss.title.width, 0.05, 0.9, (width) => ed.setStartScreen({ title: { ...ss.title, width } }))}
+        <label className="wed-theme-slider">
+          <span>rotate</span>
+          <input
+            type="range"
+            min={-180}
+            max={180}
+            step={1}
+            value={ss.title.rotation}
+            onChange={(ev) => ed.setStartScreen({ title: { ...ss.title, rotation: Number(ev.target.value) } })}
+          />
+          <span className="wed-dim">{ss.title.rotation}°</span>
+        </label>
+        {slider('centre x', ss.title.x, 0, 1, (x) => ed.setStartScreen({ title: { ...ss.title, x } }))}
+        {slider('centre y', ss.title.y, 0, 1, (y) => ed.setStartScreen({ title: { ...ss.title, y } }))}
+      </div>
+      <div className="wed-group">
+        <div className="wed-group-name">Subtitle + buttons</div>
         {slider('size', ss.ui.scale, 0.5, 2, (scale) => ed.setStartScreen({ ui: { ...ss.ui, scale } }))}
         {slider('left', ss.ui.x, 0, 0.95, (x) => ed.setStartScreen({ ui: { ...ss.ui, x } }))}
         {slider('middle', ss.ui.y, 0.05, 0.95, (y) => ed.setStartScreen({ ui: { ...ss.ui, y } }))}

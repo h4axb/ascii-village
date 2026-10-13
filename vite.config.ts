@@ -94,6 +94,45 @@ function worldEditorSavePlugin(): Plugin {
   };
 }
 
+// Dev-only upload for the start screen's title image (the world editor's
+// Start screen tab): the PNG in the request body becomes
+// public/start-title.png, written at once. Where it's drawn, how big and
+// turned, and its version (so browsers fetch the new picture) are part of
+// world.json, saved with the world.
+function startTitleUploadPlugin(): Plugin {
+  const filePath = path.resolve(__dirname, 'public/start-title.png');
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const MAX = 12 * 1024 * 1024;
+  return {
+    name: 'start-title-upload',
+    configureServer(server) {
+      server.middlewares.use('/__dev/save-title', (req, res, next) => {
+        if (req.method !== 'POST') return next();
+        const chunks: Buffer[] = [];
+        let size = 0;
+        const reply = (status: number, data: unknown) => {
+          res.statusCode = status;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(data));
+        };
+        req.on('data', (chunk: Buffer) => {
+          size += chunk.length;
+          if (size <= MAX) chunks.push(chunk);
+        });
+        req.on('end', () => {
+          (async () => {
+            const body = Buffer.concat(chunks);
+            if (size > MAX) return reply(413, { error: 'the image is over 12 MB' });
+            if (body.length < 8 || !body.subarray(0, 8).equals(PNG)) return reply(400, { error: 'not a PNG file' });
+            await writeFile(filePath, body);
+            reply(200, { saved: 'public/start-title.png', bytes: body.length });
+          })().catch((err) => reply(500, { error: String(err) }));
+        });
+      });
+    },
+  };
+}
+
 // Dev-only save endpoint for the DEV Intro Editor's "INTRO" tab
 // (src/devIntroNarration.ts, part of the "E" editor). Same idea as above:
 // POSTs the editor's current { [stageId]: NarrationBeat[] } working copy
@@ -278,7 +317,7 @@ function participantDevPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), worldEditorSavePlugin(), introNarrationSavePlugin(), themeSavePlugin(), groundSavePlugin(), feedbackDevStorePlugin(), participantDevPlugin()],
+  plugins: [react(), worldEditorSavePlugin(), startTitleUploadPlugin(), introNarrationSavePlugin(), themeSavePlugin(), groundSavePlugin(), feedbackDevStorePlugin(), participantDevPlugin()],
   server: {
     // Pinned so a dev server never silently drifts onto a different port
     // (Vite's default is to auto-increment on conflict) — localStorage is

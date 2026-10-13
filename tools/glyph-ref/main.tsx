@@ -586,18 +586,13 @@ function App() {
     for (const x of list) {
       const m = x.marks!, art = x.art!;
       const id = `${slug(m.category || 'ref')}-${slug(m.title || x.name)}`;
-      const post = async (overwrite: boolean) => {
-        if (target === 'asset') {
-          const b = bake(art, { ...x.opts, bg: 'alpha' }, atlas);
-          return fetch('/__ref/send-asset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: id, asset: toGameAsset(m, `${x.path} (Glyph Generator)`, b, x.asset.kind, x.asset.scale), overwrite }) });
-        }
-        return fetch('/__ref/send-ref', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ref: toRefDoc(id, m, art.w, art.h), art: imgToDataUrl(art), overwrite }) });
-      };
-      let r = await post(false);
-      if (r.status === 409) {
-        const d = await r.json();
-        if (!window.confirm(`${d.file} already exists. Overwrite it?`)) continue;
-        r = await post(true);
+      // never overwrites: a taken name gets the next free one (<name>-2, ...)
+      let r: Response;
+      if (target === 'asset') {
+        const b = bake(art, { ...x.opts, bg: 'alpha' }, atlas);
+        r = await fetch('/__ref/send-asset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: id, asset: toGameAsset(m, `${x.path} (Glyph Generator)`, b, x.asset.kind, x.asset.scale) }) });
+      } else {
+        r = await fetch('/__ref/send-ref', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ref: toRefDoc(id, m, art.w, art.h), art: imgToDataUrl(art) }) });
       }
       const d = await r.json();
       if (!r.ok) {
@@ -605,7 +600,7 @@ function App() {
         continue;
       }
       update(x.id, (old) => ({ sent: { ...old.sent, [target]: d.saved } }));
-      done.push(d.saved);
+      done.push(d.renamed ? `${d.saved} (new name: the old one was taken)` : d.saved);
     }
     setStatus(`${target === 'asset' ? 'sent to the editor assets (reload the game to see them under New)' : 'sent to the crafting library'}: ${done.join(', ') || 'nothing'}`);
   }

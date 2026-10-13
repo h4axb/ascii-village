@@ -19,9 +19,10 @@ export interface SignBoard {
 export interface SignLayers {
   w: number;
   h: number;
-  axis: number; // the post's centre column
+  axis: number; // the post's centre line (x.5 for a post of even width)
   post: SignCell[];
   boards: SignBoard[];
+  empty?: string; // the colour key of an empty cell ('.', or ' ' from the Glyph Generator)
 }
 export interface SignPanel {
   flip?: boolean; // points the other way (left, for a board drawn pointing right)
@@ -47,7 +48,10 @@ function canvasOf(L: SignLayers) {
   let reach = 0;
   for (const c of [...L.post, ...L.boards.flatMap((b) => [...b.cells, ...b.icon])]) reach = Math.max(reach, Math.abs(c[0] - L.axis));
   const half = Math.ceil(reach) + SIDE;
-  return { w: half * 2 + 1, h: L.h + TOP, ox: half - L.axis, oy: TOP };
+  // a post of even width centres on a column edge: one column more, so the
+  // canvas stays symmetric about it on whole columns
+  const odd = L.axis % 1 !== 0;
+  return { w: half * 2 + (odd ? 2 : 1), h: L.h + TOP, ox: Math.floor(half - L.axis + (odd ? 0.5 : 0)), oy: TOP };
 }
 
 const isDefault = (s?: SignSettings) => !s || (!s.flip && !(s.panels ?? []).some((p) => p && (p.flip || p.tilt)));
@@ -55,7 +59,7 @@ const isDefault = (s?: SignSettings) => !s || (!s.flip && !(s.panels ?? []).some
 export function composeSign(L: SignLayers, s?: SignSettings): { sprite: string[]; colors: string[] } {
   const cv = canvasOf(L);
   const glyph: string[][] = Array.from({ length: cv.h }, () => Array(cv.w).fill(' '));
-  const key: string[][] = Array.from({ length: cv.h }, () => Array(cv.w).fill('.'));
+  const key: string[][] = Array.from({ length: cv.h }, () => Array(cv.w).fill(L.empty ?? '.'));
   const put = (x: number, y: number, g: string, k: string) => {
     const cx = x + cv.ox;
     const cy = y + cv.oy;
@@ -122,7 +126,9 @@ export function composeSign(L: SignLayers, s?: SignSettings): { sprite: string[]
   const sprite: string[] = [];
   const colors: string[] = [];
   for (let i = 0; i < rows; i++) {
-    const r = Math.min(cv.h - 1, Math.floor(i / STRETCH));
+    // spread evenly, like the Glyph Generator (src/glyph/sprite.ts): every
+    // row of the drawing shows, the last one too
+    const r = Math.floor((i * cv.h) / rows);
     sprite.push(glyph[r].map((g) => g + g).join(''));
     colors.push(key[r].map((k) => k + k).join(''));
   }

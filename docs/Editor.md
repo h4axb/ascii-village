@@ -74,7 +74,8 @@ The inspector (shown when something is selected) edits x, y, scale and
 rotation; for placed objects also their kind, and for new assets the
 settings every copy shares.
 
-The wayfinder sign is made of parts (`src/wayfinder.ts`): its inspector has a
+The wayfinder sign and the Glyph Generator's wooden directional sign are made
+of parts (`src/wayfinder.ts`, `layers` in their asset files): the inspector has a
 **Sign** group to flip the whole sign and, per board (top / middle / bottom),
 point it the other way or tilt it (−30°…+30°). The pictures on the boards
 (house, shop, pond) never mirror. Saved per placement (`sign` in `world.json`).

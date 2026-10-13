@@ -562,39 +562,25 @@
       "scale": 0.1
     },
     {
-      "id": "stone-flat-slab-1",
-      "asset": "stone-flat-slab",
-      "x": 60,
-      "y": 54,
-      "scale": 0.11
+      "id": "stone-mossy-5-1",
+      "asset": "stone-mossy-5",
+      "x": 50,
+      "y": 59,
+      "scale": 0.2
     },
     {
-      "id": "stone-split-boulder-1",
-      "asset": "stone-split-boulder",
-      "x": 49,
-      "y": 58,
-      "scale": 0.11
+      "id": "stone-mossy-3-1",
+      "asset": "stone-mossy-3",
+      "x": 46,
+      "y": 60,
+      "scale": 0.3
     },
     {
-      "id": "stone-leaning-shard-1",
-      "asset": "stone-leaning-shard",
-      "x": 52,
-      "y": 57,
-      "scale": 0.11
-    },
-    {
-      "id": "stone-tall-monolith-1",
-      "asset": "stone-tall-monolith",
-      "x": 49,
-      "y": 52,
-      "scale": 0.11
-    },
-    {
-      "id": "stone-stacked-blocks-1",
-      "asset": "stone-stacked-blocks",
-      "x": 52,
+      "id": "stone-mossy-10-1",
+      "asset": "stone-mossy-10",
+      "x": 47,
       "y": 55,
-      "scale": 0.11
+      "scale": 0.3
     }
   ],
   "colliders": {

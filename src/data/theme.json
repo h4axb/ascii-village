@@ -153,16 +153,20 @@
         "ground.slabRim": "#94928a",
         "ground.slabGlyph": "#e6e3d6",
         "grassTuft.mid": "#62793e",
-        "stoneAsset.light": "#e1c8a8",
+        "stoneAsset.light": "#d7ba93",
         "stoneAsset.mid": "#9b8b73",
         "stoneAsset.shadow": "#553f43",
-        "stoneAsset.moss": "#3c6b50",
-        "stoneAsset.grass": "#84b068",
+        "stoneAsset.moss": "#6d9d6c",
+        "stoneAsset.grass": "#92b77b",
         "player.shadow": "#2e5a24"
       },
       "characters": {
-        "player": 1.45,
+        "player": 1.28,
         "mitchy": 1.17
+      },
+      "stones": {
+        "saturation": 1.03,
+        "brightness": 1.02
       }
     }
   }

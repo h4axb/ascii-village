@@ -2372,3 +2372,40 @@
 .ds-panel ::-webkit-scrollbar-thumb:hover {
   background: var(--ds-line-strong);
 }
+
+/* ---- the [F] prompt: what's in reach and what F does (App.tsx) ----------- */
+.ds-interact-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  z-index: 900;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px 10px 12px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  color: var(--ds-text);
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  cursor: pointer;
+  animation: ds-prompt-in 140ms ease-out;
+}
+.ds-interact-prompt .ds-kbd {
+  min-width: 1.6em;
+  padding: 3px 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+@keyframes ds-prompt-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}

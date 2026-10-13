@@ -600,6 +600,13 @@
       "y": 13,
       "scale": 0.3,
       "rotation": 1
+    },
+    {
+      "id": "bush-simple-9",
+      "asset": "bush-simple",
+      "x": 13,
+      "y": 26,
+      "scale": 0.3
     }
   ],
   "colliders": {

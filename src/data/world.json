@@ -598,7 +598,8 @@
       "asset": "stone-mossy-7",
       "x": 113,
       "y": 13,
-      "scale": 0.3
+      "scale": 0.3,
+      "rotation": 1
     }
   ],
   "colliders": {

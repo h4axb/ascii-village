@@ -167,6 +167,13 @@
       "stones": {
         "saturation": 1.03,
         "brightness": 1.02
+      },
+      "groundShadow": 1,
+      "pond": {
+        "saturation": 1,
+        "brightness": 0.99,
+        "tint": "#5cd3db",
+        "tintAmount": 0.11
       }
     }
   }

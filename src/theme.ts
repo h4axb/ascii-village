@@ -35,6 +35,8 @@ export interface ThemePreset {
   // the stone assets (src/data/assets/*stone-*.json): their colours follow
   // the stoneAsset.* swatches, then this saturation / brightness (1 = as drawn)
   stones?: StoneLook;
+  // how dark the ground shade around objects is (terrain.ts AO; 0 = none, 1 = as designed)
+  groundShadow?: number;
 }
 export interface StoneLook {
   saturation: number;
@@ -199,6 +201,7 @@ function presetOf(d: ThemeDoc, name: string): ThemePreset {
     swatches: { ...SAVED.presets[SAVED.active]?.swatches, ...p.swatches },
     characters: { player: 1, mitchy: 1, ...p.characters },
     stones: { saturation: 1, brightness: 1, ...p.stones },
+    groundShadow: p.groundShadow ?? 1,
   };
 }
 
@@ -250,6 +253,7 @@ export const themeRgb = (name: string): RGB => hexToRgb(themeColor(name));
 
 // A swatch as set, without the grade (for colours the grade never touches)
 export const themeSwatch = (name: string): string => cur.swatches[name] ?? '#ff00ff';
+export const groundShadow = (): number => cur.groundShadow ?? 1;
 export const stoneLook = (): StoneLook => ({ saturation: 1, brightness: 1, ...cur.stones });
 
 // A colour between two swatches (0 = a, 1 = b), graded
@@ -316,6 +320,11 @@ export function setSwatch(name: string, hex: string) {
 }
 export function setCharacterSaturation(who: Character, v: number) {
   cur.characters = { player: 1, mitchy: 1, ...cur.characters, [who]: v };
+  doc.presets[doc.active] = cur;
+  changed();
+}
+export function setGroundShadow(v: number) {
+  cur.groundShadow = v;
   doc.presets[doc.active] = cur;
   changed();
 }

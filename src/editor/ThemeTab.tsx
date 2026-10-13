@@ -19,6 +19,7 @@ import {
   selectPreset,
   setCharacterSaturation,
   setStoneLook,
+  setGroundShadow,
   setGrade,
   setSwatch,
   themeColor,
@@ -162,6 +163,20 @@ export function ThemeTab() {
             </label>
           );
         })}
+      </div>
+
+      <div className="wed-group">
+        <div className="wed-group-name">
+          Ground shadow
+          <button className="wed-theme-reset" onClick={() => setGroundShadow(1)}>
+            reset
+          </button>
+        </div>
+        <label className="wed-theme-slider" title="the darker, ragged ring of ground around every object's foot">
+          <span>shade around objects</span>
+          <input type="range" min={0} max={2} step={0.05} value={preset.groundShadow ?? 1} onChange={(ev) => setGroundShadow(Number(ev.target.value))} />
+          <span className="wed-dim">{(preset.groundShadow ?? 1).toFixed(2)}</span>
+        </label>
       </div>
 
       <div className="wed-group">

@@ -34,7 +34,7 @@ import {
   OCEAN_CFG,
 } from './world';
 import { RAMP_DEFAULT } from './craft/materials';
-import { onThemeChange, themeRgb } from './theme';
+import { onThemeChange, themeRgb, groundShadow } from './theme';
 import { MAT_DIRT, MAT_MEADOW, MAT_STONE, groundMat, groundWgt, onGroundEdit, slabAt } from './ground';
 
 // ---- tiny math helpers ----------------------------------------------------
@@ -230,6 +230,84 @@ function glyphMask(): Uint8Array {
     liveStructEnts().filter((e) => e.kind !== 'hotspot' && e.kind !== 'blocker'),
     1,
   ));
+}
+
+// ---- ground shadow around objects (ambient occlusion) ----------------------
+// The ground right around each object's foot is shaded darker, like grass in
+// the shade of a rock: 2-3 hard steps of the ground's own colour (dark green
+// on grass, dark brown on the path), the steps' edges broken by noise into a
+// ragged, clumpy ring; no ground glyphs inside it (computeCell).
+// One value 0..1 per colour block (the bg grid, 1ch x 1ch), baked once per
+// layout (reset with the structures). The strength is the theme's
+// groundShadow (editor Theme tab).
+export const AO = {
+  reach: 0.32, // how far the shade spreads, of the foot's width (blocks)
+  min: 1.4, // ... at least (blocks)
+  max: 7, // ... at most
+  steps: [0.14, 0.4, 0.68], // ao thresholds of the 1st, 2nd, 3rd step
+  dark: 0.12, // darker per step (of the colour)
+  noise: 1.0, // how ragged the ring is (of its reach)
+};
+const AO_SKIP = new Set(['hotspot', 'blocker', 'grasshalm', 'flowerplus', 'flower', 'cliff', 'bridge', 'pond']);
+let AO_FIELD: Float32Array | null = null;
+const AO_W = GROUND_W;
+const AO_H = Math.round(GROUND_H * (14 / 8.4));
+function aoField(): Float32Array {
+  if (AO_FIELD) return AO_FIELD;
+  const f = new Float32Array(AO_W * AO_H);
+  const ASP = 14 / 8.4; // blocks per character row
+  for (const e of liveStructEnts()) {
+    if (AO_SKIP.has(e.kind) || e.rotation) continue;
+    const k = e.scale ?? 1;
+    const rows = e.sprite.map((line) => {
+      const a = line.search(/\S/);
+      return a < 0 ? null : [a, line.trimEnd().length - 1];
+    });
+    let last = rows.length - 1;
+    while (last >= 0 && !rows[last]) last--;
+    if (last < 0) continue;
+    // the foot: the drawn extent of the bottom ~15 % of the sprite
+    const footRows = Math.max(1, Math.round((last + 1) * 0.15));
+    let xa = Infinity, xb = -Infinity;
+    for (let r = Math.max(0, last - footRows + 1); r <= last; r++) {
+      const rr = rows[r];
+      if (rr) {
+        xa = Math.min(xa, rr[0]);
+        xb = Math.max(xb, rr[1]);
+      }
+    }
+    const ox = e.x * TILE_CH, oy = e.y * TILE_LN;
+    const x0 = ox + xa * k, x1 = ox + (xb + 1) * k; // blocks (1 block = 1 column)
+    const footY = (oy + (last + 1) * k) * ASP; // blocks
+    const R = Math.max(AO.min, Math.min(AO.max, (x1 - x0) * AO.reach));
+    const seed = Math.floor(e.x * 13 + e.y * 7);
+    const bx0 = Math.max(0, Math.floor(x0 - R - 2)), bx1 = Math.min(AO_W - 1, Math.ceil(x1 + R + 2));
+    const by0 = Math.max(0, Math.floor(footY - R * 1.2)), by1 = Math.min(AO_H - 1, Math.ceil(footY + R * 0.9));
+    for (let by = by0; by <= by1; by++)
+      for (let bx = bx0; bx <= bx1; bx++) {
+        const cx = bx + 0.5, cy = by + 0.5;
+        const dx = Math.max(0, x0 - cx, cx - x1);
+        // flatter than round (seen from above): a little more room sideways
+        // and up (behind the foot) than down
+        const dy = cy < footY ? (footY - cy) / 1.25 : (cy - footY) * 1.35;
+        let d = Math.hypot(dx, dy);
+        d += (vnoise(bx * 0.55, by * 0.55, 301 + seed) - 0.5) * R * AO.noise + (vnoise(bx * 1.3, by * 1.3, 77 + seed) - 0.5) * R * 0.35 + (hash2(bx * 1.7 + seed, by * 2.3) - 0.5) * 0.8;
+        const a = 1 - d / R;
+        const i = by * AO_W + bx;
+        if (a > f[i]) f[i] = a;
+      }
+  }
+  return (AO_FIELD = f);
+}
+// how many steps darker block (bx, by) is (0 - 3)
+function aoStep(bx: number, by: number): number {
+  if (bx < 0 || by < 0 || bx >= AO_W || by >= AO_H) return 0;
+  const a = aoField()[by * AO_W + bx];
+  if (a <= 0) return 0;
+  const j = (hash2(bx * 0.91 + 3, by * 1.33 + 17) - 0.5) * 0.12;
+  let n = 0;
+  for (const t of AO.steps) if (a > t + j) n++;
+  return n;
 }
 
 function bushes(): Float32Array {
@@ -487,6 +565,7 @@ let FIELD: TerrainField | null = null;
 // calls this after moving things; see setLiveStructEnts in world.ts).
 export function resetTerrainStructs(): void {
   STRUCT_MASK = null;
+  AO_FIELD = null;
   GLYPH_MASK = null;
   BUSHES = null;
   FIELD = null;
@@ -638,6 +717,9 @@ function computeCell(F: TerrainField, x: number, y: number) {
     tb = P.waterGlyph[2];
     m = (shallow ? 0.3 : 0.2) + 0.22 * smooth(0.5, 0.8, bright);
   }
+  // in the shade around an object: no glyphs, only the darker ground
+  const aoS = land && out.kind !== KIND_ROCK && groundShadow() > 0 ? aoStep(x, Math.floor((y + 0.5) * CELL_ASPECT)) : 0;
+  if (aoS) g = 0;
   if (tr < 0 && g) {
     tr = k >= 0 ? 255 : 0;
     tg = tr;
@@ -659,9 +741,11 @@ function computeBlock(F: TerrainField, blockWater: Uint8Array | null, bx: number
   const v = (h3 - 0.5) * 10;
   if (blockWater) blockWater[by * bgW + bx] = out.kind === KIND_WATER ? 1 : 0;
   const k4 = (by * bgW + bx) * 4;
-  bg[k4] = out.r + v;
-  bg[k4 + 1] = out.g + v;
-  bg[k4 + 2] = out.b + v * 0.8;
+  // the shade around objects: steps of the ground's own colour, darker
+  const sh = out.kind === KIND_WATER || out.kind === KIND_ROCK ? 1 : 1 - aoStep(bx, by) * AO.dark * groundShadow();
+  bg[k4] = (out.r + v) * sh;
+  bg[k4 + 1] = (out.g + v) * sh;
+  bg[k4 + 2] = (out.b + v * 0.8) * sh;
   bg[k4 + 3] = 255;
 }
 

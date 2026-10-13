@@ -619,6 +619,26 @@
       "x": 13,
       "y": 26,
       "scale": 0.3
+    },
+    {
+      "id": "wayfinder-1",
+      "asset": "wayfinder",
+      "x": 54,
+      "y": 40,
+      "scale": 0.08,
+      "sign": {
+        "panels": [
+          {
+            "flip": true,
+            "tilt": 19
+          },
+          {},
+          {
+            "flip": true,
+            "tilt": -15
+          }
+        ]
+      }
     }
   ],
   "colliders": {

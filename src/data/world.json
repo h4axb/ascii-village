@@ -34,8 +34,8 @@
       "y": 46
     },
     "flowerplus6": {
-      "x": 37,
-      "y": 38
+      "x": 34,
+      "y": 39
     },
     "cat": {
       "x": 63,
@@ -43,11 +43,11 @@
     },
     "grasshalm5": {
       "x": 33,
-      "y": 46
+      "y": 49
     },
     "flowerplus2": {
-      "x": 36,
-      "y": 38
+      "x": 33,
+      "y": 39
     },
     "flowerplus1": {
       "x": 40,
@@ -80,6 +80,10 @@
     "flowerplus7": {
       "x": 33,
       "y": 40
+    },
+    "flowerplus8": {
+      "x": 38,
+      "y": 35
     }
   },
   "removed": [
@@ -173,26 +177,26 @@
     {
       "id": "grasshalm-15",
       "asset": "grasshalm",
-      "x": 24,
-      "y": 35
+      "x": 26,
+      "y": 37
     },
     {
       "id": "grasshalm-16",
       "asset": "grasshalm",
-      "x": 56,
-      "y": 48
+      "x": 49,
+      "y": 44
     },
     {
       "id": "grasshalm-17",
       "asset": "grasshalm",
       "x": 56,
-      "y": 49
+      "y": 45
     },
     {
       "id": "grasshalm-18",
       "asset": "grasshalm",
-      "x": 56,
-      "y": 50
+      "x": 52,
+      "y": 51
     },
     {
       "id": "grasshalm-19",
@@ -375,8 +379,8 @@
     {
       "id": "grasshalm-26",
       "asset": "grasshalm",
-      "x": 64,
-      "y": 49,
+      "x": 65,
+      "y": 48,
       "scale": 0.2
     },
     {
@@ -397,7 +401,7 @@
       "id": "grasshalm-29",
       "asset": "grasshalm",
       "x": 49,
-      "y": 48,
+      "y": 52,
       "scale": 0.2
     },
     {
@@ -427,20 +431,6 @@
       "x": 99,
       "y": 18,
       "scale": 0.5
-    },
-    {
-      "id": "stone-3-1",
-      "asset": "stone-3",
-      "x": 17,
-      "y": 29,
-      "scale": 0.26
-    },
-    {
-      "id": "stone-5-1",
-      "asset": "stone-5",
-      "x": 26,
-      "y": 36,
-      "scale": 0.2
     },
     {
       "id": "palm-4",
@@ -527,17 +517,10 @@
       "scale": 0.2
     },
     {
-      "id": "wayfinder-1",
-      "asset": "wayfinder",
-      "x": 47,
-      "y": 38,
-      "scale": 0.1
-    },
-    {
       "id": "stone-mossy-5-1",
       "asset": "stone-mossy-5",
-      "x": 50,
-      "y": 59,
+      "x": 56,
+      "y": 75,
       "scale": 0.2
     },
     {
@@ -550,9 +533,58 @@
     {
       "id": "stone-mossy-10-1",
       "asset": "stone-mossy-10",
-      "x": 47,
-      "y": 55,
+      "x": 17,
+      "y": 30,
       "scale": 0.3
+    },
+    {
+      "id": "decoration-wooden-directional-sign-1",
+      "asset": "decoration-wooden-directional-sign",
+      "x": 48,
+      "y": 38,
+      "scale": 0.1
+    },
+    {
+      "id": "stone-mossy-4-1",
+      "asset": "stone-mossy-4",
+      "x": 25,
+      "y": 35,
+      "scale": 0.3
+    },
+    {
+      "id": "grasshalm-32",
+      "asset": "grasshalm",
+      "x": 26,
+      "y": 32,
+      "scale": 0.2
+    },
+    {
+      "id": "flowerplus-purple-1",
+      "asset": "flowerplus-purple",
+      "x": 28,
+      "y": 37,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-white-2",
+      "asset": "flowerplus-white",
+      "x": 15,
+      "y": 30,
+      "scale": 0.5
+    },
+    {
+      "id": "bush-simple-7",
+      "asset": "bush-simple",
+      "x": 55,
+      "y": 77,
+      "scale": 0.3
+    },
+    {
+      "id": "flowerplus-23",
+      "asset": "flowerplus",
+      "x": 32,
+      "y": 82,
+      "scale": 0.5
     }
   ],
   "colliders": {
@@ -697,7 +729,6 @@
     "95,23",
     "96,23"
   ],
-  "mitchyLook": "mitchy-cat8",
   "startScreen": {
     "view": {
       "x": 72.67,
@@ -722,10 +753,11 @@
       "v": "mv6u5zpq"
     },
     "subtitle": {
-      "x": 0.1717,
-      "y": 0.481,
+      "x": 0.175,
+      "y": 0.4325,
       "size": 14.69,
       "text": "a tiny monochrome bay"
     }
-  }
+  },
+  "mitchyLook": "mitchy-cat8"
 }

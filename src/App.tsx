@@ -179,9 +179,6 @@ import {
   type QuestBoat,
 } from './quest/state';
 
-const INTRO_TEXT =
-  "Hey, are u the new villager here? I'm Mitchy and own this shop. in this world u can go around and collect materials and if u give them back to me ill pay u fair.";
-
 // Playable characters. More can be added later; the profile circle in the
 // header always renders the face of the currently selected character.
 // `face`/`faceColors` are the head portion of the sprite (hat down to the
@@ -490,8 +487,11 @@ type Modal =
   | null;
 
 // the big ones: offered from a little further away
-// Mitchy's "!" bubble: shown within this many tiles of him
+// Mitchy's "!" bubble: shown within this many tiles of him; its drawn height
+// in em (the .mitchy-bubble-art scale x its rows), for lifting his label over it
 const MITCHY_BUBBLE_TILES = 6;
+const MITCHY_BUBBLE_SCALE = 0.3;
+const MITCHY_BUBBLE_H = SPEECH_BUBBLE.length * MITCHY_BUBBLE_SCALE + 0.4;
 const PROMPT_WIDE_KINDS = new Set<EntityKind>(['cat', 'house', 'shop', 'hotspot']);
 
 // Settings > Controls: every key the game listens to (the handler is
@@ -2298,25 +2298,6 @@ function Game() {
     return () => window.clearInterval(iv);
   }, [walkDir, dash]);
 
-  // greet the player the first time they come near Mitchy, and dismiss any
-  // bubble when the player walks away again
-  const introShownRef = useRef(false);
-  useEffect(() => {
-    // Intro Part B's own dialogue box owns Mitchy's introduction on a
-    // brand-new session — this proximity greeting is for every OTHER time
-    // the player walks up to him (including right after Part B finishes).
-    // Part C's own conversation replaces the old one-line greeting, and so
-    // does the guided quest flow (src/quest/)
-    if (cinematic || isPartC(introStageRef.current) || questRef.current) return;
-    const d = near(catDef, player);
-    if (!introShownRef.current && d <= 4) {
-      introShownRef.current = true;
-      setBubble({ text: INTRO_TEXT, width: 44 });
-    } else if (bubble && d > 4) {
-      setBubble(null);
-    }
-  }, [player, cinematic]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // =========================================================================
   // Stages 15-18 (wake up -> meet Mitchy) — orchestration. A single linear
   // async function drives the whole cinematic (black screen -> wake line ->
@@ -3601,7 +3582,6 @@ function Game() {
       setDialogue(null);
       setNameEntryOpen(false);
       setMitchyPos(null);
-      introShownRef.current = false;
       setPlayer(markers.playerStart);
       skipCinematicRef.current = false;
       setIntroAActive(false); // stages 1-14 aren't part of a manual replay
@@ -5749,8 +5729,6 @@ function Game() {
                 (hovered ?? promptTarget?.ref) &&
                 (() => {
                   const ref = (hovered ?? promptTarget?.ref)!;
-                  // no name over Mitchy: his "!" bubble (or nothing) is enough; F still talks to him
-                  if (ref.kind === 'entity' && ref.id === 'cat') return null;
                   const copy = describeInteraction(ref, interactCtx);
                   if (!copy) return null;
                   const pos =
@@ -5761,12 +5739,14 @@ function Game() {
                         : { x: plot.door.c0, y: plot.rect.y1 }; // the one gate, in the near rail
                   if (!pos) return null;
                   const withF = !!promptTarget && JSON.stringify(promptTarget.ref) === JSON.stringify(ref);
+                  // over Mitchy's "!" bubble, not on it
+                  const lift = bubbleCat && ref.kind === 'entity' && ref.id === 'cat' ? MITCHY_BUBBLE_H : 0;
                   return (
                     <div
                       className={'fpop' + (withF ? ' with-f' : '')}
                       style={{
                         left: `${pos.x * TILE_CH + 1}ch`,
-                        top: `${Math.max(0, pos.y * TILE_LN - 1.6)}em`,
+                        top: `${Math.max(0, pos.y * TILE_LN - 1.6 - lift)}em`,
                       }}
                     >
                       {withF && <kbd className="fpop-key">F</kbd>}

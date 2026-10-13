@@ -5238,6 +5238,7 @@ function Game() {
                     // ground colour. Bridge never had a rectangular
                     // background to begin with — this just stops terrain
                     // showing through its own glyph gaps, same principle.
+                    sway={e.sway}
                     solidCells={
                       e.kind === 'house' ||
                       e.kind === 'bridge' ||
@@ -6792,7 +6793,7 @@ function PlacedItemView({
 // 'cat': Mitchy is drawn like the player — solid per-cell backing plus the
 // player's outline ring (every other canvas kind has no ring). 'boulder': the
 // editor's solid assets (stones, bushes, the glyph ponds) — hundreds of cells
-// each, so a canvas too.
+// each, so a canvas too (except a sprite whose water sways: spans, see sway).
 const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder']);
 function EntSprite({
   kind,
@@ -6801,7 +6802,8 @@ function EntSprite({
   res,
   ...p
 }: React.ComponentProps<typeof ColoredSprite> & { kind: string; charW: number; lineH: number; res: number }) {
-  if (CANVAS_KINDS.has(kind) && p.colors && p.palette && !p.texture) {
+  // (an animated sprite - swaying water - keeps its spans: the canvas can't sway)
+  if (CANVAS_KINDS.has(kind) && p.colors && p.palette && !p.texture && !p.sway) {
     return (
       <SolidSpriteCanvas
         className={p.className}

@@ -224,6 +224,8 @@ export interface Ent {
   // from the .ent.<kind> CSS). Lets a specific glyph be tinted, e.g. an eye.
   palette?: Record<string, string>;
   colors?: string[];
+  // palette keys whose glyphs sway left and right (an animated pond's water)
+  sway?: string;
   // Optional CSS render scale. The generated palm keeps its full character grid
   // — every glyph and tone of the reference — and is simply DRAWN smaller, which
   // is the only way to shrink it without changing its shape. spriteTiles() and
@@ -930,6 +932,7 @@ export function buildStructEnts(doc: WorldDoc): Ent[] {
       sprite: def.sprite,
       colors: def.colors,
       palette: def.palette,
+      sway: def.sway,
       scale: a.scale ?? def.scale,
       rotation: a.rotation,
       interactable: a.interactable ?? def.interactable,

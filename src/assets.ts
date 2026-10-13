@@ -40,6 +40,8 @@ export interface AssetDef {
   // kind 'cat' only: a look for Mitchy, never placed on its own (see
   // applyMitchyLook in world.ts); the rows of his head, for portraits
   headRows?: number;
+  // palette keys whose glyphs sway left and right (an animated pond's water)
+  sway?: string;
 }
 
 export interface AssetMeta {
@@ -86,6 +88,7 @@ interface AssetFile extends AssetMeta {
   palette?: Record<string, string>;
   solid?: string[];
   headRows?: number;
+  sway?: string;
 }
 const FILES = import.meta.glob<{ default: AssetFile }>('./data/assets/*.json', { eager: true });
 
@@ -110,6 +113,7 @@ function fileAssets(): AssetDef[] {
       interactable: d.interactable ?? false,
       file,
       headRows: d.headRows,
+      sway: d.sway,
     });
   }
   return out;

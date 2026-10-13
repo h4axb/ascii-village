@@ -166,6 +166,27 @@ function Inspector({ ed, e }: { ed: WorldEditor; e: Ent }) {
           </label>
         </div>
       )}
+      {added && /^pond/.test(added.asset) && (
+        <div className="wed-group">
+          <div className="wed-group-name">Pond design</div>
+          <div className="wed-hint">Click a design to give this pond that look, in the same place.</div>
+          <div className="wed-assets">
+            {ed.assets
+              .filter((a) => /^pond/.test(a.slug) && a.sprite.length > 0)
+              .map((a) => (
+                <button
+                  key={a.slug}
+                  className={'wed-asset' + (added.asset === a.slug ? ' on' : '')}
+                  title={a.slug}
+                  onClick={() => ed.setAdded(e.id, { asset: a.slug })}
+                >
+                  <Thumb a={a} />
+                  <span>{a.label}</span>
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
       <div className="wed-row wed-btns">
         <button onClick={() => ed.duplicate(e.id)} disabled={lock.duplicate || !e.asset}>
           duplicate

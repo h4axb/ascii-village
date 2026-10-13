@@ -73,6 +73,9 @@ interface Props {
   // frames where the eye row hasn't been verified (e.g. walk-cycle frames
   // with different crop/padding — see docs/character-sprite-parts/README.md).
   eyeRow?: number;
+  // palette keys whose glyphs sway left and right (solidCells only): the
+  // glyph moves, its cell's backing stays, so no gap opens
+  sway?: string;
   onClick?: (e: React.MouseEvent) => void;
   onMouseEnter?: (e: React.MouseEvent) => void;
   onMouseLeave?: (e: React.MouseEvent) => void;
@@ -93,6 +96,7 @@ function ColoredSpriteImpl({
   perCell,
   solidCells,
   eyeRow,
+  sway,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -140,7 +144,7 @@ function ColoredSpriteImpl({
             }
             cells.push(
               <span key={x} style={hex ? { color: hex, background: darken(hex, 0.55) } : undefined}>
-                {ch}
+                {sway && key && sway.includes(key) ? <i className={`sway sw${(x >> 1) % 12}`}>{ch}</i> : ch}
               </span>,
             );
           }
@@ -332,6 +336,7 @@ function propsAreEqual(prev: Props, next: Props): boolean {
     prev.perCell === next.perCell &&
     prev.solidCells === next.solidCells &&
     prev.eyeRow === next.eyeRow &&
+    prev.sway === next.sway &&
     prev.texture === next.texture &&
     !prev.onClick === !next.onClick &&
     !prev.onMouseEnter === !next.onMouseEnter &&

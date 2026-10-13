@@ -142,7 +142,7 @@ export interface WorldEditor {
   setShowColliders(v: boolean): void;
 
   setPose(id: string, patch: Partial<WorldPose>): void;
-  setAdded(id: string, patch: Partial<Pick<WorldAdded, 'kind' | 'interactable'>>): void;
+  setAdded(id: string, patch: Partial<Pick<WorldAdded, 'kind' | 'interactable' | 'asset'>>): void;
   resetPose(id: string): void;
   remove(id: string): void;
   restore(id: string): void; // bring a removed built-in back
@@ -479,10 +479,12 @@ export function useWorldEditor(opts: {
     updateDoc((d) => setPoseRaw(d, id, patch), record);
   }
 
-  function setAdded(id: string, patch: Partial<Pick<WorldAdded, 'kind' | 'interactable'>>) {
+  function setAdded(id: string, patch: Partial<Pick<WorldAdded, 'kind' | 'interactable' | 'asset'>>) {
     updateDoc((d) => {
       const a = d.added.find((x) => x.id === id);
       if (!a) return;
+      // another design in the same place: it takes that design's own size
+      if (patch.asset && patch.asset !== a.asset && assetMap.get(patch.asset)) delete a.scale;
       Object.assign(a, patch);
       const def = assetMap.get(a.asset);
       if (a.kind === undefined || a.kind === def?.kind) delete a.kind;

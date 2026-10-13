@@ -2,6 +2,7 @@
 import { GARDEN } from './farm';
 import worldDocData from './data/world.json';
 import { assetOf, ASSET_OF_KIND } from './assets';
+import { signArt, type SignSettings } from './wayfinder';
 
 // The map is a tile grid. Each tile is 4 characters wide and 2 lines tall, so
 // the ground layer is (MAP_W*4) x (MAP_H*2) characters. Entities are positioned
@@ -831,6 +832,9 @@ export interface WorldAdded extends WorldPose {
   // drawn on the start screen only, never in the game (the editor's Start
   // screen tab places these)
   startOnly?: true;
+  // a sign made of parts (an asset with `layers`, the wayfinder): which way
+  // each board points and how it's tilted, and the whole sign flipped
+  sign?: SignSettings;
 }
 // The start screen's layout (the editor's Start screen tab): the live view of
 // the island behind the title, the player standing in it, and the title +
@@ -1052,6 +1056,8 @@ export function buildStructEnts(doc: WorldDoc, which: 'world' | 'start' | 'all' 
   for (const a of doc.added) {
     if (which === 'world' ? a.startOnly : which === 'start' && !a.startOnly) continue;
     const def = assetOf(a.asset);
+    // a sign of parts: drawn for this placement's settings
+    const art = def?.layers && a.sign ? signArt(def.layers, a.sign) : null;
     if (!def) {
       if (import.meta.env.DEV) console.warn(`[world] "${a.id}" uses unknown asset "${a.asset}" — skipped`);
       continue;
@@ -1062,8 +1068,8 @@ export function buildStructEnts(doc: WorldDoc, which: 'world' | 'start' | 'all' 
       asset: def.slug,
       x: a.x,
       y: a.y,
-      sprite: def.sprite,
-      colors: def.colors,
+      sprite: art ? art.sprite : def.sprite,
+      colors: art ? art.colors : def.colors,
       palette: def.palette,
       sway: def.sway,
       blend: def.blend,

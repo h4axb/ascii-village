@@ -48,6 +48,7 @@ const OFF: WorldEditor = {
   startScreen: startScreenOf(WORLD_DOC),
   setStartScreen: noop,
   setStartOnly: noop,
+  setSign: noop,
   undo: noop,
   redo: noop,
   canUndo: false,

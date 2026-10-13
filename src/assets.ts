@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------------------
 import * as S from './sprites';
 import type { EntityKind } from './world';
+import type { SignLayers } from './wayfinder';
 import metaData from './data/assets.meta.json';
 import { onThemeChange, stoneLook, themeSwatch, pondLook, themeColor } from './theme';
 
@@ -45,6 +46,9 @@ export interface AssetDef {
   // palette keys drawn without a backing and tinted toward the ground's
   // grass (a pond's outer grass, so its edge melts into the ground)
   blend?: string;
+  // a sign made of parts (the wayfinder): its boards turn and tilt per
+  // placement (src/wayfinder.ts)
+  layers?: SignLayers;
 }
 
 export interface AssetMeta {
@@ -93,6 +97,7 @@ interface AssetFile extends AssetMeta {
   headRows?: number;
   sway?: string;
   blend?: string;
+  layers?: SignLayers;
 }
 const FILES = import.meta.glob<{ default: AssetFile }>('./data/assets/*.json', { eager: true });
 
@@ -132,6 +137,7 @@ function fileAssets(): AssetDef[] {
       // a pond without its own sway keys: its blue colours are its water
       sway: d.sway ?? (/^pond/.test(slug) && d.palette ? waterKeys(d.palette) : undefined),
       blend: d.blend,
+      layers: d.layers,
     });
   }
   return out;

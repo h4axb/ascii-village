@@ -277,22 +277,6 @@ function hotspotSprite(wCols: number, hRows: number): string[] {
   return Array.from({ length: hRows }, () => '#'.repeat(wCols * 2));
 }
 
-// Crops a raw col/row rectangle straight out of the house's OWN sprite grid,
-// for use as a blocker's collision shape instead of a plain filled
-// rectangle (hotspotSprite) — entityBlocksTile tests per-cell glyph
-// presence (tileHasGlyph), so a blank cell in this crop is genuinely
-// walkable, not just decorative. This makes the collision "sign sensitive":
-// it blocks exactly where the house is actually drawn in that rectangle,
-// not a bigger blank box than what's really solid there. rawColEnd/
-// rawRowEnd are inclusive, in the SOURCE's own raw units (house_simplified_
-// regions.json's own col/row numbering) — columns get doubled here the same
-// way the full house sprite already is.
-function houseSlice(rawColStart: number, rawColEnd: number, rawRowStart: number, rawRowEnd: number): string[] {
-  const dc0 = rawColStart * 2;
-  const dc1 = rawColEnd * 2 + 1;
-  return S.HOUSE.slice(rawRowStart, rawRowEnd + 1).map((row) => row.slice(dc0, dc1 + 1));
-}
-
 // The player's sprite (48x28 chars post-doubling, see sprites.ts — the
 // straw-hat-still (1).svg reference) is far too big to draw at native size, hence
 // the fractional scale below (tune to taste — see PLAYER_SPAWN just after,
@@ -648,47 +632,8 @@ const STRUCT_ENTS_BASE: Ent[] = [
     scale: HOUSE_SCALE,
     solidMask: S.HOUSE_SOLID,
   },
-  // The two "flanking stone foundation blocks" wooden_floor_and_stairs's own
-  // description names (grouped with the deck+stairs into one region, cols
-  // 0-40 rows 42-51 — the house's OWN solid mask carves that whole band as
-  // walkable uniformly, same as the old house did for its deck). As their own
-  // whole-body-blocking entities so they stop the player entirely rather than
-  // just their feet, same reasoning and pattern as the old house's skirting
-  // blocks. Found by colour, not eyeballed: per-column mean lightness/
-  // saturation across rows 42-51 shows a clear brighter, more saturated flank
-  // on both sides (cols 0-14 and 28-40) against a darker, more muted middle
-  // (cols 15-27) — the actual stair treads, shaded under the porch roof.
-  //
-  // Left is TRIMMED to 6 cols (0-5), not the full 14 — the chair sits right
-  // above this flank (cols 6-13, rows 34-43), and the original 11-col trim
-  // still ate into cols 6-10, leaving no floor to stand on in front of the
-  // LEFT half of the chair. Stopping at col 5 opens the chair's entire own
-  // column span (6-13) as walkable floor, symmetric about its centre — the
-  // right half (11-13) was already open, this just matches the left half to
-  // it. This also widens the walkable stair gap between the two blocks
-  // (was tuned to leave exactly one column at the 11-col width — see the old
-  // comment in git history — now comfortably wider), so the player's 2-tile
-  // width fits through with room to spare, not just barely.
-  //
-  // sprite is a real CROP of the house's own glyphs (houseSlice), not a
-  // blank filled rectangle — entityBlocksTile tests per-cell glyph presence,
-  // so this blocks exactly where the porch texture actually has something
-  // drawn in that rectangle ("sign sensitive"), rather than a bigger solid
-  // box than what's really there.
-  ...(
-    [
-      { id: 'house-block-left', col: 0, w: 6 },
-      { id: 'house-block-right', col: 28, w: 13 },
-    ] as const
-  ).map(({ id, col, w }) => ({
-    id,
-    kind: 'blocker' as const,
-    x: 27.85 + col * 0.18,
-    y: 32 + 42 * 0.18,
-    sprite: houseSlice(col, col + w - 1, 42, 51),
-    interactable: false,
-    scale: HOUSE_SCALE,
-  })),
+  // The stone blocks flanking the stairs block through the house's own
+  // collider (world.json's colliders.house), so the editor can paint them.
   // Invisible hit-boxes over the parts of that one picture you can interact
   // with: the rocking chair and the four garments on the line. Positions are
   // the master-grid cells each one occupies — taken directly from

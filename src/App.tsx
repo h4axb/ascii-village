@@ -486,13 +486,16 @@ type Modal =
   | { t: 'pay'; sel: ItemType | null; offer: Partial<Record<ItemType, number>>; help: boolean }
   | null;
 
-// the big ones: offered from a little further away
 // Mitchy's "!" bubble: shown within this many tiles of him; its drawn height
 // in em (the .mitchy-bubble-art scale x its rows), for lifting his label over it
 const MITCHY_BUBBLE_TILES = 6;
 const MITCHY_BUBBLE_SCALE = 0.3;
 const MITCHY_BUBBLE_H = SPEECH_BUBBLE.length * MITCHY_BUBBLE_SCALE + 0.4;
+// the big ones: offered from a little further away
 const PROMPT_WIDE_KINDS = new Set<EntityKind>(['cat', 'house', 'shop', 'hotspot']);
+// The F label's bottom-left goes on an object's top-right corner, except for
+// these kinds: there it's beside the drawn shape this far down (of its height)
+const LABEL_BESIDE: Partial<Record<EntityKind, number>> = { palm: 0.78 };
 
 // Settings > Controls: every key the game listens to (the handler is
 // handlerRef further down), in the order a new player needs them.
@@ -5716,7 +5719,16 @@ function Game() {
                   if (!ent && !tile) return null;
                   let right: number; // ch
                   let top: number; // em
-                  if (ent) {
+                  const side = ent && !ent.rotation ? LABEL_BESIDE[ent.kind] : undefined;
+                  if (ent && side) {
+                    // beside the drawn shape partway down (a palm: at the top of its trunk,
+                    // under the crown), right of what's drawn there
+                    const k = ent.scale ?? 1;
+                    const r = Math.round(side * ent.sprite.length);
+                    const rows = ent.sprite.slice(Math.max(0, r - 3), r);
+                    right = ent.x * TILE_CH + k * (Math.max(...rows.map((l) => l.trimEnd().length)) + 1);
+                    top = ent.y * TILE_LN + k * r;
+                  } else if (ent) {
                     const k = ent.scale ?? 1;
                     right = ent.rotation
                       ? (ent.x + spriteTiles(ent.sprite, k, ent.rotation).wT) * TILE_CH

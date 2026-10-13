@@ -5736,7 +5736,7 @@ function Game() {
                       }}
                     >
                       {withF && <kbd className="fpop-key">F</kbd>}
-                      {copy.name}
+                      <span className="fpop-name">{copy.name}</span>
                     </div>
                   );
                 })()}

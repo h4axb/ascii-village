@@ -1533,29 +1533,44 @@ pre {
   }
 }
 
+/* The label over an interactable (hover, or the nearest thing in reach with
+   the F key that does it): the design system's dialogue look (src/ui) */
 .fpop {
   position: absolute;
-  color: #0a0a0a;
-  background: #e8e8e8;
-  padding: 0 3px;
   z-index: 500;
-  font-weight: bold;
-  animation: bob 1s infinite;
-}
-/* in reach: the F key that does it, before the name */
-.fpop.with-f {
   display: flex;
   align-items: center;
-  gap: 0.5ch;
+  gap: 0.6em;
+  padding: 0.35em 0.75em;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  color: var(--ds-text);
+  /* no font-size here: its left/top are in the world's ch/em */
+  letter-spacing: 0.3px;
+  line-height: 1.2;
   white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  animation: bob 1.6s ease-in-out infinite;
 }
+.fpop-name {
+  font-size: 0.9em;
+}
+/* the F key: the design system's key cap (.ds-kbd) */
 .fpop-key {
-  padding: 0 0.4ch;
-  border: 1px solid #0a0a0a;
+  font-size: 0.85em;
+  min-width: 1.3em;
+  padding: 0.05em 0.45em;
+  border: 1px solid var(--ds-line);
   border-bottom-width: 2px;
-  border-radius: 3px;
-  font: inherit;
-  line-height: 1.1;
+  border-radius: 0.35em;
+  background: var(--ds-surface);
+  color: var(--ds-text);
+  font-family: inherit;
+  font-weight: 600;
+  text-align: center;
 }
 
 @keyframes bob {
@@ -1581,8 +1596,8 @@ pre {
   white-space: normal;
 }
 
-/* Mitchy's speech bubble: a plain rounded box above his head, the same light
-   surface and dark text as the hover labels (.fpop) */
+/* Mitchy's speech bubble: a plain rounded box above his head, light surface
+   and dark text */
 .bubble {
   position: absolute;
   z-index: 600;

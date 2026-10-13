@@ -3740,19 +3740,14 @@ function Game() {
     setZoom((z) => Math.min(MAX_ZOOM, Math.max(minZoom, z)));
   }, [minZoom]);
 
-  // ---- hover/click interaction (see interact.ts) ----
-  // Replaces the old proximity-gated fTarget/gTarget/cropSlot + PRIO: hover
-  // shows a name from anywhere on screen, click asks yes/no — range no
-  // longer matters for triggering, only for whether the object is on screen
-  // to click at all.
-  const [hovered, setHovered] = useState<InteractRef | null>(null);
+  // ---- click interaction (see interact.ts): a click asks yes/no; walking
+  // up to something names it with the F key (promptTarget) ----
   // Opening the world editor freezes the game where it stands: drop any held
-  // walk keys and hover highlight, so nothing carries on underneath it.
+  // walk keys, so nothing carries on underneath it.
   useEffect(() => {
     if (!editorOpen) return;
     heldRef.current.clear();
     syncWalkDir();
-    setHovered(null);
   }, [editorOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // is the ghost's current spot a legal placement? drives both the tint and
@@ -5282,8 +5277,6 @@ function Game() {
                   height: `${TILE_LN}em`,
                   zIndex: plot.rect.y1 + 1,
                 }}
-                onMouseEnter={() => setHovered({ kind: 'door', door: 'gate' })}
-                onMouseLeave={() => setHovered((h) => (h?.kind === 'door' ? null : h))}
                 onClick={() => setModal({ t: 'interact', ref: { kind: 'door', door: 'gate' }, sel: 1 })}
               />
               {plot.slots.map((s, i) => {
@@ -5301,12 +5294,6 @@ function Game() {
                       top: `${s.y * TILE_LN}em`,
                       zIndex: s.y + 1,
                     }}
-                    onMouseEnter={c ? () => setHovered({ kind: 'crop', slot: i }) : undefined}
-                    onMouseLeave={
-                      c
-                        ? () => setHovered((h) => (h?.kind === 'crop' && h.slot === i ? null : h))
-                        : undefined
-                    }
                     onClick={
                       // straight to the plant's own choices (no yes/no confirm first)
                       c ? () => setModal({ t: 'crop', slot: i, sel: 0 }) : undefined
@@ -5452,15 +5439,6 @@ function Game() {
                       e.kind === 'shop' ||
                       e.kind === 'palm' ||
                       e.kind === 'boulder'
-                    }
-                    onMouseEnter={
-                      canInteract(e) ? () => setHovered({ kind: 'entity', id: e.id }) : undefined
-                    }
-                    onMouseLeave={
-                      canInteract(e)
-                        ? () =>
-                            setHovered((h) => (h?.kind === 'entity' && h.id === e.id ? null : h))
-                        : undefined
                     }
                     onClick={
                       canInteract(e)
@@ -5722,13 +5700,12 @@ function Game() {
                 </div>
               )}
 
-              {/* the name over what the mouse is on - or, walking up to
-                  something, over the nearest thing in reach, with the F key
-                  that does it (see promptTarget / pressF) */}
+              {/* walking up to something: its name over the nearest thing in
+                  reach, with the F key that does it (see promptTarget / pressF) */}
               {!modal &&
-                (hovered ?? promptTarget?.ref) &&
+                promptTarget &&
                 (() => {
-                  const ref = (hovered ?? promptTarget?.ref)!;
+                  const ref = promptTarget.ref;
                   const copy = describeInteraction(ref, interactCtx);
                   if (!copy) return null;
                   // its top-right corner: an object's drawn box, a crop or the gate
@@ -5749,12 +5726,11 @@ function Game() {
                     right = (tile!.x + 1) * TILE_CH;
                     top = tile!.y * TILE_LN;
                   }
-                  const withF = !!promptTarget && JSON.stringify(promptTarget.ref) === JSON.stringify(ref);
                   // over Mitchy's "!" bubble, not on it
                   const lift = bubbleCat && ref.kind === 'entity' && ref.id === 'cat' ? MITCHY_BUBBLE_H : 0;
                   return (
                     <div
-                      className={'fpop' + (withF ? ' with-f' : '')}
+                      className="fpop"
                       // the label's bottom-left on the object's top-right corner
                       // (transform in .fpop), so it never covers the object
                       style={{
@@ -5762,7 +5738,7 @@ function Game() {
                         top: `${Math.max(0, top - lift)}em`,
                       }}
                     >
-                      {withF && <kbd className="fpop-key">F</kbd>}
+                      <kbd className="fpop-key">F</kbd>
                       <span className="fpop-name">{copy.name}</span>
                     </div>
                   );

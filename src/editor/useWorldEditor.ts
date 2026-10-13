@@ -40,6 +40,7 @@ import {
   START_PLAYER_BOX,
 } from '../world';
 import type { Ent, EntityKind, WorldDoc, WorldPose, WorldAdded, StartScreen } from '../world';
+import type { SignSettings } from '../wayfinder';
 import { RAW_ASSETS, FIXED_ASSETS, ASSET_META, assetOf } from '../assets';
 import type { AssetDef, AssetMeta } from '../assets';
 import { resetTerrainStructs } from '../terrain';
@@ -161,6 +162,9 @@ export interface WorldEditor {
   startScreen: StartScreen;
   setStartScreen(patch: Partial<StartScreen>): void;
   setStartOnly(id: string, on: boolean): void;
+  // a sign of parts (the wayfinder): the whole sign flipped, each board's
+  // direction and tilt (null = back to as drawn)
+  setSign(id: string, sign: SignSettings | null): void;
 
   undo(): void;
   redo(): void;
@@ -603,6 +607,25 @@ export function useWorldEditor(opts: {
         subtitle: { ...cur.subtitle, ...patch.subtitle },
       };
     }, record);
+  }
+  function setSign(id: string, sign: SignSettings | null) {
+    updateDoc((d) => {
+      const a = d.added.find((x) => x.id === id);
+      if (!a) return;
+      // keep only what differs from the drawing
+      const panels = (sign?.panels ?? []).map((p) => {
+        const q: { flip?: boolean; tilt?: number } = {};
+        if (p?.flip) q.flip = true;
+        if (p?.tilt) q.tilt = Math.round(p.tilt);
+        return q;
+      });
+      while (panels.length && !panels[panels.length - 1].flip && !panels[panels.length - 1].tilt) panels.pop();
+      const clean: SignSettings = {};
+      if (sign?.flip) clean.flip = true;
+      if (panels.length) clean.panels = panels;
+      if (clean.flip || clean.panels) a.sign = clean;
+      else delete a.sign;
+    });
   }
   function setStartOnly(id: string, on: boolean) {
     updateDoc((d) => {
@@ -1213,6 +1236,7 @@ export function useWorldEditor(opts: {
     startScreen,
     setStartScreen: (patch) => setStartScreen(patch),
     setStartOnly,
+    setSign,
     setMitchyLook: (slug) =>
       updateDoc((d) => {
         if (slug === 'mitchy') delete d.mitchyLook;

@@ -15,6 +15,7 @@ import type { Ent, EntityKind } from '../world';
 import { FIXED_ASSETS, type AssetDef } from '../assets';
 import { PLACEABLE_KINDS, locksOf, isEditable } from './useWorldEditor';
 import type { WorldEditor, EditorTab } from './useWorldEditor';
+import { SIGN_TILT_MAX, type SignSettings } from '../wayfinder';
 
 const TABS: { id: EditorTab | 'image' | 'theme'; label: string }[] = [
   { id: 'objects', label: 'Objects' },
@@ -175,6 +176,7 @@ function Inspector({ ed, e }: { ed: WorldEditor; e: Ent }) {
           </label>
         </div>
       )}
+      {added && asset?.layers && <SignControls ed={ed} id={e.id} sign={added.sign} boards={asset.layers.boards.length} />}
       {added && /^pond/.test(added.asset) && (
         <div className="wed-group">
           <div className="wed-group-name">Pond design</div>
@@ -243,6 +245,53 @@ function Inspector({ ed, e }: { ed: WorldEditor; e: Ent }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// A sign made of parts (the wayfinder): flip the whole sign; per board, point
+// it the other way and tilt it. The pictures on the boards never mirror.
+const BOARD_NAMES = ['top', 'middle', 'bottom'];
+function SignControls({ ed, id, sign, boards }: { ed: WorldEditor; id: string; sign?: SignSettings; boards: number }) {
+  const panels = Array.from({ length: boards }, (_, i) => sign?.panels?.[i] ?? {});
+  const set = (patch: SignSettings) => ed.setSign(id, { flip: sign?.flip, panels, ...patch });
+  const setPanel = (i: number, p: { flip?: boolean; tilt?: number }) =>
+    set({ panels: panels.map((q, j) => (j === i ? { ...q, ...p } : q)) });
+  return (
+    <div className="wed-group">
+      <div className="wed-group-name">Sign</div>
+      <div className="wed-row">
+        <label className="wed-check">
+          <input type="checkbox" checked={!!sign?.flip} onChange={(ev) => set({ flip: ev.target.checked })} />
+          flip whole sign
+        </label>
+        <button onClick={() => ed.setSign(id, null)} disabled={!sign}>
+          reset
+        </button>
+      </div>
+      {panels.map((p, i) => (
+        <div key={i} className="wed-row">
+          <span className="wed-dim" style={{ width: '6ch' }}>
+            {BOARD_NAMES[i] ?? `board ${i + 1}`}
+          </span>
+          <label className="wed-check" title="the board points the other way (its picture stays as it is)">
+            <input type="checkbox" checked={!!p.flip} onChange={(ev) => setPanel(i, { flip: ev.target.checked })} />
+            other way
+          </label>
+          <label className="wed-theme-slider wed-grow">
+            <span>tilt</span>
+            <input
+              type="range"
+              min={-SIGN_TILT_MAX}
+              max={SIGN_TILT_MAX}
+              step={1}
+              value={p.tilt ?? 0}
+              onChange={(ev) => setPanel(i, { tilt: Number(ev.target.value) })}
+            />
+            <span className="wed-dim">{p.tilt ?? 0}°</span>
+          </label>
+        </div>
+      ))}
     </div>
   );
 }

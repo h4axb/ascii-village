@@ -88,7 +88,7 @@ import type { InteractRef, InteractCtx, InteractActions } from './interact';
 import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOUSE_GARMENT_REGIONS } from './outfit';
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
-import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
+import { ColoredSprite, SolidSpriteCanvas, darken, isWarmBrown } from './ColoredSprite';
 import { SPEECH_BUBBLE, SPEECH_BUBBLE_COLORS, SPEECH_BUBBLE_PALETTE } from './speechBubble';
 import { onThemeChange, themeRevision } from './theme';
 import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
@@ -359,6 +359,33 @@ const WALK_CYCLES = {
   left: { frames: S.WALK_LEFT_FRAMES, palette: S.WALK_LEFT_PALETTE, padTop: S.WALK_LEFT_PAD_TOP },
   right: { frames: S.WALK_RIGHT_FRAMES, palette: S.WALK_RIGHT_PALETTE, padTop: S.WALK_RIGHT_PAD_TOP },
 } as const;
+
+// The eyes of a walk frame, drawn dark like the standing portrait's (its
+// eyeRow 14): its '·' cells where the eyes are - facing down, the face row's
+// warm-brown ones (the same cells as standing, a row lower on some frames);
+// side-on, the one pair in front of the face; walking up there are none.
+const EYE_ZONES: Partial<Record<keyof typeof WALK_CYCLES, { rows: [number, number]; cols: [number, number]; warm?: true }>> = {
+  down: { rows: [12, 16], cols: [0, 99], warm: true },
+  left: { rows: [11, 14], cols: [12, 17] },
+  right: { rows: [11, 14], cols: [26, 31] },
+};
+const eyeCache = new WeakMap<object, string>();
+function eyesOf(dir: keyof typeof WALK_CYCLES, frame: { sprite: string[]; colors: string[] }): string {
+  let eyes = eyeCache.get(frame);
+  if (eyes !== undefined) return eyes;
+  const z = EYE_ZONES[dir];
+  const pal: Record<string, string> = WALK_CYCLES[dir].palette;
+  const out: string[] = [];
+  if (z)
+    for (let y = z.rows[0]; y <= z.rows[1] && y < frame.sprite.length; y++)
+      for (let x = z.cols[0]; x <= z.cols[1] && x < frame.sprite[y].length; x++) {
+        const hex = pal[frame.colors[y]?.[x] ?? ''];
+        if (frame.sprite[y][x] === '·' && hex && (!z.warm || isWarmBrown(hex))) out.push(`${x},${y}`);
+      }
+  eyes = out.join(' ');
+  eyeCache.set(frame, eyes);
+  return eyes;
+}
 
 // Per-direction multiplier on the walk-FRAME interval only (see the effect
 // below) — purely cosmetic leg cadence, independent of how fast the character
@@ -5589,10 +5616,10 @@ function Game() {
                     the whole sprite, and as spans each swap restyled
                     thousands of nodes and repainted the screen. Occupied
                     cells still get an opaque backing (terrain never shows
-                    through the character) and the 1px outline. eyeRow is
-                    only set for the idle portrait (character.face's row 14,
-                    verified against docs/character-sprite-parts's eye
-                    colour predicate) — the walk frames' crop differs. */}
+                    through the character) and the 1px outline. The eyes
+                    are drawn dark: the idle portrait's on its row 14
+                    (character.face, docs/character-sprite-parts's eye colour
+                    predicate), a walk frame's at the cells eyesOf finds. */}
                 {rideBoat && (
                   // the quest's boat, carried along under the player while sailing
                   <ColoredSprite
@@ -5629,6 +5656,7 @@ function Game() {
                   colors={displayColors}
                   palette={displayPalette}
                   eyeRow={walkAnim ? undefined : 14}
+                  eyes={walkAnim && walkDir ? eyesOf(walkDir, walkAnim.frame) : ''}
                   shade={PLAYER_SHADE}
                   charW={dims.charW}
                   lineH={dims.lineH}

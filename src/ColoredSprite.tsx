@@ -36,7 +36,7 @@ export function darken(hex: string, factor: number): string {
 // (same repo, same convention) — used by `eyeRow` below to find the
 // intentionally-empty-looking eye cells within a known row by their colour,
 // rather than by hand-picked coordinates.
-function isWarmBrown(hex: string): boolean {
+export function isWarmBrown(hex: string): boolean {
   const [r, g, b] = hexToRgb(hex);
   return r - g >= 40 && r - g <= 90 && g - b >= 5 && g - b <= 40 && r < 220;
 }
@@ -363,6 +363,9 @@ interface SolidCanvasProps {
   colors: string[];
   palette: Record<string, string>;
   eyeRow?: number;
+  // further eye cells ("x,y" keys, space-separated): a walk frame's, whose
+  // eyes aren't on one known row (App.tsx's eyesOf)
+  eyes?: string;
   className?: string;
   style?: React.CSSProperties;
   charW: number; // px per cell at the sprite's own font size
@@ -391,6 +394,7 @@ function renderSolid(
   colors: string[],
   palette: Record<string, string>,
   eyeRow: number | undefined,
+  eyes: string,
   charW: number,
   lineH: number,
   r: number,
@@ -414,6 +418,7 @@ function renderSolid(
   // cells in paint order: every background first, then every glyph's
   // outline, then the glyphs — the order the browser paints the spans in
   const glyphs: [string, number, number, string][] = [];
+  const eyeSet = new Set(eyes ? eyes.split(' ') : []);
   for (let y = 0; y < rows; y++) {
     const line = sprite[y];
     const crow = colors[y] ?? '';
@@ -423,7 +428,7 @@ function renderSolid(
       const ch = line[x];
       const key = crow[x];
       const hex = key ? palette[key] : undefined;
-      const eye = eyeRow === y && !!hex && isWarmBrown(hex);
+      const eye = (eyeRow === y && !!hex && isWarmBrown(hex)) || eyeSet.has(`${x},${y}`);
       if (ch === ' ' && !eye) continue;
       const x0 = Math.floor(x * charW * r);
       const x1 = Math.floor((x + 1) * charW * r);
@@ -457,6 +462,7 @@ export function SolidSpriteCanvas({
   colors,
   palette,
   eyeRow,
+  eyes = '',
   className,
   style,
   charW,
@@ -482,7 +488,7 @@ export function SolidSpriteCanvas({
     const base = cs.color || '#fff';
     const ring = outline ? cs.getPropertyValue(outline).trim() || '#000' : null;
     const font = cs.fontFamily || 'monospace';
-    const key = `${r}|${charW}|${lineH}|${eyeRow}|${font}|${base}|${ring}|${solid}|${shade}|${bare}`;
+    const key = `${r}|${charW}|${lineH}|${eyeRow}|${eyes}|${font}|${base}|${ring}|${solid}|${shade}|${bare}`;
     let byColors = solidCache.get(sprite);
     if (!byColors) solidCache.set(sprite, (byColors = new WeakMap()));
     let byPalette = byColors.get(colors);
@@ -490,7 +496,7 @@ export function SolidSpriteCanvas({
     let look = byPalette.get(palette);
     if (!look || look.key !== key) {
       if (look) look.img.width = look.img.height = 0; // old resolution: free it now
-      look = { key, img: renderSolid(sprite, colors, palette, eyeRow, charW, lineH, r, font, base, ring, solid, shade, bare) };
+      look = { key, img: renderSolid(sprite, colors, palette, eyeRow, eyes, charW, lineH, r, font, base, ring, solid, shade, bare) };
       byPalette.set(palette, look);
     }
     const { img } = look;
@@ -499,7 +505,7 @@ export function SolidSpriteCanvas({
       c.height = img.height;
     } else ctx.clearRect(0, 0, c.width, c.height);
     ctx.drawImage(img, 0, 0);
-  }, [sprite, colors, palette, eyeRow, charW, lineH, r, outline, solid, shade, bare]);
+  }, [sprite, colors, palette, eyeRow, eyes, charW, lineH, r, outline, solid, shade, bare]);
   return (
     <canvas
       ref={ref}

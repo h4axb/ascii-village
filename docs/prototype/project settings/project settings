@@ -72,6 +72,7 @@ crafting panel alternatives: https://asciia-bay-2.app-testing.workers.dev/intro/
 /2/feedback
 /cinematic
 /intro-old
+glyph editor: pnpm ref
 
 ## Project structure
 + rendering: vite, water+static assets on canvas

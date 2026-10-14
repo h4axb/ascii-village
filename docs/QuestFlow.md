@@ -17,7 +17,7 @@ The other links are unchanged.
 3. MAKE YOURSELF AT HOME: store an item at the house.
 4. CHECK IN WITH MITCHY. *Cinematic A:* Mitchy hands over the crafting token.
 5. BEYOND THE SHORE: craft a water vehicle and place it on the water. *Cinematic B:* sail to the shop island, then **NEW BEGINNINGS COMPLETE**.
-6. **The seed gift.** Mitchy offers a housewarming seed, named only by a hint: "Something small and sweet" (strawberries) or "Something big and round" (a pumpkin). The pick goes into the bag (`quest.seedKind`).
+6. **The seed gift.** Mitchy offers a housewarming seed, named only by a hint: "Tiny sweet seed" (strawberries) or "Round golden seed" (a pumpkin). The pick goes into the bag (`quest.seedKind`).
 
 **GROWING ROOTS** (*Time to make this little island feel more like home.*)
 1. A GARDEN OF YOUR OWN: craft a watering tool from a token bought at the shop.
@@ -72,7 +72,7 @@ All in `src/quest/quests.ts`:
 - On quest links, a floating vehicle is placed on open water within 6 tiles of the player.
 - After the trip it stays docked. Clicking it gives **Sail across**, a short ferry between the main island and the shop island (`src/quest/route.ts`).
 
-**Seeds**
+- Picked flowers no longer drop seeds; the seed comes from Mitchy’s gift.
 - Every link: a picked flower drops a seed 15% of the time. While the planting step still needs one, a seed is guaranteed.
 - A seed stays dormant until its first watering, then grows into a Sunbloom in about 45 s. A Sunbloom sells for 20 coins, the price of one token.
 - Dates can't be planted any more.

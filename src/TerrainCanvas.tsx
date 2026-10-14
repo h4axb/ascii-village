@@ -312,7 +312,12 @@ export default function TerrainCanvas(props: Props) {
       if (c.width !== w || c.height !== h) {
         c.width = w;
         c.height = h;
-      } else ctx.clearRect(0, 0, w, h);
+      } else {
+        // in canvas pixels: under the last frame's world offset this cleared
+        // a rect off the canvas, and sparkles piled up into dots over land
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+      }
       // positioned by transform on its own layer, and only restyled when
       // the box actually moves: left/top changes re-ran layout and repainted
       // the world around it on every redraw

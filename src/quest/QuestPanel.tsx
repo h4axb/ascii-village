@@ -64,7 +64,6 @@ function KeyboardIcon() {
 }
 
 export function QuestPanel({
-  line,
   objective,
   task,
   sub,
@@ -74,16 +73,15 @@ export function QuestPanel({
   controls,
   onToggle,
   onControls,
-  intro,
   onHint,
   hintBusy,
   blinkControls,
+  blinkQuest,
 }: {
-  line: string; // the questline title
-  intro?: string; // the questline's one-line intro, under its title
   onHint?: () => void; // the light bulb: play this step's hint
   hintBusy?: boolean; // a hint is playing
   blinkControls?: boolean; // the Controls bookmark blinks (a hint)
+  blinkQuest?: boolean; // the Quest bookmark blinks (the way back from the controls)
   objective: Objective;
   task?: string; // overrides objective.task (e.g. once the boat is crafted)
   sub?: string; // overrides objective.sub
@@ -112,16 +110,16 @@ export function QuestPanel({
   else
     body = (
       <>
+        {/* the step's title (the questline's own title and intro aren't
+            shown in the panel), the hint's light bulb on its right */}
         <div className="qp-head">
-          <div className="qp-line">{line}</div>
+          <div className="qp-title">{objective.title}</div>
           {onHint && (
             <button className="qp-hint" onClick={onHint} disabled={hintBusy} aria-label="hint" title="Hint">
               <BulbIcon />
             </button>
           )}
         </div>
-        {intro && <div className="qp-intro">{intro}</div>}
-        <div className="qp-title">{objective.title}</div>
         <div className="qp-task">
           {objective.icon && <span className="qp-icon">{objective.icon}</span>}
           <span>{task ?? objective.task}</span>
@@ -147,7 +145,7 @@ export function QuestPanel({
       </div>
       <div className="qp-tabs">
         <button
-          className={'qp-tab' + (open && view === 'quest' ? ' on' : '')}
+          className={'qp-tab' + (open && view === 'quest' ? ' on' : '') + (blinkQuest ? ' blink' : '')}
           onClick={onToggle}
           aria-label={open && view === 'quest' ? 'hide the quest' : 'show the quest'}
           title="Quest"

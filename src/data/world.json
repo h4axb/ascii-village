@@ -66,8 +66,8 @@
       "y": 41
     },
     "flowerplus5": {
-      "x": 53,
-      "y": 42
+      "x": 54,
+      "y": 41
     },
     "flowerplus3": {
       "x": 41,
@@ -344,8 +344,8 @@
     {
       "id": "flowerplus-14",
       "asset": "flowerplus",
-      "x": 50,
-      "y": 40,
+      "x": 48,
+      "y": 42,
       "scale": 0.5
     },
     {
@@ -623,34 +623,9 @@
     {
       "id": "wayfinder-1",
       "asset": "wayfinder",
-      "x": 53,
-      "y": 40,
+      "x": 51,
+      "y": 39,
       "scale": 0.08,
-      "sign": {
-        "panels": [
-          {
-            "flip": true,
-            "tilt": 19
-          },
-          {},
-          {
-            "flip": true,
-            "tilt": -15
-          }
-        ]
-      },
-      "look": {
-        "sat": 75,
-        "bright": 122,
-        "tint": -7
-      }
-    },
-    {
-      "id": "decoration-wooden-directional-sign-10-1",
-      "asset": "decoration-wooden-directional-sign-10",
-      "x": 50,
-      "y": 40,
-      "scale": 0.11,
       "sign": {
         "panels": [
           {
@@ -660,14 +635,14 @@
           {},
           {
             "flip": true,
-            "tilt": -30
+            "tilt": -17
           }
         ]
       },
       "look": {
-        "sat": 115,
-        "bright": 103,
-        "tint": 1
+        "sat": 75,
+        "bright": 122,
+        "tint": -7
       }
     }
   ],

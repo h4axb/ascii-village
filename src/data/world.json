@@ -540,8 +540,8 @@
     {
       "id": "decoration-wooden-directional-sign-1",
       "asset": "decoration-wooden-directional-sign",
-      "x": 50.6,
-      "y": 37.55,
+      "x": 55.6,
+      "y": 40.55,
       "scale": 0.1,
       "sign": {
         "panels": [
@@ -636,6 +636,26 @@
           {
             "flip": true,
             "tilt": -15
+          }
+        ]
+      }
+    },
+    {
+      "id": "decoration-wooden-directional-sign-10-1",
+      "asset": "decoration-wooden-directional-sign-10",
+      "x": 50,
+      "y": 40,
+      "scale": 0.11,
+      "sign": {
+        "panels": [
+          {
+            "flip": true,
+            "tilt": 30
+          },
+          {},
+          {
+            "flip": true,
+            "tilt": -23
           }
         ]
       }

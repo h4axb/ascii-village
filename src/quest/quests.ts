@@ -288,15 +288,15 @@ export type SeedKind = 'strawberry' | 'pumpkin';
 export const SEED_CHOICES: { kind: SeedKind; option: string; name: string; desc: string }[] = [
   {
     kind: 'strawberry',
-    option: 'Something small and sweet',
-    name: 'Sweet little seed',
+    option: 'Tiny sweet seed',
+    name: 'Tiny sweet seed',
     desc: 'Mitchy’s gift. It dreams of something small, red and sweet.',
   },
   {
     kind: 'pumpkin',
-    option: 'Something big and round',
-    name: 'Hefty round seed',
-    desc: 'Mitchy’s gift. It dreams of something big, round and orange.',
+    option: 'Round golden seed',
+    name: 'Round golden seed',
+    desc: 'Mitchy’s gift. It dreams of something big, round and golden.',
   },
 ];
 

@@ -1268,14 +1268,14 @@ pre {
   position: absolute;
   height: 3px;
   margin-top: 2px;
-  background: var(--ui-slot-border);
-  border: 1px solid var(--ui-border);
+  background: var(--ds-dialogue);
+  border: 1px solid var(--ds-line-strong);
   border-radius: 2px;
   overflow: hidden;
 }
 .push-bar-fill {
   height: 100%;
-  background: var(--ui-accent);
+  background: var(--ds-name);
 }
 
 /* The ghost preview while placement mode is active. No palette/colors are
@@ -1607,17 +1607,21 @@ pre {
   font-size: 0.9em;
 }
 
-/* Mitchy's speech bubble: a plain rounded box above his head, light surface
-   and dark text */
+/* Mitchy's speech bubble: a box above his head in the design system's
+   dialogue look */
 .bubble {
   position: absolute;
   z-index: 600;
   transform: translateY(calc(-100% - 0.4em));
   width: max-content;
   padding: 0.45em 0.9ch;
-  border-radius: 0.5em;
-  background: #e8e8e8;
-  color: #0a0a0a;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-dialogue);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  color: var(--ds-text);
   white-space: normal;
   line-height: 1.35;
   overflow-wrap: break-word;
@@ -3478,11 +3482,14 @@ pre {
 }
 
 .map-hint-toast-inner {
-  background: var(--ui-bg);
-  border: 2px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  color: var(--ds-text);
+  background: var(--ds-dialogue);
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-sm);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
   padding: 8px 14px;
-  box-shadow: var(--ui-shadow);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
 @keyframes mapHintFade {

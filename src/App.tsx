@@ -231,7 +231,7 @@ const ITEM_INFO: Record<ItemType, { name: string; desc: string }> = {
   iceflower: { name: 'Ice Flower', desc: 'A frost-hardened bloom from the tundra.' },
   // while Mitchy's gift is in play it's named by its hint (seedHint, set in Game)
   get seed() {
-    return seedHint ?? { name: 'Seed', desc: 'A tiny seed shaken out of a wildflower. Plant it and water it.' };
+    return seedHint ?? { name: 'Seed', desc: 'A tiny seed. Plant it and water it.' };
   },
   bloom: { name: 'Sunbloom', desc: 'A big golden bloom grown from a seed. Mitchy pays well for these.' },
   strawberry: { name: 'Strawberries', desc: 'Small, red and sweet - grown from Mitchy’s gift. Mitchy pays well for these.' },
@@ -320,7 +320,6 @@ const BOAT_SCALE = 1.9;
 // cinematic walking speeds (tiles/s): a calm stroll, slower than the player's own walk
 const WALK_SPEED_MITCHY = 2.6;
 const WALK_SPEED_PLAYER = 3; // the quest's water vehicle, compared with an ordinary crafted item
-const SEED_CHANCE = 0.15; // a picked flower drops a seed (1-2 in 10)
 
 const WALK_MS = 170;
 const DASH_MS = 100;
@@ -537,6 +536,7 @@ const CONTROLS: [string, string[]][] = [
   ['Interact / menus', ['Click']],
   ['Dash', ['Shift']],
   ['Interact (when near) / yes', ['F']],
+  ['Pack the boat into the inventory (when near)', ['B']],
   ['Inventory', ['I']],
   ['Map', ['M']],
   ['Back to the player', ['Space']],
@@ -3303,22 +3303,26 @@ function Game() {
     setModal({ t: 'land', x: t.x, y: t.y, sel: 0 });
   }
 
+  // the nearest free land spot for the player around a shore tile (null: no room)
+  function landingSpotNear(x: number, y: number): Pt | null {
+    for (let r = 0; r <= 4; r++)
+      for (let oy = -r; oy <= r; oy++)
+        for (let ox = -r; ox <= r; ox++) {
+          if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
+          const nx = x + ox - Math.floor(PLAYER_T.wT / 2);
+          const ny = y + oy - (PLAYER_T.hT - 1);
+          if (!blocked(nx, ny, undefined, true)) return { x: nx, y: ny };
+        }
+    return null;
+  }
+
   // Go ashore at (x, y): the player walks to the boat's edge facing the
   // shore and jumps off; the boat stays on the water where it is
   async function questLand(x: number, y: number) {
     const q = questRef.current;
     if (!q?.riding || !q.boat) return;
     setModal(null);
-    // the nearest free land spot for the player around the clicked tile
-    let spot: Pt | null = null;
-    for (let r = 0; r <= 4 && !spot; r++)
-      for (let oy = -r; oy <= r && !spot; oy++)
-        for (let ox = -r; ox <= r && !spot; ox++) {
-          if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
-          const nx = x + ox - Math.floor(PLAYER_T.wT / 2);
-          const ny = y + oy - (PLAYER_T.hT - 1);
-          if (!blocked(nx, ny, undefined, true)) spot = { x: nx, y: ny };
-        }
+    const spot = landingSpotNear(x, y);
     if (!spot) {
       showToast('no room to land there.');
       return;
@@ -4069,14 +4073,6 @@ function Game() {
     discover('resource');
     const item = COLLECT_AS[e.kind] ?? (e.kind as ItemType);
     setInv((v) => ({ ...v, [item]: v[item] + 1 }));
-    // a flower now and then drops a seed - not on the quest links, where
-    // Mitchy's gift is the seed
-    if (item === 'flower' && !QUEST_ENABLED) {
-      if (Math.random() < SEED_CHANCE) {
-        setInv((v) => ({ ...v, seed: v.seed + 1 }));
-        showToast('a seed fell out of the flower!');
-      }
-    }
     const q = questRef.current;
     if (q && isStep(q, 'gather')) {
       const gathered = q.gathered + 1;
@@ -4173,6 +4169,7 @@ function Game() {
   const [hintMarks, setHintMarks] = useState<HintTarget[]>([]);
   const [hintSparkles, setHintSparkles] = useState<string[]>([]);
   const [blinkControls, setBlinkControls] = useState(false);
+  const [blinkQuest, setBlinkQuest] = useState(false);
   const [hintCard, setHintCard] = useState<{ pages: string[]; i: number } | null>(null);
   const hintCardRef = useRef(hintCard);
   hintCardRef.current = hintCard;
@@ -4182,6 +4179,29 @@ function Game() {
     setHintMarks([]);
     setHintSparkles([]);
   }, [quest?.part, quest?.step]);
+  // Mitchy's waiting "!" once talked to, by what he was waiting on (see bubbleCat)
+  const [mitchySeen, setMitchySeen] = useState<string | null>(null);
+  // Interacting with something a "!" stands over clears that "!" (a hint's
+  // mark, Mitchy's waiting bubble) - it's done its job.
+  function seenMark(ref: InteractRef) {
+    let t: HintTarget | null = null;
+    if (ref.kind === 'crop') t = 'crop';
+    else if (ref.kind === 'door') t = 'garden';
+    else {
+      const e = ents.find((x) => x.id === ref.id);
+      if (e?.id === 'house') t = 'house';
+      else if (e?.id === 'cat') t = 'mitchy';
+      else if (e?.kind === 'pond') t = 'pond';
+      else if (e?.kind === 'gardenbed') t = 'garden';
+      else if (e && RESOURCE_KINDS.has(e.kind)) t = 'resource';
+      if (e?.id === 'cat') setMitchySeen(mitchyWaitKey);
+    }
+    if (t) setHintMarks((m) => m.filter((x) => x !== t));
+  }
+  function doInteraction(ref: InteractRef) {
+    seenMark(ref);
+    runInteraction(ref, interactCtx, interactActions);
+  }
   // An objective on the map: its top centre (tiles, for a "!") and centre
   // (ch/em, for the camera).
   function hintSpot(t: HintTarget): { id: string; top: { x: number; y: number }; c: { x: number; y: number } } | null {
@@ -4296,16 +4316,22 @@ function Game() {
       if (oi) oi.go(0);
       return;
     }
+    if (!modal && boatPrompt) {
+      if (boatPrompt.kind === 'board') void questBoard(boatPrompt.id);
+      else void questLand(boatPrompt.x, boatPrompt.y);
+      return;
+    }
     if (!modal && promptTarget) {
       setBubble(null);
       // a plant in reach with the watering tool in hand: water it
       if (promptTarget.ref.kind === 'crop') {
         const slot = promptTarget.ref.slot;
+        seenMark(promptTarget.ref);
         if (crops.find((c) => c.slot === slot)?.stage === 'ready') harvestCrop(slot);
         else startWatering(slot);
         return;
       }
-      runInteraction(promptTarget.ref, interactCtx, interactActions);
+      doInteraction(promptTarget.ref);
       return;
     }
     if (bubble) setBubble(null);
@@ -4351,20 +4377,56 @@ function Game() {
     {
       const { c0, c1 } = plot.door;
       const gy = plot.rect.y1;
-      const gap = Math.max(Math.max(0, c0 - (player.x + PLAYER_T.wT - 1), player.x - c1), Math.abs(gy - feetY));
+      // from outside or from inside the bed (where the fence row hides the
+      // feet a little further back), so it's never only one-way
+      const dy = feetY < gy ? Math.max(0, gy - feetY - 1) : feetY - gy;
+      const gap = Math.max(Math.max(0, c0 - (player.x + PLAYER_T.wT - 1), player.x - c1), dy);
       const dist = Math.hypot((c0 + c1 + 1) / 2 - pcx, gy + 1 - pcy);
       if (gap <= 1 && (!best || gap < best.gap || (gap === best.gap && dist < best.dist)))
         best = { ref: { kind: 'door', door: 'gate' }, gap, dist };
     }
     return best;
   })();
+  // The quest's boat in reach: [F] climb in / [B] pack it away; while
+  // sailing with land in reach: [F] go ashore there (the nearest shore tile
+  // the player has room to land on). Wins over anything farther away.
+  const boatPrompt = (() => {
+    if (!quest?.boat || modal || cinematic || mapOpen || editorOpen || placing || hintLock || hintCard) return null;
+    if (riding) {
+      const box = sailingBoatBox(player.x, player.y);
+      if (!box) return null;
+      const R = Math.ceil(LAND_REACH);
+      let best: { x: number; y: number; d: number } | null = null;
+      for (let y = box.y0 - R; y <= box.y1 + R; y++)
+        for (let x = box.x0 - R; x <= box.x1 + R; x++) {
+          const d = Math.hypot(Math.max(box.x0 - x, 0, x - box.x1), Math.max(box.y0 - y, 0, y - box.y1));
+          if (d > LAND_REACH || (best && d >= best.d) || isOpenWater(x, y)) continue;
+          best = { x, y, d };
+        }
+      // the same landing questLand makes there
+      if (best && !landingSpotNear(best.x, best.y)) best = null;
+      return best ? { kind: 'land' as const, x: best.x, y: best.y, at: { right: (box.x1 + 1) * TILE_CH, top: box.y0 * TILE_LN } } : null;
+    }
+    const b = placedItems.find((p) => p.id === quest.boat!.id);
+    if (!b) return null;
+    const { wT, hT } = spriteTiles(b.sprite, b.scale, b.rotation);
+    const gx = Math.max(b.x - (player.x + PLAYER_T.wT - 1), 0, player.x - (b.x + wT - 1));
+    const gy = Math.max(b.y - (player.y + PLAYER_T.hT - 1), 0, player.y - (b.y + hT - 1));
+    const gap = Math.hypot(gx, gy);
+    // something else nearer (a flower on the shore) keeps its own label
+    if (gap > BOARD_REACH || (promptTarget && promptTarget.gap < gap)) return null;
+    return { kind: 'board' as const, id: b.id, at: { right: (b.x + wT) * TILE_CH, top: b.y * TILE_LN } };
+  })();
   // Mitchy's "!" bubble: while something with him is still open (the intro's
   // part C, bringing him the gathered things, reporting back) and the player
   // is within a few tiles of him - the same states openDialog branches on.
   const mitchyWaiting =
     introStage === 'partC:explore' || introStage === 'partC:payment' || isStep(quest, 'mitchy') || isStep(quest, 'report');
+  // what he's waiting on; once talked to about it his bubble goes, until
+  // the next thing he waits on
+  const mitchyWaitKey = `${introStage}|${quest?.part}|${quest?.step}`;
   const bubbleCat = (() => {
-    if (!mitchyWaiting || modal || cinematic || mapOpen || editorOpen) return null;
+    if (!mitchyWaiting || mitchySeen === mitchyWaitKey || modal || cinematic || mapOpen || editorOpen) return null;
     const cat = ents.find((e) => e.id === 'cat');
     if (!cat || nearestIsland(player.x, player.y).idx !== nearestIsland(cat.x, cat.y).idx) return null;
     return near(cat, player) <= MITCHY_BUBBLE_TILES ? cat : null;
@@ -4644,7 +4706,7 @@ function Game() {
         // setModal calls land in the same React batch, so the last one wins.
         go: (s) => {
           setModal(null);
-          if (s === 0) runInteraction(m.ref, interactCtx, interactActions);
+          if (s === 0) doInteraction(m.ref);
         },
       };
     }
@@ -4982,7 +5044,10 @@ function Game() {
       if (!ev.repeat) holdStart(k);
     } else if (k === 'shift') setDash(true);
     else if (k === 'f') pressF();
-    else if (k === 'i') setModal({ t: 'inventory' });
+    else if (k === 'b') {
+      // the boat in reach goes back into the bag
+      if (boatPrompt?.kind === 'board' && !cinematic && !hintLockRef.current) questStowBoat(boatPrompt.id);
+    } else if (k === 'i') setModal({ t: 'inventory' });
     else if (k === MAP_KEY) {
       if (!ev.repeat && !modal) setMapOpen(true);
     } else if (k === ' ') {
@@ -5279,12 +5344,11 @@ function Game() {
           </div>
           {questObjective && questLine && !questHidden && !cinematic && (
             <QuestPanel
-              line={questLine.title}
-              intro={questLine.intro}
               objective={questObjective}
               onHint={runHint}
               hintBusy={!!hintRun}
               blinkControls={blinkControls}
+              blinkQuest={blinkQuest}
               task={questTask}
               sub={questSub}
               progress={questObjective.target ? { n: quest!.gathered, of: questObjective.target } : undefined}
@@ -5292,6 +5356,7 @@ function Game() {
               view={questView}
               controls={CONTROLS}
               onToggle={() => {
+                setBlinkQuest(false);
                 if (questView === 'quest') setQuestOpen((o) => !o);
                 else {
                   setQuestView('quest');
@@ -5301,9 +5366,12 @@ function Game() {
               onControls={() => {
                 if (questView === 'controls' && questOpen) {
                   setQuestView('quest');
+                  setBlinkQuest(false);
                 } else {
                   setQuestView('controls');
                   setQuestOpen(true);
+                  // points the way back to the quest
+                  setBlinkQuest(true);
                 }
               }}
             />
@@ -5758,7 +5826,7 @@ function Game() {
                       canInteract(e)
                         ? e.kind === 'cat'
                           ? // no "talk to Mitchy?" confirm: straight to his menu
-                            () => runInteraction({ kind: 'entity', id: e.id }, interactCtx, interactActions)
+                            () => doInteraction({ kind: 'entity', id: e.id })
                           : () => setModal({ t: 'interact', ref: { kind: 'entity', id: e.id }, sel: 1 })
                         : undefined
                     }
@@ -6027,8 +6095,12 @@ function Game() {
                 <div
                   className="saypop"
                   style={{
+                    // its bottom on the top of the player's head, so a longer
+                    // message grows upward instead of under the player
                     left: `${player.x * TILE_CH}ch`,
-                    top: `${Math.max(0, player.y * TILE_LN - 1.8)}em`,
+                    top: `${player.y * TILE_LN}em`,
+                    transform: 'translateY(calc(-100% - 0.3em))',
+                    width: 'max-content',
                     zIndex: 700,
                   }}
                 >
@@ -6098,6 +6170,7 @@ function Game() {
                   reach, with the F key that does it (see promptTarget / pressF) */}
               {!modal &&
                 promptTarget &&
+                !boatPrompt &&
                 !(nothingEnt && promptTarget.ref.kind === 'entity' && promptTarget.ref.id === nothingEnt.id) &&
                 (() => {
                   const ref = promptTarget.ref;
@@ -6155,6 +6228,20 @@ function Game() {
                   }}
                 >
                   <span>{nothingText}</span>
+                </div>
+              )}
+
+              {/* the boat's keys (see boatPrompt) */}
+              {boatPrompt && (
+                <div className="fpop" style={{ left: `${boatPrompt.at.right}ch`, top: `${boatPrompt.at.top}em` }}>
+                  <kbd className="fpop-key">F</kbd>
+                  <span className="fpop-name">{boatPrompt.kind === 'board' ? 'enter ship' : 'disembark ship'}</span>
+                  {boatPrompt.kind === 'board' && (
+                    <>
+                      <kbd className="fpop-key">B</kbd>
+                      <span className="fpop-name">pack into inventory</span>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -6617,7 +6704,7 @@ function Game() {
                     // close before acting — see the 'interact' case in
                     // optInfo() for why the order matters
                     setModal(null);
-                    if (i === 0) runInteraction(modal.ref, interactCtx, interactActions);
+                    if (i === 0) doInteraction(modal.ref);
                   }}
                   hint="[F] yes · [Esc] no · click to choose"
                 />

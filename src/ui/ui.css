@@ -2011,15 +2011,15 @@
   color: var(--ds-name);
   margin-bottom: 8px;
 }
-/* the questline title with the hint's light bulb on its right */
+/* the step title with the hint's light bulb on its right */
 .qp-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
 }
-.qp-head .qp-line {
-  margin-bottom: 4px;
+.qp-head .qp-title {
+  margin-bottom: 6px;
 }
 .qp-hint {
   flex: none;

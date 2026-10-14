@@ -7,6 +7,7 @@ import walkDownData from './data/walkDown.json';
 import walkUpData from './data/walkUp.json';
 import walkLeftData from './data/walkLeft.json';
 import walkRightData from './data/walkRight.json';
+import waterRightData from './data/waterRight.json';
 import palmData from './data/palm.json';
 import houseData from './data/house.json';
 import shopData from './data/shop.json';
@@ -248,6 +249,47 @@ export const WALK_LEFT_PAD_TOP: number = (walkLeftData as { padTop?: number }).p
 export const WALK_RIGHT_FRAMES: WalkFrame[] = walkRightData.frames;
 export const WALK_RIGHT_PALETTE: Record<string, string> = walkRightData.palette;
 export const WALK_RIGHT_PAD_TOP: number = (walkRightData as { padTop?: number }).padTop ?? 0;
+
+// ---------------------------------------------------------------------------
+// WATERING — player_watering_right.svg (frames ready, extend, pour; the walk
+// frames' 22x28 canvas, see waterRight.json's "source"). Each frame carries
+// `hand`: where the hand is, in the sprite's own chars/rows, for the
+// watering tool held behind it. Facing left is the right side mirrored (the
+// glyphs that face a way swapped), until it has its own art; up and down use
+// the side the plant is on (App.tsx's waterAnimFor).
+// ---------------------------------------------------------------------------
+export interface WaterFrame extends WalkFrame {
+  pose: 'ready' | 'extend' | 'pour';
+  hand: [number, number];
+}
+export interface WaterAnim {
+  frames: WaterFrame[]; // ready, extend, pour
+  palette: Record<string, string>;
+  facing: 'right' | 'left';
+}
+const MIRROR_GLYPH: Record<string, string> = { '/': '\\', '\\': '/', '(': ')', ')': '(', '<': '>', '>': '<', '[': ']', ']': '[', '{': '}', '}': '{', '«': '»', '»': '«' };
+const mirrorRows = (rows: string[] | undefined, glyphs = false) =>
+  rows?.map((r) => [...r].reverse().map((ch) => (glyphs ? (MIRROR_GLYPH[ch] ?? ch) : ch)).join(''));
+export const WATER_RIGHT: WaterAnim = {
+  frames: waterRightData.frames as WaterFrame[],
+  palette: waterRightData.palette,
+  facing: 'right',
+};
+export const WATER_LEFT: WaterAnim = {
+  frames: WATER_RIGHT.frames.map((f) => {
+    const w = Math.max(...f.sprite.map((l) => l.length));
+    return {
+      ...f,
+      sprite: mirrorRows(f.sprite, true)!,
+      colors: mirrorRows(f.colors)!,
+      shirtMask: mirrorRows(f.shirtMask),
+      shortsMask: mirrorRows(f.shortsMask),
+      hand: [w - f.hand[0], f.hand[1]] as [number, number],
+    };
+  }),
+  palette: WATER_RIGHT.palette,
+  facing: 'left',
+};
 
 // ---------------------------------------------------------------------------
 // MITCHY — baked from cat3_sized.svg the same way as the player (player.json):

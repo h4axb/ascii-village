@@ -363,6 +363,21 @@ const WALK_CYCLES = {
   right: { frames: S.WALK_RIGHT_FRAMES, palette: S.WALK_RIGHT_PALETTE, padTop: S.WALK_RIGHT_PAD_TOP },
 } as const;
 
+// The watering animation (see `watering` in Game): how long each frame
+// holds (ms, the SVG's own 1.8 s loop: ready 25%, extend 20%, pour 30%,
+// extend 25%), and which frame each phase shows.
+type WaterPhase = 'ready' | 'extend' | 'pour' | 'done';
+const WATER_MS = { ready: 450, extend: 360, pourMin: 540, done: 450 };
+const WATER_POSE: Record<WaterPhase, number> = { ready: 0, extend: 1, pour: 2, done: 1 };
+// One watering animation per side the plant can be on. Only facing right has
+// its own art so far (player_watering_right.svg) and left is it mirrored;
+// add 'up' / 'down' here when they have theirs - until then waterAnimFor uses
+// the side the plant leans to.
+const WATER_ANIMS: Partial<Record<'right' | 'left' | 'up' | 'down', S.WaterAnim>> = {
+  right: S.WATER_RIGHT,
+  left: S.WATER_LEFT,
+};
+
 // Per-direction multiplier on the walk-FRAME interval only (see the effect
 // below) — purely cosmetic leg cadence, independent of how fast the character
 // actually crosses tiles (that's still WALK_MS/DASH_MS everywhere). <1 cycles
@@ -1981,6 +1996,7 @@ function Game() {
   // wall/entity is a no-op, and callers use this to avoid resetting the step
   // timer on a move that didn't happen (see lastStepRef below).
   function tryMove(dx: number, dy: number): boolean {
+    if (wateringRef.current) return false; // standing still while watering
     const p = playerRef.current;
     const n = resolveMove(p, dx, dy);
     const moved = n.x !== p.x || n.y !== p.y;
@@ -2064,6 +2080,13 @@ function Game() {
   const [walkDir, setWalkDir] = useState<WalkDir>(null);
   const walkDirRef = useRef<WalkDir>(null);
   const [walkFrame, setWalkFrame] = useState(0);
+  // Watering a plant (F next to a planted seed, the watering tool in hand):
+  // the watering frames play - ready, extend, then pour for as long as F is
+  // held (the water lands as the pour starts), then extend and back to
+  // standing. `anim` is the side the plant is on (waterAnimFor).
+  const [watering, setWatering] = useState<{ anim: S.WaterAnim; slot: number; phase: WaterPhase; held: boolean } | null>(null);
+  const wateringRef = useRef(watering);
+  wateringRef.current = watering;
   // Set by holdStart, read by the rAF loop below: which direction (left/right
   // only) is waiting on its very first, frame-gated step off idle. See the
   // loop's threshold calc for why only left/right need this.
@@ -2280,6 +2303,7 @@ function Game() {
       const k = e.key.toLowerCase();
       if (k === 'shift') setDash(false);
       else holdEnd(k);
+      if (k === 'f') releaseWatering();
     };
     const clear = () => {
       heldRef.current.clear();
@@ -4059,8 +4083,46 @@ function Game() {
   // "yes" while an interact confirm is open; otherwise do what the prompt
   // offers (the nearest thing in reach, see promptTarget), or dismiss a
   // speech bubble.
+  // ---- watering (see `watering` above) ----
+  const canWater = (c: PlantedCrop) => equipped?.tool === 'water' && c.stage === 'growing';
+  // The plant's side: right/left by where it is from the player's middle,
+  // up/down when it's more above/below than beside; a side without its own
+  // animation yet uses the one it leans to (right when straight on).
+  function waterAnimFor(slot: number): S.WaterAnim {
+    const s = plot.slots[slot];
+    const dx = s.x + 0.5 - (player.x + PLAYER_T.wT / 2);
+    const dy = s.y + 0.5 - (player.y + PLAYER_T.hT - 0.5);
+    const side = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down';
+    return WATER_ANIMS[side] ?? (dx < 0 ? S.WATER_LEFT : S.WATER_RIGHT);
+  }
+  function startWatering(slot: number) {
+    const q = questRef.current;
+    if (q && equipped && q.waterTool === equipped.ownedId && !q.filled) {
+      showToast(QL.needFill);
+      return;
+    }
+    setWatering({ anim: waterAnimFor(slot), slot, phase: 'ready', held: true });
+    // the on-screen F button: letting go of it ends the pour too
+    window.addEventListener('pointerup', releaseWatering, { once: true });
+  }
+  function releaseWatering() {
+    setWatering((w) => (w && w.held ? { ...w, held: false } : w));
+  }
+  useEffect(() => {
+    if (!watering) return;
+    const { phase, held, slot } = watering;
+    if (phase === 'pour' && held) return; // pours until F is let go
+    const ms = phase === 'ready' ? WATER_MS.ready : phase === 'extend' ? WATER_MS.extend : phase === 'pour' ? WATER_MS.pourMin : WATER_MS.done;
+    const next: WaterPhase | null = phase === 'ready' ? 'extend' : phase === 'extend' ? 'pour' : phase === 'pour' ? 'done' : null;
+    const t = window.setTimeout(() => {
+      if (next === 'pour') waterCrops(slot); // the water lands
+      setWatering((w) => (w ? (next ? { ...w, phase: next } : null) : w));
+    }, ms);
+    return () => window.clearTimeout(t);
+  }, [watering?.phase, watering?.held]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function pressF() {
-    if (cinematic || mapOpen) return;
+    if (cinematic || mapOpen || wateringRef.current) return;
     if (modal && modal.t === 'interact') {
       const oi = optInfo(modal);
       if (oi) oi.go(0);
@@ -4068,6 +4130,11 @@ function Game() {
     }
     if (!modal && promptTarget) {
       setBubble(null);
+      // a plant in reach with the watering tool in hand: water it
+      if (promptTarget.ref.kind === 'crop') {
+        startWatering(promptTarget.ref.slot);
+        return;
+      }
       runInteraction(promptTarget.ref, interactCtx, interactActions);
       return;
     }
@@ -4085,7 +4152,7 @@ function Game() {
   // a tile of the player's feet (2 for Mitchy and the buildings), the nearest
   // one winning - by tile gap, then by the distance between the two feet.
   const promptTarget = (() => {
-    if (modal || cinematic || mapOpen || editorOpen || placing || riding) return null;
+    if (modal || cinematic || mapOpen || editorOpen || placing || riding || watering) return null;
     const pcx = player.x + PLAYER_T.wT / 2;
     const pcy = player.y + PLAYER_T.hT;
     let best: { ref: InteractRef; gap: number; dist: number } | null = null;
@@ -4098,6 +4165,17 @@ function Game() {
       const f = footprint(e);
       const dist = Math.hypot((f.x0 + f.x1 + 1) / 2 - pcx, f.row + 1 - pcy);
       if (!best || gap < best.gap || (gap === best.gap && dist < best.dist)) best = { ref, gap, dist };
+    }
+    // a planted seed in reach, with the watering tool in hand: water it
+    const feetY = player.y + PLAYER_T.hT - 1;
+    for (const c of crops) {
+      if (!canWater(c)) continue;
+      const s = plot.slots[c.slot];
+      if (!s) continue;
+      const gap = Math.max(Math.max(0, s.x - (player.x + PLAYER_T.wT - 1), player.x - s.x), Math.abs(s.y - feetY));
+      if (gap > 1) continue;
+      const dist = Math.hypot(s.x + 0.5 - pcx, s.y + 1 - pcy);
+      if (!best || gap < best.gap || (gap === best.gap && dist < best.dist)) best = { ref: { kind: 'crop', slot: c.slot }, gap, dist };
     }
     return best;
   })();
@@ -4792,19 +4870,21 @@ function Game() {
   // than reusing PLAYER_SCALE as-is — otherwise the character would visibly
   // grow or shrink the instant you start/stop walking.
   // sailing the boat: the player stands still in it, no walk cycle
-  const cycle = walkDir && !(quest?.riding && quest.boat) ? WALK_CYCLES[walkDir] : null;
+  const cycle = walkDir && !(quest?.riding && quest.boat) && !watering ? WALK_CYCLES[walkDir] : null;
   const walkAnim = cycle
     ? { frame: cycle.frames[walkFrame], palette: cycle.palette, padTop: cycle.padTop }
     : null;
-  const baseSprite = walkAnim ? walkAnim.frame.sprite : character.sprite;
-  const baseColors = walkAnim ? walkAnim.frame.colors : character.colors;
-  const basePalette = walkAnim ? walkAnim.palette : character.palette;
+  // watering: its frame instead (same canvas as the walk frames)
+  const waterFrame = watering ? watering.anim.frames[WATER_POSE[watering.phase]] : null;
+  const baseSprite = waterFrame ? waterFrame.sprite : walkAnim ? walkAnim.frame.sprite : character.sprite;
+  const baseColors = waterFrame ? waterFrame.colors : walkAnim ? walkAnim.frame.colors : character.colors;
+  const basePalette = waterFrame ? watering!.anim.palette : walkAnim ? walkAnim.palette : character.palette;
   // Which cells are the shirt/shorts for whatever's currently on screen —
   // baked directly into each walk frame / the static portrait (see
   // sprites.ts's WalkFrame and PLAYER_SHIRT_MASK/PLAYER_SHORTS_MASK), not
   // looked up from a hand-maintained table.
-  const baseShirtMask = walkAnim ? walkAnim.frame.shirtMask : character.shirtMask;
-  const baseShortsMask = walkAnim ? walkAnim.frame.shortsMask : character.shortsMask;
+  const baseShirtMask = waterFrame ? waterFrame.shirtMask : walkAnim ? walkAnim.frame.shirtMask : character.shirtMask;
+  const baseShortsMask = waterFrame ? waterFrame.shortsMask : walkAnim ? walkAnim.frame.shortsMask : character.shortsMask;
   // Outfit recolor (see outfit.ts) — a no-op passthrough (same objects back)
   // when nothing's been picked yet, so this costs nothing for most players.
   const recolored = useMemo(
@@ -4848,7 +4928,7 @@ function Game() {
   // were that much taller than it really is and shrink it below the static
   // portrait the instant you start walking.
   const contentRows = displaySprite.length - (walkAnim?.padTop ?? 0);
-  const playerK = walkAnim ? (PLAYER_SCALE * character.sprite.length) / contentRows : PLAYER_SCALE;
+  const playerK = walkAnim || waterFrame ? (PLAYER_SCALE * character.sprite.length) / contentRows : PLAYER_SCALE;
   const playerW = Math.max(...displaySprite.map((l) => l.length));
   const playerOffX = ((1 - playerK) * playerW) / 2;
   // Anchor math uses the FULL padded height, not contentRows — the padding
@@ -5632,6 +5712,39 @@ function Game() {
                 {!rideBoat && (
                   <PlayerShadow x={player.x} y={player.y} cx={(playerK * playerW) / 2} footEm={playerK * displaySprite.length} />
                 )}
+                {/* watering: the tool in hand, behind the hand (drawn first),
+                    held at the frame's hand and tipped as it pours; about 9
+                    rows of the player's art tall, at most 16 chars wide */}
+                {waterFrame &&
+                  equipped &&
+                  (() => {
+                    const tw = Math.max(1, ...equipped.sprite.map((l) => l.length));
+                    const th = Math.max(1, equipped.sprite.length);
+                    const s = Math.min(9 / th, 16 / tw);
+                    const [hx, hy] = waterFrame.hand;
+                    const tilt = watering!.phase === 'pour' ? 35 : watering!.phase === 'ready' ? 0 : 12;
+                    const flip = watering!.anim.facing === 'left' ? -1 : 1;
+                    return (
+                      <div
+                        className="rig-water-tool"
+                        style={{
+                          left: `${hx * playerK}ch`,
+                          top: `${hy * playerK - hopEm}em`,
+                          transform: `scaleX(${flip}) rotate(${tilt}deg) scale(${playerK})`,
+                        }}
+                      >
+                        <ColoredSprite
+                          style={{ transform: `scale(${s}) translate(-15%, -55%)` }}
+                          sprite={equipped.sprite}
+                          colors={equipped.colors}
+                          palette={equipped.palette}
+                          color={equipped.color}
+                          texture={equipped.textureModifier}
+                          solidCells
+                        />
+                      </div>
+                    );
+                  })()}
                 <SolidSpriteCanvas
                   className="player-sprite"
                   style={{
@@ -5642,8 +5755,14 @@ function Game() {
                   sprite={displaySprite}
                   colors={displayColors}
                   palette={displayPalette}
-                  eyeRow={walkAnim ? undefined : 14}
-                  eyes={walkAnim && walkDir ? eyesOf(walkDir, walkAnim.frame) : ''}
+                  eyeRow={walkAnim || waterFrame ? undefined : 14}
+                  eyes={
+                    waterFrame
+                      ? eyesOf(watering!.anim.facing === 'right' ? 'waterRight' : 'waterLeft', waterFrame)
+                      : walkAnim && walkDir
+                        ? eyesOf(walkDir, walkAnim.frame)
+                        : ''
+                  }
                   shade={PLAYER_SHADE}
                   charW={dims.charW}
                   lineH={dims.lineH}
@@ -5670,7 +5789,7 @@ function Game() {
                   />
                 )}
 
-                {equipped?.equip?.mode === 'hold' && (
+                {equipped?.equip?.mode === 'hold' && !waterFrame && (
                   <ColoredSprite
                     className="rig-held"
                     style={{
@@ -5767,7 +5886,7 @@ function Game() {
                       }}
                     >
                       <kbd className="fpop-key">F</kbd>
-                      <span className="fpop-name">{copy.name}</span>
+                      <span className="fpop-name">{ref.kind === 'crop' ? `water ${copy.name.toLowerCase()}` : copy.name}</span>
                     </div>
                   );
                 })()}

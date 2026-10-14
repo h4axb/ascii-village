@@ -8,17 +8,22 @@
 import * as S from './sprites';
 import { isWarmBrown } from './ColoredSprite';
 
-type Dir = 'up' | 'down' | 'left' | 'right';
+type Dir = 'up' | 'down' | 'left' | 'right' | 'waterRight' | 'waterLeft';
 const PALETTES: Record<Dir, Record<string, string>> = {
   up: S.WALK_UP_PALETTE,
   down: S.WALK_DOWN_PALETTE,
   left: S.WALK_LEFT_PALETTE,
   right: S.WALK_RIGHT_PALETTE,
+  waterRight: S.WATER_RIGHT.palette,
+  waterLeft: S.WATER_LEFT.palette,
 };
 const EYE_ZONES: Partial<Record<Dir, { rows: [number, number]; cols: [number, number]; warm?: true }>> = {
   down: { rows: [12, 16], cols: [0, 99], warm: true },
   left: { rows: [11, 14], cols: [12, 17] },
   right: { rows: [11, 14], cols: [26, 31] },
+  // the watering frames: the walk-right head a row lower and a cell right
+  waterRight: { rows: [12, 15], cols: [28, 33] },
+  waterLeft: { rows: [12, 15], cols: [10, 15] },
 };
 const cache = new WeakMap<object, string>();
 export function eyesOf(dir: Dir, frame: { sprite: string[]; colors: string[] }): string {

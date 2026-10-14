@@ -4601,3 +4601,21 @@ pre {
   border-color: #8ff3ff;
   color: #fff;
 }
+
+/* watering: the tool held behind the hand (App.tsx's waterFrame): a point
+   at the hand that the tool hangs from, turned as it pours */
+.rig-water-tool {
+  position: absolute;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+.rig-water-tool > pre {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  line-height: 1;
+  white-space: pre;
+  transform-origin: 0 0;
+}

@@ -603,8 +603,8 @@
     {
       "id": "prop-wooden-directional-sign-3-1",
       "asset": "prop-wooden-directional-sign-3",
-      "x": 50,
-      "y": 40,
+      "x": 49.76,
+      "y": 39.6,
       "scale": 0.08,
       "look": {
         "sat": 129,

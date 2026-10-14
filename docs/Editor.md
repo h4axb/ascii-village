@@ -74,6 +74,11 @@ The inspector (shown when something is selected) edits x, y, scale and
 rotation; for placed objects also their kind, and for new assets the
 settings every copy shares.
 
+Its **Colour** group recolours just that object: saturation and brightness
+(100% = as drawn) and tint (turns the hue, −180°…180°); *reset colours*
+puts it back. Saved per object (`look` in `world.json`), for placed and
+built-in objects alike.
+
 The wayfinder sign, the Wayfinder (v4) and the Glyph Generator's wooden directional sign are made
 of parts (`src/wayfinder.ts`, `layers` in their asset files): the inspector has a
 **Sign** group to flip the whole sign and, per board (top / middle / bottom),

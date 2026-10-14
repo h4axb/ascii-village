@@ -38,6 +38,7 @@ import {
   startScreenOf,
   startFrame,
   START_PLAYER_BOX,
+  cleanLook,
 } from '../world';
 import type { Ent, EntityKind, WorldDoc, WorldPose, WorldAdded, StartScreen } from '../world';
 import type { SignSettings } from '../wayfinder';
@@ -478,19 +479,31 @@ export function useWorldEditor(opts: {
     const added = doc.added.find((a) => a.id === id);
     const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<WorldPose>;
     if (clean.rotation === 0) clean.rotation = undefined;
+    // a look back at the drawing's own colours: none at all
+    const lookSet = 'look' in patch;
+    const look = cleanLook(patch.look);
+    delete clean.look;
     if (added) {
       Object.assign(added, clean);
       if (added.rotation === undefined) delete added.rotation;
+      if (lookSet) {
+        if (look) added.look = look;
+        else delete added.look;
+      }
       return;
     }
     const base = BASE_ENTS.find((e) => e.id === id);
     if (!base) return;
     const cur = doc.moved[id] ?? { x: base.x, y: base.y };
     const pose: WorldPose = { ...cur, ...clean };
+    if (lookSet) {
+      if (look) pose.look = look;
+      else delete pose.look;
+    }
     if (pose.rotation === undefined) delete pose.rotation;
     if (pose.scale === undefined || pose.scale === base.scale) delete pose.scale;
     // back where it started: no entry at all
-    if (pose.x === base.x && pose.y === base.y && pose.scale === undefined && !pose.rotation) delete doc.moved[id];
+    if (pose.x === base.x && pose.y === base.y && pose.scale === undefined && !pose.rotation && !pose.look) delete doc.moved[id];
     else doc.moved[id] = pose;
   }
 

@@ -542,7 +542,7 @@
       "asset": "decoration-wooden-directional-sign",
       "x": 55.6,
       "y": 40.55,
-      "scale": 0.1,
+      "scale": 0.09,
       "sign": {
         "panels": [
           {
@@ -623,7 +623,7 @@
     {
       "id": "wayfinder-1",
       "asset": "wayfinder",
-      "x": 54,
+      "x": 53,
       "y": 40,
       "scale": 0.08,
       "sign": {
@@ -638,6 +638,11 @@
             "tilt": -15
           }
         ]
+      },
+      "look": {
+        "sat": 75,
+        "bright": 122,
+        "tint": -7
       }
     },
     {
@@ -655,9 +660,14 @@
           {},
           {
             "flip": true,
-            "tilt": -23
+            "tilt": -30
           }
         ]
+      },
+      "look": {
+        "sat": 115,
+        "bright": 103,
+        "tint": 1
       }
     }
   ],

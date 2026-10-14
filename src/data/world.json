@@ -538,26 +538,6 @@
       "scale": 0.3
     },
     {
-      "id": "decoration-wooden-directional-sign-1",
-      "asset": "decoration-wooden-directional-sign",
-      "x": 55.6,
-      "y": 40.55,
-      "scale": 0.09,
-      "sign": {
-        "panels": [
-          {
-            "flip": true,
-            "tilt": 23
-          },
-          {},
-          {
-            "flip": true,
-            "tilt": -30
-          }
-        ]
-      }
-    },
-    {
       "id": "stone-mossy-4-1",
       "asset": "stone-mossy-4",
       "x": 25,
@@ -621,27 +601,14 @@
       "scale": 0.3
     },
     {
-      "id": "wayfinder-1",
-      "asset": "wayfinder",
-      "x": 51,
-      "y": 39,
+      "id": "prop-wooden-directional-sign-3-1",
+      "asset": "prop-wooden-directional-sign-3",
+      "x": 50,
+      "y": 40,
       "scale": 0.08,
-      "sign": {
-        "panels": [
-          {
-            "flip": true,
-            "tilt": 30
-          },
-          {},
-          {
-            "flip": true,
-            "tilt": -17
-          }
-        ]
-      },
       "look": {
-        "sat": 75,
-        "bright": 122,
+        "sat": 129,
+        "bright": 108,
         "tint": -7
       }
     }

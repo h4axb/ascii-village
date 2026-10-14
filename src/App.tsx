@@ -1723,7 +1723,7 @@ function Game() {
   //   clicking a distant entity on another island anyway, since the click
   //   handler itself never checked distance or reachability at all.
   // - Mitchy and the buildings (house/shop, plus 'hotspot' — the invisible
-  //   hit-boxes for the chair/door/clothesline are literally part of the
+  //   hit-boxes for the door/clothesline are literally part of the
   //   house's own picture) go further: CLOSE range only, same distance
   //   Mitchy's own greet-bubble already uses below, so you can't open the
   //   shop or talk to the cat from across the map just because it's on

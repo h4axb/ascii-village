@@ -41,21 +41,13 @@ export interface InteractionCopy {
 // already existed and worked, it just had nothing pointing at it.
 export type HotspotInfo =
   | { act: 'outfit'; region: 'shorts' | 'shirt'; bakedHex: string }
-  | { name: string; question: string; act: 'house' }
-  // no sit-down animation exists yet — saying yes just acknowledges it rather
-  // than silently doing nothing, so the chair doesn't read as broken
-  | { name: string; question: string; act: 'sit' };
+  | { name: string; question: string; act: 'house' };
 
 export const HOTSPOT_INFO: Record<string, HotspotInfo> = {
   'house-cloth-shorts': { act: 'outfit', region: 'shorts', bakedHex: '#fef5e6' },
   'house-cloth-shirt-purple': { act: 'outfit', region: 'shirt', bakedHex: '#cba7cb' },
   'house-cloth-shirt-yellow': { act: 'outfit', region: 'shirt', bakedHex: '#ffd379' },
   'house-cloth-shirt-green': { act: 'outfit', region: 'shirt', bakedHex: '#afb787' },
-  'house-chair': {
-    name: 'the armchair',
-    question: 'Do you want to sit on the armchair?',
-    act: 'sit',
-  },
   'house-door': {
     name: 'the house',
     question: 'Do you want to check the house?',
@@ -210,7 +202,6 @@ export function runInteraction(ref: InteractRef, ctx: InteractCtx, actions: Inte
       const info = HOTSPOT_INFO[e.id];
       if (!info) break;
       if (info.act === 'house') actions.openHouseMenu();
-      else if (info.act === 'sit') actions.say('you rock back and forth for a while.');
       else {
         const hangingHex = ctx.lineColors[e.id] ?? info.bakedHex;
         actions.wearFromLine(e.id, info.region, hangingHex);

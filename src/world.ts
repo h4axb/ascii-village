@@ -26,7 +26,7 @@ export type EntityKind =
   | 'cat'
   | 'house'
   // An invisible interaction zone pinned over part of another sprite — the
-  // clothesline garments, the chair and the front door are all painted INTO
+  // clothesline garments and the front door are all painted INTO
   // the house's own picture, so they need a hit-box of their own to be
   // hoverable and clickable. Never drawn (styles.css hides it), never solid.
   | 'hotspot'
@@ -635,7 +635,7 @@ const STRUCT_ENTS_BASE: Ent[] = [
   // The stone blocks flanking the stairs block through the house's own
   // collider (world.json's colliders.house), so the editor can paint them.
   // Invisible hit-boxes over the parts of that one picture you can interact
-  // with: the rocking chair and the four garments on the line. Positions are
+  // with: the front door and the four garments on the line. Positions are
   // the master-grid cells each one occupies — taken directly from
   // house_simplified_regions.json (the same file that marked the source
   // image's regions), run through the anchor formula above, not eyeballed.
@@ -647,15 +647,13 @@ const STRUCT_ENTS_BASE: Ent[] = [
   // overlapping and fighting over the same click. Padded ROWS instead (top
   // and bottom, all four garments already share rows 25-29/26-29, so a row
   // pad extends into the house body above and the porch below — harmless,
-  // nothing else claims that space) and left the chair's columns padded too,
-  // since it has no horizontal neighbour to collide with.
+  // nothing else claims that space).
   ...(
     [
       { id: 'house-cloth-shorts', col: 7, row: 24, w: 6, h: 7 },
       { id: 'house-cloth-shirt-purple', col: 14, row: 25, w: 5, h: 6 },
       { id: 'house-cloth-shirt-yellow', col: 21, row: 25, w: 5, h: 6 },
       { id: 'house-cloth-shirt-green', col: 28, row: 25, w: 4, h: 6 },
-      { id: 'house-chair', col: 5, row: 33, w: 10, h: 12 },
       // front_door region (house_simplified_regions.json): cols[23,30] rows[30,40]
       { id: 'house-door', col: 23, row: 30, w: 8, h: 11 },
     ] as const

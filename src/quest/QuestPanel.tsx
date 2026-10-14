@@ -47,6 +47,13 @@ function BookmarkIcon() {
     </svg>
   );
 }
+function BulbIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+      <path d="M9 17.5h6M10 20.5h4M12 3.5a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.2 1.1 2v.7h5v-.7c0-.8.4-1.5 1.1-2A6 6 0 0 0 12 3.5z" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
 function KeyboardIcon() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
@@ -67,8 +74,16 @@ export function QuestPanel({
   controls,
   onToggle,
   onControls,
+  intro,
+  onHint,
+  hintBusy,
+  blinkControls,
 }: {
   line: string; // the questline title
+  intro?: string; // the questline's one-line intro, under its title
+  onHint?: () => void; // the light bulb: play this step's hint
+  hintBusy?: boolean; // a hint is playing
+  blinkControls?: boolean; // the Controls bookmark blinks (a hint)
   objective: Objective;
   task?: string; // overrides objective.task (e.g. once the boat is crafted)
   sub?: string; // overrides objective.sub
@@ -97,7 +112,15 @@ export function QuestPanel({
   else
     body = (
       <>
-        <div className="qp-line">{line}</div>
+        <div className="qp-head">
+          <div className="qp-line">{line}</div>
+          {onHint && (
+            <button className="qp-hint" onClick={onHint} disabled={hintBusy} aria-label="hint" title="Hint">
+              <BulbIcon />
+            </button>
+          )}
+        </div>
+        {intro && <div className="qp-intro">{intro}</div>}
         <div className="qp-title">{objective.title}</div>
         <div className="qp-task">
           {objective.icon && <span className="qp-icon">{objective.icon}</span>}
@@ -132,7 +155,7 @@ export function QuestPanel({
           <BookmarkIcon />
         </button>
         <button
-          className={'qp-tab' + (open && view === 'controls' ? ' on' : '')}
+          className={'qp-tab' + (open && view === 'controls' ? ' on' : '') + (blinkControls ? ' blink' : '')}
           onClick={onControls}
           aria-label="controls"
           title="Controls"

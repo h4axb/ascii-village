@@ -31,7 +31,7 @@ export const QUEST_ENABLED = QUEST_ORDER !== null;
 export const FINAL_SURVEY_URL = 'https://tally.so/r/7R8900';
 
 export type StepId =
-  | 'controls'
+  | 'explore'
   | 'gather'
   | 'store'
   | 'mitchy'
@@ -44,146 +44,261 @@ export type StepId =
   | 'companion'
   | 'report';
 
+// A step's hint: played only when the player clicks the light bulb in the
+// quest panel (App.tsx's runHint). `focus` locks the player and glides the
+// camera to the objective (then back); `bubble` leaves a "!" over it until
+// the step is done; `sparkles` twinkle around the nearest resources; `blink`
+// flashes the Controls bookmark; `card` is a picture hint in a modal - its
+// pages describe the picture in [brackets] until the art is drawn.
+export type HintTarget = 'resource' | 'house' | 'mitchy' | 'pond' | 'garden' | 'crop';
+export interface Hint {
+  focus?: HintTarget;
+  bubble?: boolean;
+  sparkles?: boolean;
+  blink?: 'controls';
+  card?: { pages: string[] };
+}
+
 export interface Objective {
   id: StepId;
   title: string;
   icon?: string;
   task?: string; // the line next to the icon
-  target?: number; // a progress counter (gather)
-  sub: string;
+  target?: number; // a progress counter (gather, explore)
+  sub: string; // the goal
+  hint: Hint;
 }
 export interface Questline {
   title: string;
+  intro: string; // under the questline title
   steps: Objective[];
   done: { title: string; text: string }; // the QUEST COMPLETE popup
 }
 
-export const GATHER_TARGET = 12;
+export const GATHER_TARGET = 3;
+export const EXPLORE_TILES = 10; // YOUR FIRST STEPS: walk this far
 
 export const QUESTLINE_1: Questline = {
   title: 'NEW BEGINNINGS',
+  intro: 'Your new life on ASCIIA Bay starts here.',
   steps: [
     {
-      id: 'controls',
-      title: 'LEARN THE CONTROLS',
-      task: 'Open the Controls panel',
-      sub: 'Take a moment to see how to move, interact, and explore the island.',
+      id: 'explore',
+      title: 'YOUR FIRST STEPS',
+      icon: '👣',
+      task: 'Walk around a little',
+      sub: 'Look around a little to orientate.',
+      hint: { blink: 'controls' },
     },
     {
       id: 'gather',
-      title: 'FIELD GATHERING',
+      title: 'LITTLE THINGS ADD UP',
       icon: '🌸',
       task: `Collect ${GATHER_TARGET} resources`,
       target: GATHER_TARGET,
-      sub: 'Look around the island and gather materials growing in the field.',
+      sub: 'Gather a few useful things to start your new life here.',
+      hint: { focus: 'resource', sparkles: true },
     },
     {
       id: 'store',
-      title: 'A PLACE TO KEEP THINGS',
+      title: 'MAKE YOURSELF AT HOME',
       icon: '🏠',
-      task: 'Find your house and store one item',
-      sub: 'Your house is to the north. Open the map if you need help finding it, then store one gathered item there.',
+      task: 'Store something at home',
+      sub: 'Find a place for the things you’ve gathered.',
+      hint: { focus: 'house', bubble: true },
     },
     {
       id: 'mitchy',
-      title: 'FIND MITCHY',
+      title: 'CHECK IN WITH MITCHY',
       icon: '🐾',
-      task: 'Return to Mitchy',
-      sub: 'You have the basics down. Mitchy should be waiting for you.',
+      task: 'Talk to Mitchy',
+      sub: 'Let Mitchy know how you’re settling in.',
+      hint: { focus: 'mitchy', bubble: true },
     },
     {
       id: 'vehicle',
-      title: 'BUILD A WAY ACROSS',
+      title: 'BEYOND THE SHORE',
       icon: '🛶',
-      task: 'Craft a water vehicle',
-      sub: 'Use Mitchy’s crafting token to create something that can carry you across the water.',
+      task: 'Craft a way across the water',
+      sub: 'Find your own way across the water to Mitchy’s shop.',
+      hint: {
+        card: {
+          pages: [
+            '[Picture: a little boat inside a speech bubble]\nUse the crafting token from your inventory to make something that floats, then place it on the water.',
+          ],
+        },
+      },
     },
   ],
-  done: { title: 'NEW BEGINNINGS', text: 'You found your footing on ASCIIA Bay.' },
+  done: { title: 'NEW BEGINNINGS', text: 'Your first adventure brought you all the way across the bay!' },
 };
-
-// Questline 2 and the replay share these steps (the replay's texts differ
-// only where the user's spec words them differently)
-const growing = (replay: boolean): Objective[] => [
-  {
-    id: 'tool',
-    title: 'PREPARE YOUR GARDEN',
-    icon: '💧',
-    task: 'Craft a watering tool',
-    sub: replay
-      ? 'Buy a crafting token and create something you can use to water plants.'
-      : 'Buy a crafting token from Mitchy’s shop and create something you can use to water plants.',
-  },
-  {
-    id: 'fill',
-    title: 'FILL YOUR WATERING TOOL',
-    icon: '💦',
-    task: 'Fill the watering tool',
-    sub: 'Head to the pond in the south of the main island and fill your watering tool.',
-  },
-  {
-    id: 'plant',
-    title: 'PLANT SOMETHING',
-    icon: '🌱',
-    task: 'Plant a seed',
-    sub: replay
-      ? 'Choose a planting spot and plant a seed.'
-      : 'Choose a planting spot and plant a seed. You can find seeds while gathering plants.',
-  },
-  {
-    id: 'water',
-    title: 'HELP IT GROW',
-    icon: '💧',
-    task: 'Water the plant',
-    sub: 'Use your filled watering tool on the planted seed.',
-  },
-  {
-    id: 'harvest',
-    title: 'FIRST HARVEST',
-    icon: '🌿',
-    task: 'Harvest the plant',
-    sub: replay
-      ? 'Harvest the crop and sell it for the money you need.'
-      : 'Your crop is ready. Harvest it and see what it is worth.',
-  },
-  {
-    id: 'companion',
-    title: 'A SMALL COMPANION',
-    icon: '🐾',
-    task: 'Craft and equip a companion',
-    sub: replay
-      ? 'Sell your harvest, buy another crafting token, and create a little companion.'
-      : 'Sell your harvest, buy another crafting token, and create a little companion for your journey.',
-  },
-  {
-    id: 'report',
-    title: 'REPORT BACK',
-    icon: '🐈',
-    task: 'Return to Mitchy',
-    sub: replay ? 'Return to Mitchy when you’re finished.' : 'Show Mitchy what you’ve learned.',
-  },
-];
 
 export const QUESTLINE_2: Questline = {
   title: 'GROWING ROOTS',
-  steps: growing(false),
-  done: { title: 'GROWING ROOTS', text: 'You’ve learned the basics of life on ASCIIA Bay.' },
+  intro: 'Time to make this little island feel more like home.',
+  steps: [
+    {
+      id: 'tool',
+      title: 'A GARDEN OF YOUR OWN',
+      icon: '💧',
+      task: 'Craft a watering tool',
+      sub: 'Create something to help your first plant grow.',
+      hint: {
+        card: {
+          pages: [
+            '[Picture: a watering can inside a speech bubble]\nBuy a crafting token in Mitchy’s shop and create something that can water plants.',
+          ],
+        },
+      },
+    },
+    {
+      id: 'fill',
+      title: 'A LITTLE WATER GOES A LONG WAY',
+      icon: '💦',
+      task: 'Fill it at the pond',
+      sub: 'Find some fresh water for your new creation.',
+      hint: { focus: 'pond', bubble: true },
+    },
+    {
+      id: 'plant',
+      title: 'PUT DOWN ROOTS',
+      icon: '🌱',
+      task: 'Plant your seed',
+      sub: 'Find the perfect little spot for your seed.',
+      hint: { focus: 'garden', bubble: true },
+    },
+    {
+      id: 'water',
+      title: 'HELP IT FLOURISH',
+      icon: '💧',
+      task: 'Water your plant',
+      sub: 'Give your new plant the care it needs to grow.',
+      hint: {
+        card: {
+          pages: [
+            '[Picture: the I key inside a speech bubble]\nPress I to open your inventory.',
+            '[Picture: the inventory opens, the watering can is clicked and equipped - equip animation]\nHold your watering tool, then walk up to your plant and press F.',
+          ],
+        },
+      },
+    },
+    {
+      id: 'harvest',
+      title: 'THE FIRST HARVEST',
+      icon: '🌿',
+      task: 'Harvest your plant',
+      sub: 'Enjoy the first fruits of your care.',
+      hint: { focus: 'crop', bubble: true },
+    },
+    {
+      id: 'companion',
+      title: 'A FRIEND OF YOUR OWN',
+      icon: '🐾',
+      task: 'Craft and equip a companion',
+      sub: 'Bring a little companion into your new life.',
+      hint: { focus: 'mitchy', bubble: true },
+    },
+    {
+      id: 'report',
+      title: 'SOMETHING TO SHOW',
+      icon: '🐈',
+      task: 'Talk to Mitchy',
+      sub: 'Share what you’ve accomplished with Mitchy.',
+      hint: { focus: 'mitchy', bubble: true },
+    },
+  ],
+  done: { title: 'GROWING ROOTS', text: 'Little by little, this place is becoming your own.' },
 };
 
 export const REPLAY: Questline = {
   title: 'SECOND JOURNEY',
+  intro: 'A familiar journey, with another way to bring your ideas to life.',
   steps: [
     {
       id: 'vehicle',
-      title: 'CROSS THE WATER',
+      title: 'ACROSS THE BAY, ONCE MORE',
       icon: '🛶',
-      task: 'Craft a water vehicle',
-      sub: 'Use your crafting token to create something that can carry you across the water.',
+      task: 'Craft a way across the water',
+      sub: 'Create another way to reach Mitchy’s shop.',
+      hint: { card: { pages: ['[Picture: a ship with a ? on it]\nYour crafting token can make something that floats.'] } },
     },
-    ...growing(true),
+    {
+      id: 'tool',
+      title: 'A GARDEN OF YOUR OWN',
+      icon: '💧',
+      task: 'Craft a watering tool',
+      sub: 'Create something to help your next plant grow.',
+      hint: { card: { pages: ['[Picture: a watering can with a ? above it]\nCreate something that can water plants.'] } },
+    },
+    {
+      id: 'fill',
+      title: 'A LITTLE WATER GOES A LONG WAY',
+      icon: '💦',
+      task: 'Fill it at the pond',
+      sub: 'Find some fresh water for your new creation.',
+      hint: { focus: 'pond', bubble: true },
+    },
+    {
+      id: 'plant',
+      title: 'PUT DOWN ROOTS',
+      icon: '🌱',
+      task: 'Plant your seed',
+      sub: 'Find a little spot for your next seed.',
+      hint: { focus: 'garden', bubble: true },
+    },
+    {
+      id: 'water',
+      title: 'HELP IT FLOURISH',
+      icon: '💧',
+      task: 'Water your plant',
+      sub: 'Help your plant grow.',
+      hint: { card: { pages: ['[Picture: the player walks up to the seed, then the F key]\nWith your watering tool in hand, walk up to your plant and press F.'] } },
+    },
+    {
+      id: 'harvest',
+      title: 'THE FIRST HARVEST',
+      icon: '🌿',
+      task: 'Harvest your plant',
+      sub: 'Gather what you’ve grown.',
+      hint: { card: { pages: ['[Picture: the player stands next to the grown crop, the F key]\nOnce it has grown, stand next to it and press F.'] } },
+    },
+    {
+      id: 'companion',
+      title: 'A FRIEND OF YOUR OWN',
+      icon: '🐾',
+      task: 'Craft and equip a companion',
+      sub: 'Bring another little companion into your world.',
+      hint: { focus: 'mitchy' },
+    },
+    {
+      id: 'report',
+      title: 'SOMETHING TO SHOW',
+      icon: '🐈',
+      task: 'Talk to Mitchy',
+      sub: 'Share your creations with Mitchy.',
+      hint: { focus: 'mitchy', bubble: true },
+    },
   ],
-  done: { title: 'SECOND JOURNEY', text: 'You’ve completed the second journey.' },
+  done: { title: 'SECOND JOURNEY', text: 'You’ve explored two different ways to bring your ideas to life!' },
 };
+
+// The housewarming gift (after the first trip to the shop, and again in the
+// replay): two seeds, named only by a hint so what grows stays a surprise
+export type SeedKind = 'strawberry' | 'pumpkin';
+export const SEED_CHOICES: { kind: SeedKind; option: string; name: string; desc: string }[] = [
+  {
+    kind: 'strawberry',
+    option: 'Something small and sweet',
+    name: 'Sweet little seed',
+    desc: 'Mitchy’s gift. It dreams of something small, red and sweet.',
+  },
+  {
+    kind: 'pumpkin',
+    option: 'Something big and round',
+    name: 'Hefty round seed',
+    desc: 'Mitchy’s gift. It dreams of something big, round and orange.',
+  },
+];
 
 // ---- Mitchy's lines (mysterious, enthusiastic, a little odd, warm) ----
 export const LINES = {
@@ -199,6 +314,10 @@ export const LINES = {
   // Cinematic B and C: arriving at the shop island (equivalent in length)
   arrive1: 'There it is. My little shop. Come by when you’ve got a moment, I may have something useful for you.',
   arrive2: 'There it is again. My little shop. Come by when you’ve got a moment, I may have something useful.',
+  // the housewarming gift at the shop (SEED_CHOICES)
+  giftOffer: 'Welcome to my little shop! Every new villager gets a housewarming gift. Pick one, but I won’t tell you what grows.',
+  giftOfferAgain: 'Back again! Here, another seed for your garden. Which one this time?',
+  giftThanks: 'Good pick. Plant it somewhere nice and give it a drink.',
   // the temporary option when reporting back
   doneOption: 'I’m done.',
   doneReply: 'Hm. Not bad at all. You’ve picked things up quickly.',

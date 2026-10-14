@@ -785,6 +785,10 @@ export const ICEFLOWER = [
 // A seed (dropped by wildflowers) and the Sunbloom it grows into
 export const SEED = [' . ', '(o)'];
 export const SUNBLOOM = ['\\|/', '-@-', '/|\\', ' | '];
+// Mitchy's gift seeds grow into one of these (quests.ts's SEED_CHOICES):
+// placeholder art, a strawberry plant with its berries and a pumpkin on its vine
+export const STRAWBERRY = [' \\v/ ', '(o)(o)', ' \\|/ '];
+export const PUMPKIN = ['  _/_ ', ' (@@@)', '(@@@@@)'];
 
 // Landing banner: "ASCIIA" over "BAY", in the same figlet "standard"
 // letterforms as before. Letters carry their own padding and are simply

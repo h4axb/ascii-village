@@ -11,29 +11,35 @@ The other links are unchanged.
 
 ## Flow
 
-**NEW BEGINNINGS**
-1. Learn the controls.
-2. Gather 12 resources.
-3. Store an item at the house.
-4. Find Mitchy. *Cinematic A:* Mitchy hands over the crafting token.
-5. Craft a water vehicle and place it on the water.
-6. QUEST COMPLETE. *Cinematic B:* sail to the shop island.
+**NEW BEGINNINGS** (*Your new life on ASCIIA Bay starts here.*)
+1. YOUR FIRST STEPS: walk around a little (10 tiles).
+2. LITTLE THINGS ADD UP: gather 3 resources.
+3. MAKE YOURSELF AT HOME: store an item at the house.
+4. CHECK IN WITH MITCHY. *Cinematic A:* Mitchy hands over the crafting token.
+5. BEYOND THE SHORE: craft a water vehicle and place it on the water. *Cinematic B:* sail to the shop island, then **NEW BEGINNINGS COMPLETE**.
+6. **The seed gift.** Mitchy offers a housewarming seed, named only by a hint: "Something small and sweet" (strawberries) or "Something big and round" (a pumpkin). The pick goes into the bag (`quest.seedKind`).
 
-**GROWING ROOTS**
-1. Craft a watering tool from a token bought at the shop.
-2. Fill it at the pond.
-3. Plant a seed.
-4. Water it.
-5. Harvest it.
-6. Sell the Sunbloom (20 coins), buy a token, craft a companion and equip it.
-7. Report back with "I'm done."
-8. Mitchy's line, then QUEST COMPLETE.
+**GROWING ROOTS** (*Time to make this little island feel more like home.*)
+1. A GARDEN OF YOUR OWN: craft a watering tool from a token bought at the shop.
+2. A LITTLE WATER GOES A LONG WAY: fill it at the pond.
+3. PUT DOWN ROOTS: plant the gift seed.
+4. HELP IT FLOURISH: water it (F next to it, holding the tool).
+5. THE FIRST HARVEST: harvest it (F once grown). Strawberries and pumpkins both sell for 20 coins, one token.
+6. A FRIEND OF YOUR OWN: craft a companion and equip it.
+7. SOMETHING TO SHOW: report back with "I'm done.", then **GROWING ROOTS COMPLETE**.
 
 **Rating questions (condition 1)**, then **Continue**, then the **black transition screen**, then **Begin second part**.
 
-**SECOND JOURNEY (condition 2).** The game restarts right after Cinematic A. *Cinematic C* is the same sail as B. The steps from the watering tool to "I'm done" follow, then QUEST COMPLETE.
+**SECOND JOURNEY (condition 2)** (*A familiar journey, with another way to bring your ideas to life.*): the game restarts right after Cinematic A.
+1. ACROSS THE BAY, ONCE MORE: the vehicle. *Cinematic C* (the same sail), then the seed gift again.
+2. The seven GROWING ROOTS steps, from the watering tool to SOMETHING TO SHOW, with shorter texts, then **SECOND JOURNEY COMPLETE**.
 
 **Rating questions (condition 2)**, then Mitchy's closing lines, then **Open final survey**.
+
+**Hints.** The light bulb at the top right of the quest panel plays the current step's hint (`hint` on each objective). Hints never play on their own.
+- **Focus hints:** lock the player, glide the camera to the objective (resource, house, Mitchy, pond, garden bed or your plant) and back, and can leave a "!" over it until the step changes. The resource hint also sparkles the 3 nearest resources.
+- **YOUR FIRST STEPS:** blinks the Controls bookmark.
+- **Picture hints:** open a modal whose [bracketed] line describes the picture to be drawn.
 
 ## What to edit
 

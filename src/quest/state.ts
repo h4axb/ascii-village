@@ -1,7 +1,7 @@
 // Quest progress (SaveState.quest) and the small pure helpers around it.
 // See quests.ts for the flow itself.
 import type { SaveState } from '../save';
-import { QUEST_ORDER, QUESTLINE_1, QUESTLINE_2, REPLAY, type Cond, type Objective, type Questline, type StepId } from './quests';
+import { QUEST_ORDER, QUESTLINE_1, QUESTLINE_2, REPLAY, type Cond, type Objective, type Questline, type StepId, type SeedKind } from './quests';
 
 // Where in the test the player is:
 //   q1 / q2      questlines 1 and 2 (condition 1)
@@ -26,7 +26,9 @@ export interface QuestBoat {
 export interface QuestState {
   part: QuestPart;
   step: number; // index into the current questline's steps
-  gathered: number; // FIELD GATHERING's counter
+  gathered: number; // LITTLE THINGS ADD UP's counter
+  walked?: number; // YOUR FIRST STEPS' counter (tiles walked)
+  seedKind?: SeedKind; // the housewarming gift's seed (what it grows)
   waterTool?: string; // the crafted watering tool's ownedId
   filled?: boolean; // the watering tool holds water
   seedCrop?: string; // the planted seed's crop id

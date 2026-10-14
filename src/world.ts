@@ -18,7 +18,7 @@ export const GROUND_H = MAP_H * TILE_LN;
 
 // seed: dropped now and then by a flower (plant it, water it once); bloom:
 // what a seed grows into, the crop worth one crafting token
-export type ItemType = 'flower' | 'stone' | 'date' | 'cactus' | 'fern' | 'iceflower' | 'seed' | 'bloom';
+export type ItemType = 'flower' | 'stone' | 'date' | 'cactus' | 'fern' | 'iceflower' | 'seed' | 'bloom' | 'strawberry' | 'pumpkin';
 export type EntityKind =
   | ItemType
   | 'palm'

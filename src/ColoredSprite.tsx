@@ -73,6 +73,8 @@ interface Props {
   // frames where the eye row hasn't been verified (e.g. walk-cycle frames
   // with different crop/padding — see docs/character-sprite-parts/README.md).
   eyeRow?: number;
+  // further eye cells ("x,y" keys, space-separated): a walk frame's (playerEyes.ts)
+  eyes?: string;
   // palette keys whose glyphs sway left and right (solidCells only): the
   // glyph moves, its cell's backing stays, so no gap opens
   sway?: string;
@@ -99,6 +101,7 @@ function ColoredSpriteImpl({
   perCell,
   solidCells,
   eyeRow,
+  eyes,
   sway,
   blend,
   onClick,
@@ -123,13 +126,14 @@ function ColoredSpriteImpl({
         {sprite.map((line, y) => {
           const crow = colors![y] ?? '';
           const isEyeRow = eyeRow === y;
+          const eyeSet = eyes ? new Set(eyes.split(' ')) : null;
           const cells: React.ReactNode[] = [];
           let gap = '';
           for (let x = 0; x < line.length; x++) {
             const ch = line[x];
             const key = crow[x];
             const hex = key ? palette![key] : undefined;
-            const eyeHere = isEyeRow && !!hex && isWarmBrown(hex);
+            const eyeHere = (isEyeRow && !!hex && isWarmBrown(hex)) || !!eyeSet?.has(`${x},${y}`);
             if (ch === ' ' && !eyeHere) {
               gap += ' ';
               continue;
@@ -340,6 +344,7 @@ function propsAreEqual(prev: Props, next: Props): boolean {
     prev.perCell === next.perCell &&
     prev.solidCells === next.solidCells &&
     prev.eyeRow === next.eyeRow &&
+    prev.eyes === next.eyes &&
     prev.sway === next.sway &&
     prev.blend === next.blend &&
     prev.texture === next.texture &&

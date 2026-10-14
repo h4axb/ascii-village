@@ -31,6 +31,7 @@ export interface MapCharacterEntry {
   palette?: Record<string, string>;
   color?: string; // base colour for mono sprites
   solid?: boolean; // per-cell backing, as the character is drawn in the world
+  eyeRow?: number; // the face's eye row, drawn dark (with solid)
   ringColor?: string; // border accent so the player/Mitchy read as distinct
 }
 
@@ -192,7 +193,7 @@ function Head({ c, size }: { c: MapCharacterEntry; size: number }) {
       className="map-head"
       style={{ width: size, height: size, borderColor: c.ringColor ?? 'var(--ui-accent)', fontSize }}
     >
-      <ColoredSprite sprite={c.sprite} colors={c.colors} palette={c.palette} color={c.color} solidCells={c.solid} />
+      <ColoredSprite sprite={c.sprite} colors={c.colors} palette={c.palette} color={c.color} solidCells={c.solid} eyeRow={c.eyeRow} />
     </div>
   );
 }

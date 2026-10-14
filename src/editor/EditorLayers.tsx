@@ -5,6 +5,7 @@
 import { ColoredSprite } from '../ColoredSprite';
 import { MARKER_REGISTRY } from '../sceneMarkers';
 import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint, startFrame, startScreenSize, startTitleUrl, START_PLAYER_FRAME, START_PLAYER_K, START_PLAYER_BOX } from '../world';
+import { eyesOf } from '../playerEyes';
 import { PlayerShadow } from '../PlayerShadow';
 import * as S from '../sprites';
 import type { Ent } from '../world';
@@ -108,6 +109,7 @@ function StartLayer({ ed }: { ed: WorldEditor }) {
           sprite={fr.sprite}
           colors={fr.colors}
           palette={S.WALK_DOWN_PALETTE}
+          eyes={eyesOf('down', fr)}
           solidCells
         />
       </div>

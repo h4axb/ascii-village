@@ -165,7 +165,7 @@ import { flushFeedbackOutbox, newFeedbackId, playerId, sendFeedback, SESSION } f
 import { CraftPrefsSettings } from './CraftFeedback';
 import { LINK } from './link';
 import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
-import { QUEST_ENABLED, GATHER_TARGET, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, type StepId } from './quest/quests';
+import { QUEST_ENABLED, GATHER_TARGET, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, DISCOVERIES, type StepId, type DiscoveryId } from './quest/quests';
 import { boatReachable, boatRoute, seaRoute, pathLength, pointAt, type Pt } from './quest/route';
 import { QuestPanel, type QuestView } from './quest/QuestPanel';
 import { QuestComplete, RatingSequence, TestTransition } from './quest/TestScreens';
@@ -547,6 +547,22 @@ const FRESH_SHOP: Modal = {
 };
 
 type Bubble = { text: string; width: number } | null;
+
+// A first-discovery toast (see discover in Game): floats in at the top
+// centre, holds 2 s, floats out, then hands over to the next one.
+const DISCOVERY_MS = 200 + 2000 + 300;
+function DiscoveryToast({ title, sub, onDone }: { title: string; sub: string; onDone(): void }) {
+  useEffect(() => {
+    const t = window.setTimeout(onDone, DISCOVERY_MS);
+    return () => window.clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="discovery-toast" role="status" style={{ animationDuration: `${DISCOVERY_MS}ms` }}>
+      <div className="discovery-title">{title}</div>
+      <div className="discovery-sub">{sub}</div>
+    </div>
+  );
+}
 
 export default function App() {
   const [started, setStarted] = useState(false);
@@ -1192,6 +1208,11 @@ function Game() {
   const [lineColors, setLineColors] = useState<Record<string, string>>(
     () => saved?.lineColors ?? {},
   );
+  // First discoveries (quests.ts's DISCOVERIES): the ones already shown, and
+  // the toasts waiting to show (one at a time, top centre)
+  const [discoveries, setDiscoveries] = useState<string[]>(() => saved?.discoveries ?? []);
+  const discoveriesRef = useRef(discoveries);
+  const [discoveryQueue, setDiscoveryQueue] = useState<DiscoveryId[]>([]);
   // Recovery hatch: `resetOutfit()` in the browser console puts the player
   // and the clothesline back to their baked defaults. Goes through React
   // state (not a raw localStorage edit) so it can't lose a race against the
@@ -1650,6 +1671,7 @@ function Game() {
     coinGrants,
     outfit,
     lineColors,
+    discoveries,
     playerName,
     introDone,
     introStage,
@@ -3507,10 +3529,25 @@ function Game() {
     if (QUEST_ENABLED && introDone && !questRef.current) setQuest(freshQuest());
   }, [introDone]); // eslint-disable-line react-hooks/exhaustive-deps
   // a user test shouldn't depend on remembering to save: every quest step
-  // is written straight away
+  // (and every first discovery) is written straight away
   useEffect(() => {
     if (QUEST_ENABLED && quest) writeSave(snapRef.current());
-  }, [quest]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [quest, discoveries]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The first time the player does one of the basics during the quests, a
+  // toast says so (once each; saved, so a reload doesn't repeat it)
+  function discover(id: DiscoveryId) {
+    if (!QUEST_ENABLED || !questRef.current || discoveriesRef.current.includes(id)) return;
+    discoveriesRef.current = [...discoveriesRef.current, id];
+    setDiscoveries(discoveriesRef.current);
+    setDiscoveryQueue((q) => [...q, id]);
+  }
+  useEffect(() => {
+    if (modal?.t === 'settings') discover('settings');
+    if ((modal?.t === 'settings' && modal.page === 'controls') || (questOpen && questView === 'controls')) discover('controls');
+    if (modal?.t === 'houseMenu') discover('home');
+    if (mapOpen) discover('map');
+  }, [modal, mapOpen, questOpen, questView]); // eslint-disable-line react-hooks/exhaustive-deps
   // A run gets its participant id when its quests start (a new player, or
   // after New Game); it stays in the save, so a reload keeps it. Feedback
   // records are tagged with it (feedback/client.ts).
@@ -3983,6 +4020,7 @@ function Game() {
   function collect(e: Ent) {
     // wild spawns are derived, so collecting = recording an exception
     setRemoved((s) => new Set(s).add(e.id));
+    discover('resource');
     const item = COLLECT_AS[e.kind] ?? (e.kind as ItemType);
     setInv((v) => ({ ...v, [item]: v[item] + 1 }));
     // a flower now and then drops a seed (and always does while the
@@ -4176,6 +4214,15 @@ function Game() {
       if (gap > 1) continue;
       const dist = Math.hypot(s.x + 0.5 - pcx, s.y + 1 - pcy);
       if (!best || gap < best.gap || (gap === best.gap && dist < best.dist)) best = { ref: { kind: 'crop', slot: c.slot }, gap, dist };
+    }
+    // the garden gate in reach: open or close it
+    {
+      const { c0, c1 } = plot.door;
+      const gy = plot.rect.y1;
+      const gap = Math.max(Math.max(0, c0 - (player.x + PLAYER_T.wT - 1), player.x - c1), Math.abs(gy - feetY));
+      const dist = Math.hypot((c0 + c1 + 1) / 2 - pcx, gy + 1 - pcy);
+      if (gap <= 1 && (!best || gap < best.gap || (gap === best.gap && dist < best.dist)))
+        best = { ref: { kind: 'door', door: 'gate' }, gap, dist };
     }
     return best;
   })();
@@ -5886,7 +5933,15 @@ function Game() {
                       }}
                     >
                       <kbd className="fpop-key">F</kbd>
-                      <span className="fpop-name">{ref.kind === 'crop' ? `water ${copy.name.toLowerCase()}` : copy.name}</span>
+                      <span className="fpop-name">
+                        {ref.kind === 'crop'
+                          ? `water ${copy.name.toLowerCase()}`
+                          : ref.kind === 'door'
+                            ? doors[ref.door]
+                              ? 'close the door'
+                              : 'open the door'
+                            : copy.name}
+                      </span>
                     </div>
                   );
                 })()}
@@ -5911,6 +5966,16 @@ function Game() {
       </div>
 
       {!cinematic && <TouchControls onHold={holdStart} onRelease={holdEnd} onF={pressF} onI={toggleInventory} />}
+
+      {/* a first discovery: top centre, one at a time */}
+      {discoveryQueue[0] && (
+        <DiscoveryToast
+          key={discoveryQueue[0]}
+          title={DISCOVERIES[discoveryQueue[0]].title}
+          sub={DISCOVERIES[discoveryQueue[0]].sub}
+          onDone={() => setDiscoveryQueue((q) => q.slice(1))}
+        />
+      )}
 
       {/* ---- unified intro overlay stack ----
           Stages 1-14 (IntroA) render on top of everything else, including

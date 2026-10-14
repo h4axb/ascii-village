@@ -244,3 +244,15 @@ export const TRANSITION_TEXT = [
   'Your previous progress has not been lost.',
   'Continue whenever you’re ready.',
 ];
+
+// ---- first discoveries: a small toast the first time the player does each
+// of these during the quests (App.tsx's discover), playful since there's no
+// completion animation ----
+export type DiscoveryId = 'resource' | 'settings' | 'controls' | 'map' | 'home';
+export const DISCOVERIES: Record<DiscoveryId, { title: string; sub: string }> = {
+  resource: { title: 'A Pocketful of Possibilities', sub: 'Collect resources to use, store, or sell later.' },
+  settings: { title: 'A Little Know-How', sub: 'You can revisit Settings anytime.' },
+  controls: { title: 'You’re Getting the Hang of It', sub: 'You can revisit Controls anytime.' },
+  map: { title: 'The Lay of the Land', sub: 'Use your map to find your way around the island.' },
+  home: { title: 'A Place to Call Your Own', sub: 'Store your collected items safely here.' },
+};

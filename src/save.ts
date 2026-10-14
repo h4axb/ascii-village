@@ -45,6 +45,8 @@ export interface SaveState {
   // What's currently hanging on each clothesline hotspot (keyed by hotspot
   // id) — the other half of the wardrobe swap. Absent = still baked default.
   lineColors?: Record<string, string>;
+  // the first discoveries already shown (quests.ts's DISCOVERIES ids)
+  discoveries?: string[];
   // Player's chosen display name, set during Intro Part B's name-entry
   // panel. Absent on pre-Part-B saves; falls back to a default elsewhere.
   playerName?: string;

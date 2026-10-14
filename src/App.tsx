@@ -42,7 +42,7 @@ import {
   GARDEN_BED_SCALE,
 } from './world';
 import TerrainCanvas from './TerrainCanvas';
-import { resetTerrainStructs } from './terrain';
+import { resetTerrainStructs, rectOverWater } from './terrain';
 import { PlayerShadow } from './PlayerShadow';
 import type { Ent, ItemType, EntityKind } from './world';
 import {
@@ -315,6 +315,9 @@ const SAVE_SCREEN_MS = 1600; // the black saving screen stays at least this long
 const QUEST_SAIL_SPEED = 9;
 const MARKER_BOAT_LAUNCH = 'quest.boatLaunch'; // sceneMarkers.ts
 const LAND_REACH = 2.5;
+// the water kept between a sailing boat's hull and the sand: ~2-3 px each way
+// (a ch is ~8.4 px, an em 14)
+const BOAT_SHORE_GAP = { ch: 0.3, em: 0.2 };
 const BOARD_REACH = 3; // tiles from the player to the boat's edge to climb in // tiles from the boat to a shore click that lands
 const BOAT_SCALE = 1.9;
 // cinematic walking speeds (tiles/s): a calm stroll, slower than the player's own walk
@@ -1932,15 +1935,21 @@ function Game() {
     // sailing the quest's boat: only open water (landing goes through
     // questLand, which tests the shore spot with `landing`)
     if (ridingRef.current && !landing) {
-      // the WHOLE boat (centred under the player) stays on open water, never
-      // over the drawn sand
-      const box = sailingBoatBox(nx, ny) ?? { x0: nx, y0: ny, x1: nx + PLAYER_T.wT - 1, y1: ny + PLAYER_T.hT - 1 };
-      for (let ty = box.y0; ty <= box.y1; ty++) {
-        for (let tx = box.x0; tx <= box.x1; tx++) {
-          if (!isOpenWater(tx, ty)) return true;
-        }
+      // the WHOLE boat (centred under the player) stays on open water: its
+      // drawn hull, plus a hair of water round it (BOAT_SHORE_GAP), over
+      // nothing but water-coloured blocks, so it never touches the sand
+      const box = sailingBoatBox(nx, ny);
+      if (!box) {
+        for (let ty = ny; ty < ny + PLAYER_T.hT; ty++)
+          for (let tx = nx; tx < nx + PLAYER_T.wT; tx++) if (!isOpenWater(tx, ty)) return true;
+        return false;
       }
-      return false;
+      const k = box.b.scale ?? 1;
+      const cx0 = box.x0 * TILE_CH;
+      const cy0 = box.y0 * TILE_LN;
+      const cx1 = cx0 + k * Math.max(...box.b.sprite.map((l) => l.length));
+      const cy1 = cy0 + k * box.b.sprite.length;
+      return !rectOverWater(cx0 - BOAT_SHORE_GAP.ch, cy0 - BOAT_SHORE_GAP.em, cx1 + BOAT_SHORE_GAP.ch, cy1 + BOAT_SHORE_GAP.em);
     }
     // ocean blocks movement unless riding something that floats (a boat)
     const floating = equippedRef.current?.equip?.mode === 'vehicle' && !!equippedRef.current.equip.float;
@@ -5687,14 +5696,8 @@ function Game() {
               })}
               {crops.map((c) => {
                 const st = cropStatus(c, wt, fxFor(c.slot));
-                const badge =
-                  c.stage === 'ready'
-                    ? 'ready!'
-                    : c.stage === 'failed'
-                      ? 'x'
-                      : st.thirsty
-                        ? 'water!'
-                        : '';
+                // no "water!" badge on a thirsty plant (taken out on request)
+                const badge = c.stage === 'ready' ? 'ready!' : c.stage === 'failed' ? 'x' : '';
                 if (!badge) return null;
                 const s = plot.slots[c.slot];
                 return (

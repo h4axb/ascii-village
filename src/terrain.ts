@@ -554,6 +554,8 @@ export interface TerrainField {
   /** 1 where every colour block under the cell is water: water glyphs and
    *  sparkles only go there, so none ever lands on a sand-coloured block */
   overWater: Uint8Array;
+  /** 1 per colour block (bgW x bgH) drawn as water */
+  blockWater: Uint8Array;
 }
 
 const pack = (r: number, g: number, b: number) =>
@@ -772,6 +774,7 @@ export function terrainField(): TerrainField {
     glyph: new Uint8Array(n),
     color: new Uint32Array(n),
     overWater: new Uint8Array(n),
+    blockWater: new Uint8Array(bgW * bgH),
   };
   const { kind, glyph } = F;
   for (let y = 0; y < GROUND_H; y++) for (let x = 0; x < GROUND_W; x++) computeCell(F, x, y);
@@ -780,7 +783,7 @@ export function terrainField(): TerrainField {
   // rectangles; with 5/3 as many rows each block is one cell wide and one
   // cell-width tall. Same colour field, sampled at the block centres, each
   // block slightly varied like a painted tile.
-  const blockWater = new Uint8Array(bgW * bgH);
+  const { blockWater } = F;
   for (let by = 0; by < bgH; by++) for (let bx = 0; bx < bgW; bx++) computeBlock(F, blockWater, bx, by);
   // A cell is ~1.67 blocks tall: it may straddle the sand/water edge of the
   // colour layer even when its own centre is water. Such cells keep no water
@@ -807,6 +810,21 @@ export function terrainField(): TerrainField {
   }
   FIELD = F;
   return FIELD;
+}
+
+// Is the rectangle [cx0, cx1) x [cy0, cy1) (world ch / em) drawn as water
+// all over, with no sand-coloured block anywhere under it? What a boat keeps
+// to: its drawn hull never touches the beach.
+export function rectOverWater(cx0: number, cy0: number, cx1: number, cy1: number): boolean {
+  const F = terrainField();
+  const ky = F.bgH / GROUND_H; // blocks per em
+  const bx0 = Math.max(0, Math.floor(cx0));
+  const bx1 = Math.min(F.bgW - 1, Math.ceil(cx1) - 1);
+  const by0 = Math.max(0, Math.floor(cy0 * ky));
+  const by1 = Math.min(F.bgH - 1, Math.ceil(cy1 * ky) - 1);
+  for (let by = by0; by <= by1; by++)
+    for (let bx = bx0; bx <= bx1; bx++) if (!F.blockWater[by * F.bgW + bx]) return false;
+  return true;
 }
 
 // Repaint the cells (and their colour blocks) in [x0..x1] x [y0..y1] after a

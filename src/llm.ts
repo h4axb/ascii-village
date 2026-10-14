@@ -115,6 +115,8 @@ const BASE_PRICE: Record<string, number> = {
   iceflower: 9,
   seed: 1,
   bloom: 20, // exactly one crafting token (TOKEN_PRICE)
+  strawberry: 20, // the gift seeds' harvests: one token each
+  pumpkin: 20,
 };
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

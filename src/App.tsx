@@ -165,7 +165,7 @@ import { flushFeedbackOutbox, newFeedbackId, playerId, sendFeedback, SESSION } f
 import { CraftPrefsSettings } from './CraftFeedback';
 import { LINK } from './link';
 import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
-import { QUEST_ENABLED, GATHER_TARGET, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, DISCOVERIES, type StepId, type DiscoveryId } from './quest/quests';
+import { QUEST_ENABLED, GATHER_TARGET, EXPLORE_TILES, SEED_CHOICES, type SeedKind, type HintTarget, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, DISCOVERIES, type StepId, type DiscoveryId } from './quest/quests';
 import { boatReachable, boatRoute, seaRoute, pathLength, pointAt, type Pt } from './quest/route';
 import { QuestPanel, type QuestView } from './quest/QuestPanel';
 import { QuestComplete, RatingSequence, TestTransition } from './quest/TestScreens';
@@ -220,6 +220,8 @@ const CHARACTERS: Character[] = [
   },
 ];
 
+// the gift seed's hint name and description (quests.ts's SEED_CHOICES), or null
+let seedHint: { name: string; desc: string } | null = null;
 const ITEM_INFO: Record<ItemType, { name: string; desc: string }> = {
   flower: { name: 'Wildflower', desc: 'A messy bunch of meadow blooms.' },
   stone: { name: 'Stone', desc: 'A small, satisfyingly smooth rock.' },
@@ -227,8 +229,13 @@ const ITEM_INFO: Record<ItemType, { name: string; desc: string }> = {
   cactus: { name: 'Cactus', desc: 'A prickly little desert survivor.' },
   fern: { name: 'Fern', desc: 'A feathery frond from the deep jungle.' },
   iceflower: { name: 'Ice Flower', desc: 'A frost-hardened bloom from the tundra.' },
-  seed: { name: 'Seed', desc: 'A tiny seed shaken out of a wildflower. Plant it and water it.' },
+  // while Mitchy's gift is in play it's named by its hint (seedHint, set in Game)
+  get seed() {
+    return seedHint ?? { name: 'Seed', desc: 'A tiny seed shaken out of a wildflower. Plant it and water it.' };
+  },
   bloom: { name: 'Sunbloom', desc: 'A big golden bloom grown from a seed. Mitchy pays well for these.' },
+  strawberry: { name: 'Strawberries', desc: 'Small, red and sweet - grown from Mitchy’s gift. Mitchy pays well for these.' },
+  pumpkin: { name: 'Pumpkin', desc: 'Big, round and orange - grown from Mitchy’s gift. Mitchy pays well for these.' },
 };
 
 const ITEM_SPRITES: Record<ItemType, string[]> = {
@@ -240,9 +247,11 @@ const ITEM_SPRITES: Record<ItemType, string[]> = {
   iceflower: S.ICEFLOWER,
   seed: S.SEED,
   bloom: S.SUNBLOOM,
+  strawberry: S.STRAWBERRY,
+  pumpkin: S.PUMPKIN,
 };
 
-const ITEM_TYPES: ItemType[] = ['flower', 'stone', 'date', 'cactus', 'fern', 'iceflower', 'seed', 'bloom'];
+const ITEM_TYPES: ItemType[] = ['flower', 'stone', 'date', 'cactus', 'fern', 'iceflower', 'seed', 'bloom', 'strawberry', 'pumpkin'];
 
 // The translated modifiers, in words. The model's own narrative already sits
 // in funcDesc; this is the honest mechanical readout underneath it, so a
@@ -296,6 +305,12 @@ const lastMotion = new WeakMap<HTMLElement, string>();
 const TOKEN_FX_MS = 900;
 // the quest flow (src/quest/): how long QUEST COMPLETE stays, boat speed (tiles/s)
 const QUEST_DONE_MS = 2800;
+// a hint's camera (runHint): the glide to the objective and back, and the hold
+const HINT_GLIDE_MS = 700;
+const HINT_HOLD_MS = 1400;
+const HINT_BLINK_MS = 4000;
+// what counts as a resource for LITTLE THINGS ADD UP's hint
+const RESOURCE_KINDS = new Set<EntityKind>(['flower', 'flowerplus', 'stone', 'date', 'cactus', 'fern', 'iceflower']);
 const SAVE_SCREEN_MS = 1600; // the black saving screen stays at least this long
 const QUEST_SAIL_SPEED = 9;
 const MARKER_BOAT_LAUNCH = 'quest.boatLaunch'; // sceneMarkers.ts
@@ -1270,7 +1285,7 @@ function Game() {
   // Deliberately NOT limited to keeping the player on screen — you can zoom
   // off to look anywhere on the map; Space (or double-tap) brings it back.
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [camTween, setCamTween] = useState<'zoom' | 'recentre' | null>(null);
+  const [camTween, setCamTween] = useState<'zoom' | 'recentre' | 'hint' | null>(null);
   const camTweenRef = useRef(camTween);
   camTweenRef.current = camTween;
   // planetary menu around the player avatar (bottom-left HUD)
@@ -2018,11 +2033,18 @@ function Game() {
   // wall/entity is a no-op, and callers use this to avoid resetting the step
   // timer on a move that didn't happen (see lastStepRef below).
   function tryMove(dx: number, dy: number): boolean {
-    if (wateringRef.current) return false; // standing still while watering
+    if (wateringRef.current || hintLockRef.current) return false; // standing still while watering / a hint plays
     const p = playerRef.current;
     const n = resolveMove(p, dx, dy);
     const moved = n.x !== p.x || n.y !== p.y;
     if (moved) {
+      // YOUR FIRST STEPS: done after walking a little
+      const q0 = questRef.current;
+      if (q0 && isStep(q0, 'explore')) {
+        const walked = (q0.walked ?? 0) + 1;
+        if (walked >= EXPLORE_TILES) questDone('explore', { walked });
+        else setQuest({ ...q0, walked });
+      }
       // Arm this step's visual interpolation window BEFORE setPlayer: the
       // rAF loop applies it imperatively (see applyWalkTransform) in this
       // same tick, synchronously — it doesn't wait for React's own re-render
@@ -2802,6 +2824,8 @@ function Game() {
   const [questView, setQuestView] = useState<QuestView>('quest');
   // the crafted boat waits in the bag until it is placed on the water
   const questBoatInBag = isStep(quest, 'vehicle') && bag.some((o) => o.kind !== 'token' && o.equip?.float);
+  // the gift seed's name in the bag (ITEM_INFO.seed)
+  seedHint = quest?.seedKind ? (SEED_CHOICES.find((c) => c.kind === quest.seedKind) ?? null) : null;
   const questTask = questBoatInBag ? 'Place it on the water' : undefined;
   const questSub = questBoatInBag
     ? 'Open your inventory, choose your vehicle and Place in world, then set it on the water near the shore.'
@@ -3127,6 +3151,15 @@ function Game() {
     ]);
     await questSay([q.part === 'q1' ? QL.arrive1 : QL.arrive2]);
     setDialogue(null);
+    // the first trip ends NEW BEGINNINGS
+    if (q.part === 'q1') {
+      setQuestHidden(true);
+      setQuestComplete(QUESTLINE_1.done);
+      await sleep(QUEST_DONE_MS);
+      setQuestComplete(null);
+    }
+    // Mitchy's housewarming gift: a seed, picked by its hint
+    const seedKind = await questGiftSeed(q.part === 'q1');
     if (shop) await tweenMitchyTo({ x: stand.x + 5, y: Math.round(shop.y + shopT.hT) }, WALK_SPEED_MITCHY);
     await letterboxOut();
     // the boat waits at the shore; from now on the player sails it themselves
@@ -3134,12 +3167,25 @@ function Game() {
     const cur = questRef.current!;
     setQuest(
       cur.part === 'q1'
-        ? { ...cur, part: 'q2', step: 0, boat }
-        : { ...(advance(cur) ?? cur), boat },
+        ? { ...cur, part: 'q2', step: 0, boat, seedKind }
+        : { ...(advance(cur) ?? cur), boat, seedKind },
     );
     setCinematic(null);
     setQuestHidden(false);
     questBusyRef.current = false;
+  }
+
+  // The housewarming gift at the shop: two seeds named only by a hint
+  // (SEED_CHOICES); the one picked goes into the bag.
+  async function questGiftSeed(first: boolean): Promise<SeedKind> {
+    setDialogue({ speaker: PART_C_SPEAKER, text: first ? QL.giftOffer : QL.giftOfferAgain, choices: SEED_CHOICES.map((c) => c.option) });
+    const i = await waitForDialogueChoice();
+    const pick = SEED_CHOICES[i] ?? SEED_CHOICES[0];
+    await questSay([QL.giftThanks]);
+    setDialogue(null);
+    setInv((v) => ({ ...v, seed: v.seed + 1 }));
+    showToast(`you received a ${pick.name.toLowerCase()}!`);
+    return pick.kind;
   }
 
   // Outside the cinematics the player sails the boat themselves: click it →
@@ -4023,15 +4069,10 @@ function Game() {
     discover('resource');
     const item = COLLECT_AS[e.kind] ?? (e.kind as ItemType);
     setInv((v) => ({ ...v, [item]: v[item] + 1 }));
-    // a flower now and then drops a seed (and always does while the
-    // planting quest needs one and the player has none)
-    if (item === 'flower') {
-      const q = questRef.current;
-      const line = q && questlineOf(q.part);
-      const plantAt = line ? line.steps.findIndex((o) => o.id === 'plant') : -1;
-      const needSeed =
-        !!q && plantAt >= 0 && q.step <= plantAt && invRef.current.seed <= 0 && !crops.some((c) => c.dormant);
-      if (needSeed || Math.random() < SEED_CHANCE) {
+    // a flower now and then drops a seed - not on the quest links, where
+    // Mitchy's gift is the seed
+    if (item === 'flower' && !QUEST_ENABLED) {
+      if (Math.random() < SEED_CHANCE) {
         setInv((v) => ({ ...v, seed: v.seed + 1 }));
         showToast('a seed fell out of the flower!');
       }
@@ -4121,6 +4162,94 @@ function Game() {
   // "yes" while an interact confirm is open; otherwise do what the prompt
   // offers (the nearest thing in reach, see promptTarget), or dismiss a
   // speech bubble.
+  // ---- hints (the quest panel's light bulb; quests.ts's Hint) ----
+  // hintLock: the player stands still while the camera shows the way;
+  // hintMarks: "!" bubbles over objectives (until the step changes);
+  // hintSparkles: resources twinkling; hintCard: a picture hint's modal.
+  const [hintLock, setHintLock] = useState(false);
+  const hintLockRef = useRef(false);
+  hintLockRef.current = hintLock;
+  const [hintMarks, setHintMarks] = useState<HintTarget[]>([]);
+  const [hintSparkles, setHintSparkles] = useState<string[]>([]);
+  const [blinkControls, setBlinkControls] = useState(false);
+  const [hintCard, setHintCard] = useState<{ pages: string[]; i: number } | null>(null);
+  const hintCardRef = useRef(hintCard);
+  hintCardRef.current = hintCard;
+  const hintRun = hintLock || !!hintCard;
+  // a new step: the last one's marks and sparkles go
+  useEffect(() => {
+    setHintMarks([]);
+    setHintSparkles([]);
+  }, [quest?.part, quest?.step]);
+  // An objective on the map: its top centre (tiles, for a "!") and centre
+  // (ch/em, for the camera).
+  function hintSpot(t: HintTarget): { id: string; top: { x: number; y: number }; c: { x: number; y: number } } | null {
+    const of = (e: Ent | undefined) => {
+      if (!e) return null;
+      const { wT, hT } = spriteTiles(e.sprite, e.scale, e.rotation);
+      return { id: e.id, top: { x: e.x + wT / 2, y: e.y }, c: { x: (e.x + wT / 2) * TILE_CH, y: (e.y + hT / 2) * TILE_LN } };
+    };
+    if (t === 'house') return of(ents.find((e) => e.id === 'house'));
+    if (t === 'mitchy') return of(ents.find((e) => e.id === 'cat'));
+    if (t === 'pond') return of(ents.find((e) => e.kind === 'pond'));
+    if (t === 'garden') return of(ents.find((e) => e.kind === 'gardenbed'));
+    if (t === 'crop') {
+      const c = crops.find((x) => x.id === quest?.seedCrop) ?? crops[0];
+      const sl = c ? plot.slots[c.slot] : null;
+      if (!sl) return of(ents.find((e) => e.kind === 'gardenbed'));
+      return { id: `crop-${c!.slot}`, top: { x: sl.x + 0.5, y: sl.y }, c: { x: (sl.x + 0.5) * TILE_CH, y: (sl.y + 0.5) * TILE_LN } };
+    }
+    return of(nearestResources(1)[0]);
+  }
+  // the resources nearest the player (on this island)
+  function nearestResources(n: number): Ent[] {
+    return ents
+      .filter((e) => RESOURCE_KINDS.has(e.kind) && canInteract(e))
+      .map((e) => ({ e, d: Math.hypot(e.x - player.x, e.y - player.y) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, n)
+      .map((x) => x.e);
+  }
+  async function runHint() {
+    const obj = objectiveOf(questRef.current);
+    if (!obj || hintLockRef.current || hintCardRef.current || cinematic || modal) return;
+    const h = obj.hint;
+    if (h.card) {
+      setHintCard({ pages: h.card.pages, i: 0 });
+      return;
+    }
+    if (h.blink) {
+      setQuestOpen(true);
+      setBlinkControls(true);
+      window.setTimeout(() => setBlinkControls(false), HINT_BLINK_MS);
+    }
+    if (!h.focus) return;
+    const spot = hintSpot(h.focus);
+    if (!spot) {
+      showToast('nothing like that nearby right now.');
+      return;
+    }
+    // lock, glide there, mark it, hold, glide back, unlock
+    setHintLock(true);
+    heldRef.current.clear();
+    syncWalkDir();
+    const c = camRef.current;
+    setCamTween('hint');
+    setPan({ x: spot.c.x - c.pcx, y: spot.c.y - c.pcy });
+    await sleep(HINT_GLIDE_MS);
+    if (h.bubble) setHintMarks((m) => (m.includes(h.focus!) ? m : [...m, h.focus!]));
+    if (h.sparkles) setHintSparkles(nearestResources(3).map((e) => e.id));
+    await sleep(HINT_HOLD_MS);
+    setPan({ x: 0, y: 0 });
+    await sleep(HINT_GLIDE_MS);
+    setCamTween(null);
+    setHintLock(false);
+  }
+  // the picture hint: next page, or close it on the last (or Esc)
+  function stepHintCard(close = false) {
+    setHintCard((hc) => (!hc || close || hc.i >= hc.pages.length - 1 ? null : { ...hc, i: hc.i + 1 }));
+  }
+
   // ---- watering (see `watering` above) ----
   const canWater = (c: PlantedCrop) => equipped?.tool === 'water' && c.stage === 'growing';
   // The plant's side: right/left by where it is from the player's middle,
@@ -4160,7 +4289,7 @@ function Game() {
   }, [watering?.phase, watering?.held]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function pressF() {
-    if (cinematic || mapOpen || wateringRef.current) return;
+    if (cinematic || mapOpen || wateringRef.current || hintLockRef.current) return;
     if (modal && modal.t === 'interact') {
       const oi = optInfo(modal);
       if (oi) oi.go(0);
@@ -4170,7 +4299,9 @@ function Game() {
       setBubble(null);
       // a plant in reach with the watering tool in hand: water it
       if (promptTarget.ref.kind === 'crop') {
-        startWatering(promptTarget.ref.slot);
+        const slot = promptTarget.ref.slot;
+        if (crops.find((c) => c.slot === slot)?.stage === 'ready') harvestCrop(slot);
+        else startWatering(slot);
         return;
       }
       runInteraction(promptTarget.ref, interactCtx, interactActions);
@@ -4190,7 +4321,7 @@ function Game() {
   // a tile of the player's feet (2 for Mitchy and the buildings), the nearest
   // one winning - by tile gap, then by the distance between the two feet.
   const promptTarget = (() => {
-    if (modal || cinematic || mapOpen || editorOpen || placing || riding || watering) return null;
+    if (modal || cinematic || mapOpen || editorOpen || placing || riding || watering || hintLock || hintCard) return null;
     const pcx = player.x + PLAYER_T.wT / 2;
     const pcy = player.y + PLAYER_T.hT;
     let best: { ref: InteractRef; gap: number; dist: number } | null = null;
@@ -4207,7 +4338,7 @@ function Game() {
     // a planted seed in reach, with the watering tool in hand: water it
     const feetY = player.y + PLAYER_T.hT - 1;
     for (const c of crops) {
-      if (!canWater(c)) continue;
+      if (!canWater(c) && c.stage !== 'ready') continue; // water it, or harvest it once grown
       const s = plot.slots[c.slot];
       if (!s) continue;
       const gap = Math.max(Math.max(0, s.x - (player.x + PLAYER_T.wT - 1), player.x - s.x), Math.abs(s.y - feetY));
@@ -4574,7 +4705,11 @@ function Game() {
     setInv((v) => ({ ...v, [it]: v[it] - 1 }));
     const crop =
       it === 'seed'
-        ? seedCrop(slot, ITEM_SPRITES.bloom, wt)
+        ? (() => {
+            // Mitchy's gift grows what was picked; any other seed a Sunbloom
+            const kind = questRef.current?.seedKind ?? 'bloom';
+            return seedCrop(slot, ITEM_SPRITES[kind], wt, kind);
+          })()
         : createCrop(slot, ITEM_INFO[it].name, ITEM_SPRITES[it], 'plant', { kind: 'base', it }, wt);
     setCrops((cs) => [...cs, crop]);
     setModal(null);
@@ -4685,7 +4820,7 @@ function Game() {
     if (c.harvest.kind === 'base') {
       const it = c.harvest.it;
       // a seed grows into ONE Sunbloom (20 coins, one crafting token)
-      const n = (it === 'bloom' ? 1 : 2) + bonus;
+      const n = (it === 'bloom' || it === 'strawberry' || it === 'pumpkin' ? 1 : 2) + bonus;
       setInv((v) => ({ ...v, [it]: v[it] + n }));
       return `${n} ${ITEM_INFO[it].name.toLowerCase()}`;
     }
@@ -4706,7 +4841,7 @@ function Game() {
     if (!yielded) return;
     if (seed) {
       questDone('harvest');
-      window.setTimeout(() => showToast('a Sunbloom sells for 20 coins at the shop, just enough for a crafting token!'), 1800);
+      window.setTimeout(() => showToast(`${yielded} sell for 20 coins at the shop, just enough for a crafting token!`), 1800);
     }
     showToast(`harvested ${yielded}!`);
     setModal(null);
@@ -4753,6 +4888,16 @@ function Game() {
       if (!ev.repeat) downloadBackup();
       return;
     }
+    // a hint: its picture modal takes Enter/F/Space (next) and Esc (close);
+    // while the camera shows the way, nothing else
+    if (hintCardRef.current) {
+      if (!ev.repeat && (k === 'enter' || k === 'f' || k === ' ' || k === 'escape')) {
+        ev.preventDefault();
+        stepHintCard(k === 'escape');
+      }
+      return;
+    }
+    if (hintLockRef.current) return;
     // Full input lock while the save indicator is showing — the write/
     // download itself already completed synchronously inside
     // downloadBackup()/saveGameToStorage() above; this is purely honoring
@@ -4907,7 +5052,9 @@ function Game() {
       ? `transform ${ZOOM_MS}ms ease-out`
       : camTween === 'recentre'
         ? `transform ${RECENTRE_MS}ms ease-in-out`
-        : `transform ${glideDur}s linear`;
+        : camTween === 'hint'
+          ? `transform ${HINT_GLIDE_MS}ms ease-in-out`
+          : `transform ${glideDur}s linear`;
 
   // The current walk-cycle frame, if any (see walkDir/walkFrame above) —
   // swapped in for the static portrait while W/A/S/D is held, with its own
@@ -5114,7 +5261,11 @@ function Game() {
           {questObjective && questLine && !questHidden && !cinematic && (
             <QuestPanel
               line={questLine.title}
+              intro={questLine.intro}
               objective={questObjective}
+              onHint={runHint}
+              hintBusy={!!hintRun}
+              blinkControls={blinkControls}
               task={questTask}
               sub={questSub}
               progress={questObjective.target ? { n: quest!.gathered, of: questObjective.target } : undefined}
@@ -5134,7 +5285,6 @@ function Game() {
                 } else {
                   setQuestView('controls');
                   setQuestOpen(true);
-                  questDone('controls');
                 }
               }}
             />
@@ -5885,6 +6035,46 @@ function Game() {
                 </div>
               )}
 
+              {/* a hint's "!" over each objective it pointed at (Mitchy's
+                  own waiting bubble already covers him) */}
+              {hintMarks.map((t) => {
+                if (t === 'mitchy' && bubbleCat) return null;
+                const spot = hintSpot(t);
+                if (!spot) return null;
+                return (
+                  <div
+                    key={`mark-${t}`}
+                    className="mitchy-bubble"
+                    style={{ left: `${spot.top.x * TILE_CH}ch`, top: `${spot.top.y * TILE_LN - 0.4}em` }}
+                  >
+                    <ColoredSprite
+                      className="mitchy-bubble-art"
+                      sprite={SPEECH_BUBBLE}
+                      colors={SPEECH_BUBBLE_COLORS}
+                      palette={SPEECH_BUBBLE_PALETTE}
+                      perCell
+                    />
+                  </div>
+                );
+              })}
+              {/* a hint's sparkles round the nearest resources */}
+              {hintSparkles.map((id) => {
+                const e = ents.find((x) => x.id === id);
+                if (!e) return null;
+                const { wT, hT } = spriteTiles(e.sprite, e.scale, e.rotation);
+                return (
+                  <div
+                    key={`spark-${id}`}
+                    className="hint-sparkle"
+                    style={{ left: `${e.x * TILE_CH}ch`, top: `${e.y * TILE_LN}em`, width: `${wT * TILE_CH}ch`, height: `${hT * TILE_LN}em` }}
+                  >
+                    <i>✦</i>
+                    <i>✧</i>
+                    <i>✦</i>
+                  </div>
+                );
+              })}
+
               {/* walking up to something: its name over the nearest thing in
                   reach, with the F key that does it (see promptTarget / pressF) */}
               {!modal &&
@@ -5935,7 +6125,7 @@ function Game() {
                       <kbd className="fpop-key">F</kbd>
                       <span className="fpop-name">
                         {ref.kind === 'crop'
-                          ? `water ${copy.name.toLowerCase()}`
+                          ? `${crops.find((c) => c.slot === ref.slot)?.stage === 'ready' ? 'harvest' : 'water'} ${copy.name.toLowerCase()}`
                           : ref.kind === 'door'
                             ? doors[ref.door]
                               ? 'close the door'
@@ -5966,6 +6156,31 @@ function Game() {
       </div>
 
       {!cinematic && <TouchControls onHold={holdStart} onRelease={holdEnd} onF={pressF} onI={toggleInventory} />}
+
+      {/* a picture hint (the light bulb): placeholder text until the art is
+          drawn - the [bracketed] line says what the picture will show */}
+      {hintCard && (
+        <div className="overlay hint-overlay" onClick={(e) => e.target === e.currentTarget && stepHintCard(true)}>
+          <div className="ds-panel hint-card" role="dialog" aria-label="hint">
+            <div className="ds-panel-title">Hint</div>
+            {hintCard.pages[hintCard.i].split('\n').map((line, j) => (
+              <p key={j} className={line.startsWith('[') ? 'hint-pic' : 'ds-panel-text'}>
+                {line}
+              </p>
+            ))}
+            <div className="hint-foot">
+              {hintCard.pages.length > 1 && (
+                <span className="hint-page">
+                  {hintCard.i + 1} / {hintCard.pages.length}
+                </span>
+              )}
+              <button className="ds-action go" onClick={() => stepHintCard()}>
+                <span>{hintCard.i < hintCard.pages.length - 1 ? 'Next' : 'Got it'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* a first discovery: top centre, one at a time */}
       {discoveryQueue[0] && (
@@ -6192,8 +6407,7 @@ function Game() {
                   className="ds-action ds-settings-open"
                   onClick={() => {
                     setModal({ t: 'settings', page: 'controls' });
-                    questDone('controls');
-                  }}
+                    }}
                 >
                   <span className="ds-action-icon">
                     <KeysIcon className="ds-save-icon" />

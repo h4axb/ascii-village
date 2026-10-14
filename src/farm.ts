@@ -305,20 +305,28 @@ export const PLANTABLE_BASE: ItemType[] = ['seed', 'flower', 'cactus', 'fern', '
 // A seed waits (dormant) until its first watering, then grows quickly into a
 // Sunbloom. It is thirsty from the start and never wilts while it waits.
 export const SEED_GROW_MS = 45_000;
-export function seedCrop(slot: number, sprite: string[], wt: number): PlantedCrop {
+// `kind`: Mitchy's gift seed grows strawberries or a pumpkin (same care and
+// timing); any other seed grows a Sunbloom.
+const SEED_GROWS: Record<'bloom' | 'strawberry' | 'pumpkin', string> = {
+  bloom: 'Sunbloom',
+  strawberry: 'Strawberries',
+  pumpkin: 'Pumpkin',
+};
+export function seedCrop(slot: number, sprite: string[], wt: number, kind: 'bloom' | 'strawberry' | 'pumpkin' = 'bloom'): PlantedCrop {
+  const name = SEED_GROWS[kind];
   return {
     id: `crop-${wt}-${slot}-${Math.floor(Math.random() * 1e6)}`,
     slot,
-    name: 'Sunbloom',
+    name,
     sprite,
     care: {
       thirst: 'medium',
       waterEveryMs: 1_000,
       growMs: SEED_GROW_MS,
       toleranceMs: 24 * 60 * MIN,
-      hint: 'A fresh seed. Water it once and it grows into a Sunbloom in under a minute.',
+      hint: kind === 'bloom' ? 'A fresh seed. Water it once and it grows into a Sunbloom in under a minute.' : 'Mitchy’s gift. Water it once and see what grows - in under a minute.',
     },
-    harvest: { kind: 'base', it: 'bloom' },
+    harvest: { kind: 'base', it: kind },
     plantedAt: Number.MAX_SAFE_INTEGER / 2, // dormant: growth starts at the first watering
     lastWateredAt: wt - 2_000,
     stage: 'growing',

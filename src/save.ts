@@ -115,9 +115,9 @@ function introPartBDoneToIntroDone(s: SaveState): SaveState {
   return s;
 }
 
-// Item types added later (seed, bloom) start at zero in older saves
+// Item types added later (seed, bloom, the gift harvests) start at zero in older saves
 const withNewItems = (r: Counts | undefined): Counts | undefined =>
-  r ? ({ ...{ seed: 0, bloom: 0 }, ...r } as Counts) : r;
+  r ? ({ ...{ seed: 0, bloom: 0, strawberry: 0, pumpkin: 0 }, ...r } as Counts) : r;
 
 function migrate(s: SaveState): SaveState {
   s.doors = doorsToGate(s.doors);

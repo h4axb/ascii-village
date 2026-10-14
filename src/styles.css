@@ -1586,15 +1586,25 @@ pre {
 
 .saypop {
   position: absolute;
-  color: #fff;
-  background: #0a0a0a;
-  border: 1px solid #777;
-  padding: 1px 6px;
+  /* the design system's dialogue look, like the F label (.fpop); no
+     font-size here - its left/top are in the world's ch/em */
+  color: var(--ds-text);
+  background: var(--ds-dialogue);
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-sm);
+  backdrop-filter: var(--ds-blur);
+  -webkit-backdrop-filter: var(--ds-blur);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  padding: 0.35em 0.75em;
+  line-height: 1.25;
   z-index: 500;
   /* short messages ("oh nothing...") stay on one line; longer ones (the
      palm's "already picked" text) wrap instead of running off-screen */
   max-width: 220px;
   white-space: normal;
+}
+.saypop > span {
+  font-size: 0.9em;
 }
 
 /* Mitchy's speech bubble: a plain rounded box above his head, light surface

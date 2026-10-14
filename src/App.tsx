@@ -4106,15 +4106,16 @@ function Game() {
     const palmT = spriteTiles(S.PALM, PALM_SCALE);
     const bunchT = spriteTiles(S.DATE_FRUIT, PALM_SCALE);
     const dy = Math.max(0, palmT.hT - bunchT.hT);
-    const maxX = Math.max(0, palmT.wT - bunchT.wT);
-    const count = Math.random() < 0.5 ? 2 : 3;
-    const dates: Ent[] = S.PALM_ANIM.bundles.slice(0, count).map((_, i) => {
+    const dateW = Math.max(...S.DATE_FRUIT.map((l) => l.length));
+    // one bunch on the ground for every bunch the animation dropped, centred
+    // on the column it landed on (the cell's middle) - no rounding, so it
+    // lies exactly where it was seen to land, the right one on the right
+    const dates: Ent[] = S.PALM_ANIM.bundles.map((_, i) => {
       const landX = bundleLandingX(S.PALM_ANIM, i);
-      const tileX = Math.round((landX * PALM_SCALE) / TILE_CH - bunchT.wT / 2);
       return {
         id: `date-${Date.now()}-${i}`,
         kind: 'date',
-        x: tree.x + Math.max(0, Math.min(maxX, tileX)),
+        x: tree.x + ((landX + 0.5 - dateW / 2) * PALM_SCALE) / TILE_CH,
         y: tree.y + dy,
         sprite: S.DATE_FRUIT,
         interactable: true,
@@ -5011,6 +5012,24 @@ function Game() {
   }
 
   const nothingEnt = nothingId ? ents.find((e) => e.id === nothingId) : null;
+  // where an object's F label hangs (ch, em): its top-right corner, or, for
+  // kinds in LABEL_BESIDE, beside the drawn shape partway down (a palm: at the
+  // top of its trunk, under the crown), right of what's drawn there
+  const entLabelAnchor = (ent: Ent): { right: number; top: number } => {
+    const k = ent.scale ?? 1;
+    const side = !ent.rotation ? LABEL_BESIDE[ent.kind] : undefined;
+    if (side) {
+      const r = Math.round(side * ent.sprite.length);
+      const rows = ent.sprite.slice(Math.max(0, r - 3), r);
+      return { right: ent.x * TILE_CH + k * (Math.max(...rows.map((l) => l.trimEnd().length)) + 1), top: ent.y * TILE_LN + k * r };
+    }
+    return {
+      right: ent.rotation
+        ? (ent.x + spriteTiles(ent.sprite, k, ent.rotation).wT) * TILE_CH
+        : ent.x * TILE_CH + k * Math.max(...ent.sprite.map((l) => l.length)),
+      top: ent.y * TILE_LN,
+    };
+  };
 
   // ---- camera: follows the player, clamped to the map edges ----
   const viewW = dims.viewW / zoom; // world chars visible (measured, not fixed)
@@ -6013,7 +6032,7 @@ function Game() {
                     zIndex: 700,
                   }}
                 >
-                  {toast}
+                  <span>{toast}</span>
                 </div>
               )}
 
@@ -6079,6 +6098,7 @@ function Game() {
                   reach, with the F key that does it (see promptTarget / pressF) */}
               {!modal &&
                 promptTarget &&
+                !(nothingEnt && promptTarget.ref.kind === 'entity' && promptTarget.ref.id === nothingEnt.id) &&
                 (() => {
                   const ref = promptTarget.ref;
                   const copy = describeInteraction(ref, interactCtx);
@@ -6091,21 +6111,8 @@ function Game() {
                   if (!ent && !tile) return null;
                   let right: number; // ch
                   let top: number; // em
-                  const side = ent && !ent.rotation ? LABEL_BESIDE[ent.kind] : undefined;
-                  if (ent && side) {
-                    // beside the drawn shape partway down (a palm: at the top of its trunk,
-                    // under the crown), right of what's drawn there
-                    const k = ent.scale ?? 1;
-                    const r = Math.round(side * ent.sprite.length);
-                    const rows = ent.sprite.slice(Math.max(0, r - 3), r);
-                    right = ent.x * TILE_CH + k * (Math.max(...rows.map((l) => l.trimEnd().length)) + 1);
-                    top = ent.y * TILE_LN + k * r;
-                  } else if (ent) {
-                    const k = ent.scale ?? 1;
-                    right = ent.rotation
-                      ? (ent.x + spriteTiles(ent.sprite, k, ent.rotation).wT) * TILE_CH
-                      : ent.x * TILE_CH + k * Math.max(...ent.sprite.map((l) => l.length));
-                    top = ent.y * TILE_LN;
+                  if (ent) {
+                    ({ right, top } = entLabelAnchor(ent));
                   } else {
                     right = (tile!.x + 1) * TILE_CH;
                     top = tile!.y * TILE_LN;
@@ -6140,11 +6147,14 @@ function Game() {
                 <div
                   className="saypop"
                   style={{
-                    left: `${nothingEnt.x * TILE_CH + 1}ch`,
-                    top: `${Math.max(0, nothingEnt.y * TILE_LN - 1.8)}em`,
+                    // in the F label's own spot (it stands in for that label
+                    // meanwhile), its bottom-left on the label's anchor
+                    left: `${entLabelAnchor(nothingEnt).right}ch`,
+                    top: `${entLabelAnchor(nothingEnt).top}em`,
+                    transform: 'translateY(calc(-100% - 0.3em))',
                   }}
                 >
-                  {nothingText}
+                  <span>{nothingText}</span>
                 </div>
               )}
 

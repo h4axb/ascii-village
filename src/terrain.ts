@@ -584,11 +584,13 @@ onThemeChange(() => {
 // a character cell's height / width (14px line / 8.4px char, see App.tsx)
 const CELL_ASPECT = 14 / 8.4;
 
-// How many signs the base grass carries (chances per cell): the tufts in
-// their clusters over the darker patches, the marks thickening toward the
-// coast (at the shore), the stray marks everywhere, and the coastal shrub
-// band's foliage marks
-const GRASS_SIGNS = { tuft: 0.3, rim: 0.35, scatter: 0.004, bush: 0.5 };
+// Of the grass cells that carry a sign (LAND_SIGNS), how likely it's a tuft
+// (in their clusters over the darker patches) rather than a foliage mark
+const GRASS_SIGNS = { tuft: 0.3 };
+// The share of land cells that carry a sign at all, on every kind of ground
+// (grass, bushes, sand, dirt, rock, ...): a sparse sprinkle, not a carpet.
+// Which cells is one hash; the ground kind only picks the sign and its tone.
+const LAND_SIGNS = 0.02;
 
 function computeCell(F: TerrainField, x: number, y: number) {
   const { ndv, kind, glyph, color } = F;
@@ -610,6 +612,7 @@ function computeCell(F: TerrainField, x: number, y: number) {
   let k = 0; // + lightens toward white, − darkens
   let tr = -1, tg = 0, tb = 0, m = 0; // optional tint toward a colour instead
   const land = out.kind !== KIND_WATER;
+  const pass = hash2(x * 2.713 + 5, y * 0.931 + 17) < LAND_SIGNS; // this land cell gets a sign
   // fine surface texture shared by every surface (0..1)
   const tex = vnoise(fx * 1.7, fy * 1.7, 201) * 0.6 + h * 0.4;
   if (land && glyphMask()[idx]) {
@@ -628,10 +631,10 @@ function computeCell(F: TerrainField, x: number, y: number) {
     tg = fg + (P.fringeGlyph[1] - fg) * fringe;
     tb = fb + (P.fringeGlyph[2] - fb) * fringe;
     m = 0.8 + 0.18 * Math.max(lit, fringe);
-    if (h >= GRASS_SIGNS.bush) g = 0; // bare on the other half
+    if (!pass) g = 0; // bare, but for the LAND_SIGNS share
   } else if (out.kind === KIND_DIRT) {
     // a few scattered pebbles and crumbs
-    if (h < 0.1) {
+    if (pass) {
       g = G_DIRT[Math.floor(h2 * G_DIRT.length)];
       const pe = h2 < 0.6 ? P.dirtPebble : P.dirtRim;
       tr = pe[0];
@@ -641,7 +644,7 @@ function computeCell(F: TerrainField, x: number, y: number) {
     }
   } else if (out.kind === KIND_MEADOW) {
     // a few light, soft blades
-    if (h < 0.07) {
+    if (pass) {
       g = G_MEADOW[Math.floor(h2 * 97) % G_MEADOW.length];
       tr = P.meadowGlyph[0];
       tg = P.meadowGlyph[1];
@@ -650,7 +653,7 @@ function computeCell(F: TerrainField, x: number, y: number) {
     }
   } else if (out.kind === KIND_STONEGROUND) {
     // a few pebbles and stones, light marks on calm grey
-    if (h < 0.09) {
+    if (pass) {
       g = G_STONEGROUND[Math.floor(h2 * 97) % G_STONEGROUND.length];
       tr = P.stoneGroundGlyph[0];
       tg = P.stoneGroundGlyph[1];
@@ -659,7 +662,7 @@ function computeCell(F: TerrainField, x: number, y: number) {
     }
   } else if (out.kind === KIND_SLAB) {
     // smooth flat stone: a rare speck, nothing on the rim
-    if (out.edge > 0 && h < 0.04) {
+    if (out.edge > 0 && pass) {
       g = 1; // ·
       tr = P.slabGlyph[0];
       tg = P.slabGlyph[1];
@@ -676,14 +679,16 @@ function computeCell(F: TerrainField, x: number, y: number) {
     const tuftCluster = smooth(0.35, 0.72, vnoise(fx * 0.3, fy * 0.3, 91));
     const inland = 1 - smooth(0.8, 0.9, out.ndv);
     const tuftP = GRASS_SIGNS.tuft * (1 - smooth(0.25, 0.6, out.patch)) * tuftCluster * inland;
-    if (h < GRASS_SIGNS.scatter + GRASS_SIGNS.rim * rim * rim) {
+    // a sign cell: a tuft in the tuft clusters, else a foliage mark (more
+    // of those toward the coast)
+    if (pass && h2 >= tuftP) {
       g = G_LEAF[Math.floor(h2 * G_LEAF.length)];
       const fringe = smooth(0.965, 1.005, out.ndv);
       tr = P.foliageGlyph[0] + (P.fringeGlyph[0] - P.foliageGlyph[0]) * fringe;
       tg = P.foliageGlyph[1] + (P.fringeGlyph[1] - P.foliageGlyph[1]) * fringe;
       tb = P.foliageGlyph[2] + (P.fringeGlyph[2] - P.foliageGlyph[2]) * fringe;
       m = rim > 0.2 ? 0.4 + 0.5 * rim : 0.25;
-    } else if (h2 < tuftP) {
+    } else if (pass) {
       g = G_TUFT[Math.floor(h * 97) % G_TUFT.length];
       tr = P.grassGlyph[0];
       tg = P.grassGlyph[1];
@@ -691,7 +696,7 @@ function computeCell(F: TerrainField, x: number, y: number) {
       m = 0.62 + 0.3 * tex;
     }
   } else if (out.kind === KIND_ROCK) {
-    if (h < 0.9) {
+    if (pass) {
       g = G_ROCK[Math.floor(h2 * G_ROCK.length)];
       tr = P.rockGlyph[0];
       tg = P.rockGlyph[1];
@@ -700,14 +705,16 @@ function computeCell(F: TerrainField, x: number, y: number) {
     }
   } else if (out.kind === KIND_SAND) {
     const stones = vnoise(fx * 0.8, fy * 0.8, 313);
-    if (stones > 0.9 && out.ndv < 1.045 && h < 0.4) {
+    if (!pass) {
+      // bare sand
+    } else if (stones > 0.9 && out.ndv < 1.045) {
       g = h2 > 0.5 ? G_O : G_BIG_O;
       const st = h2 > 0.5 ? P.stoneLight : P.stone;
       tr = st[0];
       tg = st[1];
       tb = st[2];
       m = 1;
-    } else if (h < 0.8) {
+    } else {
       // warm glyph grain over the whole band, yellow-olive right next to
       // the rim so sand and foliage knit together like the reference
       const nearRim = 1 - smooth(1.015, 1.045, out.ndv);

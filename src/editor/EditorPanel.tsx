@@ -11,7 +11,7 @@ import { DevIntroTab } from '../DevIntroTab';
 import { ThemeTab } from './ThemeTab';
 import { GroundTab } from './GroundTab';
 import type { IntroNarrationTool } from '../devIntroNarration';
-import type { Ent, EntityKind } from '../world';
+import type { ColorLook, Ent, EntityKind } from '../world';
 import { FIXED_ASSETS, type AssetDef } from '../assets';
 import { PLACEABLE_KINDS, locksOf, isEditable } from './useWorldEditor';
 import type { WorldEditor, EditorTab } from './useWorldEditor';
@@ -176,6 +176,7 @@ function Inspector({ ed, e }: { ed: WorldEditor; e: Ent }) {
           </label>
         </div>
       )}
+      {e.palette && <LookControls ed={ed} id={e.id} look={added ? added.look : ed.doc.moved[e.id]?.look} />}
       {added && asset?.layers && <SignControls ed={ed} id={e.id} sign={added.sign} boards={asset.layers.boards.length} />}
       {added && /^pond/.test(added.asset) && (
         <div className="wed-group">
@@ -245,6 +246,35 @@ function Inspector({ ed, e }: { ed: WorldEditor; e: Ent }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// An object's colours: saturation, brightness and tint (a turn of the hue),
+// for this object only (world.json's `look` on it)
+function LookControls({ ed, id, look }: { ed: WorldEditor; id: string; look?: ColorLook }) {
+  const set = (patch: ColorLook) => ed.setPose(id, { look: { ...look, ...patch } });
+  const row = (label: string, value: number, min: number, max: number, unit: string, on: (v: number) => void) => (
+    <label className="wed-theme-slider wed-grow">
+      <span>{label}</span>
+      <input type="range" min={min} max={max} step={1} value={value} onChange={(ev) => on(Number(ev.target.value))} />
+      <span className="wed-dim">
+        {value}
+        {unit}
+      </span>
+    </label>
+  );
+  return (
+    <div className="wed-group">
+      <div className="wed-group-name">Colour</div>
+      <div className="wed-row">{row('saturation', look?.sat ?? 100, 0, 200, '%', (sat) => set({ sat }))}</div>
+      <div className="wed-row">{row('brightness', look?.bright ?? 100, 30, 170, '%', (bright) => set({ bright }))}</div>
+      <div className="wed-row">{row('tint', look?.tint ?? 0, -180, 180, '°', (tint) => set({ tint }))}</div>
+      <div className="wed-row">
+        <button onClick={() => ed.setPose(id, { look: undefined })} disabled={!look}>
+          reset colours
+        </button>
+      </div>
     </div>
   );
 }

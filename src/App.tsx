@@ -1542,7 +1542,8 @@ function Game() {
   // Memoized on `lineColors` alone (the house's own STRUCT_ENTS sprite/colors
   // /palette are static) so this only recomputes on an actual swap, not
   // every render.
-  const houseBaseEnt = useMemo(() => STRUCT_ENTS.find((e) => e.id === 'house'), []);
+  // the live house (the world editor's colour sliders included)
+  const houseBaseEnt = useMemo(() => structEnts.find((e) => e.id === 'house'), [structEnts]);
   const houseRecolored = useMemo(() => {
     if (!houseBaseEnt?.colors || !houseBaseEnt.palette || Object.keys(lineColors).length === 0) return null;
     let colors = houseBaseEnt.colors;

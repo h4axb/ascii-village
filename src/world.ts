@@ -768,6 +768,61 @@ export interface WorldPose {
   y: number;
   scale?: number;
   rotation?: 0 | 1 | 2 | 3;
+  look?: ColorLook;
+}
+// An object's colours, set in the world editor's inspector: saturation and
+// brightness in % (100 = as drawn), tint a turn of the hue in degrees.
+export interface ColorLook {
+  sat?: number;
+  bright?: number;
+  tint?: number;
+}
+// only what differs from the drawing; nothing left = no look at all
+export function cleanLook(l?: ColorLook): ColorLook | undefined {
+  if (!l) return undefined;
+  const out: ColorLook = {};
+  if (l.sat !== undefined && Math.round(l.sat) !== 100) out.sat = Math.round(l.sat);
+  if (l.bright !== undefined && Math.round(l.bright) !== 100) out.bright = Math.round(l.bright);
+  if (l.tint !== undefined && Math.round(l.tint) !== 0) out.tint = Math.round(l.tint);
+  return Object.keys(out).length ? out : undefined;
+}
+// a palette with the look applied (one per palette and look)
+const lookCache = new WeakMap<Record<string, string>, Map<string, Record<string, string>>>();
+export function lookPalette(pal: Record<string, string>, look: ColorLook): Record<string, string> {
+  let m = lookCache.get(pal);
+  if (!m) lookCache.set(pal, (m = new Map()));
+  const key = JSON.stringify(look);
+  let out = m.get(key);
+  if (out) return out;
+  const sat = (look.sat ?? 100) / 100;
+  const bright = (look.bright ?? 100) / 100;
+  const tint = look.tint ?? 0;
+  out = {};
+  for (const [k, hex] of Object.entries(pal)) {
+    const v = /^#([0-9a-f]{6})$/i.exec(hex);
+    if (!v) {
+      out[k] = hex;
+      continue;
+    }
+    const n = parseInt(v[1], 16);
+    let r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    // to HSL, turn the hue, scale the saturation, back
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    let h = 0, s = 0;
+    if (d) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h *= 60;
+    }
+    h = (((h + tint) % 360) + 360) % 360;
+    s = Math.min(1, s * sat);
+    const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m0 = l - c / 2;
+    [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    const to = (u: number) => Math.round(Math.min(1, Math.max(0, (u + m0) * bright)) * 255).toString(16).padStart(2, '0');
+    out[k] = `#${to(r)}${to(g)}${to(b)}`;
+  }
+  m.set(key, out);
+  return out;
 }
 export interface WorldAdded extends WorldPose {
   id: string;
@@ -995,6 +1050,7 @@ export function buildStructEnts(doc: WorldDoc, which: 'world' | 'start' | 'all' 
         scale: (base.scale ?? 1) * k,
       };
     }
+    if (own?.look && e.palette) e = { ...e, palette: lookPalette(e.palette, own.look) };
     const painted = colliderFor(doc, e.asset, e.sprite);
     out.push(painted ? { ...e, solidMask: painted } : e);
   }
@@ -1015,7 +1071,7 @@ export function buildStructEnts(doc: WorldDoc, which: 'world' | 'start' | 'all' 
       y: a.y,
       sprite: art ? art.sprite : def.sprite,
       colors: art ? art.colors : def.colors,
-      palette: def.palette,
+      palette: a.look && def.palette ? lookPalette(def.palette, a.look) : def.palette,
       sway: def.sway,
       blend: def.blend,
       scale: a.scale ?? def.scale,

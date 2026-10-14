@@ -39,8 +39,9 @@ import {
   startFrame,
   START_PLAYER_BOX,
   cleanLook,
+  placedBoxes,
 } from '../world';
-import type { Ent, EntityKind, WorldDoc, WorldPose, WorldAdded, StartScreen } from '../world';
+import type { Ent, EntityKind, WorldDoc, WorldPose, WorldAdded, StartScreen, ColliderBox } from '../world';
 import type { SignSettings } from '../wayfinder';
 import { RAW_ASSETS, FIXED_ASSETS, ASSET_META, assetOf } from '../assets';
 import type { AssetDef, AssetMeta } from '../assets';
@@ -156,6 +157,14 @@ export interface WorldEditor {
   setMeta(slug: string, patch: AssetMeta): void;
   resetCollider(slug: string): void;
   clearBlockedTiles(): void; // remove every painted map tile
+  // the Colliders tab's collider boxes: drawn, moved, resized on the map
+  colliderMode: 'boxes' | 'tiles';
+  setColliderMode(m: 'boxes' | 'tiles'): void;
+  boxes: ColliderBox[]; // where they stand now (an owner's live spot)
+  selBox: string | null;
+  selectBox(id: string | null): void;
+  removeBox(id: string): void;
+  clearBoxes(): void;
   // Mitchy's look: an asset of kind 'cat' ('mitchy' = his original art)
   mitchyLook: string;
   setMitchyLook(slug: string): void;
@@ -350,7 +359,12 @@ type Drag =
   | { type: 'startUi'; dx: number; dy: number; moved: boolean }
   | { type: 'startTitle'; dx: number; dy: number; moved: boolean }
   | { type: 'startSub'; dx: number; dy: number; moved: boolean }
-  | { type: 'startPlayer'; dx: number; dy: number; moved: boolean };
+  | { type: 'startPlayer'; dx: number; dy: number; moved: boolean }
+  // the Colliders tab's boxes (in tiles): drawn from a corner, moved by the
+  // grab point, resized by a corner against the opposite one
+  | { type: 'boxDraw'; x0: number; y0: number; id: string; owner?: string; moved: boolean }
+  | { type: 'boxMove'; id: string; dx: number; dy: number; moved: boolean }
+  | { type: 'boxResize'; id: string; fx: number; fy: number; moved: boolean };
 
 export function useWorldEditor(opts: {
   fieldRef: React.RefObject<HTMLElement | null>;
@@ -376,6 +390,8 @@ export function useWorldEditor(opts: {
   const [cursor, setCursor] = useState<{ x: number; y: number; wx: number; wy: number } | null>(null);
   const [showIds, setShowIds] = useState(false);
   const [showColliders, setShowColliders] = useState(false);
+  const [colliderMode, setColliderMode] = useState<'boxes' | 'tiles'>('boxes');
+  const [selBox, setSelBox] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<EditorStatus | null>(null);
   const [structKey, setStructKey] = useState(0);
@@ -766,6 +782,64 @@ export function useWorldEditor(opts: {
     }
   }
 
+  // ---- collider boxes (Colliders tab) ----
+  const BOX_MIN = 0.25;
+  const boxesNow = () => placedBoxes(stateRef.current.doc, structRef.current);
+  // set a box from where it stands on the map (back to its owner's frame)
+  function putBox(doc: WorldDoc, b: ColliderBox) {
+    const list = (doc.colliderBoxes ??= []);
+    const o = b.owner ? structRef.current.find((e) => e.id === b.owner) : undefined;
+    const stored: ColliderBox = { id: b.id, x: round2(b.x - (o?.x ?? 0)), y: round2(b.y - (o?.y ?? 0)), w: round2(b.w), h: round2(b.h) };
+    if (o) stored.owner = o.id;
+    const i = list.findIndex((x) => x.id === b.id);
+    if (i >= 0) list[i] = stored;
+    else list.push(stored);
+  }
+  function removeBox(id: string) {
+    updateDoc((d) => {
+      d.colliderBoxes = (d.colliderBoxes ?? []).filter((b) => b.id !== id);
+      if (!d.colliderBoxes.length) delete d.colliderBoxes;
+    });
+    setSelBox((cur) => (cur === id ? null : cur));
+  }
+  function clearBoxes() {
+    updateDoc((d) => {
+      delete d.colliderBoxes;
+    });
+    setSelBox(null);
+  }
+  // the box rectangle between two points, snapped (q per tile), at least BOX_MIN
+  function rectOf(ax: number, ay: number, bx: number, by: number, q: number) {
+    const sn = (v: number) => Math.round(v * q) / q;
+    let x0 = sn(Math.min(ax, bx)), x1 = sn(Math.max(ax, bx));
+    let y0 = sn(Math.min(ay, by)), y1 = sn(Math.max(ay, by));
+    if (x1 - x0 < BOX_MIN) x1 = x0 + BOX_MIN;
+    if (y1 - y0 < BOX_MIN) y1 = y0 + BOX_MIN;
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  // what's under the pointer (in tiles): the selected box's x / a corner /
+  // inside, else any box
+  function hitBox(px: number, py: number): { id: string; part: 'x' | 'corner' | 'inside'; fx?: number; fy?: number } | null {
+    const all = boxesNow();
+    const sel = all.find((b) => b.id === selBox);
+    if (sel) {
+      const r = 0.35;
+      if (Math.abs(px - (sel.x + sel.w + 0.3)) <= r && Math.abs(py - (sel.y - 0.3)) <= r) return { id: sel.id, part: 'x' };
+      for (const [cx, cy, fx, fy] of [
+        [sel.x, sel.y, sel.x + sel.w, sel.y + sel.h],
+        [sel.x + sel.w, sel.y, sel.x, sel.y + sel.h],
+        [sel.x, sel.y + sel.h, sel.x + sel.w, sel.y],
+        [sel.x + sel.w, sel.y + sel.h, sel.x, sel.y],
+      ])
+        if (Math.abs(px - cx) <= 0.25 && Math.abs(py - cy) <= 0.25) return { id: sel.id, part: 'corner', fx, fy };
+    }
+    for (let i = all.length - 1; i >= 0; i--) {
+      const b = all[i];
+      if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) return { id: b.id, part: 'inside' };
+    }
+    return null;
+  }
+
   function clearBlockedTiles() {
     updateDoc((d) => {
       delete d.blockedTiles;
@@ -906,6 +980,15 @@ export function useWorldEditor(opts: {
       if (selected && !selected.startsWith('marker:')) duplicate(selected);
       return;
     }
+    if (k === 'escape' && selBox) {
+      setSelBox(null);
+      return;
+    }
+    if ((k === 'delete' || k === 'backspace') && selBox) {
+      ev.preventDefault();
+      removeBox(selBox);
+      return;
+    }
     if (k === 'escape') {
       if (armed) setArmed(null);
       else if (selected) setSelected(null);
@@ -1036,6 +1119,39 @@ export function useWorldEditor(opts: {
       if (tab === 'ground') {
         beginStroke(w.wx, w.wy);
         dragRef.current = { type: 'ground' };
+        return;
+      }
+      // Colliders tab, boxes: draw, select, move, resize, delete
+      if (tab === 'colliders' && colliderMode === 'boxes') {
+        const px = w.wx / TILE_CH;
+        const py = w.wy / TILE_LN;
+        const h = hitBox(px, py);
+        if (h?.part === 'x') {
+          removeBox(h.id);
+          return;
+        }
+        if (h?.part === 'corner') {
+          dragRef.current = { type: 'boxResize', id: h.id, fx: h.fx!, fy: h.fy!, moved: false };
+          return;
+        }
+        if (h) {
+          const b = boxesNow().find((x) => x.id === h.id)!;
+          setSelBox(h.id);
+          dragRef.current = { type: 'boxMove', id: h.id, dx: px - b.x, dy: py - b.y, moved: false };
+          return;
+        }
+        setSelBox(null);
+        // a new box: on an object it belongs to that object (moves with it)
+        const owner = hitObject(w.wx, w.wy) ?? undefined;
+        const q = ev.shiftKey ? 1 : 4;
+        dragRef.current = {
+          type: 'boxDraw',
+          x0: Math.round(px * q) / q,
+          y0: Math.round(py * q) / q,
+          id: `box-${Date.now().toString(36)}`,
+          owner: owner?.id,
+          moved: false,
+        };
         return;
       }
       // Colliders tab: every click toggles the tile under it
@@ -1174,6 +1290,27 @@ export function useWorldEditor(opts: {
         d.moved = true;
       } else if (d.type === 'ground') {
         strokeTo(w.wx, w.wy);
+      } else if (d.type === 'boxDraw' || d.type === 'boxResize' || d.type === 'boxMove') {
+        const px = w.wx / TILE_CH;
+        const py = w.wy / TILE_LN;
+        const q = ev.shiftKey ? 1 : 4;
+        const cur = boxesNow().find((b) => b.id === d.id);
+        let next: ColliderBox;
+        if (d.type === 'boxDraw') {
+          if (!d.moved && Math.abs(px - d.x0) < 0.2 && Math.abs(py - d.y0) < 0.2) return;
+          next = { id: d.id, owner: d.owner, ...rectOf(d.x0, d.y0, px, py, q) };
+        } else if (d.type === 'boxResize') {
+          if (!cur) return;
+          next = { ...cur, ...rectOf(d.fx, d.fy, px, py, q) };
+        } else {
+          if (!cur) return;
+          const sn = (v: number) => Math.round(v * q) / q;
+          next = { ...cur, x: sn(px - d.dx), y: sn(py - d.dy) };
+        }
+        if (cur && cur.x === next.x && cur.y === next.y && cur.w === next.w && cur.h === next.h) return;
+        updateDoc((doc) => putBox(doc, next), !d.moved);
+        if (d.type === 'boxDraw' && !d.moved) setSelBox(d.id);
+        d.moved = true;
       } else if (d.type === 'paint') {
         // a drag keeps doing what its first tile did (adding or clearing)
         const key = `${tx},${ty}`;
@@ -1245,6 +1382,16 @@ export function useWorldEditor(opts: {
     setMeta,
     resetCollider,
     clearBlockedTiles,
+    colliderMode,
+    setColliderMode: (m) => {
+      setColliderMode(m);
+      setSelBox(null);
+    },
+    boxes: placedBoxes(state.doc, structEnts),
+    selBox,
+    selectBox: setSelBox,
+    removeBox,
+    clearBoxes,
     mitchyLook: state.doc.mitchyLook ?? 'mitchy',
     startScreen,
     setStartScreen: (patch) => setStartScreen(patch),

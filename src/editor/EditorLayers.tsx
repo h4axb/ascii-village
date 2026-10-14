@@ -156,6 +156,27 @@ export function EditorWorldLayers({ ed, ents }: { ed: WorldEditor; ents: Ent[] }
               />
             );
           })}
+          {/* the collider boxes; the selected one with its corners and x */}
+          {ed.boxes.map((b) => {
+            const on = ed.tab === 'colliders' && ed.selBox === b.id;
+            return (
+              <div
+                key={b.id}
+                className={'wed-cbox' + (on ? ' on' : '')}
+                style={{ left: `${b.x * TILE_CH}ch`, top: `${b.y * TILE_LN}em`, width: `${b.w * TILE_CH}ch`, height: `${b.h * TILE_LN}em` }}
+              >
+                {on && (
+                  <>
+                    <i className="wed-cbox-h nw" />
+                    <i className="wed-cbox-h ne" />
+                    <i className="wed-cbox-h sw" />
+                    <i className="wed-cbox-h se" />
+                    <b className="wed-cbox-x">×</b>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </>
       )}
       {sel && ed.tab === 'colliders' && <Colliders e={sel} withEmpty />}

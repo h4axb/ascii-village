@@ -959,6 +959,37 @@ export const START_PLAYER_BOX = {
   w: START_PLAYER_K * Math.max(...START_PLAYER_FRAME.sprite.map((l) => l.length)),
   h: START_PLAYER_K * START_PLAYER_FRAME.sprite.length,
 };
+// A collider box drawn in the world editor's Colliders tab, in tiles (any
+// quarter): it blocks every tile it overlaps where the player's feet would
+// land, like the painted map tiles. With an owner its x/y are from that
+// object's x/y, so it moves with it (a box over the house door).
+export interface ColliderBox {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  owner?: string;
+}
+// the boxes where they stand on the map (an owner's live position)
+export function placedBoxes(doc: WorldDoc, ents: readonly { id: string; x: number; y: number }[]): ColliderBox[] {
+  const out: ColliderBox[] = [];
+  for (const b of doc.colliderBoxes ?? []) {
+    if (!b.owner) {
+      out.push(b);
+      continue;
+    }
+    const o = ents.find((e) => e.id === b.owner);
+    if (o) out.push({ ...b, x: o.x + b.x, y: o.y + b.y });
+  }
+  return out;
+}
+// does the box cover any part of tile (tx, ty)? (an edge on the tile's
+// border doesn't count)
+export function boxBlocksTile(b: ColliderBox, tx: number, ty: number): boolean {
+  return b.x < tx + 1 && b.x + b.w > tx && b.y < ty + 1 && b.y + b.h > ty;
+}
+
 export interface WorldDoc {
   version: 2;
   moved: Record<string, WorldPose>; // built-in (STRUCT_ENTS_BASE) objects, by id
@@ -969,6 +1000,8 @@ export interface WorldDoc {
   // editor's Colliders tab — an invisible wall, independent of any object.
   // Like the buildings, they stop the player's feet.
   blockedTiles?: string[];
+  // Collider boxes drawn in the editor's Colliders tab (see ColliderBox).
+  colliderBoxes?: ColliderBox[];
   // Mitchy's look: the slug of an asset of kind 'cat' (src/data/assets/),
   // chosen in the editor's Assets tab. Absent = his original art ('mitchy').
   mitchyLook?: string;

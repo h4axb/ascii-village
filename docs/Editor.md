@@ -42,7 +42,15 @@ a message instead of overwriting it: reload to get the new version.
   (Shift+click keeps placing). Each new object gets its own id (`grasshalm-3`).
 - **Markers** — named positions cutscenes read by id. *place*/*move*, then
   click the map; drag them afterwards.
-- **Colliders** — every collider is shown in red. Click a tile to flip it:
+- **Colliders** — two modes, switched at the top of the tab:
+  - **boxes** (default): drag on the map to draw a collider box (¼-tile steps,
+    Shift: whole tiles). Click a box to select it: drag it to move, drag a
+    corner to resize, click the red **×** at its top-right (or Del) to delete.
+    Drawn on an object (the house), a box belongs to it and moves with it;
+    anywhere else it's on the map. A box stops the player's feet on every tile
+    it touches (the player still walks whole tiles). Saved as `colliderBoxes`
+    in `world.json`; shown in cyan.
+  - **tiles**: every collider is shown in red. Click a tile to flip it:
   a blocking tile stops blocking, an empty one starts. Drag to flip many (a
   drag keeps doing what its first tile did). A new blocking tile inside the
   *selected* object becomes part of that object's collider (it moves with it;

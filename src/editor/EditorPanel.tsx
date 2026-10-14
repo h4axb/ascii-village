@@ -683,8 +683,61 @@ function MarkersTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): voi
 
 function CollidersTab({ ed, sel }: { ed: WorldEditor; sel: Ent | null }) {
   const painted = sel?.asset ? ed.doc.colliders[sel.asset] : undefined;
+  const modeSwitch = (
+    <div className="wed-row wed-btns">
+      <button className={ed.colliderMode === 'boxes' ? 'on' : ''} onClick={() => ed.setColliderMode('boxes')}>
+        boxes
+      </button>
+      <button className={ed.colliderMode === 'tiles' ? 'on' : ''} onClick={() => ed.setColliderMode('tiles')}>
+        tiles
+      </button>
+    </div>
+  );
+  if (ed.colliderMode === 'boxes') {
+    const raw = ed.doc.colliderBoxes ?? [];
+    return (
+      <div>
+        {modeSwitch}
+        <div className="wed-hint">
+          <b>Drag</b> on the map to draw a collider box (¼-tile steps; Shift: whole tiles). <b>Click</b> a box to select
+          it: drag it to move, drag a corner to resize, click its <b>×</b> (or Del) to delete. Drawn on an object (the
+          house), it belongs to that object and moves with it. A box stops the player's feet on every tile it touches.
+        </div>
+        <div className="wed-list">
+          {raw.map((b) => (
+            <div
+              key={b.id}
+              className={'wed-list-row' + (ed.selBox === b.id ? ' on' : '')}
+              onClick={() => ed.selectBox(b.id)}
+            >
+              <span>
+                {b.w}×{b.h} tiles
+              </span>
+              <span className="wed-dim">{b.owner ? `on ${b.owner}` : 'on the map'}</span>
+              <button onClick={(ev) => (ev.stopPropagation(), ed.removeBox(b.id))} title="delete">
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="wed-row wed-btns">
+          <span>
+            {raw.length} box{raw.length === 1 ? '' : 'es'}
+          </span>
+          <button onClick={ed.clearBoxes} disabled={!raw.length}>
+            delete all boxes
+          </button>
+        </div>
+        <label className="wed-check">
+          <input type="checkbox" checked={ed.showColliders} onChange={(ev) => ed.setShowColliders(ev.target.checked)} />
+          show colliders in the other tabs too
+        </label>
+      </div>
+    );
+  }
   return (
     <div>
+      {modeSwitch}
       <div className="wed-hint">
         Click a tile to flip it: a blocking tile (red) stops blocking, an empty one starts. Drag to flip many — a drag
         keeps doing what its first tile did. Blocking tiles stop the player's feet.

@@ -20,6 +20,8 @@ import {
   clampCam,
   type StartScreen,
   START_PLAYER_FRAME,
+  placedBoxes,
+  boxBlocksTile,
   START_PLAYER_K,
   startFrame,
   startTitleUrl,
@@ -1485,6 +1487,10 @@ function Game() {
   const blockedTiles = useMemo(() => new Set(editor.doc.blockedTiles ?? []), [editor.doc.blockedTiles]);
   const blockedTilesRef = useRef(blockedTiles);
   blockedTilesRef.current = blockedTiles;
+  // the editor's collider boxes, where they stand now (an owner's live spot)
+  const colliderBoxes = useMemo(() => placedBoxes(editor.doc, structEnts), [editor.doc, structEnts]);
+  const colliderBoxesRef = useRef(colliderBoxes);
+  colliderBoxesRef.current = colliderBoxes;
   const gardenEnt = structEnts.find((e) => e.id === 'garden-bed');
 
   // The garden travels as ONE thing. Its fence art, its collider, its gate and
@@ -1866,6 +1872,9 @@ function Game() {
     for (let tx = pbox.x0; tx <= pbox.x1; tx++) {
       if (blockedTilesRef.current.has(`${tx},${feetY}`)) return true;
     }
+    // and the collider boxes drawn there: the same, for the feet
+    for (const b of colliderBoxesRef.current)
+      for (let tx = pbox.x0; tx <= pbox.x1; tx++) if (boxBlocksTile(b, tx, feetY)) return true;
     // the garden fence blocks movement except through open doors
     if (gardenBlocks(nx, ny, PLAYER_T.wT, PLAYER_T.hT, doorsRef.current, plotRef.current)) return true;
     // sailing the quest's boat: only open water (landing goes through

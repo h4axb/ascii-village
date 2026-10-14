@@ -4552,3 +4552,52 @@ pre {
 @media (prefers-reduced-motion: reduce) {
   .mitchy-bubble-art { animation: none; }
 }
+
+/* the world editor's collider boxes (Colliders tab, boxes): cyan, so they're
+   not taken for painted tiles; the selected one with its corners and x */
+.wed-cbox {
+  position: absolute;
+  z-index: 9000;
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 1px solid rgba(80, 220, 240, 0.95);
+  background: rgba(80, 220, 240, 0.28);
+}
+.wed-cbox.on {
+  border: 2px solid #8ff3ff;
+  background: rgba(80, 220, 240, 0.4);
+}
+.wed-cbox-h {
+  position: absolute;
+  width: 0.5ch;
+  height: 0.5em;
+  background: #fff;
+  border: 1px solid #0b6b78;
+  transform: translate(-50%, -50%);
+}
+.wed-cbox-h.nw { left: 0; top: 0; }
+.wed-cbox-h.ne { left: 100%; top: 0; }
+.wed-cbox-h.sw { left: 0; top: 100%; }
+.wed-cbox-h.se { left: 100%; top: 100%; }
+/* the x sits just outside the top-right corner (0.3 tile out, as hitBox) */
+.wed-cbox-x {
+  position: absolute;
+  left: calc(100% + 1.2ch);
+  top: -0.6em;
+  transform: translate(-50%, -50%);
+  width: 1.6ch;
+  height: 0.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  color: #fff;
+  background: #c2413a;
+  border-radius: 0.2em;
+}
+/* the Colliders tab's boxes / tiles switch */
+.wed-btns button.on {
+  background: rgba(80, 220, 240, 0.3);
+  border-color: #8ff3ff;
+  color: #fff;
+}

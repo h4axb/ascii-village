@@ -369,9 +369,18 @@ export const TRANSITION_TEXT = [
 // completion animation ----
 export type DiscoveryId = 'resource' | 'settings' | 'controls' | 'map' | 'home';
 export const DISCOVERIES: Record<DiscoveryId, { title: string; sub: string }> = {
-  resource: { title: 'A Pocketful of Possibilities', sub: 'Collect resources to use, store, or sell later.' },
+  resource: { title: 'A Pocketful of Possibilities', sub: 'Your first resource is in your inventory. Collected items can be sold at Mitchy’s shop.' },
   settings: { title: 'A Little Know-How', sub: 'You can revisit Settings anytime.' },
-  controls: { title: 'You’re Getting the Hang of It', sub: 'You can revisit Controls anytime.' },
-  map: { title: 'The Lay of the Land', sub: 'Use your map to find your way around the island.' },
-  home: { title: 'A Place to Call Your Own', sub: 'Store your collected items safely here.' },
+  controls: { title: 'Getting the Hang of It', sub: 'You can check the controls anytime in Settings.' },
+  map: { title: 'The Lay of the Land', sub: 'Use the map to find your way around the island. Press M to open it anytime.' },
+  home: { title: 'A Place to Call Your Own', sub: 'Welcome home! You can store collected items here.' },
 };
+
+// a step by its id, in whichever questline it's in
+export function objectiveById(id: string): Objective | null {
+  for (const l of [QUESTLINE_1, QUESTLINE_2, REPLAY]) {
+    const o = l.steps.find((x) => x.id === id);
+    if (o) return o;
+  }
+  return null;
+}

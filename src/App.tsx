@@ -167,7 +167,7 @@ import { flushFeedbackOutbox, newFeedbackId, playerId, sendFeedback, SESSION } f
 import { CraftPrefsSettings } from './CraftFeedback';
 import { LINK } from './link';
 import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
-import { QUEST_ENABLED, GATHER_TARGET, EXPLORE_TILES, SEED_CHOICES, type SeedKind, type HintTarget, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, DISCOVERIES, type StepId, type DiscoveryId } from './quest/quests';
+import { QUEST_ENABLED, GATHER_TARGET, EXPLORE_TILES, SEED_CHOICES, type SeedKind, type HintTarget, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, DISCOVERIES, objectiveById, type StepId, type DiscoveryId } from './quest/quests';
 import { boatReachable, boatRoute, seaRoute, pathLength, pointAt, type Pt } from './quest/route';
 import { QuestPanel, type QuestView } from './quest/QuestPanel';
 import { QuestComplete, RatingSequence, TestTransition } from './quest/TestScreens';
@@ -306,11 +306,11 @@ const lastMotion = new WeakMap<HTMLElement, string>();
 // Intro Part C: how long the crafting token takes to fly to the player
 const TOKEN_FX_MS = 900;
 // the quest flow (src/quest/): how long QUEST COMPLETE stays, boat speed (tiles/s)
-const QUEST_DONE_MS = 2800;
+const QUEST_DONE_MS = 3800;
 // a hint's camera (runHint): the glide to the objective and back, and the hold
 const HINT_GLIDE_MS = 700;
 const HINT_HOLD_MS = 1400;
-const HINT_BLINK_MS = 4000;
+const HINT_BLINK_MS = 5000;
 // what counts as a resource for LITTLE THINGS ADD UP's hint
 const RESOURCE_KINDS = new Set<EntityKind>(['flower', 'flowerplus', 'stone', 'date', 'cactus', 'fern', 'iceflower']);
 const SAVE_SCREEN_MS = 1600; // the black saving screen stays at least this long
@@ -574,7 +574,7 @@ type Bubble = { text: string; width: number } | null;
 
 // A first-discovery toast (see discover in Game): floats in at the top
 // centre, holds 2 s, floats out, then hands over to the next one.
-const DISCOVERY_MS = 200 + 2000 + 300;
+const DISCOVERY_MS = 200 + 3000 + 300;
 function DiscoveryToast({ title, sub, onDone }: { title: string; sub: string; onDone(): void }) {
   useEffect(() => {
     const t = window.setTimeout(onDone, DISCOVERY_MS);
@@ -582,6 +582,7 @@ function DiscoveryToast({ title, sub, onDone }: { title: string; sub: string; on
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="discovery-toast" role="status" style={{ animationDuration: `${DISCOVERY_MS}ms` }}>
+      <div className="discovery-kicker">FIRST DISCOVERY</div>
       <div className="discovery-title">{title}</div>
       <div className="discovery-sub">{sub}</div>
     </div>
@@ -4230,6 +4231,13 @@ function Game() {
   const [hintSparkles, setHintSparkles] = useState<string[]>([]);
   const [blinkControls, setBlinkControls] = useState(false);
   const [blinkQuest, setBlinkQuest] = useState(false);
+  // the step the player last saw in the quest panel (QuestPanel plays a
+  // finished step's beat when it comes back to a newer one); the current
+  // one at the start, so nothing plays on load
+  const [seenStep, setSeenStep] = useState<string | null>(null);
+  useEffect(() => {
+    if (questObjective && seenStep === null) setSeenStep(questObjective.id);
+  }, [questObjective, seenStep]);
   const [hintCard, setHintCard] = useState<{ pages: string[]; i: number } | null>(null);
   const hintCardRef = useRef(hintCard);
   hintCardRef.current = hintCard;
@@ -5440,6 +5448,8 @@ function Game() {
               hintBusy={!!hintRun}
               blinkControls={blinkControls}
               blinkQuest={blinkQuest}
+              seen={seenStep ? objectiveById(seenStep) : null}
+              onSeen={setSeenStep}
               task={questTask}
               sub={questSub}
               progress={questObjective.target ? { n: quest!.gathered, of: questObjective.target } : undefined}

@@ -4711,6 +4711,12 @@ pre {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
   animation: discovery-float 2500ms ease both;
 }
+.discovery-kicker {
+  margin-bottom: 3px;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  color: var(--ds-name);
+}
 .discovery-title {
   font-size: 15px;
   font-weight: 600;
@@ -4723,8 +4729,8 @@ pre {
 }
 @keyframes discovery-float {
   0% { opacity: 0; transform: translate(-50%, -10px); }
-  8% { opacity: 1; transform: translate(-50%, 0); }
-  88% { opacity: 1; transform: translate(-50%, 0); }
+  6% { opacity: 1; transform: translate(-50%, 0); }
+  91% { opacity: 1; transform: translate(-50%, 0); }
   100% { opacity: 0; transform: translate(-50%, -6px); }
 }
 @media (prefers-reduced-motion: reduce) {

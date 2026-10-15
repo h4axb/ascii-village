@@ -57,6 +57,11 @@ export type EntityKind =
   // decor but with an opaque backing per cell, so it reads as solid stone
   // instead of glyphs floating over the grass.
   | 'boulder'
+  // a fence piece or the wooden sign board (src/fence.ts): drawn solid,
+  // blocks where it's drawn
+  | 'fence'
+  // a fence gate: F opens and closes it (open, only its posts block)
+  | 'gate'
   | 'placed'; // a player-placed decoration/furniture entity (see placement.ts)
 
 // ---------------------------------------------------------------------------

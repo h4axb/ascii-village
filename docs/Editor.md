@@ -171,3 +171,18 @@ shows each island's bounds and follows the drag. The ground is redrawn when you 
 
 Moves are saved with the world (`world.json` → `islands`, whole-tile offsets by island index) and undo like any
 other edit.
+
+## Fences
+
+Assets → **Fences** has a modular glyph fence (`src/fence.ts`) in two woods (red-brown and light):
+
+- **rail**: the fence seen from the front, one tile; rails join up end to end.
+- **upright**: the fence running down the screen, one tile.
+- **post**: a lone post for row ends and corners.
+- **gate**: 4 tiles, a post at each end. In the game, walking up to it shows **[F] open the gate**. Opening it swaps in
+  the open drawing (leaves swung in), and only its posts block, so the player walks through. F again closes it.
+  Open gates are kept in the save.
+- **sign board**: the wooden sign, plain or with a notice pinned on.
+
+Click places one piece. **Shift + drag** with a fence piece armed lays a row of it as long as the drag, across or down,
+whichever way you drag furthest. The row is one undo step. Fence pieces are drawn solid and block where they're drawn.

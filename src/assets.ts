@@ -19,6 +19,7 @@
 // types — hence the scale numbers written out here.
 // ---------------------------------------------------------------------------
 import * as S from './sprites';
+import * as F from './fence';
 import type { EntityKind } from './world';
 import type { SignLayers } from './wayfinder';
 import metaData from './data/assets.meta.json';
@@ -36,7 +37,7 @@ export interface AssetDef {
   solid?: string[];
   scale: number;
   interactable: boolean;
-  group: 'Buildings' | 'Nature' | 'Items' | 'Water' | 'New';
+  group: 'Buildings' | 'Nature' | 'Fences' | 'Items' | 'Water' | 'New';
   file?: string; // src/data/assets/<file> for file assets
   // kind 'cat' only: a look for Mitchy, never placed on its own (see
   // applyMitchyLook in world.ts); the rows of his head, for portraits
@@ -64,6 +65,38 @@ const blank = (sprite: string[]) => sprite.map((l) => ' '.repeat(l.length));
 
 // The sprites that live in code. Scales match the constants in world.ts
 // (HOUSE_SCALE, SHOP_SCALE, ...).
+// the fence pieces and the sign board (src/fence.ts), in both woods
+const fenceAssets = (): AssetDef[] => {
+  const out: AssetDef[] = [];
+  for (const wood of ['red', 'light'] as const) {
+    const pal = F.fencePalette(wood);
+    const w = wood === 'red' ? 'red' : 'light';
+    const piece = (slug: string, label: string, a: F.FenceArt, kind: 'fence' | 'gate' = 'fence'): AssetDef => ({
+      slug: `${slug}-${w}`,
+      label: `${label} (${w} wood)`,
+      kind,
+      group: 'Fences',
+      sprite: a.sprite,
+      colors: a.colors,
+      palette: pal,
+      scale: F.FENCE_SCALE,
+      interactable: kind === 'gate',
+    });
+    out.push(
+      piece('fence-rail', 'Fence rail', F.FENCE_RAIL),
+      piece('fence-upright', 'Fence upright', F.FENCE_UPRIGHT),
+      piece('fence-post', 'Fence post', F.FENCE_POST),
+      piece('fence-gate', 'Fence gate', F.GATE_CLOSED, 'gate'),
+    );
+  }
+  const red = F.fencePalette('red');
+  out.push(
+    { slug: 'sign-board', label: 'Sign board', kind: 'fence', group: 'Fences', sprite: F.SIGN_BOARD.sprite, colors: F.SIGN_BOARD.colors, palette: red, scale: F.FENCE_SCALE, interactable: false },
+    { slug: 'sign-board-notice', label: 'Sign board with notice', kind: 'fence', group: 'Fences', sprite: F.SIGN_NOTICE.sprite, colors: F.SIGN_NOTICE.colors, palette: red, scale: F.FENCE_SCALE, interactable: false },
+  );
+  return out;
+};
+
 const CODE_ASSETS: AssetDef[] = [
   { slug: 'house', label: 'House', kind: 'house', group: 'Buildings', sprite: S.HOUSE, colors: S.HOUSE_COLORS, palette: S.HOUSE_PALETTE, solid: S.HOUSE_SOLID, scale: 0.36, interactable: false },
   { slug: 'shop', label: 'Shop', kind: 'shop', group: 'Buildings', sprite: S.SHOP, colors: S.SHOP_COLORS, palette: S.SHOP_PALETTE, solid: S.SHOP_SOLID, scale: 0.4, interactable: true },
@@ -78,6 +111,7 @@ const CODE_ASSETS: AssetDef[] = [
   { slug: 'stone', label: 'Stone (collectable)', kind: 'stone', group: 'Items', sprite: S.STONE, scale: 1, interactable: true },
   { slug: 'cactus', label: 'Cactus (collectable)', kind: 'cactus', group: 'Items', sprite: S.CACTUS, scale: 1, interactable: true },
   { slug: 'fern', label: 'Fern (collectable)', kind: 'fern', group: 'Items', sprite: S.FERN, scale: 1, interactable: true },
+  ...fenceAssets(),
   { slug: 'iceflower', label: 'Ice flower (collectable)', kind: 'iceflower', group: 'Items', sprite: S.ICEFLOWER, scale: 1, interactable: true },
   { slug: 'date', label: 'Dates (collectable)', kind: 'date', group: 'Items', sprite: S.DATE_FRUIT, colors: S.DATE_COLORS, palette: S.DATE_PALETTE, scale: 1, interactable: true },
 ];

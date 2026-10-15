@@ -163,6 +163,22 @@ pre {
   font-size: 17px;
   letter-spacing: 0.5px;
 }
+/* the ◆ either side of the highlighted button's name (the palm's and the
+   terrain's own diamond glyph) */
+.landing-mark {
+  display: inline-block;
+  margin: 0 0.6em;
+  color: var(--ds-coin);
+  font-size: 0.7em;
+  vertical-align: 0.15em;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.landing-option.sel .landing-mark {
+  visibility: visible;
+  opacity: 1;
+}
 .landing-option:disabled {
   opacity: 0.4;
   cursor: default;

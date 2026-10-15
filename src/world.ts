@@ -840,7 +840,7 @@ export interface WorldAdded extends WorldPose {
 export interface StartScreenDoc {
   view: { x: number; y: number }; // the tile the camera centres on
   zoom?: number; // 1 = the game's view; >1 closer, <1 wider
-  player: { x: number; y: number }; // where the player stands (tiles)
+  player: { x: number; y: number; scale?: number }; // where the player stands (tiles) and its size (1 = as in the game)
   // the subtitle + buttons: its left edge and vertical centre, as fractions
   // of the screen, and a size multiplier
   ui?: { x: number; y: number; scale?: number };
@@ -857,7 +857,7 @@ export interface StartScreenDoc {
 export interface StartScreen {
   view: { x: number; y: number };
   zoom: number;
-  player: { x: number; y: number };
+  player: { x: number; y: number; scale: number };
   ui: { x: number; y: number; scale: number };
   title: { x: number; y: number; width: number; rotation: number; aspect: number; v: string };
   subtitle: { x: number; y: number; size: number; text: string };
@@ -865,7 +865,7 @@ export interface StartScreen {
 export const START_SCREEN_DEFAULT: StartScreen = {
   view: { x: 68, y: 58 },
   zoom: 1,
-  player: { x: 72, y: 61 },
+  player: { x: 72, y: 61, scale: 1 },
   ui: { x: 0.09, y: 0.62, scale: 1 },
   title: { x: 0.22, y: 0.235, width: 0.27, rotation: 0, aspect: 0.507, v: '' },
   subtitle: { x: 0.2, y: 0.43, size: 13, text: 'a tiny monochrome bay' },
@@ -879,7 +879,7 @@ export function startScreenOf(doc: WorldDoc): StartScreen {
   return {
     view: s?.view ?? d.view,
     zoom: s?.zoom ?? d.zoom,
-    player: s?.player ?? d.player,
+    player: { x: s?.player?.x ?? d.player.x, y: s?.player?.y ?? d.player.y, scale: s?.player?.scale ?? d.player.scale },
     ui: { x: s?.ui?.x ?? d.ui.x, y: s?.ui?.y ?? d.ui.y, scale: s?.ui?.scale ?? d.ui.scale },
     title: { ...d.title, ...s?.title },
     subtitle: { ...d.subtitle, ...s?.subtitle },
@@ -953,10 +953,12 @@ export function startFrame(ss: StartScreen, scr: { w: number; h: number } = star
 // on the map (ch x lines) from its tile's top-left
 export const START_PLAYER_FRAME = S.WALK_DOWN_FRAMES[1];
 export const START_PLAYER_K = (PLAYER_SCALE * S.PLAYER.length) / (START_PLAYER_FRAME.sprite.length - S.WALK_DOWN_PAD_TOP);
-export const START_PLAYER_BOX = {
-  w: START_PLAYER_K * Math.max(...START_PLAYER_FRAME.sprite.map((l) => l.length)),
-  h: START_PLAYER_K * START_PLAYER_FRAME.sprite.length,
-};
+// the editor's size slider on top of that
+export const startPlayerK = (ss: StartScreen) => START_PLAYER_K * ss.player.scale;
+export const startPlayerBox = (ss: StartScreen) => ({
+  w: startPlayerK(ss) * Math.max(...START_PLAYER_FRAME.sprite.map((l) => l.length)),
+  h: startPlayerK(ss) * START_PLAYER_FRAME.sprite.length,
+});
 // A collider box drawn in the world editor's Colliders tab, in tiles (any
 // quarter): it blocks every tile it overlaps where the player's feet would
 // land, like the painted map tiles. With an owner its x/y are from that

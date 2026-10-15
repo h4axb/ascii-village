@@ -37,7 +37,7 @@ import {
   applyMitchyLook,
   startScreenOf,
   startFrame,
-  START_PLAYER_BOX,
+  startPlayerBox,
   cleanLook,
   placedBoxes,
 } from '../world';
@@ -671,7 +671,8 @@ export function useWorldEditor(opts: {
     if (Math.abs(wx - (f.x + f.w)) <= 2.5 && Math.abs(wy - (f.y + f.h)) <= 1.5) return 'zoom';
     const p = startScreen.player;
     const px = p.x * TILE_CH, py = p.y * TILE_LN; // the sprite's top-left
-    if (wx >= px && wx <= px + START_PLAYER_BOX.w && wy >= py && wy <= py + START_PLAYER_BOX.h) return 'player';
+    const pb = startPlayerBox(startScreen);
+    if (wx >= px && wx <= px + pb.w && wy >= py && wy <= py + pb.h) return 'player';
     // the subtitle (a thin line: a little slack round it)
     if (Math.abs(wx - f.sub.cx) <= f.sub.w / 2 + 1 && Math.abs(wy - f.sub.cy) <= f.sub.h / 2 + 0.5) return 'sub';
     if (wx >= f.ui.x && wx <= f.ui.x + f.ui.w && wy >= f.ui.y && wy <= f.ui.y + f.ui.h) return 'ui';
@@ -1262,7 +1263,7 @@ export function useWorldEditor(opts: {
         const y = Math.round((w.wy / TILE_LN - d.dy) * q) / q;
         const p = startScreen.player;
         if (p.x === x && p.y === y) return;
-        setStartScreen({ player: { x, y } }, !d.moved);
+        setStartScreen({ player: { ...p, x, y } }, !d.moved);
         d.moved = true;
       } else if (d.type === 'startUi') {
         const f = startFrame(startScreen);

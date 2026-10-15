@@ -4,7 +4,7 @@
 // the objects they point at.
 import { ColoredSprite } from '../ColoredSprite';
 import { MARKER_REGISTRY } from '../sceneMarkers';
-import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint, startFrame, startScreenSize, startTitleUrl, START_PLAYER_FRAME, START_PLAYER_K, START_PLAYER_BOX } from '../world';
+import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint, startFrame, startScreenSize, startTitleUrl, START_PLAYER_FRAME, startPlayerK, startPlayerBox } from '../world';
 import { eyesOf } from '../playerEyes';
 import { PlayerShadow } from '../PlayerShadow';
 import * as S from '../sprites';
@@ -61,7 +61,8 @@ function StartLayer({ ed }: { ed: WorldEditor }) {
   const scr = startScreenSize();
   const f = startFrame(ss, scr);
   const p = ss.player;
-  const k = START_PLAYER_K;
+  const k = startPlayerK(ss); // with the size slider
+  const pb = startPlayerBox(ss);
   const fr = START_PLAYER_FRAME;
   const cols = Math.max(...fr.sprite.map((l) => l.length));
   const box = (x: number, y: number, w: number, h: number) => ({ left: `${x}ch`, top: `${y}em`, width: `${w}ch`, height: `${h}em` });
@@ -102,7 +103,7 @@ function StartLayer({ ed }: { ed: WorldEditor }) {
         <div className="wed-start-btn" />
       </div>
       <div className="wed-start-player" style={{ left: `${p.x * TILE_CH}ch`, top: `${p.y * TILE_LN}em` }}>
-        <PlayerShadow x={p.x} y={p.y} cx={START_PLAYER_BOX.w / 2} footEm={START_PLAYER_BOX.h} />
+        <PlayerShadow x={p.x} y={p.y} cx={pb.w / 2} footEm={pb.h} />
         <ColoredSprite
           className="player-sprite"
           style={{ position: 'absolute', left: `${-((1 - k) * cols) / 2}ch`, top: `${-(1 - k) * fr.sprite.length}em`, scale: `${k}` }}

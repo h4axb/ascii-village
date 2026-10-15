@@ -544,6 +544,7 @@ function StartTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): void 
           <Num label="x" value={ss.player.x} step={1} onChange={(x) => ed.setStartScreen({ player: { ...ss.player, x } })} />
           <Num label="y" value={ss.player.y} step={1} onChange={(y) => ed.setStartScreen({ player: { ...ss.player, y } })} />
         </div>
+        {slider('size', ss.player.scale, 0.3, 3, (scale) => ed.setStartScreen({ player: { ...ss.player, scale } }))}
       </div>
       <div className="wed-group">
         <div className="wed-group-name">Title</div>

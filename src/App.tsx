@@ -22,7 +22,7 @@ import {
   START_PLAYER_FRAME,
   placedBoxes,
   boxBlocksTile,
-  START_PLAYER_K,
+  startPlayerK,
   startFrame,
   startTitleUrl,
   startUiScale,
@@ -683,6 +683,7 @@ function entPlacement(e: Ent): React.CSSProperties {
 // own colour (other sprites use 0.55) - lighter, so the character reads
 // clean rather than grimy, in the game and on the start screen
 const PLAYER_SHADE = 0.3;
+const HUD_AVATAR_FONT = 6; // px per row of the HUD head (.hud-avatar-art)
 
 // The start screen's backdrop: a live view of the island's east coast, drawn
 // by the game's own layers - the terrain (its ocean shimmers and its foam
@@ -749,7 +750,7 @@ function LandingWorld({ portrait }: { portrait: boolean }) {
   const res = dims.scale * zoom * (window.devicePixelRatio || 1);
   const ents = [...STRUCT_ENTS, ...START_ONLY_ENTS].filter((e) => !LANDING_SKIP.has(e.kind));
   const frame = START_PLAYER_FRAME; // the player mid-step (world.ts)
-  const playerK = START_PLAYER_K;
+  const playerK = startPlayerK(L); // the editor's size slider included
   const playerW = Math.max(...frame.sprite.map((l) => l.length));
   return (
     <div className="landing-world" aria-hidden>
@@ -5412,14 +5413,20 @@ function Game() {
                   with ragged rows the <pre> is sized by max-content, and any
                   slack in that box makes flex centre the BOX while the ink
                   sits off to one side. */}
-              {/* same per-cell backing and eyes as the player in the world */}
-              <ColoredSprite
-                style={{ width: `${avatarCols}ch` }}
+              {/* drawn exactly like the player in the world (same canvas,
+                  shade, outline and .player-sprite filter), so the Theme's
+                  player saturation, the outfit colours etc. show here too */}
+              <SolidSpriteCanvas
+                className="player-sprite hud-avatar-art"
+                style={{ position: 'relative', width: `${avatarCols}ch` }}
                 sprite={avatarSprite}
                 colors={avatarRecolored.colors}
                 palette={avatarRecolored.palette}
-                solidCells
                 eyeRow={14}
+                shade={PLAYER_SHADE}
+                charW={HUD_AVATAR_FONT * 0.6}
+                lineH={HUD_AVATAR_FONT}
+                res={2 * (window.devicePixelRatio || 1)}
               />
             </button>
 

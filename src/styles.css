@@ -379,6 +379,13 @@ pre {
   line-height: 1;
   white-space: pre;
 }
+/* the head: the in-game player's own canvas (App.tsx, in the flow so the
+   circle centres it), never scaled, at HUD_AVATAR_FONT */
+.hud-avatar .hud-avatar-art {
+  flex: none;
+  font-size: 6px;
+  transform-origin: 50% 50%;
+}
 
 /* zero-size anchor pinned to the avatar's centre — every orbit child
    positions itself from here with translate(var(--tx), var(--ty)) */

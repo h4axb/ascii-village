@@ -173,7 +173,8 @@
         "saturation": 1,
         "brightness": 0.99,
         "tint": "#5cd3db",
-        "tintAmount": 0.11
+        "tintAmount": 0.11,
+        "speed": 0.1
       }
     }
   }

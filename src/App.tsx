@@ -3370,7 +3370,7 @@ function Game() {
   function fillAtPond() {
     const tool = equippedRef.current;
     if (tool?.tool !== 'water') {
-      showToast('you need a container to fill it.');
+      showToast('needs a container to fill.');
       return;
     }
     const pond = nearestPond();
@@ -4342,7 +4342,7 @@ function Game() {
       return;
     }
     if (!modal && pondPrompt) {
-      if (pondPrompt.canFill) fillAtPond();
+      fillAtPond(); // with nothing to fill: says it needs a container
       return;
     }
     if (!modal && boatPrompt) {
@@ -4462,15 +4462,15 @@ function Game() {
     }
     return best;
   }
-  // Next to a pond: [F] fill water with a watering tool in hand, else a line
-  // that it needs a container. Something nearer keeps its own label.
+  // Next to a pond: [F] fill water (with nothing to fill in hand, F says it
+  // needs a container). Something nearer keeps its own label.
   const pondPrompt = (() => {
     if (boatPrompt || riding || modal || cinematic || mapOpen || editorOpen || placing || watering || hintLock || hintCard) return null;
     const p = nearestPond();
     if (!p || p.gap > POND_REACH || (promptTarget && promptTarget.gap < p.gap)) return null;
     // by the player (top-right of the head): a pond is wide, its own corner
     // is often off screen
-    return { e: p.e, canFill: equipped?.tool === 'water', at: { right: (player.x + PLAYER_T.wT) * TILE_CH, top: player.y * TILE_LN } };
+    return { e: p.e, at: { right: (player.x + PLAYER_T.wT) * TILE_CH, top: player.y * TILE_LN } };
   })();
   // Mitchy's "!" bubble: while something with him is still open (the intro's
   // part C, bringing him the gathered things, reporting back) and the player
@@ -6291,8 +6291,8 @@ function Game() {
               {/* at the pond (see pondPrompt) */}
               {pondPrompt && (
                 <div className="fpop" style={{ left: `${pondPrompt.at.right}ch`, top: `${pondPrompt.at.top}em` }}>
-                  {pondPrompt.canFill && <kbd className="fpop-key">F</kbd>}
-                  <span className="fpop-name">{pondPrompt.canFill ? 'fill water' : 'needs a container to fill'}</span>
+                  <kbd className="fpop-key">F</kbd>
+                  <span className="fpop-name">fill water</span>
                 </div>
               )}
 

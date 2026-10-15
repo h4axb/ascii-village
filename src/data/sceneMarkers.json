@@ -1,18 +1,18 @@
 {
   "intro.partB.playerStart": {
-    "x": 55,
-    "y": 55
+    "x": 44,
+    "y": 58
   },
   "intro.partB.mitchyStart": {
-    "x": 58,
-    "y": 55
+    "x": 47,
+    "y": 58
   },
   "intro.partB.mitchyExit": {
-    "x": 73,
-    "y": 55
+    "x": 55,
+    "y": 57
   },
   "quest.boatLaunch": {
-    "x": 82,
-    "y": 53
+    "x": 62,
+    "y": 58
   }
 }

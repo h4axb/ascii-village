@@ -1,6 +1,7 @@
 ﻿import * as S from './sprites';
 import { GARDEN } from './farm';
 import worldDocData from './data/world.json';
+import mainIslandData from './data/mainIsland.json';
 import { assetOf, ASSET_OF_KIND } from './assets';
 import { signArt, type SignSettings } from './wayfinder';
 
@@ -87,7 +88,123 @@ interface IslandDef {
 // islands only ever get ADDED around it, in map space opened up to their
 // south/east (see MAP_W/MAP_H above; the main island's own margin to the
 // original west/north edges is untouched).
-const MAIN_ISLAND: IslandDef = { cx: 40, cy: 50, rx: 36, ry: 44 };
+// Its SHAPE comes from src/data/mainIsland.json, baked from the reference map
+// (scripts/bake-island.py): one class per ground cell (ch x line) — water,
+// grass, sand, cliff face, stones in the water. Its coast field (below) is
+// the signed distance to that land, so walking, boats, the drawn coast and
+// the sea routes all follow the picture. This ellipse is only its bounds
+// (the sea routes' ring circles outside it).
+type IslandGrid = { x0: number; y0: number; cols: number; rows: number; grid: string[] };
+const MAIN_GRID = mainIslandData as IslandGrid;
+const MAIN_ISLAND: IslandDef = {
+  cx: (MAIN_GRID.x0 + MAIN_GRID.cols / 2) / TILE_CH,
+  cy: (MAIN_GRID.y0 + MAIN_GRID.rows / 2) / TILE_LN,
+  rx: MAIN_GRID.cols / TILE_CH / 2,
+  ry: MAIN_GRID.rows / TILE_LN / 2,
+};
+// The main island's class at a ground cell (world ch, lines): '.' water,
+// 'g' grass, 's' sand, 'c' cliff face, 'r' a stone in the water; null off its grid
+export function mainIslandClass(cx: number, cy: number): string | null {
+  const c = Math.floor(cx) - MAIN_GRID.x0;
+  const r = Math.floor(cy) - MAIN_GRID.y0;
+  if (r < 0 || r >= MAIN_GRID.rows || c < 0 || c >= MAIN_GRID.cols) return null;
+  return MAIN_GRID.grid[r][c] ?? '.';
+}
+// A tile with cliff face across its middle: the player can't stand there
+export function isCliffTile(tx: number, ty: number): boolean {
+  let n = 0;
+  for (let dy = 0; dy < TILE_LN; dy++)
+    for (let dx = 0; dx < TILE_CH; dx++) if (mainIslandClass(tx * TILE_CH + dx, ty * TILE_LN + dy) === 'c') n++;
+  return n * 2 >= TILE_CH * TILE_LN;
+}
+
+// The coast field: signed distance (tiles) from the island's land, inland
+// negative, scaled so the bands the terrain draws (sand rim, foam, shallows)
+// hug the shore: nd = 1 + distance / MAIN_ND_SCALE. Exact Euclidean distance
+// over the cell grid (Felzenszwalb's separable transform, cells 1/4 tile wide
+// and 1/2 tile tall), on a grid padded with open sea so it runs out smoothly.
+const MAIN_ND_SCALE = 14;
+const MAIN_PAD = { x: 32, y: 16 }; // cells of sea round the baked grid
+let MAIN_FIELD: Float32Array | null = null;
+const MAIN_FW = MAIN_GRID.cols + 2 * MAIN_PAD.x;
+const MAIN_FH = MAIN_GRID.rows + 2 * MAIN_PAD.y;
+function edt1d(f: Float64Array, n: number, w: number): Float64Array {
+  // squared distance along one axis, samples w apart (lower envelope of parabolas)
+  const d = new Float64Array(n);
+  const v = new Int32Array(n);
+  const z = new Float64Array(n + 1);
+  const cross = (q: number, p: number) => (f[q] + (q * w) ** 2 - (f[p] + (p * w) ** 2)) / (2 * w * (q - p));
+  let k = 0;
+  v[0] = 0;
+  z[0] = -Infinity;
+  z[1] = Infinity;
+  for (let q = 1; q < n; q++) {
+    let sx = cross(q, v[k]);
+    while (sx <= z[k]) sx = cross(q, v[--k]);
+    k++;
+    v[k] = q;
+    z[k] = sx;
+    z[k + 1] = Infinity;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) {
+    while (z[k + 1] < q * w) k++;
+    d[q] = (q * w - v[k] * w) ** 2 + f[v[k]];
+  }
+  return d;
+}
+// distance (tiles) from every cell to the nearest cell where `inside` holds
+function edt2d(inside: Uint8Array): Float64Array {
+  const W = MAIN_FW, H = MAIN_FH, BIG = 1e12;
+  const out = new Float64Array(W * H);
+  const col = new Float64Array(H);
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) col[y] = inside[y * W + x] ? 0 : BIG;
+    const d = edt1d(col, H, 1 / TILE_LN);
+    for (let y = 0; y < H; y++) out[y * W + x] = d[y];
+  }
+  const row = new Float64Array(W);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) row[x] = out[y * W + x];
+    const d = edt1d(row, W, 1 / TILE_CH);
+    for (let x = 0; x < W; x++) out[y * W + x] = Math.sqrt(d[x]);
+  }
+  return out;
+}
+function mainField(): Float32Array {
+  if (MAIN_FIELD) return MAIN_FIELD;
+  const land = new Uint8Array(MAIN_FW * MAIN_FH);
+  const sea = new Uint8Array(MAIN_FW * MAIN_FH);
+  for (let y = 0; y < MAIN_FH; y++)
+    for (let x = 0; x < MAIN_FW; x++) {
+      const r = y - MAIN_PAD.y, c = x - MAIN_PAD.x;
+      const ch = r >= 0 && r < MAIN_GRID.rows && c >= 0 && c < MAIN_GRID.cols ? MAIN_GRID.grid[r][c] : '.';
+      const isLand = ch !== '.' && ch !== undefined;
+      land[y * MAIN_FW + x] = isLand ? 1 : 0;
+      sea[y * MAIN_FW + x] = isLand ? 0 : 1;
+    }
+  const toLand = edt2d(land);
+  const toSea = edt2d(sea);
+  const f = new Float32Array(MAIN_FW * MAIN_FH);
+  for (let i = 0; i < f.length; i++) f[i] = 1 + (land[i] ? -toSea[i] : toLand[i]) / MAIN_ND_SCALE;
+  return (MAIN_FIELD = f);
+}
+// the main island's nd at a tile point (bilinear over the cell field; past
+// the padded grid, the distance keeps growing with the bounds' distance)
+function mainNd(tx: number, ty: number): number {
+  const f = mainField();
+  const gx = tx * TILE_CH - MAIN_GRID.x0 + MAIN_PAD.x - 0.5;
+  const gy = ty * TILE_LN - MAIN_GRID.y0 + MAIN_PAD.y - 0.5;
+  const cx = Math.max(0, Math.min(MAIN_FW - 1.001, gx));
+  const cy = Math.max(0, Math.min(MAIN_FH - 1.001, gy));
+  const x0 = Math.floor(cx), y0 = Math.floor(cy);
+  const ax = cx - x0, ay = cy - y0;
+  const i = y0 * MAIN_FW + x0;
+  const v =
+    f[i] * (1 - ax) * (1 - ay) + f[i + 1] * ax * (1 - ay) + f[i + MAIN_FW] * (1 - ax) * ay + f[i + MAIN_FW + 1] * ax * ay;
+  const out = Math.hypot((gx - cx) / TILE_CH, (gy - cy) / TILE_LN);
+  return v + out / MAIN_ND_SCALE;
+}
 
 // New islands, smallest to largest, placed with a comfortable ocean gap (15+
 // tiles) from the main island and from each other and from the map edges.
@@ -105,6 +222,7 @@ const ISLANDS: IslandDef[] = [MAIN_ISLAND, ...OTHER_ISLANDS];
 // waterline, >1 open ocean. Same wobble on every island so they all read as
 // the same hand.
 function islandNdFor(isl: IslandDef, tx: number, ty: number): number {
+  if (isl === MAIN_ISLAND) return mainNd(tx, ty);
   const dx = (tx - isl.cx) / isl.rx;
   const dy = (ty - isl.cy) / isl.ry;
   const wobble =
@@ -1234,7 +1352,7 @@ export function wildSpawns(window: number, garden: TileBox = GARDEN): Ent[] {
 // The player starts beside their house, on land. (23,32) sits well clear of
 // the house's box (28-33,32-39) and everything else in STRUCT_ENTS, with
 // enough margin to absorb PLAYER_SCALE changes without landing on the house.
-export const PLAYER_SPAWN = { x: 23, y: 32 };
+export const PLAYER_SPAWN = { x: 31, y: 25 };
 
 function mulberry32(a: number) {
   return function () {

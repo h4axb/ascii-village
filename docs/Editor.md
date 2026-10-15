@@ -144,3 +144,15 @@ He keeps his height: the scale follows the art's row count. A look is never plac
 - `src/assets.ts` — the asset registry
 - `src/world.ts` (`buildStructEnts`) — applies `world.json` when the game loads
 - `vite.config.ts` (`worldEditorSavePlugin`) — the dev-only save endpoint
+
+## The main island's shape
+
+The main island is baked from a picture: `assets/refs/island-map-ref.webp` →
+`python3 scripts/bake-island.py` (numpy, scipy, Pillow) → `src/data/mainIsland.json`.
+Every ground cell gets one class: water, grass, sand, cliff face (blocks walking) or
+a stone in the water. Trees, ponds, paths and buildings in the picture all count as
+grass. `world.ts` turns the land into the coast field that walking, boats and sea
+routes use. `terrain.ts` draws each cell by its class. To change the island, edit
+the picture (or the script's scale / origin / ignore boxes) and re-run the script.
+The painted ground from before the new island is kept in
+`assets/refs/ground-before-island-v2.json`.

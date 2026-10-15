@@ -32,6 +32,7 @@ import {
   collisionBox,
   silhouetteMask,
   OCEAN_CFG,
+  mainIslandClass,
 } from './world';
 import { RAMP_DEFAULT } from './craft/materials';
 import { onThemeChange, themeRgb, groundShadow } from './theme';
@@ -399,6 +400,13 @@ function sample(fx: number, fy: number, jit: number) {
   out.lit = 0;
   out.patch = 0;
   const n = ndv + jit;
+  // the main island is drawn from its baked map (world.ts, mainIsland.json):
+  // grass, sand, cliff faces and stones exactly where the picture has them
+  const mc = mainIslandClass(fx * TILE_CH, fy * TILE_LN);
+  if (mc !== null) {
+    sampleMain(mc, fx, fy, n);
+    return;
+  }
   // ragged, cell-scale shoreline: a little noise on where sand starts
   const edge = SAND_START_ND + (vnoise(fx * 1.3, fy * 1.3, 83) - 0.5) * 0.016;
   const onLand = n < edge;
@@ -453,6 +461,62 @@ function sample(fx: number, fy: number, jit: number) {
       out.kind = KIND_ROCK;
     }
   }
+  paintGround(fx, fy);
+}
+
+// The main island's cell by its class. The coast distance still shades the
+// water (shallows lighter) and the grass (its patches); the class decides
+// what the cell IS, so the picture's coast, beaches and cliffs stay put.
+function sampleMain(mc: string, fx: number, fy: number, n: number) {
+  if (mc === '.') {
+    const nn = Math.max(n, WATERLINE_ND + 0.004);
+    stopsAt(SEA_STOPS, nn);
+    if (nn > 1.2) {
+      const d = (fbm(fx * 0.05, fy * 0.05, 77) - 0.5) * 0.22;
+      out.r *= 1 + d;
+      out.g *= 1 + d;
+      out.b *= 1 + d;
+    }
+    out.kind = KIND_WATER;
+    return;
+  }
+  if (mc === 's') {
+    // dry sand, a little uneven
+    const nn = SAND_START_ND + 0.014 + (vnoise(fx * 0.9, fy * 0.9, 61) - 0.5) * 0.02;
+    stopsAt(SEA_STOPS, Math.min(nn, WATERLINE_ND - 0.01));
+    out.kind = KIND_SAND;
+    return;
+  }
+  if (mc === 'c' || mc === 'r') {
+    // a cliff face (or a stone in the water): grey rock in rough horizontal
+    // strata, its top edge catching the light and its foot in shadow
+    const cx = fx * TILE_CH, cy = fy * TILE_LN;
+    const top = mainIslandClass(cx, cy - 1) !== mc;
+    const foot = mainIslandClass(cx, cy + 1) !== mc;
+    const band = vnoise(fx * 0.6, fy * 5.5, 505);
+    const grain = vnoise(fx * 3.1, fy * 3.1, 17);
+    let t = 0.3 + 0.45 * band + 0.15 * grain;
+    if (band < 0.32) t -= 0.18; // the dark seams between strata
+    if (top) t = 0.95;
+    else if (foot) t *= 0.45;
+    t = clamp01(t);
+    out.r = P.rockDark[0] + (P.rock[0] - P.rockDark[0]) * t;
+    out.g = P.rockDark[1] + (P.rock[1] - P.rockDark[1]) * t;
+    out.b = P.rockDark[2] + (P.rock[2] - P.rockDark[2]) * t;
+    out.kind = KIND_ROCK;
+    return;
+  }
+  // grass, with the broad light/dark patches
+  const nn = Math.min(n, 0.985);
+  stopsAt(LAND_STOPS, nn);
+  const pch = fbm(fx * 0.075, fy * 0.075, 41);
+  const w = (1 - smooth(0.9, 0.975, nn)) * 0.85;
+  const tt = smooth(0.3, 0.72, pch);
+  out.patch = tt * (1 - smooth(0.9, 0.975, nn));
+  out.r += (P.grassDark[0] + (P.grassLight[0] - P.grassDark[0]) * tt - out.r) * w;
+  out.g += (P.grassDark[1] + (P.grassLight[1] - P.grassDark[1]) * tt - out.g) * w;
+  out.b += (P.grassDark[2] + (P.grassLight[2] - P.grassDark[2]) * tt - out.b) * w;
+  out.kind = KIND_GRASS;
   paintGround(fx, fy);
 }
 
@@ -971,7 +1035,7 @@ export function forEachFoam(
         const h = hash2(x * 0.9, y * 1.8 + 3);
         if (h > 0.25 + u * 0.7) cb(x, y, h > 0.75 ? '∘' : '·', 0.45 * (1 - u) + 0.08, 0);
       }
-    } else if (receding && f.ndv[i] >= WATERLINE_ND - PUSH) {
+    } else if (receding && f.kind[i] === KIND_SAND && f.ndv[i] >= WATERLINE_ND - PUSH) {
       // sand the wave covered at its peak and is now leaving
       cb(x, y, '', 0, 0.1 * (1 - (p - 0.32) / 0.68));
     }

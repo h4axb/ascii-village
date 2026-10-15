@@ -10,6 +10,7 @@ import {
   GROUND_H,
   isWater,
   isOpenWater,
+  isCliffTile,
   STRUCT_ENTS,
   setLiveStructEnts,
   START_ONLY_ENTS,
@@ -1934,6 +1935,8 @@ function Game() {
         }
       }
     }
+    // the island's cliff faces (world.ts, the baked map): walls for the feet
+    for (let tx = pbox.x0; tx <= pbox.x1; tx++) if (isCliffTile(tx, feetY)) return true;
     // painted map tiles (the editor's Colliders tab): walls for the feet, like
     // the buildings
     for (let tx = pbox.x0; tx <= pbox.x1; tx++) {

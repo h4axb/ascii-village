@@ -251,6 +251,38 @@
       "x": 30,
       "y": 31,
       "scale": 0.2
+    },
+    {
+      "id": "grasshalm-7",
+      "asset": "grasshalm",
+      "x": 47,
+      "y": 48,
+      "scale": 0.2,
+      "startOnly": true
+    },
+    {
+      "id": "grasshalm-8",
+      "asset": "grasshalm",
+      "x": 43,
+      "y": 47,
+      "scale": 0.2,
+      "startOnly": true
+    },
+    {
+      "id": "flowerplus-4",
+      "asset": "flowerplus",
+      "x": 47,
+      "y": 45,
+      "scale": 0.5,
+      "startOnly": true
+    },
+    {
+      "id": "flowerplus-5",
+      "asset": "flowerplus",
+      "x": 44,
+      "y": 48,
+      "scale": 0.5,
+      "startOnly": true
     }
   ],
   "colliders": {

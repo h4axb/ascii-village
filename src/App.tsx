@@ -794,7 +794,7 @@ function LandingWorld({ portrait }: { portrait: boolean }) {
                   perCell={e.kind === 'flowerplus' || e.kind === 'house' || e.kind === 'cliff'}
                   sway={e.sway}
                   blend={e.blend}
-                  solidCells={['house', 'bridge', 'shop', 'palm', 'boulder'].includes(e.kind)}
+                  solidCells={['house', 'bridge', 'shop', 'palm', 'boulder', 'grasshalm'].includes(e.kind)}
                 />
               ),
             )}
@@ -5830,7 +5830,8 @@ function Game() {
                       e.kind === 'cat' ||
                       e.kind === 'shop' ||
                       e.kind === 'palm' ||
-                      e.kind === 'boulder'
+                      e.kind === 'boulder' ||
+                      e.kind === 'grasshalm'
                     }
                     onClick={
                       canInteract(e)
@@ -7547,8 +7548,9 @@ function PlacedItemView({
 // 'cat': Mitchy is drawn like the player — solid per-cell backing plus the
 // player's outline ring (every other canvas kind has no ring). 'boulder': the
 // editor's solid assets (stones, bushes, the glyph ponds) — hundreds of cells
-// each, so a canvas too.
-const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder']);
+// each, so a canvas too. 'grasshalm': the grass tuft, filled like them (still
+// walked through: its collision mask is blank).
+const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder', 'grasshalm']);
 function EntSprite({
   kind,
   charW,

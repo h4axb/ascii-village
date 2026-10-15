@@ -390,17 +390,10 @@
       "scale": 0.5
     },
     {
-      "id": "fence-upright-light-3",
-      "asset": "fence-upright-light",
-      "x": 43,
-      "y": 44,
-      "scale": 0.5
-    },
-    {
       "id": "fence-upright-light-4",
       "asset": "fence-upright-light",
-      "x": 40,
-      "y": 48,
+      "x": 37,
+      "y": 43,
       "scale": 0.5
     },
     {
@@ -416,6 +409,20 @@
       "x": 79,
       "y": 37,
       "scale": 0.3
+    },
+    {
+      "id": "fence-upright-light-5",
+      "asset": "fence-upright-light",
+      "x": 39,
+      "y": 48,
+      "scale": 0.5
+    },
+    {
+      "id": "fence-upright-light-6",
+      "asset": "fence-upright-light",
+      "x": 37,
+      "y": 46,
+      "scale": 0.5
     }
   ],
   "colliders": {

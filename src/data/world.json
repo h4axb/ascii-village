@@ -283,6 +283,139 @@
       "y": 48,
       "scale": 0.5,
       "startOnly": true
+    },
+    {
+      "id": "flowerplus-white-3",
+      "asset": "flowerplus-white",
+      "x": 33,
+      "y": 45,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-white-4",
+      "asset": "flowerplus-white",
+      "x": 30,
+      "y": 46,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-white-5",
+      "asset": "flowerplus-white",
+      "x": 29,
+      "y": 46,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-white-6",
+      "asset": "flowerplus-white",
+      "x": 29,
+      "y": 47,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-white-7",
+      "asset": "flowerplus-white",
+      "x": 25,
+      "y": 49,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-white-8",
+      "asset": "flowerplus-white",
+      "x": 24,
+      "y": 49,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-white-9",
+      "asset": "flowerplus-white",
+      "x": 25,
+      "y": 48,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-6",
+      "asset": "flowerplus",
+      "x": 27,
+      "y": 45,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-white-10",
+      "asset": "flowerplus-white",
+      "x": 15,
+      "y": 47,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-purple-4",
+      "asset": "flowerplus-purple",
+      "x": 16,
+      "y": 48,
+      "scale": 0.5
+    },
+    {
+      "id": "grasshalm-9",
+      "asset": "grasshalm",
+      "x": 22,
+      "y": 49,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-10",
+      "asset": "grasshalm",
+      "x": 20,
+      "y": 44,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-11",
+      "asset": "grasshalm",
+      "x": 15,
+      "y": 44,
+      "scale": 0.2
+    },
+    {
+      "id": "fence-upright-light-1",
+      "asset": "fence-upright-light",
+      "x": 26,
+      "y": 35,
+      "scale": 0.5
+    },
+    {
+      "id": "fence-upright-light-2",
+      "asset": "fence-upright-light",
+      "x": 16,
+      "y": 32,
+      "scale": 0.5
+    },
+    {
+      "id": "fence-upright-light-3",
+      "asset": "fence-upright-light",
+      "x": 43,
+      "y": 44,
+      "scale": 0.5
+    },
+    {
+      "id": "fence-upright-light-4",
+      "asset": "fence-upright-light",
+      "x": 40,
+      "y": 48,
+      "scale": 0.5
+    },
+    {
+      "id": "bush-simple-4",
+      "asset": "bush-simple",
+      "x": 80,
+      "y": 15,
+      "scale": 0.3
+    },
+    {
+      "id": "stone-mossy-3-1",
+      "asset": "stone-mossy-3",
+      "x": 79,
+      "y": 37,
+      "scale": 0.3
     }
   ],
   "colliders": {

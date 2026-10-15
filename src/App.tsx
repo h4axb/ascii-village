@@ -1005,7 +1005,15 @@ function Landing({ onStart }: { onStart: () => void }) {
               onMouseEnter={() => !a.disabled && setSel(i)}
               onClick={a.run}
             >
+              {/* ◆ name ◆ on the highlighted one (hover / ↑↓); always laid
+                  out, so the words never shift */}
+              <span className="landing-mark" aria-hidden>
+                ◆
+              </span>
               {a.label}
+              <span className="landing-mark" aria-hidden>
+                ◆
+              </span>
             </button>
           ))}
         </div>

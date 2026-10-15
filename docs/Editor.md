@@ -114,6 +114,7 @@ files. See `docs/AssetTranscriptionWorkflow.md`.
 Kinds a placed asset can have:
 - **decor:** just drawn;
 - **boulder:** drawn solid, with an opaque backing per cell, on one canvas; the player's feet stop at its drawn cells. Used for the stones, bushes and glyph ponds.
+- **grasshalm** (the grass tuft): drawn filled the same way, but never blocks: you walk through it.
 - **ground:** drawn under everything, like grass;
 - **landscape:** like the cliff;
 - **bridge:** drawn over water;

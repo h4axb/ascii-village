@@ -830,6 +830,35 @@ pre {
 .wed-start-dim {
   background: rgba(8, 10, 14, 0.5);
 }
+/* the Islands tab: an island's bounds, dragged to move it */
+.wed-island {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed rgba(120, 220, 255, 0.85);
+  border-radius: 40%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 900;
+}
+.wed-island.on {
+  border-color: #ffd84a;
+  background: rgba(255, 216, 74, 0.08);
+}
+.wed-island-label {
+  position: absolute;
+  left: 50%;
+  top: -2.2em;
+  transform: translateX(-50%);
+  padding: 0.2em 0.8ch;
+  white-space: nowrap;
+  font-size: 1.2em;
+  color: #111;
+  background: rgba(120, 220, 255, 0.95);
+  border-radius: 4px;
+}
+.wed-island.on .wed-island-label {
+  background: #ffd84a;
+}
 .wed-start-frame {
   box-sizing: border-box;
   border: 2px dashed #ffd84a;

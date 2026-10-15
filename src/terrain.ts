@@ -637,6 +637,7 @@ export function resetTerrainStructs(): void {
   GLYPH_MASK = null;
   BUSHES = null;
   FIELD = null;
+  RING = null; // the shore foam's cells (an island may have moved)
 }
 
 // A theme change (the world editor's Theme tab): new colours, same shapes

@@ -12,8 +12,9 @@ import { ThemeTab } from './ThemeTab';
 import { GroundTab } from './GroundTab';
 import type { IntroNarrationTool } from '../devIntroNarration';
 import type { ColorLook, Ent, EntityKind } from '../world';
+import { ISLAND_COUNT } from '../world';
 import { FIXED_ASSETS, type AssetDef } from '../assets';
-import { PLACEABLE_KINDS, locksOf, isEditable } from './useWorldEditor';
+import { PLACEABLE_KINDS, locksOf, isEditable, ISLAND_NAMES } from './useWorldEditor';
 import type { WorldEditor, EditorTab } from './useWorldEditor';
 import { SIGN_TILT_MAX, type SignSettings } from '../wayfinder';
 
@@ -26,6 +27,7 @@ const TABS: { id: EditorTab | 'image' | 'theme'; label: string }[] = [
   { id: 'ground', label: 'Ground' },
   { id: 'theme', label: 'Theme' },
   { id: 'start', label: 'Start screen' },
+  { id: 'islands', label: 'Islands' },
 ];
 
 // thumbnails: shrink a sprite to fit a 64x44 box (6.6 x 11 px per cell at
@@ -481,6 +483,41 @@ async function trimTransparent(file: File): Promise<{ blob: Blob; aspect: number
   return { blob, aspect: Math.round((out.height / out.width) * 10000) / 10000 };
 }
 
+// Move the islands: drag one on the map. With "take everything along" the
+// objects on it, the scene markers there and its free collider boxes move
+// with it; without, they stay where they are. The ground is redrawn when the
+// island is dropped. Saved with the world (world.json `islands`).
+function IslandsTab({ ed }: { ed: WorldEditor }) {
+  return (
+    <div>
+      <div className="wed-hint">
+        Drag an island on the map to move it (whole tiles). The outline follows the drag; the ground is redrawn when you
+        let go. Painted ground stays where it is.
+      </div>
+      <label className="wed-check">
+        <input type="checkbox" checked={ed.islandCarry} onChange={(ev) => ed.setIslandCarry(ev.target.checked)} />
+        take everything on it along (objects, markers, collider boxes)
+      </label>
+      <div className="wed-list">
+        {Array.from({ length: ISLAND_COUNT }, (_, i) => {
+          const o = ed.doc.islands?.[i];
+          return (
+            <div key={i} className="wed-list-row">
+              <span>{ISLAND_NAMES[i] ?? `Island ${i}`}</span>
+              <span className="wed-dim">{o ? `moved ${o.dx}, ${o.dy}` : 'where it was made'}</span>
+              {o && (
+                <button onClick={() => ed.resetIsland(i)} title="back where it was made (what stands on it stays)">
+                  reset
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // The start screen's layout: the frame on the map (what it shows), the
 // player, the title + buttons, and the objects only it has. Everything here
 // is saved with the world (Save / Ctrl+S); reload the start screen to see it.
@@ -859,6 +896,7 @@ export function EditorPanel({
             {tab === 'ground' && <GroundTab />}
             {tab === 'theme' && <ThemeTab />}
             {tab === 'start' && <StartTab ed={ed} onFocus={onFocus} />}
+            {tab === 'islands' && <IslandsTab ed={ed} />}
           </div>
           <div className="wed-keys">
             click select · drag move (Shift: ¼ tile) · empty drag / WASD pan · arrows nudge · R rotate · +/− or Alt+wheel

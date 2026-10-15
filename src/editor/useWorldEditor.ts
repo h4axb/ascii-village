@@ -377,6 +377,9 @@ type Drag =
   | { type: 'boxDraw'; x0: number; y0: number; id: string; owner?: string; moved: boolean }
   | { type: 'boxMove'; id: string; dx: number; dy: number; moved: boolean }
   | { type: 'boxResize'; id: string; fx: number; fy: number; moved: boolean }
+  // Shift-drag with a fence piece armed: a row of it, as long as the drag,
+  // along whichever way the drag goes furthest (pieces end to end)
+  | { type: 'row'; slug: string; x0: number; y0: number; wT: number; hT: number; ids: string[]; n: number; horiz: boolean; sign?: number; moved: boolean }
   | {
       type: 'island';
       idx: number;
@@ -648,6 +651,29 @@ export function useWorldEditor(opts: {
       });
     });
     setSelected(newId);
+  }
+
+  // (re)lay a fence row: its pieces replace the ones it laid before, in one
+  // undo step for the whole drag
+  function layRow(d: Extract<Drag, { type: 'row' }>, n: number, first: boolean) {
+    const def = assetMap.get(d.slug);
+    if (!def) return;
+    const ids: string[] = [];
+    updateDoc((doc) => {
+      doc.added = doc.added.filter((a) => !d.ids.includes(a.id));
+      for (let i = 0; i < n; i++) {
+        const id = nextId(d.slug, doc);
+        ids.push(id);
+        const x = d.horiz ? d.x0 + (d.sign ?? 1) * i * d.wT : d.x0;
+        const y = d.horiz ? d.y0 : d.y0 + (d.sign ?? 1) * i * d.hT;
+        if (x < 0 || y < 0) continue;
+        doc.added.push({ id, asset: d.slug, x, y, scale: def.scale, ...(tab === 'start' ? { startOnly: true as const } : {}) });
+      }
+    }, first);
+    d.ids = ids;
+    d.n = n;
+    d.moved = !first;
+    if (ids.length) setSelected(ids[ids.length - 1]);
   }
 
   function place(slug: string, x: number, y: number) {
@@ -1145,6 +1171,14 @@ export function useWorldEditor(opts: {
 
       if (armed?.type === 'asset') {
         const g = ghostFor(armed.id, w.wx, w.wy);
+        // a fence piece with Shift: drag out a row of it (see 'row' below)
+        const def = assetMap.get(armed.id);
+        if (g && def && ev.shiftKey && (def.kind === 'fence' || def.kind === 'gate')) {
+          const { wT, hT } = spriteTiles(def.sprite, def.scale);
+          dragRef.current = { type: 'row', slug: g.slug, x0: g.x, y0: g.y, wT, hT, ids: [], n: 0, horiz: true, moved: false };
+          layRow(dragRef.current, 1, true);
+          return;
+        }
         if (g) place(g.slug, g.x, g.y);
         if (!ev.shiftKey) setArmed(null); // Shift keeps stamping
         return;
@@ -1361,6 +1395,19 @@ export function useWorldEditor(opts: {
         if (x === startScreen.title.x && y === startScreen.title.y) return;
         setStartScreen({ title: { ...startScreen.title, x, y } }, !d.moved);
         d.moved = true;
+      } else if (d.type === 'row') {
+        const g = ghostFor(d.slug, w.wx, w.wy);
+        if (!g) return;
+        const dx = g.x - d.x0;
+        const dy = g.y - d.y0;
+        // across or down, by how many whole pieces the drag covers
+        const horiz = Math.abs(dx) / d.wT >= Math.abs(dy) / d.hT;
+        const n = horiz ? Math.floor(Math.abs(dx) / d.wT) + 1 : Math.floor(Math.abs(dy) / d.hT) + 1;
+        const sign = horiz ? Math.sign(dx) || 1 : Math.sign(dy) || 1;
+        if (n === d.n && horiz === d.horiz && sign === (d.sign ?? 1)) return;
+        d.horiz = horiz;
+        d.sign = sign;
+        layRow(d, n, false);
       } else if (d.type === 'island') {
         // whole tiles; the outline follows live, the ground is redrawn on the drop
         const dx = Math.round((w.wx - d.wx0) / TILE_CH);

@@ -92,6 +92,7 @@ import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOU
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
+import { GATE_OPEN, GATE_OPEN_SOLID } from './fence';
 import { eyesOf } from './playerEyes';
 import { SPEECH_BUBBLE, SPEECH_BUBBLE_COLORS, SPEECH_BUBBLE_PALETTE } from './speechBubble';
 import { onThemeChange, themeRevision, pondLook } from './theme';
@@ -799,7 +800,7 @@ function LandingWorld({ portrait }: { portrait: boolean }) {
                   perCell={e.kind === 'flowerplus' || e.kind === 'house' || e.kind === 'cliff'}
                   sway={e.sway}
                   blend={e.blend}
-                  solidCells={['house', 'bridge', 'shop', 'palm', 'boulder', 'grasshalm'].includes(e.kind)}
+                  solidCells={['house', 'bridge', 'shop', 'palm', 'boulder', 'grasshalm', 'fence', 'gate'].includes(e.kind)}
                 />
               ),
             )}
@@ -1230,6 +1231,15 @@ function Game() {
   // Pre-gate saves carried {top, bottom}; save.ts's migrate() folds those into
   // the single {gate} this expects, so nothing legacy-shaped reaches here.
   const [doors, setDoors] = useState<Doors>(() => saved?.doors ?? { gate: false });
+  // the fence gates standing open (src/fence.ts): F opens and closes one
+  const [openGates, setOpenGates] = useState<ReadonlySet<string>>(() => new Set(saved?.openGates ?? []));
+  const toggleGate = (id: string) =>
+    setOpenGates((g) => {
+      const n = new Set(g);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   // Player outfit colour override — set by interacting with a laundry-line
   // garment (see interact.ts/outfit.ts). Empty object = default colours (the
   // sprite's own baked palette, untouched).
@@ -1591,7 +1601,12 @@ function Game() {
         // mitchyPos's own comment above for why null means "leave him where
         // he was". The world editor leaves him there too: it changes the
         // world, never the characters.
-        e.id === 'cat' && mitchyPos ? { ...e, x: mitchyPos.x, y: mitchyPos.y } : e,
+        e.id === 'cat' && mitchyPos
+          ? { ...e, x: mitchyPos.x, y: mitchyPos.y }
+          : // an open gate: its leaves swung in, only its posts block
+            e.kind === 'gate' && openGates.has(e.id)
+            ? { ...e, sprite: GATE_OPEN.sprite, colors: GATE_OPEN.colors, solidMask: GATE_OPEN_SOLID }
+            : e,
       ),
       // wild spawns skip the garden footprint so nothing sprouts inside the
       // fence — measured against where the bed actually is, so a dragged plot
@@ -1607,7 +1622,7 @@ function Game() {
       // (the quest's boat travels under the player while it is sailed)
       ...placedItems.filter((p) => p.id !== sailingBoatId).map(placedToEnt),
     ],
-    [growthWindow, removed, dynamicEnts, structEnts, placedItems, plot, mitchyPos, sailingBoatId],
+    [growthWindow, removed, dynamicEnts, structEnts, placedItems, plot, mitchyPos, sailingBoatId, openGates],
   );
 
   // House-sprite recolor for the wardrobe swap (interact.ts's 'outfit' act +
@@ -1698,6 +1713,7 @@ function Game() {
     shaken: [...shaken],
     plantedCrops: crops,
     doors,
+    openGates: [...openGates],
     placed: placedItems,
     tokenBuys,
     coinGrants,
@@ -4390,7 +4406,7 @@ function Game() {
   // object literals over values already computed this render, not worth
   // memoizing) and used by the hover tooltip, the confirm modal's question
   // text, and the confirm modal's Yes handler.
-  const interactCtx: InteractCtx = { ents, crops, wt, fxFor, doors, lineColors };
+  const interactCtx: InteractCtx = { ents, crops, wt, fxFor, doors, lineColors, openGates };
 
   // The thing in reach, named over it with the F key (the hover label): every interactable within
   // a tile of the player's feet (2 for Mitchy and the buildings), the nearest
@@ -4519,6 +4535,7 @@ function Game() {
     openHouseMenu: () => setModal({ t: 'houseMenu', sel: 0 }),
     openCropPanel: (slot) => setModal({ t: 'crop', slot }),
     toggleDoor,
+    toggleGate,
     say: showToast,
     // Two-way swap: wear `hangingHex`, and whatever was worn for that region
     // takes its place on the line at `hotspotId` (see interact.ts).
@@ -5895,7 +5912,9 @@ function Game() {
                       e.kind === 'shop' ||
                       e.kind === 'palm' ||
                       e.kind === 'boulder' ||
-                      e.kind === 'grasshalm'
+                      e.kind === 'grasshalm' ||
+                      e.kind === 'fence' ||
+                      e.kind === 'gate'
                     }
                     onClick={
                       canInteract(e)
@@ -7623,7 +7642,7 @@ function PlacedItemView({
 // editor's solid assets (stones, bushes, the glyph ponds) — hundreds of cells
 // each, so a canvas too. 'grasshalm': the grass tuft, filled like them (still
 // walked through: its collision mask is blank).
-const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder', 'grasshalm']);
+const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder', 'grasshalm', 'fence', 'gate']);
 function EntSprite({
   kind,
   charW,

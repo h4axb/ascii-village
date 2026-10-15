@@ -88,6 +88,8 @@ export interface InteractCtx {
   // id — absent means "still whatever it was baked with" (see HOTSPOT_INFO's
   // bakedHex).
   lineColors: Record<string, string>;
+  // the fence gates standing open (by entity id)
+  openGates: ReadonlySet<string>;
 }
 
 // Pure — given a ref and read-only world state, what should hover/click show?
@@ -131,6 +133,10 @@ export function describeInteraction(ref: InteractRef, ctx: InteractCtx): Interac
     }
     case 'palm':
       return { name: 'palm tree', question: 'Do you want to shake this palm tree?' };
+    case 'gate': {
+      const open = ctx.openGates.has(e.id);
+      return { name: open ? 'close the gate' : 'open the gate', question: open ? 'Do you want to close the gate?' : 'Do you want to open the gate?' };
+    }
     case 'cat':
       return { name: 'Mitchy', question: 'Do you want to talk to Mitchy?' };
     case 'shop':
@@ -162,6 +168,7 @@ export interface InteractActions {
   openHouseMenu: () => void;
   openCropPanel: (slot: number) => void;
   toggleDoor: (d: DoorId) => void;
+  toggleGate: (id: string) => void; // a fence gate (src/fence.ts)
   // Two-way swap: the player wears `hangingHex`, and whatever they were
   // wearing for that region takes its place on the line at `hotspotId`.
   wearFromLine: (hotspotId: string, region: 'shorts' | 'shirt', hangingHex: string) => void;
@@ -191,6 +198,9 @@ export function runInteraction(ref: InteractRef, ctx: InteractCtx, actions: Inte
       break;
     case 'palm':
       actions.shakeTree(e);
+      break;
+    case 'gate':
+      actions.toggleGate(e.id);
       break;
     case 'cat':
       actions.openDialog();

@@ -32,6 +32,8 @@ export interface SaveState {
   // step 5 (farming): planted crops + garden door states
   plantedCrops: PlantedCrop[];
   doors?: Doors;
+  // the fence gates (src/fence.ts) standing open, by entity id
+  openGates?: string[];
   // player-placed decorations/furniture, anywhere on the map (see placement.ts)
   placed?: PlacedItem[];
   // Daily allowances, both keyed by daySeedOf(wt). Same self-invalidating

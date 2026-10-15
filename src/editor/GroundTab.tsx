@@ -10,6 +10,7 @@ import {
   MAT_DIRT,
   MAT_MEADOW,
   MAT_STONE,
+  MAT_SAND,
   brush,
   canRedoGround,
   canUndoGround,
@@ -27,6 +28,7 @@ const TOOLS: { tool: BrushTool; label: string; hint: string }[] = [
   { tool: MAT_DIRT, label: 'Dirt', hint: 'bare earth with pebbles' },
   { tool: MAT_MEADOW, label: 'Meadow', hint: 'lighter grass with tiny flowers' },
   { tool: MAT_STONE, label: 'Stone', hint: 'stony ground' },
+  { tool: MAT_SAND, label: 'Sand', hint: 'beach sand, like the coast' },
   { tool: 'path', label: 'Stepping stones', hint: 'drag to lay flat stones along a path' },
   { tool: 'erase', label: 'Erase', hint: 'back to grass (also lifts stepping stones)' },
 ];

@@ -36,7 +36,7 @@ import {
 } from './world';
 import { RAMP_DEFAULT } from './craft/materials';
 import { onThemeChange, themeRgb, groundShadow } from './theme';
-import { MAT_DIRT, MAT_MEADOW, MAT_STONE, groundMat, groundWgt, onGroundEdit, slabAt } from './ground';
+import { MAT_DIRT, MAT_MEADOW, MAT_STONE, MAT_SAND, groundMat, groundWgt, onGroundEdit, slabAt } from './ground';
 
 // ---- tiny math helpers ----------------------------------------------------
 
@@ -525,7 +525,7 @@ function sampleMain(mc: string, fx: number, fy: number, n: number) {
 // the painted strength plus noise decides each cell, so every edge comes out
 // ragged and dithered like the coast. `out.edge` runs 0 at the border → 1
 // inside (the darker rim, the creeping grass). Stepping stones are crisp
-// shapes with a darker rim. Land only: never sand, never water.
+// shapes with a darker rim. Land only (painted sand makes beach of grass), never water.
 const mixInto = (c: RGB, t: number) => {
   out.r += (c[0] - out.r) * t;
   out.g += (c[1] - out.g) * t;
@@ -575,7 +575,10 @@ function paintGround(fx: number, fy: number) {
     out.g = P.stoneGround[1] * v;
     out.b = P.stoneGround[2] * v;
     mixInto(P.stoneGroundRim, (1 - edge) * 0.8);
-    out.kind = KIND_STONEGROUND;
+    out.kind = KIND_STONEGROUND;  } else if (m === MAT_SAND) {
+    // the coast's dry sand (as the baked beaches draw it), a little uneven
+    stopsAt(SEA_STOPS, Math.min(SAND_START_ND + 0.014 + (vnoise(fx * 0.9, fy * 0.9, 61) - 0.5) * 0.02, WATERLINE_ND - 0.01));
+    out.kind = KIND_SAND;
   }
 }
 

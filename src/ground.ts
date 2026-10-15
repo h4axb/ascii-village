@@ -21,7 +21,8 @@ export const MAT_NONE = 0;
 export const MAT_DIRT = 1;
 export const MAT_MEADOW = 2;
 export const MAT_STONE = 3;
-export type Material = typeof MAT_DIRT | typeof MAT_MEADOW | typeof MAT_STONE;
+export const MAT_SAND = 4; // beach sand, like the coast's
+export type Material = typeof MAT_DIRT | typeof MAT_MEADOW | typeof MAT_STONE | typeof MAT_SAND;
 
 // what a cell measures on screen (8.4 x 14 px, see App.tsx) — brushes and
 // stones are round on screen, not in cells
@@ -118,7 +119,7 @@ export function groundBare(tx: number, ty: number): boolean {
   const y = Math.min(GROUND_H - 1, Math.max(0, Math.round((ty + 0.5) * TILE_LN)));
   const i = y * GROUND_W + x;
   if (slabMask()[i]) return true;
-  return (mat[i] === MAT_DIRT || mat[i] === MAT_STONE) && wgt[i] >= 128;
+  return (mat[i] === MAT_DIRT || mat[i] === MAT_STONE || mat[i] === MAT_SAND) && wgt[i] >= 128;
 }
 export const groundHasPaint = () => stones.length > 0 || mat.some((m) => m !== 0);
 

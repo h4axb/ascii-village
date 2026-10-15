@@ -76,6 +76,181 @@
           }
         ]
       }
+    },
+    {
+      "id": "stone-mossy-7-1",
+      "asset": "stone-mossy-7",
+      "x": 22,
+      "y": 32,
+      "scale": 0.3
+    },
+    {
+      "id": "stone-mossy-10-1",
+      "asset": "stone-mossy-10",
+      "x": 11,
+      "y": 35,
+      "scale": 0.3
+    },
+    {
+      "id": "stone-mossy-9-1",
+      "asset": "stone-mossy-9",
+      "x": 19,
+      "y": 49,
+      "scale": 0.3
+    },
+    {
+      "id": "bush-simple-1",
+      "asset": "bush-simple",
+      "x": 45,
+      "y": 11,
+      "scale": 0.3
+    },
+    {
+      "id": "bush-simple-2",
+      "asset": "bush-simple",
+      "x": 41,
+      "y": 13,
+      "scale": 0.3
+    },
+    {
+      "id": "bush-simple-3",
+      "asset": "bush-simple",
+      "x": 45,
+      "y": 32,
+      "scale": 0.3
+    },
+    {
+      "id": "palm-1",
+      "asset": "palm",
+      "x": 49,
+      "y": 8,
+      "scale": 1
+    },
+    {
+      "id": "palm-2",
+      "asset": "palm",
+      "x": 46,
+      "y": 22,
+      "scale": 1
+    },
+    {
+      "id": "palm-3",
+      "asset": "palm",
+      "x": 79,
+      "y": 25,
+      "scale": 1
+    },
+    {
+      "id": "palm-4",
+      "asset": "palm",
+      "x": 41,
+      "y": 56,
+      "scale": 1
+    },
+    {
+      "id": "flowerplus-white-1",
+      "asset": "flowerplus-white",
+      "x": 37,
+      "y": 32,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-white-2",
+      "asset": "flowerplus-white",
+      "x": 40,
+      "y": 30,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-1",
+      "asset": "flowerplus",
+      "x": 45,
+      "y": 16,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-2",
+      "asset": "flowerplus",
+      "x": 39,
+      "y": 14,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-3",
+      "asset": "flowerplus",
+      "x": 38,
+      "y": 14,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-orange-1",
+      "asset": "flowerplus-orange",
+      "x": 39,
+      "y": 15,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-purple-1",
+      "asset": "flowerplus-purple",
+      "x": 38,
+      "y": 15,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-purple-2",
+      "asset": "flowerplus-purple",
+      "x": 26,
+      "y": 14,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-purple-3",
+      "asset": "flowerplus-purple",
+      "x": 27,
+      "y": 15,
+      "scale": 0.5
+    },
+    {
+      "id": "grasshalm-1",
+      "asset": "grasshalm",
+      "x": 27,
+      "y": 14,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-2",
+      "asset": "grasshalm",
+      "x": 26,
+      "y": 15,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-3",
+      "asset": "grasshalm",
+      "x": 47,
+      "y": 16,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-4",
+      "asset": "grasshalm",
+      "x": 43,
+      "y": 31,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-5",
+      "asset": "grasshalm",
+      "x": 38,
+      "y": 33,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-6",
+      "asset": "grasshalm",
+      "x": 30,
+      "y": 31,
+      "scale": 0.2
     }
   ],
   "colliders": {
@@ -617,13 +792,13 @@
   "blockedTiles": [],
   "startScreen": {
     "view": {
-      "x": 54,
-      "y": 60
+      "x": 50,
+      "y": 46
     },
     "zoom": 1.89,
     "player": {
-      "x": 50,
-      "y": 58,
+      "x": 48,
+      "y": 45,
       "scale": 1.35
     },
     "ui": {

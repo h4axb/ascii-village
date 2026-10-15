@@ -96,7 +96,7 @@ interface IslandDef {
 // (the sea routes' ring circles outside it).
 type IslandGrid = { x0: number; y0: number; cols: number; rows: number; grid: string[] };
 const MAIN_GRID = mainIslandData as IslandGrid;
-const MAIN_ISLAND: IslandDef = {
+const MAIN_BASE: IslandDef = {
   cx: (MAIN_GRID.x0 + MAIN_GRID.cols / 2) / TILE_CH,
   cy: (MAIN_GRID.y0 + MAIN_GRID.rows / 2) / TILE_LN,
   rx: MAIN_GRID.cols / TILE_CH / 2,
@@ -105,8 +105,8 @@ const MAIN_ISLAND: IslandDef = {
 // The main island's class at a ground cell (world ch, lines): '.' water,
 // 'g' grass, 's' sand, 'c' cliff face, 'r' a stone in the water; null off its grid
 export function mainIslandClass(cx: number, cy: number): string | null {
-  const c = Math.floor(cx) - MAIN_GRID.x0;
-  const r = Math.floor(cy) - MAIN_GRID.y0;
+  const c = Math.floor(cx) - MAIN_GRID.x0 - ISLAND_OFF[0].dx * TILE_CH;
+  const r = Math.floor(cy) - MAIN_GRID.y0 - ISLAND_OFF[0].dy * TILE_LN;
   if (r < 0 || r >= MAIN_GRID.rows || c < 0 || c >= MAIN_GRID.cols) return null;
   return MAIN_GRID.grid[r][c] ?? '.';
 }
@@ -193,8 +193,8 @@ function mainField(): Float32Array {
 // the padded grid, the distance keeps growing with the bounds' distance)
 function mainNd(tx: number, ty: number): number {
   const f = mainField();
-  const gx = tx * TILE_CH - MAIN_GRID.x0 + MAIN_PAD.x - 0.5;
-  const gy = ty * TILE_LN - MAIN_GRID.y0 + MAIN_PAD.y - 0.5;
+  const gx = (tx - ISLAND_OFF[0].dx) * TILE_CH - MAIN_GRID.x0 + MAIN_PAD.x - 0.5;
+  const gy = (ty - ISLAND_OFF[0].dy) * TILE_LN - MAIN_GRID.y0 + MAIN_PAD.y - 0.5;
   const cx = Math.max(0, Math.min(MAIN_FW - 1.001, gx));
   const cy = Math.max(0, Math.min(MAIN_FH - 1.001, gy));
   const x0 = Math.floor(cx), y0 = Math.floor(cy);
@@ -209,20 +209,43 @@ function mainNd(tx: number, ty: number): number {
 // New islands, smallest to largest, placed with a comfortable ocean gap (15+
 // tiles) from the main island and from each other and from the map edges.
 // Purely decorative landmasses for now — see the file-header note above.
-const OTHER_ISLANDS: IslandDef[] = [
+const OTHER_BASE: IslandDef[] = [
   { cx: 105, cy: 22, rx: 15, ry: 13 }, // NE — medium
   { cx: 112, cy: 60, rx: 9, ry: 8 }, // E — small
   { cx: 100, cy: 95, rx: 8, ry: 8 }, // SE — small
   { cx: 50, cy: 122, rx: 13, ry: 11 }, // S — medium
 ];
 
-const ISLANDS: IslandDef[] = [MAIN_ISLAND, ...OTHER_ISLANDS];
+const BASE_ISLANDS: IslandDef[] = [MAIN_BASE, ...OTHER_BASE];
+
+// Where each island has been moved to (the world editor's Islands tab, saved
+// in world.json's `islands`): whole tiles from where it was made. ISLANDS are
+// the islands where they stand now; the main island's baked map moves along.
+export type IslandOffsets = Record<string, { dx: number; dy: number }>;
+const ISLAND_OFF: { dx: number; dy: number }[] = BASE_ISLANDS.map(() => ({ dx: 0, dy: 0 }));
+const ISLANDS: IslandDef[] = BASE_ISLANDS.map((b) => ({ ...b }));
+export const ISLAND_COUNT = BASE_ISLANDS.length;
+export function setIslandOffsets(off: IslandOffsets | undefined) {
+  BASE_ISLANDS.forEach((b, i) => {
+    const o = off?.[i] ?? { dx: 0, dy: 0 };
+    ISLAND_OFF[i] = { dx: o.dx, dy: o.dy };
+    ISLANDS[i] = { ...b, cx: b.cx + o.dx, cy: b.cy + o.dy };
+  });
+}
+// an island's bounds (tiles, where it stands for these offsets)
+export function islandBounds(i: number, off?: IslandOffsets): IslandDef {
+  const b = BASE_ISLANDS[i];
+  const o = off ? (off[i] ?? { dx: 0, dy: 0 }) : ISLAND_OFF[i];
+  return { ...b, cx: b.cx + o.dx, cy: b.cy + o.dy };
+}
+setIslandOffsets((worldDocData as { islands?: IslandOffsets }).islands);
 
 // Signed distance-ish field from ONE island's centre: <1 inland, ≈1 the
 // waterline, >1 open ocean. Same wobble on every island so they all read as
 // the same hand.
-function islandNdFor(isl: IslandDef, tx: number, ty: number): number {
-  if (isl === MAIN_ISLAND) return mainNd(tx, ty);
+function islandNdFor(i: number, tx: number, ty: number): number {
+  if (i === 0) return mainNd(tx, ty);
+  const isl = ISLANDS[i];
   const dx = (tx - isl.cx) / isl.rx;
   const dy = (ty - isl.cy) / isl.ry;
   const wobble =
@@ -239,7 +262,7 @@ export function nearestIsland(tx: number, ty: number): { nd: number; isl: Island
   let bestIdx = 0;
   let bestNd = Infinity;
   for (let i = 0; i < ISLANDS.length; i++) {
-    const nd = islandNdFor(ISLANDS[i], tx, ty);
+    const nd = islandNdFor(i, tx, ty);
     if (nd < bestNd) {
       bestNd = nd;
       bestIdx = i;
@@ -277,6 +300,9 @@ export function regionAt(tx: number, ty: number): Region {
   if (nd > 1) return 'ocean';
   if (nd > 0.8) return 'beach'; // coastal sand ring, every island — widened further for a clearly readable band
   if (idx !== 0) return 'meadow'; // other islands: flat grass, no sub-biomes yet
+  // the main island's region anchors move with it
+  tx -= ISLAND_OFF[0].dx;
+  ty -= ISLAND_OFF[0].dy;
   if (Math.hypot(tx - VILLAGE.x, ty - VILLAGE.y) < VILLAGE.r) return 'meadow';
   if (Math.hypot(tx - SUMMIT.x, ty - SUMMIT.y) < SUMMIT.r) return 'tundra';
   if (Math.hypot(tx - VOLCANO.x, ty - VOLCANO.y) < VOLCANO.r) return 'rocky';
@@ -1124,6 +1150,8 @@ export interface WorldDoc {
   // chosen in the editor's Assets tab. Absent = his original art ('mitchy').
   mitchyLook?: string;
   startScreen?: StartScreenDoc;
+  // islands moved in the editor's Islands tab (by index, whole tiles)
+  islands?: IslandOffsets;
 }
 
 export const WORLD_DOC: WorldDoc = worldDocData as unknown as WorldDoc;

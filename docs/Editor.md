@@ -156,3 +156,16 @@ routes use. `terrain.ts` draws each cell by its class. To change the island, edi
 the picture (or the script's scale / origin / ignore boxes) and re-run the script.
 The painted ground from before the new island is kept in
 `assets/refs/ground-before-island-v2.json`.
+
+## Islands tab
+
+Drag an island on the map to move it, in whole tiles. Grab its land or the water right round it. A dashed outline
+shows each island's bounds and follows the drag. The ground is redrawn when you let go.
+
+- **take everything on it along** (on by default): objects on the island (or just off its shore), the scene markers
+  there and its free collider boxes move with it. Off: they stay put and only the island moves.
+- **reset** puts an island back where it was made. What stands on it stays where it is.
+- Painted ground never moves.
+
+Moves are saved with the world (`world.json` → `islands`, whole-tile offsets by island index) and undo like any
+other edit.

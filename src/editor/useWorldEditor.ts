@@ -40,7 +40,10 @@ import {
   startPlayerBox,
   cleanLook,
   placedBoxes,
+  nearestIsland,
+  setIslandOffsets,
 } from '../world';
+import type { IslandOffsets } from '../world';
 import type { Ent, EntityKind, WorldDoc, WorldPose, WorldAdded, StartScreen, ColliderBox } from '../world';
 import type { SignSettings } from '../wayfinder';
 import { RAW_ASSETS, FIXED_ASSETS, ASSET_META, assetOf } from '../assets';
@@ -53,7 +56,10 @@ import type { MarkerPositions } from '../sceneMarkers';
 import type { CamSnapshot } from '../coords';
 import { docHash } from './docHash';
 
-export type EditorTab = 'objects' | 'assets' | 'markers' | 'colliders' | 'intro' | 'ground' | 'start';
+// the islands by index (world.ts ISLANDS), for the Islands tab
+export const ISLAND_NAMES = ['Main island', 'Shop island', 'East islet', 'South-east islet', 'South island'];
+
+export type EditorTab = 'objects' | 'assets' | 'markers' | 'colliders' | 'intro' | 'ground' | 'start' | 'islands';
 
 // The kinds a placed asset can be given in the inspector, with what each
 // one does in the game. (Built-in kinds like 'palm' or 'pond' carry
@@ -132,6 +138,12 @@ export interface WorldEditor {
   assets: AssetDef[]; // the placeable list, with live meta applied
   structEnts: Ent[]; // the world as edited — what App.tsx draws and collides with
   structKey: number; // bumps (debounced) when the layout changed, for the terrain
+  // the Islands tab: drag an island to move it; with `islandCarry` everything
+  // standing on it (objects, scene markers, free collider boxes) moves along
+  islandCarry: boolean;
+  setIslandCarry(v: boolean): void;
+  resetIsland(i: number): void;
+  islandDrag: number | null; // the island being dragged
 
   selected: string | null; // an object id, or `marker:<id>`
   select(id: string | null): void;
@@ -364,7 +376,20 @@ type Drag =
   // grab point, resized by a corner against the opposite one
   | { type: 'boxDraw'; x0: number; y0: number; id: string; owner?: string; moved: boolean }
   | { type: 'boxMove'; id: string; dx: number; dy: number; moved: boolean }
-  | { type: 'boxResize'; id: string; fx: number; fy: number; moved: boolean };
+  | { type: 'boxResize'; id: string; fx: number; fy: number; moved: boolean }
+  | {
+      type: 'island';
+      idx: number;
+      wx0: number;
+      wy0: number;
+      off0: { dx: number; dy: number };
+      carry: { id: string; x: number; y: number }[];
+      marks: { id: string; x: number; y: number }[];
+      boxes: { id: string; x: number; y: number }[];
+      dx: number;
+      dy: number;
+      moved: boolean;
+    };
 
 export function useWorldEditor(opts: {
   fieldRef: React.RefObject<HTMLElement | null>;
@@ -395,6 +420,8 @@ export function useWorldEditor(opts: {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<EditorStatus | null>(null);
   const [structKey, setStructKey] = useState(0);
+  const [islandCarry, setIslandCarry] = useState(true);
+  const [islandDrag, setIslandDrag] = useState<number | null>(null);
   const dragRef = useRef<Drag | null>(null);
 
   const stateRef = useRef(state);
@@ -435,6 +462,18 @@ export function useWorldEditor(opts: {
     }, 300);
     return () => window.clearTimeout(t);
   }, [structEnts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // islands moved by undo / redo / discard: the world follows (a drag does
+  // this on its drop instead, the ground being slow to redraw)
+  const lastIslands = useRef(JSON.stringify(WORLD_DOC.islands ?? {}));
+  useEffect(() => {
+    const key = JSON.stringify(state.doc.islands ?? {});
+    if (key === lastIslands.current || dragRef.current?.type === 'island') return;
+    lastIslands.current = key;
+    setIslandOffsets(state.doc.islands);
+    resetTerrainStructs();
+    setStructKey((k) => k + 1);
+  }, [state.doc.islands]);
 
   const dirty = useMemo(
     () =>
@@ -1116,6 +1155,39 @@ export function useWorldEditor(opts: {
         setArmed(null);
         return;
       }
+      // Islands tab: grab an island (its land or the sea right round it)
+      if (tab === 'islands') {
+        const hit = nearestIsland(w.wx / TILE_CH, w.wy / TILE_LN);
+        if (hit.nd > 1.15) return;
+        const idx = hit.idx;
+        const off0 = stateRef.current.doc.islands?.[idx] ?? { dx: 0, dy: 0 };
+        // what stands on it (or just off its shore, like a boat): its centre
+        // tile's nearest island is this one
+        const onIt = (x: number, y: number) => {
+          const n = nearestIsland(x, y);
+          return n.idx === idx && n.nd < 1.3;
+        };
+        const carry = islandCarry
+          ? structRef.current
+              .filter((e) => !e.id.startsWith('house-') && e.kind !== 'hotspot')
+              .filter((e) => {
+                const { wT, hT } = spriteTiles(e.sprite, e.scale, e.rotation);
+                return onIt(e.x + wT / 2, e.y + hT / 2);
+              })
+              .map((e) => ({ id: e.id, x: e.x, y: e.y }))
+          : [];
+        const marks = islandCarry
+          ? Object.entries(stateRef.current.markers)
+              .filter(([, p]) => p && onIt(p.x, p.y))
+              .map(([id, p]) => ({ id, x: p!.x, y: p!.y }))
+          : [];
+        const boxes = islandCarry
+          ? (stateRef.current.doc.colliderBoxes ?? []).filter((b) => !b.owner && onIt(b.x + b.w / 2, b.y + b.h / 2)).map((b) => ({ id: b.id, x: b.x, y: b.y }))
+          : [];
+        dragRef.current = { type: 'island', idx, wx0: w.wx, wy0: w.wy, off0: { dx: off0.dx, dy: off0.dy }, carry, marks, boxes, dx: 0, dy: 0, moved: false };
+        setIslandDrag(idx);
+        return;
+      }
       // Ground tab: drag paints with the brush (ground.ts)
       if (tab === 'ground') {
         beginStroke(w.wx, w.wy);
@@ -1289,6 +1361,35 @@ export function useWorldEditor(opts: {
         if (x === startScreen.title.x && y === startScreen.title.y) return;
         setStartScreen({ title: { ...startScreen.title, x, y } }, !d.moved);
         d.moved = true;
+      } else if (d.type === 'island') {
+        // whole tiles; the outline follows live, the ground is redrawn on the drop
+        const dx = Math.round((w.wx - d.wx0) / TILE_CH);
+        const dy = Math.round((w.wy - d.wy0) / TILE_LN);
+        if (dx === d.dx && dy === d.dy) return;
+        d.dx = dx;
+        d.dy = dy;
+        commit((st) => {
+          const doc = clone(st.doc);
+          const islands: IslandOffsets = { ...doc.islands };
+          const off = { dx: d.off0.dx + dx, dy: d.off0.dy + dy };
+          if (off.dx || off.dy) islands[d.idx] = off;
+          else delete islands[d.idx];
+          if (Object.keys(islands).length) doc.islands = islands;
+          else delete doc.islands;
+          for (const c of d.carry) setPoseRaw(doc, c.id, { x: round2(c.x + dx), y: round2(c.y + dy) });
+          if (d.boxes.length)
+            doc.colliderBoxes = (doc.colliderBoxes ?? []).map((b) => {
+              const o = d.boxes.find((x) => x.id === b.id);
+              return o ? { ...b, x: o.x + dx, y: o.y + dy } : b;
+            });
+          let markers = st.markers;
+          if (d.marks.length) {
+            markers = { ...st.markers };
+            for (const m of d.marks) markers[m.id] = { x: m.x + dx, y: m.y + dy };
+          }
+          return { ...st, doc, markers };
+        }, !d.moved);
+        d.moved = true;
       } else if (d.type === 'ground') {
         strokeTo(w.wx, w.wy);
       } else if (d.type === 'boxDraw' || d.type === 'boxResize' || d.type === 'boxMove') {
@@ -1326,6 +1427,13 @@ export function useWorldEditor(opts: {
       if (d?.type === 'ground') {
         endStroke();
         return;
+      }
+      if (d?.type === 'island') {
+        setIslandDrag(null);
+        if (!d.moved) return;
+        // the island stands where it was dropped: redraw the ground round it
+        setIslandOffsets(stateRef.current.doc.islands);
+        lastIslands.current = JSON.stringify(stateRef.current.doc.islands ?? {});
       }
       if (d && d.type !== 'pan' && !d.type.startsWith('start')) {
         // the layout settled: let the terrain catch up
@@ -1393,6 +1501,17 @@ export function useWorldEditor(opts: {
     selectBox: setSelBox,
     removeBox,
     clearBoxes,
+    islandCarry,
+    setIslandCarry,
+    islandDrag,
+    resetIsland: (i) =>
+      updateDoc((d) => {
+        if (!d.islands?.[i]) return;
+        const islands = { ...d.islands };
+        delete islands[i];
+        if (Object.keys(islands).length) d.islands = islands;
+        else delete d.islands;
+      }),
     mitchyLook: state.doc.mitchyLook ?? 'mitchy',
     startScreen,
     setStartScreen: (patch) => setStartScreen(patch),

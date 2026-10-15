@@ -4,12 +4,12 @@
 // the objects they point at.
 import { ColoredSprite } from '../ColoredSprite';
 import { MARKER_REGISTRY } from '../sceneMarkers';
-import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint, startFrame, startScreenSize, startTitleUrl, START_PLAYER_FRAME, startPlayerK, startPlayerBox } from '../world';
+import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, spriteTiles, collisionBox, entityBlocksTile, footprint, startFrame, startScreenSize, startTitleUrl, START_PLAYER_FRAME, startPlayerK, startPlayerBox, islandBounds, ISLAND_COUNT } from '../world';
 import { eyesOf } from '../playerEyes';
 import { PlayerShadow } from '../PlayerShadow';
 import * as S from '../sprites';
 import type { Ent } from '../world';
-import { isEditable } from './useWorldEditor';
+import { isEditable, ISLAND_NAMES } from './useWorldEditor';
 import { brushRadiusCells } from '../ground';
 import type { WorldEditor } from './useWorldEditor';
 
@@ -125,6 +125,25 @@ export function EditorWorldLayers({ ed, ents }: { ed: WorldEditor; ents: Ent[] }
     <>
       <div className="dev-tile-grid" style={{ width: `${GROUND_W}ch`, height: `${GROUND_H}em` }} />
       {ed.tab === 'start' && <StartLayer ed={ed} />}
+      {/* the Islands tab: each island's bounds where it stands (live while dragged) */}
+      {ed.tab === 'islands' &&
+        Array.from({ length: ISLAND_COUNT }, (_, i) => {
+          const b = islandBounds(i, ed.doc.islands);
+          return (
+            <div
+              key={`isl-${i}`}
+              className={'wed-island' + (ed.islandDrag === i ? ' on' : '')}
+              style={{
+                left: `${(b.cx - b.rx) * TILE_CH}ch`,
+                top: `${(b.cy - b.ry) * TILE_LN}em`,
+                width: `${b.rx * 2 * TILE_CH}ch`,
+                height: `${b.ry * 2 * TILE_LN}em`,
+              }}
+            >
+              <span className="wed-island-label">⤧ {ISLAND_NAMES[i] ?? `Island ${i}`}</span>
+            </div>
+          );
+        })}
 
       {/* the Ground tab's brush */}
       {ed.tab === 'ground' && ed.pointerAt && (

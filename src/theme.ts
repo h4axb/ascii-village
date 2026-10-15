@@ -37,7 +37,8 @@ export interface ThemePreset {
   stones?: StoneLook;
   // how dark the ground shade around objects is (terrain.ts AO; 0 = none, 1 = as designed)
   groundShadow?: number;
-  // the ponds (src/data/assets/pond-*.json): saturation, brightness and a tint
+  // the ponds (src/data/assets/pond-*.json): saturation, brightness, a tint
+  // and how fast their water moves
   pond?: PondLook;
 }
 export interface PondLook {
@@ -45,8 +46,9 @@ export interface PondLook {
   brightness: number;
   tint: string;
   tintAmount: number;
+  speed?: number; // the water's animation: 1 = as made, 0 = still
 }
-const POND_DEFAULT: PondLook = { saturation: 1, brightness: 1, tint: '#5aa0c8', tintAmount: 0 };
+const POND_DEFAULT: PondLook = { saturation: 1, brightness: 1, tint: '#5aa0c8', tintAmount: 0, speed: 1 };
 export interface StoneLook {
   saturation: number;
   brightness: number;

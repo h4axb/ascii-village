@@ -93,7 +93,7 @@ import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
 import { eyesOf } from './playerEyes';
 import { SPEECH_BUBBLE, SPEECH_BUBBLE_COLORS, SPEECH_BUBBLE_PALETTE } from './speechBubble';
-import { onThemeChange, themeRevision } from './theme';
+import { onThemeChange, themeRevision, pondLook } from './theme';
 import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
 import { groundBare } from './ground';
 import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, IconClose, type Slot, type Action } from './ui';
@@ -315,6 +315,9 @@ const SAVE_SCREEN_MS = 1600; // the black saving screen stays at least this long
 const QUEST_SAIL_SPEED = 9;
 const MARKER_BOAT_LAUNCH = 'quest.boatLaunch'; // sceneMarkers.ts
 const LAND_REACH = 2.5;
+const POND_REACH = 1; // tiles from the player's feet to a pond's box to fill at it
+// the old animated pond, or a glyph pond (an editor asset with water keys)
+const isPond = (e: Ent) => e.kind === 'pond' || !!e.sway;
 // the water kept between a sailing boat's hull and the sand: ~2-3 px each way
 // (a ch is ~8.4 px, an em 14)
 const BOAT_SHORE_GAP = { ch: 0.3, em: 0.2 };
@@ -3363,27 +3366,31 @@ function Game() {
     questBusyRef.current = false;
   }
 
-  // The pond: fills the watering tool
-  function questPondClick() {
-    const q = questRef.current;
-    if (!q) return;
-    const tool = q.waterTool && bag.find((o) => o.ownedId === q.waterTool);
-    if (!tool) {
-      showToast('a calm little pond. you could fill a watering tool here.');
+  // The pond: fills the watering tool in hand
+  function fillAtPond() {
+    const tool = equippedRef.current;
+    if (tool?.tool !== 'water') {
+      showToast('you need a container to fill it.');
       return;
     }
-    const pond = ents.find((e) => e.kind === 'pond');
-    if (pond && near(pond, player) > 14) {
+    const pond = nearestPond();
+    if (!pond || pond.gap > POND_REACH) {
       showToast('walk up to the pond first.');
       return;
     }
-    if (q.filled) {
-      showToast('your watering tool is already full.');
+    const q = questRef.current;
+    if (q && q.waterTool === tool.ownedId) {
+      // the quest's tool keeps track of its water
+      if (q.filled) {
+        showToast('your watering tool is already full.');
+        return;
+      }
+      setQuest({ ...q, filled: true });
+      showToast(`filled ${tool.name} with pond water!`);
+      questDone('fill', { filled: true });
       return;
     }
-    setQuest({ ...q, filled: true });
     showToast(`filled ${tool.name} with pond water!`);
-    questDone('fill', { filled: true });
   }
 
   // "I'm done." while reporting back: Mitchy's line, QUEST COMPLETE, then the
@@ -3548,7 +3555,7 @@ function Game() {
         if (o) startPlacement(o);
       },
       ghost: (x: number, y: number) => setPlacing((g) => (g ? { ...g, x, y } : g)),
-      pond: () => questPondClick(),
+      pond: () => fillAtPond(),
       plantSeed: () => plantBase('seed'),
       equip: (ownedId: string) => {
         const o = bag.find((b) => b.ownedId === ownedId);
@@ -4209,7 +4216,7 @@ function Game() {
       const e = ents.find((x) => x.id === ref.id);
       if (e?.id === 'house') t = 'house';
       else if (e?.id === 'cat') t = 'mitchy';
-      else if (e?.kind === 'pond') t = 'pond';
+      else if (e && isPond(e)) t = 'pond';
       else if (e?.kind === 'gardenbed') t = 'garden';
       else if (e && RESOURCE_KINDS.has(e.kind)) t = 'resource';
       if (e?.id === 'cat') setMitchySeen(mitchyWaitKey);
@@ -4230,7 +4237,7 @@ function Game() {
     };
     if (t === 'house') return of(ents.find((e) => e.id === 'house'));
     if (t === 'mitchy') return of(ents.find((e) => e.id === 'cat'));
-    if (t === 'pond') return of(ents.find((e) => e.kind === 'pond'));
+    if (t === 'pond') return of(nearestPond()?.e ?? ents.find(isPond));
     if (t === 'garden') return of(ents.find((e) => e.kind === 'gardenbed'));
     if (t === 'crop') {
       const c = crops.find((x) => x.id === quest?.seedCrop) ?? crops[0];
@@ -4334,6 +4341,10 @@ function Game() {
       if (oi) oi.go(0);
       return;
     }
+    if (!modal && pondPrompt) {
+      if (pondPrompt.canFill) fillAtPond();
+      return;
+    }
     if (!modal && boatPrompt) {
       if (boatPrompt.kind === 'board') void questBoard(boatPrompt.id);
       else void questLand(boatPrompt.x, boatPrompt.y);
@@ -4434,6 +4445,32 @@ function Game() {
     // something else nearer (a flower on the shore) keeps its own label
     if (gap > BOARD_REACH || (promptTarget && promptTarget.gap < gap)) return null;
     return { kind: 'board' as const, id: b.id, at: { right: (b.x + wT) * TILE_CH, top: b.y * TILE_LN } };
+  })();
+  // The pond nearest the player (on this island), by the gap between the
+  // player's feet and the pond's whole box (near() measures from an object's
+  // bottom row only, which doesn't suit a wide pond)
+  function nearestPond(): { e: Ent; gap: number } | null {
+    const feet = player.y + PLAYER_T.hT - 1;
+    let best: { e: Ent; gap: number } | null = null;
+    for (const e of ents) {
+      if (!isPond(e)) continue;
+      const { wT, hT } = spriteTiles(e.sprite, e.scale, e.rotation);
+      const gx = Math.max(e.x - (player.x + PLAYER_T.wT - 1), 0, player.x - (e.x + wT - 1));
+      const gy = Math.max(e.y - feet, 0, feet - (e.y + hT - 1));
+      const gap = Math.max(gx, gy);
+      if (!best || gap < best.gap) best = { e, gap };
+    }
+    return best;
+  }
+  // Next to a pond: [F] fill water with a watering tool in hand, else a line
+  // that it needs a container. Something nearer keeps its own label.
+  const pondPrompt = (() => {
+    if (boatPrompt || riding || modal || cinematic || mapOpen || editorOpen || placing || watering || hintLock || hintCard) return null;
+    const p = nearestPond();
+    if (!p || p.gap > POND_REACH || (promptTarget && promptTarget.gap < p.gap)) return null;
+    // by the player (top-right of the head): a pond is wide, its own corner
+    // is often off screen
+    return { e: p.e, canFill: equipped?.tool === 'water', at: { right: (player.x + PLAYER_T.wT) * TILE_CH, top: player.y * TILE_LN } };
   })();
   // Mitchy's "!" bubble: while something with him is still open (the intro's
   // part C, bringing him the gathered things, reporting back) and the player
@@ -5098,7 +5135,7 @@ function Game() {
   // where an object's F label hangs (ch, em): its top-right corner, or, for
   // kinds in LABEL_BESIDE, beside the drawn shape partway down (a palm: at the
   // top of its trunk, under the crown), right of what's drawn there
-  const entLabelAnchor = (ent: Ent): { right: number; top: number } => {
+  function entLabelAnchor(ent: Ent): { right: number; top: number } {
     const k = ent.scale ?? 1;
     const side = !ent.rotation ? LABEL_BESIDE[ent.kind] : undefined;
     if (side) {
@@ -5740,7 +5777,7 @@ function Game() {
                   <PondLayer
                     key={e.id}
                     ent={e}
-                    onClick={quest && !cinematic ? questPondClick : undefined}
+                    onClick={!cinematic ? fillAtPond : undefined}
                     charW={dims.charW}
                     lineH={dims.lineH}
                     res={dims.scale * zoom * (window.devicePixelRatio || 1)}
@@ -6190,6 +6227,7 @@ function Game() {
               {!modal &&
                 promptTarget &&
                 !boatPrompt &&
+                !pondPrompt &&
                 !(nothingEnt && promptTarget.ref.kind === 'entity' && promptTarget.ref.id === nothingEnt.id) &&
                 (() => {
                   const ref = promptTarget.ref;
@@ -6247,6 +6285,14 @@ function Game() {
                   }}
                 >
                   <span>{nothingText}</span>
+                </div>
+              )}
+
+              {/* at the pond (see pondPrompt) */}
+              {pondPrompt && (
+                <div className="fpop" style={{ left: `${pondPrompt.at.right}ch`, top: `${pondPrompt.at.top}em` }}>
+                  {pondPrompt.canFill && <kbd className="fpop-key">F</kbd>}
+                  <span className="fpop-name">{pondPrompt.canFill ? 'fill water' : 'needs a container to fill'}</span>
                 </div>
               )}
 
@@ -7630,12 +7676,7 @@ function PondLayer({
   onClick?: () => void; // the quest's "fill your watering tool"
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [t, setT] = useState(0);
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const iv = window.setInterval(() => setT((v) => v + 1), POND_FRAME_MS);
-    return () => window.clearInterval(iv);
-  }, []);
+  const t = usePondTick();
   const k = ent.scale ?? 1;
   const cw = Math.max(...ent.sprite.map((l) => l.length));
   const rows = ent.sprite.length;
@@ -7704,6 +7745,21 @@ function PondLayer({
 // A glyph pond's water, animated like the old pond (pondAnim.ts waterFrame):
 // a new frame every POND_FRAME_MS, drawn by the same canvas as every solid
 // sprite. Its water tones are its `water` keys, darkest first; its glyphs are
+
+// The ponds' water clock: a frame every POND_FRAME_MS, scaled by the Theme
+// tab's pond water speed (0 = still)
+function usePondTick(): number {
+  useSyncExternalStore(onThemeChange, themeRevision);
+  const speed = pondLook().speed ?? 1;
+  const [t, setT] = useState(0);
+  useEffect(() => {
+    if (speed <= 0 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const iv = window.setInterval(() => setT((v) => v + 1), POND_FRAME_MS / speed);
+    return () => window.clearInterval(iv);
+  }, [speed]);
+  return t;
+}
+
 // the old pond's.
 function WaterSprite({
   water,
@@ -7712,12 +7768,7 @@ function WaterSprite({
   palette,
   ...p
 }: Omit<React.ComponentProps<typeof SolidSpriteCanvas>, 'outline' | 'solid'> & { water: string }) {
-  const [t, setT] = useState(0);
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const iv = window.setInterval(() => setT((v) => v + 1), POND_FRAME_MS);
-    return () => window.clearInterval(iv);
-  }, []);
+  const t = usePondTick();
   // the water keys, darkest first (they map the currents' low to high)
   const tones = useMemo(() => {
     const lum = (k: string) => {

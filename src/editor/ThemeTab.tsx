@@ -169,7 +169,7 @@ export function ThemeTab() {
       <div className="wed-group">
         <div className="wed-group-name">
           Pond
-          <button className="wed-theme-reset" onClick={() => setPondLook({ saturation: 1, brightness: 1, tintAmount: 0 })}>
+          <button className="wed-theme-reset" onClick={() => setPondLook({ saturation: 1, brightness: 1, tintAmount: 0, speed: 1 })}>
             reset
           </button>
         </div>
@@ -183,6 +183,11 @@ export function ThemeTab() {
             </label>
           );
         })}
+        <label className="wed-theme-slider">
+          <span>water speed</span>
+          <input type="range" min={0} max={3} step={0.05} value={preset.pond?.speed ?? 1} onChange={(ev) => setPondLook({ speed: Number(ev.target.value) })} />
+          <span className="wed-dim">{(preset.pond?.speed ?? 1).toFixed(2)}</span>
+        </label>
         <label className="wed-theme-slider">
           <span>pond tint colour</span>
           <input type="color" value={preset.pond?.tint ?? '#5aa0c8'} onChange={(ev) => setPondLook({ tint: ev.target.value })} />

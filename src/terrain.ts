@@ -32,7 +32,7 @@ import {
   collisionBox,
   silhouetteMask,
   OCEAN_CFG,
-  mainIslandClass,
+  islandClass,
 } from './world';
 import { RAMP_DEFAULT } from './craft/materials';
 import { onThemeChange, themeRgb, groundShadow } from './theme';
@@ -400,9 +400,9 @@ function sample(fx: number, fy: number, jit: number) {
   out.lit = 0;
   out.patch = 0;
   const n = ndv + jit;
-  // the main island is drawn from its baked map (world.ts, mainIsland.json):
+  // a baked island (the main and the shop island) is drawn from its map (world.ts):
   // grass, sand, cliff faces and stones exactly where the picture has them
-  const mc = mainIslandClass(fx * TILE_CH, fy * TILE_LN);
+  const mc = islandClass(fx * TILE_CH, fy * TILE_LN);
   if (mc !== null) {
     sampleMain(mc, fx, fy, n);
     return;
@@ -491,8 +491,8 @@ function sampleMain(mc: string, fx: number, fy: number, n: number) {
     // a cliff face (or a stone in the water): grey rock in rough horizontal
     // strata, its top edge catching the light and its foot in shadow
     const cx = fx * TILE_CH, cy = fy * TILE_LN;
-    const top = mainIslandClass(cx, cy - 1) !== mc;
-    const foot = mainIslandClass(cx, cy + 1) !== mc;
+    const top = islandClass(cx, cy - 1) !== mc;
+    const foot = islandClass(cx, cy + 1) !== mc;
     const band = vnoise(fx * 0.6, fy * 5.5, 505);
     const grain = vnoise(fx * 3.1, fy * 3.1, 17);
     let t = 0.3 + 0.45 * band + 0.15 * grain;

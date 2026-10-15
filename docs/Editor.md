@@ -147,13 +147,15 @@ He keeps his height: the scale follows the art's row count. A look is never plac
 
 ## The main island's shape
 
-The main island is baked from a picture: `assets/refs/island-map-ref.webp` →
-`python3 scripts/bake-island.py` (numpy, scipy, Pillow) → `src/data/mainIsland.json`.
+The main island and the shop island are baked from a picture: `assets/refs/island-map-ref.webp` →
+`python3 scripts/bake-island.py [main|shop]` (numpy, scipy, Pillow) → `src/data/mainIsland.json` /
+`src/data/shopIsland.json` (the picture's left and right island).
 Every ground cell gets one class: water, grass, sand, cliff face (blocks walking) or
 a stone in the water. Trees, ponds, paths and buildings in the picture all count as
 grass. `world.ts` turns the land into the coast field that walking, boats and sea
-routes use. `terrain.ts` draws each cell by its class. To change the island, edit
-the picture (or the script's scale / origin / ignore boxes) and re-run the script.
+routes use. `terrain.ts` draws each cell by its class. To change an island, edit
+the picture (or the script's per-island crop / origin / ignore boxes) and re-run the script. The boat trips go
+ashore at the `quest.shopLanding` scene marker (the shop island's south beach).
 The painted ground from before the new island is kept in
 `assets/refs/ground-before-island-v2.json`.
 

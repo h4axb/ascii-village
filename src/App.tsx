@@ -315,6 +315,7 @@ const RESOURCE_KINDS = new Set<EntityKind>(['flower', 'flowerplus', 'stone', 'da
 const SAVE_SCREEN_MS = 1600; // the black saving screen stays at least this long
 const QUEST_SAIL_SPEED = 9;
 const MARKER_BOAT_LAUNCH = 'quest.boatLaunch'; // sceneMarkers.ts
+const MARKER_SHOP_LANDING = 'quest.shopLanding'; // where the boat trips go ashore on the shop island
 const LAND_REACH = 2.5;
 const POND_REACH = 1; // tiles from the player's feet to a pond's box to fill at it
 // the old animated pond, or a glyph pond (an editor asset with water keys)
@@ -3109,6 +3110,21 @@ function Game() {
     const pb = boatBox(b);
     const half = { x: pb.wT / 2, y: pb.hT / 2 };
     const route = seaRoute({ x: b.x + half.x, y: b.y + half.y }, shopAt, Math.max(half.x, half.y));
+    // the landing marker (a beach tile): go ashore there, the boat stopping
+    // in the nearest water off it, rather than on whatever coast faces home
+    const lm = getMarkerPosition(MARKER_SHOP_LANDING);
+    if (lm.found) {
+      const land = { x: lm.x!, y: lm.y! };
+      let water: Pt | null = null;
+      for (let r = 1; r <= 8 && !water; r++)
+        for (let dy = -r; dy <= r && !water; dy++)
+          for (let dx = -r; dx <= r && !water; dx++)
+            if (Math.max(Math.abs(dx), Math.abs(dy)) === r && isOpenWater(land.x + dx, land.y + dy)) water = { x: land.x + dx, y: land.y + dy };
+      if (water) {
+        route.land = land;
+        route.dock = water;
+      }
+    }
     route.path = route.path.map((pt) => ({ x: pt.x - half.x, y: pt.y - half.y }));
     route.path[0] = { x: b.x, y: b.y };
     // the boat stops where all of it floats, right off the shop island's shore

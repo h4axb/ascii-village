@@ -14,5 +14,9 @@
   "quest.boatLaunch": {
     "x": 62,
     "y": 58
+  },
+  "quest.shopLanding": {
+    "x": 106,
+    "y": 42
   }
 }

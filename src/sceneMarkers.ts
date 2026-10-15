@@ -60,6 +60,13 @@ export const MARKER_REGISTRY: MarkerCategory[] = [
         // for both conditions of the user test (src/quest/)
         markers: [{ id: 'quest.boatLaunch', label: 'BOAT LAUNCH' }],
       },
+      {
+        id: 'shopLanding',
+        label: 'Shop island landing',
+        // where the boat trips go ashore on the shop island (a land tile on
+        // its beach); the boat stops in the water right off it
+        markers: [{ id: 'quest.shopLanding', label: 'SHOP LANDING' }],
+      },
     ],
   },
 ];

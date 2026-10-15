@@ -2,15 +2,15 @@
   "version": 2,
   "moved": {
     "house": {
-      "x": 28.5,
-      "y": 12
+      "x": 30.5,
+      "y": 5
     },
     "garden-bed": {
-      "x": 14,
-      "y": 36
+      "x": 23,
+      "y": 19
     },
     "shop": {
-      "x": 96.5,
+      "x": 70.5,
       "y": 13
     },
     "cat": {
@@ -42,7 +42,42 @@
     "palm4",
     "palm5"
   ],
-  "added": [],
+  "added": [
+    {
+      "id": "pond-island-1",
+      "asset": "pond-island",
+      "x": 13,
+      "y": 33,
+      "scale": 0.7
+    },
+    {
+      "id": "wayfinder-v4-1",
+      "asset": "wayfinder-v4",
+      "x": 41,
+      "y": 36,
+      "scale": 0.12,
+      "look": {
+        "sat": 110,
+        "bright": 110,
+        "tint": -5
+      },
+      "sign": {
+        "panels": [
+          {
+            "flip": true,
+            "tilt": 19
+          },
+          {
+            "tilt": -8
+          },
+          {
+            "flip": true,
+            "tilt": 11
+          }
+        ]
+      }
+    }
+  ],
   "colliders": {
     "house": [
       "  ##########  ",
@@ -637,5 +672,15 @@
       "h": 1,
       "owner": "house"
     }
-  ]
+  ],
+  "islands": {
+    "1": {
+      "dx": -26,
+      "dy": 0
+    },
+    "2": {
+      "dx": -23,
+      "dy": 1
+    }
+  }
 }

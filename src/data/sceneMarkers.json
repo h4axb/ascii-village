@@ -1,14 +1,14 @@
 {
   "intro.partB.playerStart": {
-    "x": 44,
+    "x": 33,
     "y": 58
   },
   "intro.partB.mitchyStart": {
-    "x": 47,
+    "x": 35,
     "y": 58
   },
   "intro.partB.mitchyExit": {
-    "x": 55,
+    "x": 53,
     "y": 57
   },
   "quest.boatLaunch": {
@@ -16,7 +16,7 @@
     "y": 58
   },
   "quest.shopLanding": {
-    "x": 106,
+    "x": 80,
     "y": 42
   }
 }

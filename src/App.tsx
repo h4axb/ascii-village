@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useMitchyLook } from './useMitchyLook';
 import * as S from './sprites';
 import {
@@ -255,6 +256,29 @@ const ITEM_SPRITES: Record<ItemType, string[]> = {
   strawberry: S.STRAWBERRY,
   pumpkin: S.PUMPKIN,
 };
+
+// resources Mitchy doesn't buy (shown greyed on the shop's Sell side)
+const UNSELLABLE = new Set<ItemType>(['seed']);
+
+// A resource as the inventory, shop and storage show it: in its world
+// colours (dates and the wildflower in their own palettes, the rest one
+// colour each), drawn on a per-cell fill by the slots (FitSprite cells).
+const BASE_COLOUR: Partial<Record<ItemType, string>> = {
+  stone: '#8a8a8a',
+  cactus: '#8dae59',
+  fern: '#8dae59',
+  iceflower: '#bfe3f0',
+  seed: '#c9a46a',
+  bloom: '#f5c542',
+  strawberry: '#e0514a',
+  pumpkin: '#e8892f',
+};
+function baseLook(it: ItemType): { sprite: string[]; colors?: string[]; palette?: Record<string, string>; color?: string } {
+  if (it === 'date') return { sprite: S.DATE_FRUIT, colors: S.DATE_COLORS, palette: S.DATE_PALETTE };
+  if (it === 'flower' && Object.keys(S.FLOWER_PLUS_PALETTE).length)
+    return { sprite: S.FLOWER_PLUS, colors: S.FLOWER_PLUS_COLORS, palette: S.FLOWER_PLUS_PALETTE };
+  return { sprite: ITEM_SPRITES[it], color: BASE_COLOUR[it] ?? '#8dae59' };
+}
 
 const ITEM_TYPES: ItemType[] = ['flower', 'stone', 'date', 'cactus', 'fern', 'iceflower', 'seed', 'bloom', 'strawberry', 'pumpkin'];
 
@@ -4906,8 +4930,8 @@ function Game() {
   function sellPick() {
     const m = modalRef.current;
     if (!m || m.t !== 'shop' || m.tab !== 'sell') return;
-    const item = m.pick ?? ITEM_TYPES.find((t) => inv[t] > 0);
-    if (!item || inv[item] <= 0) return;
+    const item = m.pick ?? ITEM_TYPES.find((t) => inv[t] > 0 && !UNSELLABLE.has(t));
+    if (!item || inv[item] <= 0 || UNSELLABLE.has(item)) return;
     const n = Math.max(1, Math.min(m.amount, inv[item]));
     const coins = n * basePrice(item);
     setInv((v) => ({ ...v, [item]: Math.max(0, v[item] - n) }));
@@ -7109,6 +7133,7 @@ function Game() {
           {modal.t === 'recraft' && (
             <RecraftSheet
               items={bag.filter((o) => o.kind !== 'token')}
+              placed={placedItems}
               money={money}
               line={modal.line ?? null}
               onRecraft={startRecraft}
@@ -7265,6 +7290,7 @@ function WaterBar({ level, style }: { level: { bar: number; drop: number }; styl
 // button: 12 coins, then back into that item's chat to give a new prompt.
 function RecraftSheet({
   items,
+  placed,
   money,
   line,
   onRecraft,
@@ -7272,6 +7298,7 @@ function RecraftSheet({
   onClose,
 }: {
   items: OwnedItem[];
+  placed: PlacedItem[]; // in the world: listed greyed (pick it up to recraft it)
   money: number;
   line: string | null;
   onRecraft: (item: OwnedItem, rec: CraftRecord | null) => void;
@@ -7279,7 +7306,8 @@ function RecraftSheet({
   onClose: () => void;
 }) {
   const history = useMemo(() => loadHistory(), []);
-  const recOf = (o: OwnedItem) =>
+  const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
+  const recOf = (o: { name: string; sprite: string[] }) =>
     history.find((r) => r.name === o.name && r.sprite.join('\n') === o.sprite.join('\n')) ??
     history.find((r) => r.name === o.name) ??
     null;
@@ -7289,13 +7317,13 @@ function RecraftSheet({
       <div className="recraft">
         <p className="ds-muted recraft-sub">Change an existing item's prompt and craft it again.</p>
         <div className="recraft-list">
-          {items.length === 0 && <div className="ds-muted recraft-empty">Nothing crafted in your bag yet.</div>}
+          {items.length === 0 && placed.length === 0 && <div className="ds-muted recraft-empty">Nothing crafted yet.</div>}
           {items.map((o) => {
             const rec = recOf(o);
             return (
               <div key={o.ownedId} className="recraft-row">
                 <span className="recraft-thumb">
-                  <FitSprite look={{ sprite: o.sprite, color: o.color, palette: o.palette, colors: o.colors }} fill={0.8} maxScale={1.6} />
+                  <FitSprite look={{ sprite: o.sprite, color: o.color, palette: o.palette, colors: o.colors }} fill={0.8} maxScale={1.6} cells />
                 </span>
                 <span className="recraft-text">
                   <span className="recraft-name">{o.name}</span>
@@ -7308,7 +7336,40 @@ function RecraftSheet({
               </div>
             );
           })}
+          {placed.map((o) => {
+            const rec = recOf(o);
+            return (
+              <div
+                key={o.id}
+                className="recraft-row away"
+                onMouseEnter={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setTip({ x: r.left + r.width / 2, y: r.top });
+                }}
+                onMouseLeave={() => setTip(null)}
+              >
+                <span className="recraft-thumb">
+                  <FitSprite look={{ sprite: o.sprite, color: o.color, palette: o.palette, colors: o.colors }} fill={0.8} maxScale={1.6} cells />
+                </span>
+                <span className="recraft-text">
+                  <span className="recraft-name">{o.name}</span>
+                  <span className="recraft-prompt">{rec ? `“${rec.prompt}”` : o.desc}</span>
+                  <span className="ds-muted">Placed in the world</span>
+                </span>
+                <button className="ds-option recraft-btn" disabled aria-disabled>
+                  Recraft <IconCoin size={16} /> {RECRAFT_PRICE} Gold
+                </button>
+              </div>
+            );
+          })}
         </div>
+        {tip &&
+          createPortal(
+            <div className="ds-slot-tip" role="tooltip" style={{ left: tip.x, top: tip.y }}>
+              It needs to be in your inventory to change it.
+            </div>,
+            document.body,
+          )}
         {line && <p className="recraft-line">{line}</p>}
       </div>
     </Sheet>
@@ -7472,7 +7533,9 @@ function ShopSheet({
   onClose: () => void;
   buy: ShopBuyProps;
 }) {
-  const owned = ITEM_TYPES.filter((t) => inv[t] > 0 && t !== 'seed'); // seeds can't be sold
+  const owned = ITEM_TYPES.filter((t) => inv[t] > 0 && !UNSELLABLE.has(t));
+  // what can't be sold (seeds) is still shown, greyed, after the rest
+  const unsellable = ITEM_TYPES.filter((t) => inv[t] > 0 && UNSELLABLE.has(t));
   const item = pick && inv[pick] > 0 ? pick : (owned[0] ?? null);
   const fact = useFunFact(tab === 'sell' ? item : null);
   const price = item ? basePrice(item) : 0;
@@ -7503,18 +7566,28 @@ function ShopSheet({
         <>
           <Split>
             <SlotGrid
-              slots={owned.map((it) => ({
-                key: it,
-                look: { sprite: ITEM_SPRITES[it] },
-                count: inv[it],
-                label: ITEM_INFO[it].name,
-              }))}
+              slots={[
+                ...owned.map((it) => ({
+                  key: it,
+                  look: baseLook(it),
+                  count: inv[it],
+                  label: ITEM_INFO[it].name,
+                })),
+                ...unsellable.map((it) => ({
+                  key: it,
+                  look: baseLook(it),
+                  count: inv[it],
+                  label: ITEM_INFO[it].name,
+                  disabled: true,
+                  note: "This item can't be sold.",
+                })),
+              ]}
               selected={item}
               onSelect={(s) => onPick(s.key as ItemType)}
             />
             {item ? (
               <DetailPanel
-                look={{ sprite: ITEM_SPRITES[item] }}
+                look={baseLook(item)}
                 title={ITEM_INFO[item].name}
                 stats={[
                   { icon: <IconCoin />, value: price, label: 'Sell Price' },
@@ -7654,7 +7727,7 @@ function InventorySheet({
   const slots: Slot[] = [
     ...bases.map((it) => ({
       key: it,
-      look: { sprite: ITEM_SPRITES[it] },
+      look: baseLook(it),
       count: inv[it],
       label: ITEM_INFO[it].name,
       disabled: equipPick, // raw materials can't be held
@@ -7742,7 +7815,7 @@ function InventorySheet({
   } else if (base) {
     detail = (
       <DetailPanel
-        look={{ sprite: ITEM_SPRITES[base] }}
+        look={baseLook(base)}
         title={ITEM_INFO[base].name}
         titleAside={coinValue(basePrice(base))}
         stats={[{ icon: <IconBag />, value: inv[base], label: pay ? 'Owned' : 'In Inventory' }]}
@@ -7900,7 +7973,7 @@ function StoragePanel({
   const entry = list.length ? list[effSel] : null;
   const toSlot = (e: StorEntry, i: number): Slot => ({
     key: `${e.where}:${e.item}`,
-    look: { sprite: ITEM_SPRITES[e.item] },
+    look: baseLook(e.item),
     count: e.where === 'store' ? storage[e.item] : inv[e.item],
     label: `${ITEM_INFO[e.item].name}${e.where === 'store' ? ' in storage' : ''}`,
     ...({ index: i } as object),
@@ -7924,7 +7997,7 @@ function StoragePanel({
         </div>
         {entry ? (
           <DetailPanel
-            look={{ sprite: ITEM_SPRITES[entry.item] }}
+            look={baseLook(entry.item)}
             title={ITEM_INFO[entry.item].name}
             stats={[
               { icon: <IconBag size={18} />, value: inv[entry.item], label: 'in your inventory' },

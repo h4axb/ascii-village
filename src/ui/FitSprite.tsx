@@ -20,6 +20,7 @@ export function FitSprite({
   maxScale = 1,
   cover = false,
   solid,
+  cells = false,
 }: {
   look: SpriteLook;
   className?: string;
@@ -30,6 +31,10 @@ export function FitSprite({
   cover?: boolean;
   // the player's per-cell backing + eyes, as in the world (see ColoredSprite)
   solid?: { eyeRow?: number };
+  // every drawn glyph on a darkened backing of its own colour, as the dates
+  // and flowers in the world (a look without a palette gets one from its
+  // colour)
+  cells?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [k, setK] = useState(1);
@@ -48,20 +53,34 @@ export function FitSprite({
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(b);
-    return () => ro.disconnect();
-  }, [look.sprite, fill, maxScale, cover]);
+    // the first measure can land before the font has loaded
+    let alive = true;
+    document.fonts?.ready.then(() => alive && fit());
+    return () => {
+      alive = false;
+      ro.disconnect();
+    };
+  }, [look.sprite, fill, maxScale, cover, cells]);
+  const cellLook = cells && !(look.colors && look.palette && Object.keys(look.palette).length) ? oneColour(look) : look;
   return (
     <div className={'ds-fit' + (className ? ' ' + className : '')} ref={box}>
       <ColoredSprite
-        sprite={look.sprite}
-        colors={look.colors}
-        palette={look.palette}
-        color={look.color}
-        texture={look.texture}
-        solidCells={!!solid}
+        sprite={cellLook.sprite}
+        colors={cellLook.colors}
+        palette={cellLook.palette}
+        color={cellLook.color}
+        texture={cellLook.texture}
+        solidCells={!!solid || cells}
         eyeRow={solid?.eyeRow}
         style={{ transform: `translate(-50%, -50%) scale(${k})` }}
       />
     </div>
   );
+}
+
+// A single-colour look as a one-key palette, so it can take per-cell backing
+const CREAM = '#e9dcc1';
+function oneColour(look: SpriteLook): SpriteLook {
+  const hex = look.color ?? CREAM;
+  return { ...look, palette: { a: hex }, colors: look.sprite.map((l) => l.replace(/[^ ]/g, 'a')) };
 }

@@ -47,7 +47,7 @@ export function DetailPanel({
   return (
     <aside className="ds-detail">
       <div className="ds-detail-head">
-        <FitSprite className="ds-detail-art" look={look} fill={0.8} maxScale={2.6} />
+        <FitSprite className="ds-detail-art" look={look} fill={0.8} maxScale={2.6} cells />
         <div className="ds-detail-titles">
           <div className="ds-detail-title">
             <span>{title}</span>

@@ -2544,3 +2544,31 @@
   margin: 0;
   color: var(--ds-text);
 }
+
+/* a greyed slot's note while hovered (SlotGrid `note`) */
+.ds-slot-tip {
+  position: fixed;
+  z-index: 300000; /* over every sheet and overlay */
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 6px 10px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-dialogue);
+  color: var(--ds-text);
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.ds-slot.disabled {
+  filter: grayscale(1);
+}
+
+/* Recraft: an item placed in the world, greyed (pick it up to change it) */
+.recraft-row.away {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+}
+.recraft-row.away .recraft-btn {
+  cursor: default;
+}

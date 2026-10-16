@@ -10,9 +10,10 @@
 #   side-right   the short side piece going back to the left
 #   gate         the arched gate between its two posts
 #   gate-open    the gate with its door taken out (only the posts)
-#   stick-left   one side picket with its rail stubs (from side-left): stacked
-#                down the screen they make the enclosure's left side
-#   stick-right  the same from side-right, for the right side
+#   stick-left   one upright side slat, edge-on (a front picket narrowed, its
+#                side face shaded): stacked down the screen they make the
+#                enclosure's left side
+#   stick-right  the same mirrored, for the right side
 # (The sheet's crossed-out corner piece is not used.)
 #
 #   python3 scripts/cut-fence.py <outdir>
@@ -30,13 +31,25 @@ pieces = {
     'side-left': crop(745, 158, 982, 530),
     'side-right': crop(1074, 158, 1310, 534),
     'gate': crop(720, 578, 1366, 952),
-    'stick-left': crop(862, 158, 982, 470),
-    'stick-right': crop(1074, 158, 1194, 470),
 }
 pieces['front-right'] = ImageOps.mirror(pieces['front-left'])
 g = np.array(pieces['gate'])
 g[:, 838 - 720:1249 - 720, 3] = 0  # the door, between the posts
 pieces['gate-open'] = Image.fromarray(g)
+# a side slat, edge-on like the reference's side fences: the middle front
+# picket (its rails run behind it, so it's clean), narrowed to 70% of its
+# width, its far side shaded as the slat's side face
+def slat(mirror):
+    im = crop(377, 226, 494, 502)
+    im = im.resize((round(im.width * 0.7), im.height), Image.LANCZOS)
+    a = np.array(im).astype(float)
+    w = a.shape[1]
+    side = slice(round(w * 0.6), w)
+    a[:, side, :3] *= 0.8
+    out = Image.fromarray(a.clip(0, 255).astype(np.uint8))
+    return ImageOps.mirror(out) if mirror else out
+pieces['stick-left'] = slat(False)
+pieces['stick-right'] = slat(True)
 for name, im in pieces.items():
     im.save(f'{OUT}/{name}.png')
     print(name, im.size)

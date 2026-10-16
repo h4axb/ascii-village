@@ -6235,6 +6235,7 @@ function Game() {
                   rotation={p.rotation}
                   palette={p.palette}
                   colors={p.colors}
+                  color={p.color}
                   texture={p.textureModifier}
                   chargeFrac={pushCharge?.id === p.id ? pushCharge.frac : null}
                   onClick={(e) => {
@@ -6315,6 +6316,7 @@ function Game() {
                   sprite={equipped.sprite}
                   colors={equipped.colors}
                   palette={equipped.palette}
+                  color={equipped.color}
                   texture={equipped.textureModifier}
                   solidCells
                 />
@@ -8039,6 +8041,7 @@ function PlacedItemView({
   rotation,
   palette,
   colors,
+  color,
   texture,
   ghost,
   chargeFrac,
@@ -8051,6 +8054,7 @@ function PlacedItemView({
   rotation: 0 | 1 | 2 | 3;
   palette?: Record<string, string>;
   colors?: string[];
+  color?: string;
   texture?: TextureModifier;
   ghost?: 'valid' | 'invalid' | 'warn';
   chargeFrac?: number | null;
@@ -8087,6 +8091,7 @@ function PlacedItemView({
         sprite={sprite}
         colors={ghost ? undefined : colors}
         palette={ghost ? undefined : palette}
+        color={ghost ? undefined : color}
         // ghost stays a plain valid/invalid tint — a shiny/neon/metallic
         // effect would fight the red/green readability the ghost exists for.
         texture={ghost ? undefined : texture}

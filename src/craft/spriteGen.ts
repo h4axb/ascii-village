@@ -588,11 +588,15 @@ export interface ClarifyOption {
   size?: SizeClass;
   finish?: TextureModifier;
   mood?: Mood;
+  colour?: string; // a colour word the item is made in
+  surprise?: boolean; // add the surprise (a watering can: the flower on top)
+  drop?: string[]; // leave these detail phrases out of the prompt
 }
 export interface ClarifyQuestion {
   topic: string; // short name of the decision ("Focus"), shown in the plan panel
   q: string; // Mitchy's question, one natural sentence
   options: ClarifyOption[];
+  noDecide?: boolean; // no "You decide" (a yes/no about the player's own words); unanswered = the first option
 }
 
 const SIZES: SizeClass[] = ['small', 'medium', 'large'];

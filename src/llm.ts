@@ -30,8 +30,6 @@ import {
   planAndRender,
   suggestAlternatives,
   analyzeCraft,
-  clarifyCraft,
-  MOOD_QUESTION,
   SIZE_QUESTION,
   MOOD_PRESETS,
   textureModifierFor,
@@ -62,6 +60,11 @@ import {
   refDescription,
   gameCategoryOf,
   logRefCraft,
+  isWateringCan,
+  shapeWateringCan,
+  colourOf,
+  withoutDetails,
+  unknownsOf,
   type RefMatch,
 } from './craft/refCraft';
 
@@ -435,11 +438,15 @@ export async function craftItem(
   // so this deterministic pass is the part that always holds.
   const policy = checkPolicy(prompt);
   if (!policy.allowed) return { ok: false, reply: policy.reason! };
+  // the details the player chose to leave out (the /1 pre preferences)
+  if (opts.clarify?.dropDetails?.length) prompt = withoutDetails(prompt, opts.clarify.dropDetails);
 
   // From the reference library first (craft/refCraft.ts): 0 calls when the
   // matcher can place every word, 1 small call otherwise. Nothing in the
   // library fits -> the shape planner below, as before.
-  if (REF_CRAFT_ON && hasRefBodies()) {
+  // (watering cans come from the library on every link: the three
+  // references in src/data/refs/watering-can-*)
+  if ((REF_CRAFT_ON || isWateringCan(matchRefs(prompt))) && hasRefBodies()) {
     const r = await craftWithRefs(prompt, ui, opts);
     if (r) return r;
   }
@@ -623,7 +630,12 @@ async function craftWithRefs(
   ui: CraftUiHooks | undefined,
   opts: { prefs?: boolean; clarify?: CraftClarify },
 ): Promise<CraftResult | null> {
-  let m: RefMatch & { details?: Parameters<typeof buildFromMatch>[0]['details']; mirror?: boolean } = matchRefs(prompt);
+  const pickedColour = opts.clarify?.colour ? colourOf(opts.clarify.colour.toLowerCase().split(/\s+/).pop()!) : null;
+  let m: RefMatch & { details?: Parameters<typeof buildFromMatch>[0]['details']; mirror?: boolean } = shapeWateringCan(matchRefs(prompt), prompt, {
+    surprise: opts.clarify?.surprise,
+    colour: pickedColour,
+  });
+  const can = isWateringCan(m) ? { body: m.body!, colours: m.colours, petals: m.petals } : null;
   let text: { description: string; tags: string[]; fn: ItemFunction; name?: string } | null = null;
   let via: 'match' | 'model' = 'match';
   if (m.needsModel && llmEnabled) {
@@ -642,6 +654,9 @@ async function craftWithRefs(
         return null;
       }
       m = chosen;
+      // a watering can keeps the variant and colours picked above; the
+      // model only adds the details
+      if (can) m = { ...m, body: can.body, colours: { ...m.colours, ...can.colours }, petals: can.petals };
       via = 'model';
       if (c?.description) text = { description: c.description, tags: c.tags ?? [], fn: c.fn!, name: c.name };
     } catch (err) {
@@ -654,7 +669,9 @@ async function craftWithRefs(
     return null;
   }
   ui?.onStage?.('drawing');
-  const sp = await buildFromMatch(m, opts.clarify?.size);
+  // the size: the answer, else a size word in the prompt
+  const said = /\b(tiny|small|little|mini)\b/i.test(prompt) ? 'small' : /\b(big|large|huge|giant)\b/i.test(prompt) ? 'large' : /\bmedium\b/i.test(prompt) ? 'medium' : undefined;
+  const sp = await buildFromMatch(m, opts.clarify?.size ?? said);
   sp.lines.forEach((line, i) => ui?.onLine?.(line, i, 0));
   logRefCraft(prompt, via, m.body.id, m.leftover);
   const category = gameCategoryOf(m.body);
@@ -671,6 +688,11 @@ async function craftWithRefs(
   item.scale = sp.scale;
   item.desc = t.description;
   item.tags = [...t.tags, `prompt: ${prompt.trim()}`];
+  // a watering can waters
+  if (can) {
+    item.tool = 'water';
+    item.equip = { mode: 'hold' };
+  }
   const spec = parseSpec(prompt);
   item.textureModifier = textureModifierFor(spec.finish);
   const finish = opts.clarify?.finish ?? (opts.clarify?.mood ? MOOD_PRESETS[opts.clarify.mood].finish : undefined);
@@ -700,16 +722,65 @@ export type { ClarifyQuestion, ClarifyOption } from './craft';
 export interface CraftClarify {
   guidance: string;
   size?: SizeClass;
+  colour?: string; // the colour picked ("Sky blue")
+  surprise?: boolean; // "Yes, surprise me"
+  dropDetails?: string[]; // detail phrases the player chose to leave out
   finish?: TextureModifier;
   mood?: Mood;
 }
+// The questions come from what the prompt leaves open, worked out locally
+// (craft/refCraft.ts unknownsOf, no model call): its size and colour when it
+// names none; the details no reference can draw (named from the prompt, a
+// yes/no); otherwise whether to add a surprise.
 export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> {
   // a blocked prompt is refused by craftItem right after, without questions
   if (!checkPolicy(prompt).allowed) return [];
-  // an unreachable AI throws AiServiceError (the workshop shows it); only an
-  // answer without usable questions falls back to the fixed ones
-  const qs = llmEnabled ? await clarifyCraft(prompt, chatJSON, { model: MODELS.fast, fallbackModel: MODELS.fastFallback }) : [];
-  return [MOOD_QUESTION, qs[0] ?? SIZE_QUESTION];
+  return preQuestions(prompt);
+}
+const COLOUR_OPTIONS: { label: string; word: string }[] = [
+  { label: 'Sky blue', word: 'blue' },
+  { label: 'Sunny yellow', word: 'yellow' },
+  { label: 'Rose pink', word: 'pink' },
+  { label: 'Leaf green', word: 'green' },
+];
+export function preQuestions(prompt: string): ClarifyQuestion[] {
+  const u = unknownsOf(prompt);
+  const qs: ClarifyQuestion[] = [];
+  if (!u.sizeNamed)
+    qs.push({
+      ...SIZE_QUESTION,
+      options: SIZE_QUESTION.options.map((o, i) => ({ ...o, label: ['Small', 'Medium', 'Large'][i] ?? o.label })),
+    });
+  if (!u.colourNamed)
+    qs.push({
+      topic: 'Colour',
+      q: 'What colour should it be?',
+      options: COLOUR_OPTIONS.map((c) => ({ label: c.label, effect: `Main colour: ${c.label.toLowerCase()}.`, colour: c.word })),
+    });
+  if (u.refBody && u.details.length) {
+    const many = u.details.length > 1;
+    const names = u.details.map((d) => `the ${d}`);
+    const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
+    const it = many ? 'them' : 'it';
+    qs.push({
+      topic: u.details.map((d) => d.replace(/^\w/, (ch) => ch.toUpperCase())).join(', '),
+      q: `${list.replace(/^\w/, (ch) => ch.toUpperCase())} ${many ? "aren't among" : "isn't one of"} my patterns, so ${many ? 'their' : 'its'} look may be unpredictable. Craft ${it} anyway?`,
+      options: [
+        { label: `Craft ${it} anyway`, effect: `Include ${list}, drawn freely.` },
+        { label: `Leave ${it} out`, effect: `Leave ${list} out.`, drop: u.details },
+      ],
+      noDecide: true,
+    });
+  } else
+    qs.push({
+      topic: 'Surprise',
+      q: 'Should I add a little surprise?',
+      options: [
+        { label: 'Yes, surprise me', effect: 'Add one unexpected, charming little detail.', surprise: true },
+        { label: 'Keep it classic', effect: 'Keep it classic, no extras.', surprise: false },
+      ],
+    });
+  return qs;
 }
 export async function preflightCraft(prompt: string): Promise<CraftPreflight> {
   if (!llmEnabled || !checkPolicy(prompt).allowed) return { needsChoice: false };

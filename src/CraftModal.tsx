@@ -164,7 +164,7 @@ function ResultCard({
   return (
     <div className="cw3-card">
       <Frame className="cw3-art">
-        <FitSprite look={look} fill={0.82} maxScale={2.4} />
+        <FitSprite look={look} fill={0.82} maxScale={2.4} cells />
       </Frame>
       <div className="cw3-card-name">
         {name}
@@ -401,7 +401,7 @@ export default function CraftModal({
           push({
             who: 'mitchy',
             kind: 'text',
-            text: `Ooh, before I start I have ${qs.length === 1 ? 'one quick question' : 'two quick questions'} so it turns out the way you imagine.`,
+            text: `Ooh, before I start I have ${qs.length === 1 ? 'one quick question' : qs.length === 2 ? 'two quick questions' : 'a few quick questions'} so it turns out the way you imagine.`,
           });
           push({ who: 'mitchy', kind: 'text', text: qs[0].q });
         }).catch((err: unknown) => {
@@ -506,7 +506,8 @@ export default function CraftModal({
   function commitClar(skipped: boolean) {
     const c = clarRef.current;
     if (!c || c.locked) return;
-    const picks = c.questions.map((_, i) => c.picks[i] ?? null);
+    // a question without "You decide" left open takes its first option
+    const picks = c.questions.map((q, i) => c.picks[i] ?? (q.noDecide ? 0 : null));
     if (skipped && c.step < c.questions.length)
       push({ who: 'mitchy', kind: 'text', text: "No problem, I'll decide the rest myself." });
     setClar({ ...c, picks, locked: true });
@@ -517,6 +518,9 @@ export default function CraftModal({
       size: chosen.find((o) => o.size)?.size,
       finish: chosen.find((o) => o.finish)?.finish,
       mood: chosen.find((o) => o.mood)?.mood,
+      colour: chosen.find((o) => o.colour)?.colour,
+      surprise: chosen.some((o) => o.surprise),
+      dropDetails: chosen.flatMap((o) => o.drop ?? []),
     };
     c.run(cl, clarLog(c, picks, skipped, 'crafted'));
   }
@@ -785,7 +789,7 @@ export default function CraftModal({
     : asked
       ? [
           ...asked.options.map((o, j) => ({ label: o.label, go: () => answerClar(j) })),
-          { label: YOU_DECIDE, go: () => answerClar(null), cls: 'decide' },
+          ...(asked.noDecide ? [] : [{ label: YOU_DECIDE, go: () => answerClar(null), cls: 'decide' }]),
         ]
     : phase === 'clarifying'
       ? [] // the plan panel: change answers there, then Craft it!
@@ -1120,7 +1124,7 @@ export default function CraftModal({
                     }}
                   >
                     <span className="cw3-hthumb">
-                      <FitSprite look={lookOf(r)} fill={0.8} maxScale={1.6} />
+                      <FitSprite look={lookOf(r)} fill={0.8} maxScale={1.6} cells />
                     </span>
                     <span className="cw3-hrow-text">
                       <span className="cw3-hrow-prompt">{r.prompt}</span>

@@ -241,6 +241,42 @@ export interface Recipe {
   decorations: { ref: RefDoc; img: Img; area: string }[];
   details: { area: string; regions: DetailRegion[] }[];
   mirror?: boolean;
+  // recolour only a part's blossom-coloured pixels (its leaves and stems,
+  // the greens, keep theirs): a flower's petals in a new colour
+  petals?: { part: string; rgb: RGB }[];
+}
+
+// the hue (0-360) and saturation (0-1) of a pixel
+function hueSat(r: number, g: number, b: number): [number, number] {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx === mn) return [0, 0];
+  const d = mx - mn;
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = (h * 60 + 360) % 360;
+  return [h, d / Math.max(1, mx)];
+}
+function recolourPetals(l: Layer, name: string, target: RGB): void {
+  const d = l.img.data;
+  const petal = (i: number) => {
+    const [h, sat] = hueSat(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]);
+    // not the greens and the yellow-greens of leaves, and coloured at all
+    // (or near-white petal highlights)
+    return l.part[i] === name && d[i * 4 + 3] > 0 && (sat < 0.12 ? lum([d[i * 4], d[i * 4 + 1], d[i * 4 + 2]]) > 200 : h < 50 || h > 175);
+  };
+  let sum = 0, n = 0;
+  for (let i = 0; i < l.part.length; i++)
+    if (petal(i)) {
+      sum += lum([d[i * 4], d[i * 4 + 1], d[i * 4 + 2]]);
+      n++;
+    }
+  if (!n) return;
+  const mean = Math.max(1, sum / n);
+  const marks: number[] = [];
+  for (let i = 0; i < l.part.length; i++) if (petal(i)) marks.push(i);
+  for (const i of marks) {
+    const k = lum([d[i * 4], d[i * 4 + 1], d[i * 4 + 2]]) / mean;
+    for (let c = 0; c < 3; c++) d[i * 4 + c] = d[i * 4 + c] * 0.15 + Math.min(255, target[c] * k) * 0.85;
+  }
 }
 
 // Point-in-shape for the detail painter: the same primitives as the crafting
@@ -332,6 +368,7 @@ export function compose(r: Recipe): Layer {
     if (z === 'fixed') continue;
     recolour(l, name, rgb);
   }
+  for (const pt of r.petals ?? []) recolourPetals(l, pt.part, pt.rgb);
   for (const dcr of r.decorations) {
     const a = r.body.ref.areas.find((x) => x.name === dcr.area);
     if (!a) continue;

@@ -49,13 +49,15 @@ export function ClarifyPlan({
                 {o.label}
               </button>
             ))}
-            <button
-              className={'fb-chip decide' + (picks[i] === null ? ' on' : '')}
-              disabled={locked}
-              onClick={() => onPick(i, null)}
-            >
-              {YOU_DECIDE}
-            </button>
+            {!q.noDecide && (
+              <button
+                className={'fb-chip decide' + (picks[i] === null ? ' on' : '')}
+                disabled={locked}
+                onClick={() => onPick(i, null)}
+              >
+                {YOU_DECIDE}
+              </button>
+            )}
           </div>
         </div>
       ))}

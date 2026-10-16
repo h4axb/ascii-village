@@ -109,6 +109,12 @@ function ColoredSpriteImpl({
   onMouseLeave,
   texture,
 }: Props) {
+  // a single-colour sprite (a craft without a palette) still gets its
+  // per-cell backing: its colour as a one-key palette
+  if (solidCells && !(colors && palette && Object.keys(palette).length) && color) {
+    palette = { a: color };
+    colors = sprite.map((l) => l.replace(/[^ ]/g, 'a'));
+  }
   const hasColour = !!colors && !!palette && Object.keys(palette).length > 0;
   const preStyle: React.CSSProperties = color ? { color, ...style } : { ...style };
   const texClass = texture && texture !== 'matte' ? ` tex-${texture}` : '';

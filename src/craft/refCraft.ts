@@ -91,7 +91,7 @@ const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split
 const sing = (w: string) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
 const STOP = new Set(['a', 'an', 'the', 'with', 'and', 'of', 'on', 'in', 'for', 'to', 'my', 'some', 'little', 'big', 'small', 'tiny', 'very']);
 
-function colourOf(word: string): RGB | null {
+export function colourOf(word: string): RGB | null {
   const p = PALETTE[word];
   if (p) return [parseInt(p.slice(1, 3), 16), parseInt(p.slice(3, 5), 16), parseInt(p.slice(5, 7), 16)];
   const m = (MATERIALS as Record<string, RGB>)[word === 'wooden' ? 'wood' : word === 'golden' ? 'gold' : word === 'metallic' || word === 'iron' || word === 'steel' ? 'metal' : word === 'stony' ? 'stone' : word];
@@ -122,6 +122,7 @@ export interface RefMatch {
   decorations: { ref: RefDoc; area: string }[];
   leftover: string[]; // words the matcher could not place (a detail? a function?)
   needsModel: boolean;
+  petals?: { part: string; rgb: RGB }[]; // a flower's petals recoloured (watering cans)
 }
 
 const FUNCTION_WORDS = /\b(that|which|can|could|lets?|makes?|named|called|faster|fast|float|floats|fly|flies|shoots?|glows?|heals?)\b/;
@@ -197,6 +198,57 @@ export function matchRefs(prompt: string): RefMatch {
   res.leftover = ws.filter((w) => !STOP.has(w) && !used.has(w) && !colourOf(w));
   res.needsModel = res.leftover.length > 0 || FUNCTION_WORDS.test(prompt.toLowerCase());
   return res;
+}
+
+// ---- what a prompt leaves open (the /1 pre-preference questions) ----------------------
+// Local, no model call: whether a size or a colour is named, and which asked-
+// for details no reference can draw (they'd be drawn freely). A detail is
+// the run of unplaceable words as written in the prompt ("pirate skull").
+const SIZE_WORDS = new Set(['tiny', 'small', 'little', 'mini', 'big', 'large', 'huge', 'giant', 'medium', 'smol', 'massive']);
+// words that ask for nothing to draw
+const FILLER = new Set([
+  'it', 'its', 'please', 'make', 'me', 'i', 'want', 'need', 'give', 'would', 'like', 'really', 'so', 'just', 'one', 'that',
+  'which', 'is', 'be', 'top', 'side', 'front', 'body', 'lid', 'cute', 'pretty', 'nice', 'cool', 'lovely', 'beautiful',
+  'cozy', 'happy', 'cheerful', 'new', 'old', 'shiny', 'matte', 'glossy', 'painted', 'item', 'thing', 'tool', 'water',
+  'plant', 'plants', 'garden', 'watering', 'can', 'cans', 'sprinkler', 'craft', 'some',
+]);
+export interface PromptUnknowns {
+  refBody: boolean; // a library body fits (its details can be checked)
+  can: boolean; // it's a watering can
+  sizeNamed: boolean;
+  colourNamed: boolean;
+  details: string[]; // asked-for details no reference can draw, as phrases from the prompt
+}
+export function unknownsOf(prompt: string): PromptUnknowns {
+  const raw = prompt.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter(Boolean);
+  const m = matchRefs(prompt);
+  const can = isWateringCan(m);
+  const shaped = can ? shapeWateringCan(m, prompt) : m;
+  const loose = new Set(shaped.leftover.filter((w) => !FILLER.has(w) && !FUNCTION_WORDS.test(w)));
+  // runs of unplaceable words, in the prompt's own order and spelling
+  const details: string[] = [];
+  let run: string[] = [];
+  for (const w of raw) {
+    if (loose.has(sing(w)) || (run.length && loose.has(w))) run.push(w);
+    else {
+      if (run.length) details.push(run.join(' '));
+      run = [];
+    }
+  }
+  if (run.length) details.push(run.join(' '));
+  return {
+    refBody: !!m.body,
+    can,
+    sizeNamed: raw.some((w) => SIZE_WORDS.has(w)),
+    colourNamed: raw.some((w) => !!colourOf(w)),
+    details: [...new Set(details)],
+  };
+}
+// the prompt without the given detail phrases (the player left them out)
+export function withoutDetails(prompt: string, details: string[]): string {
+  let p = ` ${prompt} `;
+  for (const d of details) p = p.replace(new RegExp(`\\s(?:an?|the|some)?\\s*${d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'), ' ');
+  return p.replace(/\s+/g, ' ').trim();
 }
 
 // ---- 2. the one model call -----------------------------------------------------------------
@@ -307,9 +359,75 @@ export function choiceToMatch(c: RefChoice, guess: RefMatch): (RefMatch & { deta
   return { body, score: guess.score, colours, swaps, decorations, leftover: [], needsModel: false, details, mirror: !!c.mirror };
 }
 
+// ---- watering cans ---------------------------------------------------------------------------
+// Three references, three variants (re-bakes of one count as the same):
+// the classic garden can, the golden can and the can with the flower on top.
+// Plain wishes alternate between classic and golden for shape diversity;
+// the flower can comes from "flower"/"blooming" or the surprise answer.
+export type CanVariant = 'classic' | 'golden' | 'flower';
+const variantOf = (r: RefDoc): CanVariant => (r.id.includes('flower') ? 'flower' : r.id.includes('golden') ? 'golden' : 'classic');
+const CAN_FIXED = new Set(['flower', 'rose']); // keep their own colours when the can is recoloured
+let lastPlain: CanVariant = Math.random() < 0.5 ? 'classic' : 'golden';
+
+export const isWateringCan = (m: RefMatch) => m.body?.category === 'watering-can';
+
+// the can the words (or the surprise) ask for, recoloured as a whole: a
+// named colour goes on every part but the flower (recolour keeps each glyph's
+// shading, so the contrast stays), and the flower then takes the colour that
+// fits the can best
+export function shapeWateringCan(m: RefMatch, prompt: string, opts: { surprise?: boolean; colour?: RGB | null } = {}): RefMatch {
+  if (!isWateringCan(m)) return m;
+  const ws = words(prompt).map(sing);
+  const has = (...xs: string[]) => xs.some((x) => ws.includes(x));
+  let v: CanVariant;
+  if (opts.surprise || has('flower', 'blooming', 'bloom', 'blossom')) v = 'flower';
+  else if (has('gold', 'golden', 'brass', 'ornate', 'long', 'fancy')) v = 'golden';
+  else if (has('classic', 'garden', 'simple', 'plain', 'old')) v = 'classic';
+  else v = lastPlain = lastPlain === 'classic' ? 'golden' : 'classic';
+  const pool = REFS.filter((r) => r.role === 'body' && r.category === 'watering-can' && variantOf(r) === v);
+  const body = pool[Math.floor(Math.random() * pool.length)] ?? m.body!;
+  // the colour asked for: the clarify answer, else one the words named
+  const named = opts.colour ?? Object.values(m.colours)[0] ?? null;
+  const colours: Record<string, RGB> = {};
+  let petals: { part: string; rgb: RGB }[] = [];
+  if (named) {
+    for (const p of body.parts) if (p.zone !== 'fixed' && !CAN_FIXED.has(p.name)) colours[p.name] = named;
+    // the flower's petals (not its leaves) in the colour that fits the can
+    if (body.parts.some((p) => p.name === 'flower')) petals = [{ part: 'flower', rgb: accentFor(named) }];
+  }
+  // the matcher placed "flower" as part of the body: not a leftover
+  const leftover = m.leftover.filter((w) => !['flower', 'blooming', 'bloom', 'blossom', 'gold', 'golden', 'classic', 'fancy', 'ornate', 'long'].includes(w));
+  // ("can" itself is no wish for a function)
+  const fnWish = FUNCTION_WORDS.test(prompt.toLowerCase().replace(/\bwatering\s+cans?\b/g, ''));
+  return { ...m, body, colours, petals, leftover, needsModel: leftover.length > 0 || fnWish };
+}
+
+// a flower colour that sits well on a can of colour `rgb`: of a few
+// blossom colours, the one whose hue is farthest from the can's (a grey or
+// white can keeps the pink)
+const BLOSSOMS: { hue: number; rgb: RGB }[] = [
+  { hue: 330, rgb: [255, 133, 198] }, // pink, the reference's own
+  { hue: 48, rgb: [255, 214, 74] }, // buttercup yellow
+  { hue: 275, rgb: [190, 140, 255] }, // violet
+  { hue: 20, rgb: [255, 150, 90] }, // peach
+];
+export function accentFor(rgb: RGB): RGB {
+  const [r, g, b] = rgb;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx - mn < 30) return BLOSSOMS[0].rgb;
+  const d = mx - mn;
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = (h * 60 + 360) % 360;
+  const dist = (a: number) => Math.min(Math.abs(a - h), 360 - Math.abs(a - h));
+  return BLOSSOMS.reduce((best, c) => (dist(c.hue) > dist(best.hue) ? c : best)).rgb;
+}
+
 // ---- 3. build -----------------------------------------------------------------------------------
 const SIGNS = { small: 320, medium: 520, large: 800 } as const;
 const SCREEN_W = { small: 9, medium: 13, large: 18 } as const; // on-screen width in ch
+// watering cans are drawn finer: 600-800 glyphs, the middle by default
+const CAN_SIGNS = { small: 600, medium: 700, large: 800 } as const;
+const CAN_SCREEN_W = { small: 11, medium: 13, large: 15 } as const;
 
 export interface RefSprite {
   lines: string[];
@@ -332,14 +450,16 @@ export async function buildFromMatch(m: RefMatch & { details?: RefChoice['detail
       regions: d.regions.map((r): DetailRegion => ({ ...r, rgb: rgbOf(r.material) ?? MATERIALS.stone })),
     })),
     mirror: m.mirror,
+    petals: m.petals,
   };
   const layer = compose(recipe);
-  const band = size ?? body.sizeBand ?? 'small';
+  const can = body.category === 'watering-can';
+  const band = size ?? (can ? 'medium' : body.sizeBand ?? 'small');
   // references carry real transparency: gaps are meant (no hole filling)
-  const b = bake(layer.img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs: SIGNS[band] }, getAtlas());
+  const b = bake(layer.img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs: (can ? CAN_SIGNS : SIGNS)[band] }, getAtlas());
   const g = bakedToSprite(b);
   const w = Math.max(1, ...g.sprite.map((l) => l.length));
-  return { lines: g.sprite, colors: g.colors, palette: g.palette, scale: SCREEN_W[band] / w, signs: b.signs, body };
+  return { lines: g.sprite, colors: g.colors, palette: g.palette, scale: (can ? CAN_SCREEN_W : SCREEN_W)[band] / w, signs: b.signs, body };
 }
 
 // what a crafted item gets when no model wrote its text

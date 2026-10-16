@@ -27,6 +27,7 @@ import {
   startFrame,
   startTitleUrl,
   startUiScale,
+  START_UI_PX,
   startSubtitleBox,
   wildSpawns,
   PLAYER_SPAWN,
@@ -987,7 +988,15 @@ function Landing({ onStart }: { onStart: () => void }) {
         style={
           portrait
             ? undefined
-            : { left: `${ui.x * 100}%`, top: `${ui.y * 100}%`, transform: `translateY(-50%) scale(${startUiScale(START_SCREEN, screenW)})` }
+            : // anchored by its top: where a 3-button column's top is
+              // (START_UI_PX), so an extra button (New Game) goes below and
+              // the first one never moves
+              {
+                left: `${ui.x * 100}%`,
+                top: `${ui.y * 100}%`,
+                transformOrigin: 'left top',
+                transform: `translateY(${-(START_UI_PX.h / 2) * startUiScale(START_SCREEN, screenW)}px) scale(${startUiScale(START_SCREEN, screenW)})`,
+              }
         }
       >
         {portrait && <img className="landing-logo portrait" src={titleSrc} alt="ASCII Bay" draggable={false} />}

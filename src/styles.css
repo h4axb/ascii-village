@@ -4795,8 +4795,8 @@ pre {
 /* a plant's water bar (WaterBar in App.tsx), centred over its slot */
 .water-bar {
   position: absolute;
-  height: 1.3em;
-  width: 5.07em;
+  height: 1.56em;
+  width: 5.33em;
   transform: translateX(-50%);
   pointer-events: none;
   image-rendering: pixelated;
@@ -4824,4 +4824,16 @@ pre {
 }
 .checkpoint-chip .hud-tc-icon {
   animation: save-icon-pulse 0.8s ease-in-out infinite;
+}
+
+/* an F label on an object's left (the player is on its right), and the
+   disembark label above / below the boat (see boatPrompt) */
+.fpop.left {
+  transform: translate(calc(-100% - 0.3em), calc(-100% - 0.3em));
+}
+.fpop.up {
+  transform: translate(-50%, calc(-100% - 0.3em));
+}
+.fpop.down {
+  transform: translate(-50%, 0.3em);
 }

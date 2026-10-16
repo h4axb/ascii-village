@@ -170,7 +170,7 @@ import { CraftPrefsSettings } from './CraftFeedback';
 import { LINK } from './link';
 import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
 import { QUEST_ENABLED, GATHER_TARGET, EXPLORE_TILES, SEED_CHOICES, type SeedKind, type HintTarget, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, DISCOVERIES, objectiveById, type StepId, type DiscoveryId } from './quest/quests';
-import { boatReachable, boatRoute, seaRoute, pathLength, pointAt, type Pt } from './quest/route';
+import { boatReachable, boatRoute, seaRoute, pathLength, pointAt, smoothBoatPath, type Pt } from './quest/route';
 import { QuestPanel, type QuestView } from './quest/QuestPanel';
 import { QuestComplete, RatingSequence, TestTransition } from './quest/TestScreens';
 import { resetPrefs } from './craft/prefs';
@@ -318,7 +318,9 @@ const HINT_BLINK_MS = 5000;
 // what counts as a resource for LITTLE THINGS ADD UP's hint
 const RESOURCE_KINDS = new Set<EntityKind>(['flower', 'flowerplus', 'stone', 'date', 'cactus', 'fern', 'iceflower']);
 const SAVE_SCREEN_MS = 1600; // the black saving screen stays at least this long
-const QUEST_SAIL_SPEED = 9;
+const QUEST_SAIL_SPEED = 4;
+// the sail eases up to speed over this many tiles, and down again at the end
+const SAIL_RAMP_TILES = 3;
 const MARKER_BOAT_LAUNCH = 'quest.boatLaunch'; // sceneMarkers.ts
 const MARKER_SHOP_LANDING = 'quest.shopLanding'; // where the boat trips go ashore on the shop island
 const LAND_REACH = 2.5;
@@ -332,7 +334,9 @@ const BOARD_REACH = 3; // tiles from the player to the boat's edge to climb in /
 const BOAT_SCALE = 1.9;
 // cinematic walking speeds (tiles/s): a calm stroll, slower than the player's own walk
 const WALK_SPEED_MITCHY = 2.6;
-const WALK_SPEED_PLAYER = 3; // the quest's water vehicle, compared with an ordinary crafted item
+const WALK_SPEED_PLAYER = 3;
+// how far Mitchy jumps into the boat from where she stands (tiles)
+const MITCHY_JUMP_REACH = 6; // the quest's water vehicle, compared with an ordinary crafted item
 
 const WALK_MS = 170;
 const DASH_MS = 100;
@@ -3013,43 +3017,102 @@ function Game() {
   }
 
   // Everyone along `path` at `speed` tiles/s: the boat at the point, the
-  // player and Mitchy riding on it
+  // player and Mitchy riding on it. The path's corners are rounded (where the
+  // whole boat still floats), the speed eases in and out, and the riders are
+  // glued to the boat's exact (fractional) spot every frame - the player's
+  // drawn position goes straight through stepAnimRef, so nothing steps in
+  // whole tiles while the boat glides.
   function questSail(boatId: string, path: Pt[], speed: number, withMitchy: boolean): Promise<void> {
-    // riders sit in the boat: everything is drawn from its top edge, so the
-    // player shares the boat's top row at its left, Mitchy at its right
     const boat = placedItemsRef.current.find((p) => p.id === boatId);
     const { wT } = boat ? spriteTiles(boat.sprite, boat.scale, boat.rotation) : { wT: 4 };
-    const ride = { x: 0, y: 0 };
+    const route = boat ? smoothBoatPath(path, (x, y) => boatFloats(boat, x, y)) : path;
+    const total = pathLength(route);
+    // a trapezoid speed profile: up to speed over RAMP tiles, down again
+    const R = Math.min(SAIL_RAMP_TILES, total / 2);
+    const acc = R > 0 ? (speed * speed) / (2 * R) : Infinity;
+    const ta = R > 0 ? (2 * R) / speed : 0;
+    const T = total / speed + ta;
+    const distAt = (t: number) =>
+      t <= 0 ? 0 : t < ta ? 0.5 * acc * t * t : t < T - ta ? R + speed * (t - ta) : t < T ? total - 0.5 * acc * (T - t) ** 2 : total;
     return new Promise((resolve) => {
-      const total = pathLength(path);
       const t0 = performance.now();
       const tick = () => {
-        const d = Math.min(total, ((performance.now() - t0) / 1000) * speed);
-        const at = pointAt(path, d);
+        const now = performance.now();
+        const d = distAt((now - t0) / 1000);
+        const at = pointAt(route, d);
         setPlacedItems((ps) => ps.map((p) => (p.id === boatId ? { ...p, x: at.x, y: at.y } : p)));
-        questStepPlayer(Math.round(at.x + ride.x), Math.round(at.y + ride.y), 1000 / speed + 25);
+        // the player on the boat's top-left, drawn at its exact spot
+        stepAnimRef.current = { fromX: at.x, fromY: at.y, toX: at.x, toY: at.y, t0: now, durMs: 0 };
+        const rx = Math.round(at.x);
+        const ry = Math.round(at.y);
+        if (playerRef.current.x !== rx || playerRef.current.y !== ry) {
+          playerRef.current = { x: rx, y: ry };
+          setPlayer({ x: rx, y: ry });
+        }
         if (withMitchy) {
-          const m = { x: at.x + Math.max(1.5, wT - 1.5), y: at.y + ride.y };
+          const m = { x: at.x + Math.max(1.5, wT - 1.5), y: at.y };
           mitchyPosRef.current = m;
           setMitchyPos(m);
         }
-        if (d >= total) return resolve();
+        if (d >= total) {
+          // settle the drawn player onto its whole tile
+          stepAnimRef.current = { fromX: at.x, fromY: at.y, toX: rx, toY: ry, t0: now, durMs: 120 };
+          return resolve();
+        }
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
     });
   }
 
+  // The player follows Mitchy on her trail (where she was ~0.9 s ago, their
+  // feet lined up) until `done`, a tile at a time with the walk cycle
+  async function questFollowMitchy(done: () => boolean, catT: { wT: number; hT: number }) {
+    const trail: { t: number; p: Pt }[] = [];
+    const ms = 1000 / WALK_SPEED_PLAYER;
+    let last = performance.now();
+    while (!done()) {
+      const now = performance.now();
+      const m = mitchyPosRef.current;
+      if (m) trail.push({ t: now, p: { x: m.x, y: m.y } });
+      const back = trail.find((e) => e.t >= now - 900) ?? trail[0];
+      await sleep(16);
+      if (!back || now - last < ms) continue;
+      last = now;
+      const to = { x: Math.round(back.p.x + catT.wT / 2 - PLAYER_T.wT / 2), y: Math.round(back.p.y + catT.hT - PLAYER_T.hT) };
+      const p = playerRef.current;
+      if (p.x === to.x && p.y === to.y) continue;
+      const sx = Math.sign(to.x - p.x);
+      const sy = Math.sign(to.y - p.y);
+      const dir: WalkDir = sy < 0 ? 'up' : sy > 0 ? 'down' : sx < 0 ? 'left' : 'right';
+      if (walkDirRef.current !== dir) {
+        walkDirRef.current = dir;
+        setWalkDir(dir);
+      }
+      questStepPlayer(p.x + sx, p.y + sy, ms + 25);
+    }
+  }
+
+  // Walks the player to `to` a tile at a time, playing the walk cycle for
+  // each step's direction (vertical wins, as with the keys)
   async function questWalkPlayer(to: Pt, tilesPerSec = 6) {
     let p = playerRef.current;
     const ms = 1000 / tilesPerSec;
+    const face = (dir: WalkDir) => {
+      if (walkDirRef.current === dir) return;
+      walkDirRef.current = dir;
+      setWalkDir(dir);
+      if (dir) setWalkFrame(1);
+    };
     while (p.x !== to.x || p.y !== to.y) {
-      const nx = p.x + Math.sign(to.x - p.x);
-      const ny = p.y + Math.sign(to.y - p.y);
-      questStepPlayer(nx, ny, ms + 25);
+      const sx = Math.sign(to.x - p.x);
+      const sy = Math.sign(to.y - p.y);
+      face(sy < 0 ? 'up' : sy > 0 ? 'down' : sx < 0 ? 'left' : 'right');
+      questStepPlayer(p.x + sx, p.y + sy, ms + 25);
       await sleep(ms);
       p = playerRef.current;
     }
+    face(null);
   }
 
   // Cinematics B and C: board, sail to the shop island, walk up to the shop,
@@ -3106,13 +3169,29 @@ function Game() {
         }
     return near;
   }
-  // The point of the boat's box nearest to `toward` — where someone stands to
-  // step off toward it — as a top-left for a footprint `w`×`h`
-  function boatEdgeToward(b: PlacedItem, toward: Pt, w: number, h: number): Pt {
+  // The land spot next to boat `b` (a w×h footprint with no open water under
+  // it, within 2 tiles of the boat) nearest `from`: where someone stands on
+  // the shore to jump in. `player`: also clear of anything solid.
+  function shoreSpotNear(b: PlacedItem, from: Pt, w: number, h: number, player: boolean): Pt | null {
     const bb = boatBox(b);
-    const cx = Math.max(bb.x0, Math.min(bb.x1, toward.x));
-    const cy = Math.max(bb.y0, Math.min(bb.y1, toward.y));
-    return { x: Math.round(cx - w / 2), y: Math.round(cy - h / 2) };
+    let best: { p: Pt; d: number } | null = null;
+    for (let y = bb.y0 - h - 2; y <= bb.y1 + 2; y++)
+      for (let x = bb.x0 - w - 2; x <= bb.x1 + 2; x++) {
+        const gx = Math.max(bb.x0 - (x + w - 1), 0, x - bb.x1);
+        const gy = Math.max(bb.y0 - (y + h - 1), 0, y - bb.y1);
+        if (Math.max(gx, gy) < 1 || Math.max(gx, gy) > 2) continue;
+        let land = true;
+        for (let ty = y; ty < y + h && land; ty++) for (let tx = x; tx < x + w && land; tx++) if (isOpenWater(tx, ty)) land = false;
+        if (!land || (player && blocked(x, y, undefined, true))) continue;
+        const d = Math.hypot(x - from.x, y - from.y);
+        if (!best || d < best.d) best = { p: { x, y }, d };
+      }
+    return best?.p ?? null;
+  }
+  // Is a w×h footprint at (x, y) all on land?
+  function onLand(x: number, y: number, w: number, h: number) {
+    for (let ty = Math.round(y); ty < Math.round(y) + h; ty++) for (let tx = Math.round(x); tx < Math.round(x) + w; tx++) if (isOpenWater(tx, ty)) return false;
+    return true;
   }
 
   // The trip from where boat `b` lies to the shop island: the ring around the
@@ -3180,32 +3259,49 @@ function Game() {
     const startB = boatBox(placed);
     const playerSeat = { x: startB.x0, y: startB.y0 };
     const mitchySeat = { x: startB.x0 + Math.max(1.5, startB.wT - 1.5), y: startB.y0 };
+    // nobody walks on the water: Mitchy jumps in from the shore (walking up
+    // to it first only when she's too far for a jump), the player walks a
+    // little to the shore and jumps in after her
     const onShore = { x: Math.round(playerRef.current.x), y: Math.round(playerRef.current.y) };
-    await tweenMitchyTo(boatEdgeToward(placed, mitchyPosRef.current ?? onShore, catT.wT, catT.hT), WALK_SPEED_MITCHY);
+    const mFrom = mitchyPosRef.current ?? onShore;
+    if (Math.hypot(mFrom.x - mitchySeat.x, mFrom.y - mitchySeat.y) > MITCHY_JUMP_REACH) {
+      const mShore = shoreSpotNear(placed, mFrom, catT.wT, catT.hT, false);
+      if (mShore) await tweenMitchyTo(mShore, WALK_SPEED_MITCHY);
+    }
     await mitchyJumpTo(mitchySeat);
-    await questWalkPlayer(boatEdgeToward(placed, onShore, PLAYER_T.wT, PLAYER_T.hT), WALK_SPEED_PLAYER);
+    const pShore = shoreSpotNear(placed, onShore, PLAYER_T.wT, PLAYER_T.hT, true);
+    if (pShore) await questWalkPlayer(pShore, WALK_SPEED_PLAYER);
     await playerJumpTo(playerSeat);
     await sleep(300);
     await questSail(placed.id, route.path, QUEST_SAIL_SPEED, true);
-    // disembark: each walks to the boat's edge toward the land and jumps off,
-    // Mitchy first
-    const boatNow = placedItemsRef.current.find((p) => p.id === placed.id) ?? placed;
-    const landM = { x: route.land.x + 2, y: route.land.y };
-    await tweenMitchyTo(boatEdgeToward(boatNow, landM, catT.wT, catT.hT), WALK_SPEED_MITCHY);
+    // disembark: both jump from the boat straight onto the land, Mitchy first
+    const landP = landingSpotNear(route.land.x, route.land.y) ?? route.land;
+    const landM =
+      [PLAYER_T.wT + 1, -catT.wT - 1, PLAYER_T.wT + 3, 0]
+        .map((dx) => ({ x: landP.x + dx, y: landP.y + PLAYER_T.hT - catT.hT }))
+        .find((m) => onLand(m.x, m.y, catT.wT, catT.hT)) ?? { x: landP.x + 2, y: landP.y };
     await mitchyJumpTo(landM);
-    await questWalkPlayer(boatEdgeToward(boatNow, route.land, PLAYER_T.wT, PLAYER_T.hT), WALK_SPEED_PLAYER);
-    await playerJumpTo(route.land);
-    // up to the shop: Mitchy ahead on the right, the player following
-    const stand = shop
-      ? { x: Math.round(shop.x + shopT.wT / 2) - 3, y: Math.round(shop.y + shopT.hT) + 1 }
-      : route.land;
+    await sleep(150);
+    await playerJumpTo(landP);
+    // up to the shop: Mitchy first, the player behind her on her trail, then
+    // a step up-left to stand on her left with a tile between them
+    const mStand = shop
+      ? { x: Math.round(shop.x + shopT.wT / 2 - catT.wT / 2) + 2, y: Math.round(shop.y + shopT.hT) + 1 }
+      : landM;
+    const behind = { x: Math.round(mStand.x + catT.wT / 2 - PLAYER_T.wT / 2), y: mStand.y + catT.hT + 1 };
+    const beside = { x: mStand.x - PLAYER_T.wT - 1, y: mStand.y + catT.hT - PLAYER_T.hT };
+    let mDone = false;
     await Promise.all([
-      tweenMitchyTo({ x: stand.x + 4, y: stand.y }, WALK_SPEED_MITCHY),
+      tweenMitchyTo(mStand, WALK_SPEED_MITCHY).then(() => (mDone = true)),
       (async () => {
         await sleep(600);
-        await questWalkPlayer(stand, WALK_SPEED_PLAYER);
+        await questFollowMitchy(() => mDone, catT);
+        await questWalkPlayer(behind, WALK_SPEED_PLAYER);
       })(),
     ]);
+    await sleep(200);
+    await questWalkPlayer(beside, WALK_SPEED_PLAYER);
+
     await questSay([q.part === 'q1' ? QL.arrive1 : QL.arrive2]);
     setDialogue(null);
     // the first trip ends NEW BEGINNINGS
@@ -3217,7 +3313,7 @@ function Game() {
     }
     // Mitchy's housewarming gift: a seed, picked by its hint
     const seedKind = await questGiftSeed(q.part === 'q1');
-    if (shop) await tweenMitchyTo({ x: stand.x + 5, y: Math.round(shop.y + shopT.hT) }, WALK_SPEED_MITCHY);
+    if (shop) await tweenMitchyTo({ x: mStand.x + 1, y: Math.round(shop.y + shopT.hT) }, WALK_SPEED_MITCHY);
     await letterboxOut();
     // the boat waits at the shore; from now on the player sails it themselves
     const boat: QuestBoat = { id: placed.id };
@@ -3396,7 +3492,7 @@ function Game() {
       placedItemsRef.current = placedItemsRef.current.map((it) => (it.id === boat!.id ? boat! : it));
     }
     setQuest({ ...questRef.current!, riding: false });
-    if (boat) await questWalkPlayer(boatEdgeToward(boat, spot, PLAYER_T.wT, PLAYER_T.hT), WALK_SPEED_PLAYER);
+    // straight from the boat onto the land
     await playerJumpTo(spot);
     setCinematic(null);
     questBusyRef.current = false;
@@ -4470,7 +4566,7 @@ function Game() {
     for (const e of ents) {
       if (!canInteract(e)) continue;
       const gap = near(e, player);
-      if (gap > (PROMPT_WIDE_KINDS.has(e.kind) ? 2 : 1)) continue;
+      if (gap > (e.kind === 'shop' ? 3 : PROMPT_WIDE_KINDS.has(e.kind) ? 2 : 1)) continue;
       const ref: InteractRef = { kind: 'entity', id: e.id };
       if (!describeInteraction(ref, interactCtx)) continue;
       const f = footprint(e);
@@ -4520,7 +4616,17 @@ function Game() {
         }
       // the same landing questLand makes there
       if (best && !landingSpotNear(best.x, best.y)) best = null;
-      return best ? { kind: 'land' as const, x: best.x, y: best.y, at: { right: (box.x1 + 1) * TILE_CH, top: box.y0 * TILE_LN } } : null;
+      if (!best) return null;
+      // the label on the side of the shore it lands on
+      const side: 'left' | 'right' | 'up' | 'down' =
+        best.x < box.x0 ? 'left' : best.x > box.x1 ? 'right' : best.y < box.y0 ? 'up' : 'down';
+      const at =
+        side === 'left'
+          ? { right: box.x0 * TILE_CH, top: box.y0 * TILE_LN, side }
+          : side === 'right'
+            ? { right: (box.x1 + 1) * TILE_CH, top: box.y0 * TILE_LN, side }
+            : { right: ((box.x0 + box.x1 + 1) / 2) * TILE_CH, top: (side === 'up' ? box.y0 : box.y1 + 1) * TILE_LN, side };
+      return { kind: 'land' as const, x: best.x, y: best.y, at };
     }
     const b = placedItems.find((p) => p.id === quest.boat!.id);
     if (!b) return null;
@@ -4530,7 +4636,8 @@ function Game() {
     const gap = Math.hypot(gx, gy);
     // something else nearer (a flower on the shore) keeps its own label
     if (gap > BOARD_REACH || (promptTarget && promptTarget.gap < gap)) return null;
-    return { kind: 'board' as const, id: b.id, at: { right: (b.x + wT) * TILE_CH, top: b.y * TILE_LN } };
+    const onLeft = labelLeft(b.x, wT);
+    return { kind: 'board' as const, id: b.id, at: { right: (onLeft ? b.x : b.x + wT) * TILE_CH, top: b.y * TILE_LN, side: onLeft ? ('left' as const) : ('right' as const) } };
   })();
   // The pond nearest the player (on this island), by the gap between the
   // player's feet and the pond's whole box (near() measures from an object's
@@ -5228,14 +5335,19 @@ function Game() {
   // where an object's F label hangs (ch, em): its top-right corner, or, for
   // kinds in LABEL_BESIDE, beside the drawn shape partway down (a palm: at the
   // top of its trunk, under the crown), right of what's drawn there
-  function entLabelAnchor(ent: Ent): { right: number; top: number } {
+  // `left`: the mirrored spot on its left side instead (its `right` is then
+  // where the label's right edge goes - see labelLeft / .fpop.left)
+  function entLabelAnchor(ent: Ent, left = false): { right: number; top: number } {
     const k = ent.scale ?? 1;
     const side = !ent.rotation ? LABEL_BESIDE[ent.kind] : undefined;
     if (side) {
       const r = Math.round(side * ent.sprite.length);
-      const rows = ent.sprite.slice(Math.max(0, r - 3), r);
-      return { right: ent.x * TILE_CH + k * (Math.max(...rows.map((l) => l.trimEnd().length)) + 1), top: ent.y * TILE_LN + k * r };
+      const rows = ent.sprite.slice(Math.max(0, r - 3), r).filter((l) => l.trim());
+      const top = ent.y * TILE_LN + k * r;
+      if (left) return { right: ent.x * TILE_CH + k * (Math.min(...rows.map((l) => l.length - l.trimStart().length)) - 1), top };
+      return { right: ent.x * TILE_CH + k * (Math.max(...rows.map((l) => l.trimEnd().length)) + 1), top };
     }
+    if (left) return { right: ent.x * TILE_CH, top: ent.y * TILE_LN };
     return {
       right: ent.rotation
         ? (ent.x + spriteTiles(ent.sprite, k, ent.rotation).wT) * TILE_CH
@@ -5243,6 +5355,20 @@ function Game() {
       top: ent.y * TILE_LN,
     };
   };
+  // Is the player right of this span (tiles)? Then an F label goes on its
+  // left, away from the player.
+  function labelLeft(x0: number, wT: number) {
+    return player.x + PLAYER_T.wT / 2 > x0 + wT / 2;
+  }
+  // (by what's drawn: a sprite's blank margins don't count)
+  function entLabelLeft(e: Ent) {
+    if (e.rotation) return labelLeft(e.x, spriteTiles(e.sprite, e.scale, e.rotation).wT);
+    const k = e.scale ?? 1;
+    const rows = e.sprite.filter((l) => l.trim());
+    const lead = Math.min(...rows.map((l) => l.length - l.trimStart().length));
+    const end = Math.max(...rows.map((l) => l.trimEnd().length));
+    return labelLeft(e.x + (k * lead) / TILE_CH, (k * (end - lead)) / TILE_CH);
+  }
 
   // ---- camera: follows the player, clamped to the map edges ----
   const viewW = dims.viewW / zoom; // world chars visible (measured, not fixed)
@@ -5845,7 +5971,7 @@ function Game() {
                   <WaterBar
                     key={`bar-${c.id}`}
                     level={waterLevel(c, wt)}
-                    style={{ left: `${(s.x + 0.5) * TILE_CH}ch`, top: `${s.y * TILE_LN - 1.4}em`, zIndex: 450 }}
+                    style={{ left: `${(s.x + 0.5) * TILE_CH}ch`, top: `${s.y * TILE_LN - 1.65}em`, zIndex: 450 }}
                   />
                 );
               })}
@@ -6347,17 +6473,25 @@ function Game() {
                   if (!ent && !tile) return null;
                   let right: number; // ch
                   let top: number; // em
-                  if (ent) {
-                    ({ right, top } = entLabelAnchor(ent));
+                  const onLeft = ent ? entLabelLeft(ent) : labelLeft(tile!.x, ref.kind === 'door' ? plot.door.c1 - plot.door.c0 + 1 : 1);
+                  if (ent?.kind === 'shop') {
+                    // a wide building: by the player's head, its corners are
+                    // often off screen
+                    right = (onLeft ? player.x : player.x + PLAYER_T.wT) * TILE_CH;
+                    top = player.y * TILE_LN;
+                  } else if (ent) {
+                    ({ right, top } = entLabelAnchor(ent, onLeft));
                   } else {
-                    right = (tile!.x + 1) * TILE_CH;
+                    right = (onLeft ? tile!.x : tile!.x + 1) * TILE_CH;
                     top = tile!.y * TILE_LN;
+                    // over a plant's water bar, not on it
+                    if (ref.kind === 'crop' && crops.some((c) => c.slot === ref.slot && c.stage === 'growing' && isFillCrop(c))) top -= 1.7;
                   }
                   // over Mitchy's "!" bubble, not on it
                   const lift = bubbleCat && ref.kind === 'entity' && ref.id === 'cat' ? MITCHY_BUBBLE_H : 0;
                   return (
                     <div
-                      className="fpop"
+                      className={'fpop' + (onLeft ? ' left' : '')}
                       // the label's bottom-left on the object's top-right corner
                       // (transform in .fpop), so it never covers the object
                       style={{
@@ -6376,7 +6510,9 @@ function Game() {
                             ? doors[ref.door]
                               ? 'close the door'
                               : 'open the door'
-                            : copy.name}
+                            : ent?.kind === 'shop'
+                              ? 'open shop'
+                              : copy.name}
                       </span>
                     </div>
                   );
@@ -6388,9 +6524,9 @@ function Game() {
                   style={{
                     // in the F label's own spot (it stands in for that label
                     // meanwhile), its bottom-left on the label's anchor
-                    left: `${entLabelAnchor(nothingEnt).right}ch`,
-                    top: `${entLabelAnchor(nothingEnt).top}em`,
-                    transform: 'translateY(calc(-100% - 0.3em))',
+                    left: `${entLabelAnchor(nothingEnt, entLabelLeft(nothingEnt)).right}ch`,
+                    top: `${entLabelAnchor(nothingEnt, entLabelLeft(nothingEnt)).top}em`,
+                    transform: entLabelLeft(nothingEnt) ? 'translate(calc(-100% - 0.3em), calc(-100% - 0.3em))' : 'translateY(calc(-100% - 0.3em))',
                   }}
                 >
                   <span>{nothingText}</span>
@@ -6407,7 +6543,7 @@ function Game() {
 
               {/* the boat's keys (see boatPrompt) */}
               {boatPrompt && (
-                <div className="fpop" style={{ left: `${boatPrompt.at.right}ch`, top: `${boatPrompt.at.top}em` }}>
+                <div className={'fpop' + (boatPrompt.at.side !== 'right' ? ' ' + boatPrompt.at.side : '')} style={{ left: `${boatPrompt.at.right}ch`, top: `${boatPrompt.at.top}em` }}>
                   <kbd className="fpop-key">F</kbd>
                   <span className="fpop-name">{boatPrompt.kind === 'board' ? 'enter ship' : 'disembark ship'}</span>
                   {boatPrompt.kind === 'board' && (
@@ -6973,11 +7109,13 @@ function Game() {
 // draining once the bar is empty - then 4 segments that fill with water
 // while it's poured (full = grown). See waterLevel in farm.ts.
 const DROP_PX = ['...oo...', '..oiio..', '..oiio..', '.oiiiio.', '.oiiiio.', 'oiiiiiio', 'oiiiiiio', 'oiiiiiio', '.oiiiio.', '..oooo..'];
-const WB = { line: '#3a2117', empty: '#241713', hi: '#a9e0ff', mid: '#4ea6e3', deep: '#2b6fb3', glint: '#e8f7ff' };
+const WB = { line: '#3a2117', empty: '#241713', hi: '#a9e0ff', mid: '#4ea6e3', deep: '#2b6fb3', glint: '#e8f7ff', rim: 'rgba(242, 234, 217, 0.85)' };
 function WaterBar({ level, style }: { level: { bar: number; drop: number }; style: React.CSSProperties }) {
-  const px: React.ReactElement[] = [];
-  const dot = (x: number, y: number, fill: string, w = 1, h = 1) =>
-    px.push(<rect key={px.length} x={x} y={y} width={w} height={h} fill={fill} />);
+  // drawn into a pixel grid (1px margin for the light rim around it all)
+  const grid = new Map<string, string>();
+  const dot = (x: number, y: number, fill: string, w = 1, h = 1) => {
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) grid.set(`${xx + 1},${yy + 1}`, fill);
+  };
   // the drop: interior rows 1..8 fill from the bottom
   const dropRows = Math.round(level.drop * 8);
   DROP_PX.forEach((row, y) =>
@@ -7007,9 +7145,25 @@ function WaterBar({ level, style }: { level: { bar: number; drop: number }; styl
       dot(sx, 6, WB.deep, w, 2);
     }
   }
+  // the light rim: every free pixel touching a drawn one
+  const rim: string[] = [];
+  for (let y = 0; y < 12; y++)
+    for (let x = 0; x < 41; x++) {
+      if (grid.has(`${x},${y}`)) continue;
+      let touch = false;
+      for (let dy = -1; dy <= 1 && !touch; dy++) for (let dx = -1; dx <= 1 && !touch; dx++) touch = grid.has(`${x + dx},${y + dy}`);
+      if (touch) rim.push(`${x},${y}`);
+    }
   return (
-    <svg className="water-bar" viewBox="0 0 39 10" shapeRendering="crispEdges" style={style} aria-hidden>
-      {px}
+    <svg className="water-bar" viewBox="0 0 41 12" shapeRendering="crispEdges" style={style} aria-hidden>
+      {rim.map((k) => {
+        const [x, y] = k.split(',').map(Number);
+        return <rect key={'r' + k} x={x} y={y} width={1} height={1} fill={WB.rim} />;
+      })}
+      {[...grid].map(([k, fill]) => {
+        const [x, y] = k.split(',').map(Number);
+        return <rect key={k} x={x} y={y} width={1} height={1} fill={fill} />;
+      })}
     </svg>
   );
 }

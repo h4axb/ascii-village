@@ -74,6 +74,28 @@ export function pointAt(path: Pt[], d: number): Pt {
   return path[path.length - 1];
 }
 
+// Rounds a boat route's corners (two Chaikin passes). A cut point is kept
+// only where the whole boat still floats (`floats`, at the rounded spot);
+// otherwise the original corner stays. The ends never move.
+export function smoothBoatPath(path: Pt[], floats: (x: number, y: number) => boolean): Pt[] {
+  let pts = path;
+  for (let pass = 0; pass < 2 && pts.length > 2; pass++) {
+    const out: Pt[] = [pts[0]];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i - 1];
+      const b = pts[i];
+      const c = pts[i + 1];
+      const q = { x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 };
+      const r = { x: b.x * 0.75 + c.x * 0.25, y: b.y * 0.75 + c.y * 0.25 };
+      if (floats(Math.round(q.x), Math.round(q.y)) && floats(Math.round(r.x), Math.round(r.y))) out.push(q, r);
+      else out.push(b);
+    }
+    out.push(pts[pts.length - 1]);
+    pts = out;
+  }
+  return pts;
+}
+
 // A route for a `wT`×`hT` boat from top-left `from` to top-left `to` on
 // which every tile of the boat stays on open water the whole way (A* over
 // boat positions), kept off the map's edges where the camera can't centre

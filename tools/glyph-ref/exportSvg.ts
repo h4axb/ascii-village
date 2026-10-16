@@ -28,6 +28,8 @@ export function toSvg(name: string, b: Baked, cellPart: string[], m: Marks): str
   out.push(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W / 2}" height="${H / 2}" role="img" aria-label="${esc(m.title)}, ${b.cols} by ${b.rows} glyphs" data-asset="${esc(name)}" data-signs="${b.signs}"` +
       ` data-role="${m.role}" data-category="${esc(m.category)}" data-tags="${esc(m.tags.join(','))}"` +
+      (m.names.length ? ` data-names="${esc(m.names.join(','))}"` : '') +
+      `` +
       ` data-anchors="${esc(JSON.stringify(m.anchors))}" data-areas="${esc(JSON.stringify(m.areas))}">`,
   );
   out.push(`  <title>${esc(m.title)}</title>`);
@@ -70,6 +72,7 @@ export function toRefDoc(id: string, m: Marks, w: number, h: number): RefDoc {
     gameCategory: m.gameCategory,
     ...(m.role === 'part' && m.partType ? { partType: m.partType } : {}),
     tags: m.tags,
+    ...(m.names.length ? { names: m.names } : {}),
     description: m.description,
     sizeBand: m.sizeBand,
     w,

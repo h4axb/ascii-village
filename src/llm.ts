@@ -48,6 +48,7 @@ import {
   type ItemFunction,
 } from './craft/functions';
 import { checkPolicy } from './craft/policy';
+import { fallbackNote } from './craft/colours';
 import {
   REF_CRAFT_ON,
   hasRefBodies,
@@ -66,10 +67,17 @@ import {
   shapeShip,
   shapeWateringCan,
   colourOf,
+  colourPhrasesOf,
+  partSwatches,
+  colourPrompt,
+  parseColours,
+  applyColours,
+  wholeColour,
   withoutDetails,
   unknownsOf,
   type RefMatch,
 } from './craft/refCraft';
+import type { RefDoc } from './glyph/refs';
 
 // Structured log, one record per generation. Kept in memory + echoed to the
 // console; read it for playtest analysis.
@@ -326,7 +334,8 @@ const GENERATED_POOL: Record<Category, Omit<ShopItem, 'id' | 'kind'>[]> = (() =>
 export type CraftResult =
   // kind: what kind of thing it is (its main element) and applied: the
   // player's crafting preferences used for it — both only with opts.prefs
-  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs }
+  // note: what Mitchy says after it (a colour that couldn't be mixed exactly)
+  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs; note?: string }
   // `suggestions`: up to 3 alternative craft prompts (shown as clickable
   // buttons). Present only on BENIGN failures — never on category mismatches
   // or blocked (sensitive) input.
@@ -634,7 +643,9 @@ async function craftWithRefs(
   ui: CraftUiHooks | undefined,
   opts: { prefs?: boolean; clarify?: CraftClarify },
 ): Promise<CraftResult | null> {
-  const pickedColour = opts.clarify?.colour ? colourOf(opts.clarify.colour.toLowerCase().split(/\s+/).pop()!) : null;
+  // the clarify answer: its own hex ("Sky blue"), else its colour word
+  const cc = opts.clarify?.colour?.trim().toLowerCase();
+  const pickedColour = cc ? (/^#[0-9a-f]{6}$/.test(cc) ? hexRgb(cc) : colourOf(cc.split(/\s+/).pop()!)) : null;
   const shape = { surprise: opts.clarify?.surprise, colour: pickedColour };
   const first = matchRefs(prompt);
   let m: RefMatch & { details?: Parameters<typeof buildFromMatch>[0]['details']; mirror?: boolean } = isShip(first)
@@ -675,6 +686,16 @@ async function craftWithRefs(
       if (!m.body) return null;
     }
   }
+  if (pickedColour) m = wholeColour(m, pickedColour);
+  // the colours exactly as said ("baby blue"): the model names them; only
+  // when it doesn't answer the base colour words stay, and Mitchy says so
+  let note: string | undefined;
+  const phrases = colourPhrasesOf(prompt);
+  if (phrases.length) {
+    const exact = m.body ? await craftColours(prompt, m.body) : null;
+    if (exact) m = applyColours(m, exact);
+    else note = fallbackNote(phrases) ?? undefined;
+  }
   if (!m.body) {
     logRefCraft(prompt, 'planner', null, m.leftover);
     return null;
@@ -713,7 +734,35 @@ async function craftWithRefs(
   const finish = opts.clarify?.finish ?? (opts.clarify?.mood ? MOOD_PRESETS[opts.clarify.mood].finish : undefined);
   if (finish) item.textureModifier = finish;
   console.info('[craft] from references', { body: m.body.id, via, signs: sp.signs, swaps: m.swaps.map((x) => x.ref.id), decorations: m.decorations.map((x) => x.ref.id) });
-  return opts.prefs ? { ok: true, item, kind: category, applied: {} } : { ok: true, item };
+  const out: CraftResult = opts.prefs ? { ok: true, item, kind: category, applied: {} } : { ok: true, item };
+  return note ? { ...out, note } : out;
+}
+
+const hexRgb = (h: string): [number, number, number] => {
+  const n = parseInt(h.slice(1), 16);
+  return [n >> 16, (n >> 8) & 255, n & 255];
+};
+
+// One small call: the player's colour words and the body's parts -> a hex
+// colour per part that should change. null when the model isn't configured,
+// can't be reached or gives no usable colour (the caller then keeps the base
+// colour words and tells the player).
+async function craftColours(prompt: string, body: RefDoc): Promise<Record<string, [number, number, number]> | null> {
+  if (!llmEnabled) return null;
+  try {
+    const parts = await partSwatches(body);
+    const raw = await chatJSON<Record<string, unknown>>(
+      [
+        { role: 'system', content: colourPrompt() },
+        { role: 'user', content: `The item: ${body.title}. Its parts: ${JSON.stringify(parts)}\n\nThe player asked for: "${prompt}"` },
+      ],
+      { temperature: 0.2, maxTokens: 300, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
+    );
+    return parseColours(raw, body);
+  } catch (err) {
+    console.warn('[craft] colour call failed:', err);
+    return null;
+  }
 }
 
 // The /3 preflight: can this be drawn as asked, or should the player pick a
@@ -752,11 +801,12 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> 
   if (!checkPolicy(prompt).allowed) return [];
   return preQuestions(prompt);
 }
+// (each with its own exact colour: no model call needed for these)
 const COLOUR_OPTIONS: { label: string; word: string }[] = [
-  { label: 'Sky blue', word: 'blue' },
-  { label: 'Sunny yellow', word: 'yellow' },
-  { label: 'Rose pink', word: 'pink' },
-  { label: 'Leaf green', word: 'green' },
+  { label: 'Sky blue', word: '#7ec4ee' },
+  { label: 'Sunny yellow', word: '#ffd34e' },
+  { label: 'Rose pink', word: '#f39ac0' },
+  { label: 'Leaf green', word: '#6cbf5a' },
 ];
 export function preQuestions(prompt: string): ClarifyQuestion[] {
   const u = unknownsOf(prompt);

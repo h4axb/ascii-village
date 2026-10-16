@@ -21,10 +21,11 @@
 // ---------------------------------------------------------------------------
 import { bake, DEFAULTS, type GlyphShape, type Img, type RGB } from '../glyph/bake';
 import { buildAtlas } from '../glyph/atlas';
-import { compose, type DetailRegion, type Recipe, type RefDoc } from '../glyph/refs';
+import { compose, decodeMask, type DetailRegion, type Recipe, type RefDoc } from '../glyph/refs';
 import { bakedToSprite } from '../glyph/sprite';
 import { MATERIALS } from './materials';
 import { PALETTE } from './vocab';
+import { colourPhrases, isColourWord, type ColourPhrase } from './colours';
 import { parseGameplayIntent, parseItemFunction, MODIFIER_PROMPT, NEUTRAL_MODIFIERS, type ItemFunction } from './functions';
 import type { Category } from '../llm';
 import { LINK } from '../link';
@@ -141,22 +142,24 @@ export interface RefMatch {
 
 const FUNCTION_WORDS = /\b(that|which|can|could|lets?|makes?|named|called|faster|fast|float|floats|fly|flies|shoots?|glows?|heals?)\b/;
 
-// ---- dogs: a breed named in any language (src/data/refs/pet-dog-*) -------------------
-// Each dog's tags carry its breed's names in several languages; a name in the
-// prompt (the longest one, so "german shepherd" beats "shepherd") picks that
-// dog. A dog word without a breed picks one at random; no dog word, no dog
-// (a cat stays a cat).
+// ---- a body asked for by name (RefDoc.names, any language) -------------------------
+// Each library body can carry the words a player would use for it (the dogs:
+// their breed's names; your own assets: what you typed in the Glyph
+// Generator's names field). A name in the prompt (the longest one, so "german
+// shepherd" beats "shepherd") picks that body, before any category scoring.
+// A dog word without a breed picks a dog at random; no dog word, no dog (a
+// cat stays a cat).
 const DOG_WORDS = ['dog', 'dogs', 'puppy', 'pup', 'doggo', 'doggy', 'hund', 'hundchen', 'welpe', 'chien', 'chiot', 'perro', 'perrito', 'cachorro', 'cane', 'cucciolo', 'hond', 'hondje', 'pies', 'kopek'];
 const isDogRef = (r: RefDoc) => r.id.startsWith('pet-dog-');
-export function dogOf(prompt: string): { ref: RefDoc; phrase: string } | null {
+export function namedOf(prompt: string): { ref: RefDoc; phrase: string } | null {
   const p = ` ${fold(prompt).replace(/\s+/g, ' ')} `;
   let best: { ref: RefDoc; phrase: string } | null = null;
-  for (const r of REFS.filter(isDogRef))
-    // its names (the last two tags are looks: "fluffy", "big ears")
-    for (const t of [r.title, ...r.tags.slice(0, -2)]) {
+  for (const r of REFS.filter((x) => x.role === 'body' && x.names?.length))
+    for (const t of r.names!) {
       const f = fold(t).replace(/\s+/g, ' ').trim();
-      if (f.length < 3 || f === 'dog' || DOG_WORDS.includes(f)) continue;
-      if (p.includes(` ${f} `) || p.includes(` ${f}s `)) if (!best || f.length > best.phrase.length) best = { ref: r, phrase: f };
+      // (a bare colour is no name: "golden" for the golden retriever)
+      if (f.length < 3 || DOG_WORDS.includes(f) || (!f.includes(' ') && isColourWord(f))) continue;
+      if (p.includes(` ${f} `) || p.includes(` ${f}s `) || p.includes(` ${f}es `)) if (!best || f.length > best.phrase.length) best = { ref: r, phrase: f };
     }
   if (best) return best;
   if (words(prompt).some((w) => DOG_WORDS.includes(w))) {
@@ -169,18 +172,28 @@ export function dogOf(prompt: string): { ref: RefDoc; phrase: string } | null {
   }
   return null;
 }
+export const dogOf = namedOf;
+
+// the colour phrases of a prompt ("baby blue", "hellblau"; craft/colours.ts)
+// (a name's own words aren't one: "golden" retriever)
+export function colourPhrasesOf(prompt: string): ColourPhrase[] {
+  const ws = words(prompt).map(sing);
+  const name = words(namedOf(prompt)?.phrase ?? '');
+  return colourPhrases(ws).filter((p) => !ws.slice(p.start, p.end).every((w) => name.includes(w)));
+}
 
 // `force`: match the words against this body (a ship chosen by its rules)
 export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
   const ws = words(prompt).map(sing);
   const has = (w: string) => ws.includes(sing(w));
   const used = new Set<string>();
-  // body: a dog breed by name first, else the best scoring body
-  const dog = force ? null : dogOf(prompt);
+  // body: one asked for by name first (a dog breed, your dragon), else the
+  // best scoring body
+  const dog = force ? null : namedOf(prompt);
   let body: RefDoc | null = force ?? dog?.ref ?? null, score = force ? 10 : dog ? 10 : 0;
   if (dog) {
     for (const w of words(dog.phrase)) used.add(sing(w));
-    for (const w of DOG_WORDS) used.add(w);
+    if (isDogRef(dog.ref)) for (const w of DOG_WORDS) used.add(w);
   }
   for (const r of dog || force ? [] : REFS.filter((x) => x.role === 'body' && !isDogRef(x))) {
     let s = 0;
@@ -199,30 +212,41 @@ export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
     return res;
   }
   const b = res.body;
-  for (const n of [...(SYNONYMS[b.category] ?? []), ...b.category.split('-'), ...b.tags, ...words(b.title)]) for (const w of words(n)) used.add(sing(w));
+  for (const n of [...(SYNONYMS[b.category] ?? []), ...b.category.split('-'), ...b.tags, ...(b.names ?? []), ...words(b.title)]) for (const w of words(n)) used.add(sing(w));
   const partNames = b.parts.map((p) => p.name);
-  // colours: "<colour> <part>", "<part> in/of <colour>", "<colour> <body noun>" (all primary parts)
-  ws.forEach((w, i) => {
-    // a breed's own words aren't colours ("golden" retriever)
-    const c = dog && words(dog.phrase).includes(w) ? null : colourOf(w);
-    if (!c) return;
-    used.add(w);
-    const next = ws[i + 1], next2 = ws[i + 2];
+  // colours: "<colour> <part>", "<part> in/of <colour>", "<colour> <body noun>"
+  // (the whole object). A colour phrase ("baby blue") counts by its base
+  // colour here; the exact one comes from the model (llm.ts craftColours).
+  const nameWords = dog ? words(dog.phrase) : [];
+  for (const ph of colourPhrases(ws)) {
+    const pw = ws.slice(ph.start, ph.end);
+    // a name's own words aren't colours ("golden" retriever)
+    if (pw.every((w) => nameWords.includes(w))) continue;
+    for (const w of pw) used.add(w);
+    const c = ph.base ? colourOf(ph.base) : null;
+    if (!c) continue; // ("sunset": only the model can mix it)
+    const next = ws[ph.end], next2 = ws[ph.end + 1];
     const part = [next, next2].find((x) => x && partNames.includes(x));
     if (part) {
       res.colours[part] = c;
       used.add(part);
-      return;
+      continue;
     }
-    const prev = ws[i - 1] === 'of' || ws[i - 1] === 'in' ? ws[i - 2] : undefined;
+    const prev = ws[ph.start - 1] === 'of' || ws[ph.start - 1] === 'in' ? ws[ph.start - 2] : undefined;
     if (prev && partNames.includes(prev)) {
       res.colours[prev] = c;
-      return;
+      continue;
     }
-    // the whole object ("a red boat"): its main part, the biggest primary one
-    const main = mainPart(b);
-    if (main && !res.colours[main]) res.colours[main] = c;
-  });
+    // the whole object ("a red boat"): its main part, the biggest primary
+    // one; a body asked for by name all its primary and secondary parts
+    // (fixed parts and trim keep theirs)
+    if (b.names?.length) {
+      for (const p of b.parts) if ((p.zone === 'primary' || p.zone === 'secondary') && !res.colours[p.name]) res.colours[p.name] = c;
+    } else {
+      const main = mainPart(b);
+      if (main && !res.colours[main]) res.colours[main] = c;
+    }
+  }
   // swapped parts: a library part for one of the body's parts, named by its tags
   for (const r of REFS.filter((x) => x.role === 'part' && x.partType && partNames.includes(x.partType) && (x.category === b.category || !x.category))) {
     const hits = [...r.tags, ...words(r.title)].filter((t) => !STOP.has(t) && t !== r.partType && has(t));
@@ -245,7 +269,7 @@ export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
     for (const h of hits) used.add(sing(h));
   }
   for (const p of partNames) if (has(p)) used.add(p);
-  res.leftover = ws.filter((w) => !STOP.has(w) && !used.has(w) && !colourOf(w));
+  res.leftover = ws.filter((w) => !STOP.has(w) && !used.has(w) && !colourOf(w) && !isColourWord(w));
   res.needsModel = res.leftover.length > 0 || FUNCTION_WORDS.test(prompt.toLowerCase());
   return res;
 }
@@ -290,7 +314,8 @@ export function unknownsOf(prompt: string): PromptUnknowns {
     refBody: !!m.body,
     can,
     sizeNamed: raw.some((w) => SIZE_WORDS.has(w)),
-    colourNamed: raw.some((w) => !!colourOf(w)),
+    // a colour phrase, or a material ("wooden")
+    colourNamed: colourPhrasesOf(prompt).length > 0 || raw.some((w) => !!colourOf(w) && !isColourWord(w)),
     details: [...new Set(details)],
   };
 }
@@ -527,6 +552,71 @@ export function shapeShip(m: RefMatch, prompt: string, opts: { surprise?: boolea
   return out;
 }
 
+// ---- one colour for the whole thing (the clarify answer) ------------------------------
+// a body asked for by name: all its primary and secondary parts; a watering
+// can or ship is recoloured by its own shaping above; anything else its
+// main part
+export function wholeColour(m: RefMatch, rgb: RGB): RefMatch {
+  const b = m.body;
+  if (!b || isWateringCan(m) || isShip(m)) return m;
+  const colours = { ...m.colours };
+  if (b.names?.length) for (const p of b.parts) if (p.zone === 'primary' || p.zone === 'secondary') colours[p.name] = rgb;
+  const main = mainPart(b);
+  if (!b.names?.length && main) colours[main] = rgb;
+  return { ...m, colours };
+}
+
+// ---- exact colours from the model (llm.ts craftColours) ---------------------------------
+// The player's colour words ("baby blue", "hellblau", "the colour of the sea")
+// go to the model with the body's parts; it answers a hex colour per part
+// that should change, as many as needed.
+const hex = (c: RGB) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+// each part's main colour now: the average of its opaque pixels
+export async function partSwatches(body: RefDoc): Promise<{ name: string; zone: string; hex: string }[]> {
+  const img = await loadArt(body.id);
+  const mask = decodeMask(body.mask, img.w * img.h);
+  const sum = body.parts.map(() => [0, 0, 0, 0]);
+  mask.forEach((v, i) => {
+    if (!v || img.data[i * 4 + 3] < 128 || !sum[v - 1]) return;
+    for (let k = 0; k < 3; k++) sum[v - 1][k] += img.data[i * 4 + k];
+    sum[v - 1][3]++;
+  });
+  return body.parts.map((p, i) => ({ name: p.name, zone: p.zone, hex: sum[i][3] ? hex([sum[i][0] / sum[i][3], sum[i][1] / sum[i][3], sum[i][2] / sum[i][3]]) : '#888888' }));
+}
+export function colourPrompt(): string {
+  return `You colour a game item made from a marked picture. You get its parts (name, zone, current colour) and the player's words.
+Reply with JSON only: {"<part name>": "#rrggbb", ...} for exactly the parts that should change colour, as many as the words need.
+- Match the player's colour words precisely: "baby blue" is a soft light blue (#9fd3f5), not plain blue; "dunkelrot" a dark red; "the colour of the sea" a sea blue-green; "rainbow" gives the parts different rainbow colours.
+- A colour said for the whole thing ("a baby blue dragon") goes on every primary and secondary part; a colour said with a part ("red wings") only on that part.
+- Never change parts in zone "fixed" (eyes, faces, outlines). Keep "trim" parts unless the words name them.
+- Use only the part names given.`;
+}
+export function parseColours(raw: Record<string, unknown> | null | undefined, body: RefDoc): Record<string, RGB> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const src = raw.colours && typeof raw.colours === 'object' ? (raw.colours as Record<string, unknown>) : raw;
+  const out: Record<string, RGB> = {};
+  for (const [k, v] of Object.entries(src)) {
+    const part = body.parts.find((p) => p.name === k);
+    const mt = typeof v === 'string' ? v.trim().match(/^#?([0-9a-f]{6})$/i) : null;
+    if (!part || part.zone === 'fixed' || !mt) continue;
+    const n = parseInt(mt[1], 16);
+    out[part.name] = [n >> 16, (n >> 8) & 255, n & 255];
+  }
+  return Object.keys(out).length ? out : null;
+}
+// the model's colours on the match: they replace the matcher's (taken from
+// the same words); a watering can's flower keeps its own place (its petals)
+export function applyColours(m: RefMatch, exact: Record<string, RGB>): RefMatch {
+  const colours: Record<string, RGB> = {};
+  for (const [k, v] of Object.entries(exact)) if (!(isWateringCan(m) && CAN_FIXED.has(k))) colours[k] = v;
+  let petals = m.petals;
+  if (isWateringCan(m) && m.body!.parts.some((p) => p.name === 'flower')) {
+    const first = Object.values(colours)[0];
+    petals = exact.flower ? [{ part: 'flower', rgb: exact.flower }] : first ? [{ part: 'flower', rgb: accentFor(first) }] : m.petals;
+  }
+  return { ...m, colours, petals };
+}
+
 // a flower colour that sits well on a can of colour `rgb`: of a few
 // blossom colours, the one whose hue is farthest from the can's (a grey or
 // white can keeps the pink)
@@ -556,7 +646,8 @@ const CAN_SCREEN_W = { small: 11, medium: 13, large: 15 } as const;
 // a pet follows the player at about half the player's width
 const PET_SCREEN_W = { small: 3, medium: 4, large: 5.5 } as const;
 // categories built from the library on every link (not only REF_CRAFT_ON)
-export const isAlwaysRef = (m: RefMatch) => m.body?.category === 'watering-can' || m.body?.category === 'pet' || m.body?.category === 'boat';
+// (and any body asked for by its name)
+export const isAlwaysRef = (m: RefMatch) => m.body?.category === 'watering-can' || m.body?.category === 'pet' || m.body?.category === 'boat' || !!m.body?.names?.length;
 
 export interface RefSprite {
   lines: string[];
@@ -585,14 +676,18 @@ export async function buildFromMatch(m: RefMatch & { details?: RefChoice['detail
     blank: m.blank,
   };
   const layer = compose(recipe);
-  // watering cans, pets (the dogs) and ships are drawn finer: 600-800 glyphs
-  const can = body.category === 'watering-can' || body.category === 'pet' || body.category === 'boat';
+  // watering cans, pets (the dogs), ships and named bodies are drawn finer:
+  // 600-800 glyphs
+  const can = body.category === 'watering-can' || body.category === 'pet' || body.category === 'boat' || !!body.names?.length;
   const band = size ?? (can ? 'medium' : body.sizeBand ?? 'small');
   // references carry real transparency: gaps are meant (no hole filling)
   const b = bake(layer.img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs: (can ? CAN_SIGNS : SIGNS)[band] }, getAtlas());
   const g = bakedToSprite(b);
   const w = Math.max(1, ...g.sprite.map((l) => l.length));
-  const screenW = body.category === 'pet' ? PET_SCREEN_W : body.category === 'boat' ? SCREEN_W : can ? CAN_SCREEN_W : SCREEN_W;
+  // on screen by its game category: a pet follows at about half the
+  // player's width, a vehicle has the ships' size, the rest the cans'
+  const screenW =
+    body.category === 'pet' || body.gameCategory === 'pets' ? PET_SCREEN_W : body.category === 'boat' || body.gameCategory === 'vehicle' ? SCREEN_W : can ? CAN_SCREEN_W : SCREEN_W;
   return { lines: g.sprite, colors: g.colors, palette: g.palette, scale: screenW[band] / w, signs: b.signs, body };
 }
 

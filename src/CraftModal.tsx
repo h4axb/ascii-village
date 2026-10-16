@@ -441,6 +441,8 @@ export default function CraftModal({
               ? { status: 'There it is. What do you think?' }
               : {}),
         });
+        // a colour the helper couldn't mix exactly: what came out instead
+        if (r.note) push({ who: 'mitchy', kind: 'text', text: r.note });
         setPopup({ item: r.item, prompt: craftPrompt });
         lastResult.current = { item: r.item, prompt: craftPrompt };
         if (rated)

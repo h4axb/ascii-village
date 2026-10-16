@@ -53,6 +53,9 @@ export interface RefDoc {
   gameCategory: GameCategory;
   partType?: string; // role part: the body part it replaces
   tags: string[];
+  // what it is: the words a player would use for it ("dragon", "Drache"),
+  // in any language; the crafting matcher picks this body by them
+  names?: string[];
   description: string;
   sizeBand: 'small' | 'medium' | 'large';
   w: number; // art size in pixels

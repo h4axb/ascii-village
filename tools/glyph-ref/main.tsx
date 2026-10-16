@@ -76,7 +76,7 @@ async function deserialize(s: SavedItem): Promise<Item> {
     ...rest,
     opts: { ...DEFAULTS, ...rest.opts, bg: 'alpha' },
     art,
-    marks: marks && art ? { ...marks, mask: decodeMask(marks.mask, art.w * art.h) } : undefined,
+    marks: marks && art ? { ...marks, names: marks.names ?? [], mask: decodeMask(marks.mask, art.w * art.h) } : undefined,
     status: rest.status === 'cleaning' || rest.status === 'marking' || rest.status === 'queued' ? (art ? 'ready' : 'error') : rest.status,
   };
 }
@@ -144,6 +144,21 @@ function GlyphCanvas({ b, line, mode, cellPart, colorOf, only }: { b: Baked; lin
 
 // ---- the marker editor ------------------------------------------------------------------
 type Tool = 'fill' | 'paint' | 'erase' | 'anchor' | 'decoration' | 'detail';
+// a comma separated list, taken when the field is left or Enter is pressed
+// (parsing on every key would eat the comma being typed)
+function ListInput({ value, onCommit, placeholder, lower }: { value: string[]; onCommit: (v: string[]) => void; placeholder?: string; lower?: boolean }) {
+  const commit = (s: string) => onCommit(s.split(',').map((t) => (lower ? t.trim().toLowerCase() : t.trim())).filter(Boolean));
+  return (
+    <input
+      key={value.join(',')}
+      defaultValue={value.join(', ')}
+      placeholder={placeholder}
+      onBlur={(e) => commit(e.target.value)}
+      onKeyDown={(e) => e.key === 'Enter' && commit(e.currentTarget.value)}
+    />
+  );
+}
+
 function MarkerEditor({ it, onChange }: { it: Item; onChange: (m: Marks) => void }) {
   const art = it.art!, m = it.marks!;
   const [tool, setTool] = useState<Tool>('fill');
@@ -153,6 +168,7 @@ function MarkerEditor({ it, onChange }: { it: Item; onChange: (m: Marks) => void
   const [anchorSel, setAnchorSel] = useState<string | null>(null);
   const [areaSel, setAreaSel] = useState<number | null>(null);
   const [draft, setDraft] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [langs, setLangs] = useState<'idle' | 'asking' | string>('idle');
   const start = useRef<{ x: number; y: number } | null>(null);
   const seg = useMemo(() => segments(art), [art]);
   const ref = useRef<HTMLCanvasElement>(null);
@@ -355,8 +371,34 @@ function MarkerEditor({ it, onChange }: { it: Item; onChange: (m: Marks) => void
           </label>
         </div>
         <label className="field">
+          <span>names: what it is, the words a player would use</span>
+          <span className="row">
+            <ListInput value={m.names} placeholder="dragon, drache, dragón" lower onCommit={(names) => set({ names })} />
+            <button
+              type="button"
+              disabled={!m.names.length || langs === 'asking'}
+              title="ask the AI for these names in German, French, Spanish, Italian and Dutch"
+              onClick={async () => {
+                setLangs('asking');
+                try {
+                  const r = await fetch('/__ref/names', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ names: m.names, title: m.title }) });
+                  const j = (await r.json()) as { names?: string[]; error?: string };
+                  if (!r.ok || !j.names) throw new Error(j.error || r.statusText);
+                  set({ names: [...new Set([...m.names, ...j.names.map((n) => String(n).trim().toLowerCase()).filter(Boolean)])] });
+                  setLangs('idle');
+                } catch (e) {
+                  setLangs(`no languages: ${(e as Error).message}`);
+                }
+              }}
+            >
+              {langs === 'asking' ? '…' : '+ languages'}
+            </button>
+          </span>
+          {langs !== 'idle' && langs !== 'asking' && <small>{langs}</small>}
+        </label>
+        <label className="field">
           <span>tags</span>
-          <input value={m.tags.join(', ')} onChange={(e) => set({ tags: e.target.value.split(',').map((t) => t.trim()).filter(Boolean) })} />
+          <ListInput value={m.tags} onCommit={(tags) => set({ tags })} />
         </label>
         <label className="field">
           <span>description</span>

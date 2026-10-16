@@ -111,7 +111,7 @@ for m in meta:
 # 2. each dog as a crafting reference: src/data/refs/pet-dog-<slug>/
 #    art.png  the dog on its own pixel grid (the sheet's ~3 px art pixel),
 #             its colours snapped to a small palette (the JPEG noise gone)
-#    ref.json its names in several languages as tags, look traits, areas
+#    ref.json its names in several languages (names, and as tags), look traits, areas
 # ---------------------------------------------------------------------------
 import json
 
@@ -239,6 +239,8 @@ for i, (title, slug, names, traits, desc) in enumerate(BREEDS, start=1):
         'category': 'pet',
         'gameCategory': 'pets',
         'tags': ['dog'] + names + traits,
+        # what it is: the breed's names (the game finds the dog by these)
+        'names': list(dict.fromkeys(names)),
         'description': desc,
         'sizeBand': 'medium',
         'w': int(w),

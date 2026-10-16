@@ -28,6 +28,7 @@ export interface Marks {
   partType: string;
   title: string;
   tags: string[];
+  names: string[]; // what it is, the player's words for it (see RefDoc.names)
   description: string;
   sizeBand: 'small' | 'medium' | 'large';
   parts: RefPart[];
@@ -43,6 +44,7 @@ export const emptyMarks = (w: number, h: number, title: string, hint: Hint): Mar
   partType: hint.partType ?? '',
   title,
   tags: hint.tags ?? [],
+  names: [],
   description: '',
   sizeBand: 'small',
   parts: [],
@@ -245,6 +247,7 @@ interface AiReply {
   partType?: string;
   title?: string;
   tags?: string[];
+  names?: string[];
   description?: string;
   sizeBand?: string;
   parts?: AiPart[];
@@ -287,6 +290,11 @@ export async function autoMark(art: Img, base: Marks, hint: Hint, useAi: boolean
         partType: hint.partType ?? d.partType ?? '',
         title: d.title?.trim() || base.title,
         tags: [...new Set([...(hint.tags ?? []), ...(d.tags ?? []).map(String)])].slice(0, 8),
+        // what it is: the model's words, else the title's last word
+        names: [...new Set([...(Array.isArray(d.names) ? d.names.map(String) : []), (d.title?.trim() || base.title).toLowerCase().split(/\s+/).pop() ?? ''])]
+          .map((n) => n.trim().toLowerCase())
+          .filter(Boolean)
+          .slice(0, 8),
         description: d.description?.trim() ?? '',
         sizeBand: (['small', 'medium', 'large'] as const).includes(d.sizeBand as 'small') ? (d.sizeBand as Marks['sizeBand']) : 'small',
         parts: parts.map((p) => ({ name: p.name.toLowerCase().replace(/[^a-z0-9-]+/g, '-'), zone: (['primary', 'secondary', 'trim', 'fixed'] as const).includes(p.zone as 'trim') ? (p.zone as RefPart['zone']) : 'primary' })),

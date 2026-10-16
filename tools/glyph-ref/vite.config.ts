@@ -3,6 +3,7 @@
 //
 //   GET  /__ref/ai          is a vision model configured (.env VITE_LLM_API_KEY)?
 //   POST /__ref/automark    { image, hint, vocab } -> the model's marks (JSON)
+//   POST /__ref/names       { names, title } -> { names: the same in de/fr/es/it/nl }
 //   GET  /__ref/work        the batch in progress (refs/work/*.json)
 //   POST /__ref/work        { id, item } -> refs/work/<id>.json (autosave)
 //   POST /__ref/work-delete { id }
@@ -58,6 +59,7 @@ Reply with JSON only:
   "category": one of the known categories,
   "partType": for role "part": which part name it is, else "",
   "title": a short name (2-4 words),
+  "names": 1-3 lowercase English words a player would type for what it is ("dragon", "sea dragon"),
   "tags": 3-6 short traits (style, material, mood: "pirate", "wooden", "cute"),
   "description": one cozy sentence about it,
   "sizeBand": "small" | "medium" | "large",
@@ -114,6 +116,31 @@ function refFiles(env: Record<string, string>): Plugin {
             const m = text.match(/\{[\s\S]*\}/);
             if (!m) return send(502, { error: 'the model sent no JSON' });
             return send(200, JSON.parse(m[0]));
+          }
+          if (url === '/__ref/names' && req.method === 'POST') {
+            if (!key || key === 'test') return send(400, { error: 'no VITE_LLM_API_KEY in .env' });
+            const b = await body(req);
+            const r = await fetch(`${base}/chat/completions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+              body: JSON.stringify({
+                model,
+                temperature: 0,
+                max_tokens: 400,
+                messages: [
+                  {
+                    role: 'user',
+                    content: `A game object "${String(b.title ?? '')}" is called: ${JSON.stringify(b.names)}. Give the words a player would type for it in German, French, Spanish, Italian and Dutch (singular, lowercase, with and without accents where they differ). Reply with JSON only: {"names": [...]}`,
+                  },
+                ],
+              }),
+            });
+            const j = (await r.json()) as { choices?: { message?: { content?: string } }[]; error?: unknown };
+            if (!r.ok) return send(502, { error: `model: ${JSON.stringify(j.error ?? r.statusText).slice(0, 300)}` });
+            const m = (j.choices?.[0]?.message?.content ?? '').match(/\{[\s\S]*\}/);
+            if (!m) return send(502, { error: 'the model sent no JSON' });
+            const names = (JSON.parse(m[0]) as { names?: unknown }).names;
+            return send(200, { names: Array.isArray(names) ? names.map(String).slice(0, 20) : [] });
           }
           if (url === '/__ref/work' && req.method === 'GET') {
             await mkdir(WORK, { recursive: true });

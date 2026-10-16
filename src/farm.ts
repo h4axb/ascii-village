@@ -211,7 +211,29 @@ export interface PlantedCrop {
   lastWateredAt: number;
   stage: CropStage;
   dormant?: boolean; // a seed waiting for its first watering (seedCrop)
+  // Water-grown crops (seedCrop): the water bar's level (0..1) as of fillAt.
+  // Pouring raises it, full = grown; between pours it drains (BAR_DRAIN_MS),
+  // then the drop drains (DRY_MS) and the plant dries out. See waterLevel.
+  fill?: number;
+  fillAt?: number;
 }
+
+// A full water bar runs dry in this long; then the drop empties in DRY_MS.
+export const BAR_DRAIN_MS = 2 * 60_000;
+export const DRY_MS = 3 * 60_000;
+// Pouring time for an empty bar to fill (4 segments, ~1 s each).
+export const POUR_FILL_MS = 4_000;
+
+// The live water bar level and drop level of a water-grown crop.
+export function waterLevel(c: PlantedCrop, wt: number): { bar: number; drop: number } {
+  const fill = c.fill ?? 0;
+  if (c.stage === 'ready' || fill >= 1) return { bar: 1, drop: 1 };
+  const since = Math.max(0, wt - (c.fillAt ?? wt));
+  const emptyAfter = fill * BAR_DRAIN_MS;
+  if (since < emptyAfter) return { bar: fill - since / BAR_DRAIN_MS, drop: 1 };
+  return { bar: 0, drop: Math.max(0, 1 - (since - emptyAfter) / DRY_MS) };
+}
+export const isFillCrop = (c: PlantedCrop) => c.fill !== undefined;
 
 export interface CropStatus {
   thirsty: boolean;
@@ -235,6 +257,11 @@ export interface SlotEffect {
 export const NO_EFFECT: SlotEffect = { growMult: 1, toleranceMult: 1, yieldBonus: 0 };
 
 export function cropStatus(c: PlantedCrop, wt: number, fx: SlotEffect = NO_EFFECT): CropStatus {
+  if (isFillCrop(c)) {
+    const { bar, drop } = waterLevel(c, wt);
+    const toFail = ((c.fill ?? 0) * BAR_DRAIN_MS + DRY_MS) - Math.max(0, wt - (c.fillAt ?? wt));
+    return { thirsty: bar <= 0 || drop < 1, msToDue: bar * BAR_DRAIN_MS, msToFail: toFail, msToMature: Infinity, progress: bar };
+  }
   const dueAt = c.lastWateredAt + c.care.waterEveryMs;
   const failAt = dueAt + c.care.toleranceMs * fx.toleranceMult;
   const growMs = c.care.growMs * fx.growMult;
@@ -251,6 +278,10 @@ export function cropStatus(c: PlantedCrop, wt: number, fx: SlotEffect = NO_EFFEC
 // Pure stage transition, evaluated on the clock tick.
 export function advanceStage(c: PlantedCrop, wt: number, fx: SlotEffect = NO_EFFECT): CropStage {
   if (c.stage !== 'growing') return c.stage;
+  if (isFillCrop(c)) {
+    if ((c.fill ?? 0) >= 1) return 'ready';
+    return waterLevel(c, wt).drop <= 0 ? 'failed' : 'growing';
+  }
   const dueAt = c.lastWateredAt + c.care.waterEveryMs;
   const failAt = dueAt + c.care.toleranceMs * fx.toleranceMult;
   const matureAt = c.plantedAt + c.care.growMs * fx.growMult;
@@ -295,6 +326,8 @@ export function createCrop(
     plantedAt: wt,
     lastWateredAt: wt,
     stage: 'growing',
+    fill: 0,
+    fillAt: wt,
   };
 }
 
@@ -302,8 +335,8 @@ export function createCrop(
 // Sunbloom are excluded).
 export const PLANTABLE_BASE: ItemType[] = ['seed', 'flower', 'cactus', 'fern', 'iceflower'];
 
-// A seed waits (dormant) until its first watering, then grows quickly into a
-// Sunbloom. It is thirsty from the start and never wilts while it waits.
+// A seed grows by water (its water bar, see waterLevel) into a Sunbloom: it
+// dries out if it's left without water (DRY_MS after the bar runs empty).
 export const SEED_GROW_MS = 45_000;
 // `kind`: Mitchy's gift seed grows strawberries or a pumpkin (same care and
 // timing); any other seed grows a Sunbloom.
@@ -324,13 +357,14 @@ export function seedCrop(slot: number, sprite: string[], wt: number, kind: 'bloo
       waterEveryMs: 1_000,
       growMs: SEED_GROW_MS,
       toleranceMs: 24 * 60 * MIN,
-      hint: kind === 'bloom' ? 'A fresh seed. Water it once and it grows into a Sunbloom in under a minute.' : 'Mitchy’s gift. Water it once and see what grows - in under a minute.',
+      hint: kind === 'bloom' ? 'A fresh seed. Fill its water bar and it grows into a Sunbloom.' : 'Mitchy’s gift. Fill its water bar and see what grows.',
     },
     harvest: { kind: 'base', it: kind },
-    plantedAt: Number.MAX_SAFE_INTEGER / 2, // dormant: growth starts at the first watering
-    lastWateredAt: wt - 2_000,
+    plantedAt: wt,
+    lastWateredAt: wt,
     stage: 'growing',
-    dormant: true,
+    fill: 0,
+    fillAt: wt,
   };
 }
 

@@ -156,6 +156,10 @@ export interface ShopItem {
   kind: 'item' | 'token';
   tool?: 'water'; // utensils that act as tools (e.g. the watering can)
   grip?: 'left' | 'right'; // held items: the side its handle is on (right = held in the left hand)
+  // made from the reference library: that body's id (and mirrored?), e.g. a
+  // ship's seats for the boarding cinematic (shipSeats.ts)
+  refId?: string;
+  refMirror?: boolean;
   color?: string; // crafted items: base/default sprite colour (CSS colour)
   // crafted items: optional per-region colour ("paint by number"). palette maps
   // single-char keys → hex; colors is a grid the same shape as sprite, each cell
@@ -718,10 +722,13 @@ async function craftWithRefs(
   item.palette = sp.palette;
   item.colors = sp.colors;
   item.scale = sp.scale;
+  item.refId = m.body.id;
+  if (m.mirror) item.refMirror = true;
   item.desc = t.description;
   item.tags = [...t.tags, `prompt: ${prompt.trim()}`];
   // a ship from the library floats
-  if (isShip(m) && item.equip?.mode === 'vehicle') item.equip = { ...item.equip, float: true };
+  // (always a vehicle: a boat is never held in the hand)
+  if (isShip(m)) item.equip = { ...item.equip, mode: 'vehicle', float: true };
   // a watering can waters
   if (can && isWateringCan(m)) {
     item.tool = 'water';

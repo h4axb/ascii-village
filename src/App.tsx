@@ -91,7 +91,7 @@ import { loadSave, writeSave, writeSaveForLink, parseSave, downloadSaveFile, del
 import type { SaveState } from './save';
 import { describeInteraction, runInteraction } from './interact';
 import type { InteractRef, InteractCtx, InteractActions } from './interact';
-import { applyOutfit, recolorGarment, DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX, HOUSE_GARMENT_REGIONS } from './outfit';
+import { applyOutfit } from './outfit';
 import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
@@ -101,7 +101,7 @@ import { SPEECH_BUBBLE, SPEECH_BUBBLE_COLORS, SPEECH_BUBBLE_PALETTE } from './sp
 import { onThemeChange, themeRevision, pondLook } from './theme';
 import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
 import { groundBare } from './ground';
-import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, IconClose, type Slot, type Action } from './ui';
+import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, PanelCloseContext, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, type Slot, type Action } from './ui';
 import { useIntroNarrationTool } from './devIntroNarration';
 import { getMarkerPosition } from './sceneMarkers';
 import { useWorldEditor } from './editor';
@@ -174,6 +174,8 @@ import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
 import { QUEST_ENABLED, GATHER_TARGET, EXPLORE_TILES, SEED_CHOICES, type SeedKind, type HintTarget, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, DISCOVERIES, objectiveById, type StepId, type DiscoveryId } from './quest/quests';
 import { boatReachable, boatRoute, seaRoute, pathLength, pointAt, smoothBoatPath, type Pt } from './quest/route';
 import { QuestPanel, type QuestView } from './quest/QuestPanel';
+import { HintSparkles } from './HintSparkles';
+import { seatsFor, type SeatKey } from './shipSeats';
 import { QuestComplete, RatingSequence, TestTransition } from './quest/TestScreens';
 import { resetPrefs } from './craft/prefs';
 import {
@@ -366,8 +368,6 @@ const BOAT_SCALE = 1.9;
 // cinematic walking speeds (tiles/s): a calm stroll, slower than the player's own walk
 const WALK_SPEED_MITCHY = 2.6;
 const WALK_SPEED_PLAYER = 3;
-// how far Mitchy jumps into the boat from where she stands (tiles)
-const MITCHY_JUMP_REACH = 6; // the quest's water vehicle, compared with an ordinary crafted item
 
 const WALK_MS = 170;
 const DASH_MS = 100;
@@ -602,7 +602,7 @@ const SHEET_MODALS = new Set<NonNullable<Modal>['t']>(['craft', 'recraft', 'inve
 
 const FRESH_SHOP: Modal = {
   t: 'shop',
-  tab: 'sell',
+  tab: 'buy', // the shop opens on Buy
   cat: 'plant',
   pick: null,
   amount: 1,
@@ -1291,37 +1291,14 @@ function Game() {
       else n.add(id);
       return n;
     });
-  // Player outfit colour override — set by interacting with a laundry-line
-  // garment (see interact.ts/outfit.ts). Empty object = default colours (the
-  // sprite's own baked palette, untouched).
-  const [outfit, setOutfit] = useState<Outfit>(() => saved?.outfit ?? {});
-  // What's currently hanging on each clothesline hotspot, keyed by hotspot
-  // id — the other half of the wardrobe swap (wearFromLine below). Absent
-  // entry = still whatever it was baked with (HOTSPOT_INFO's bakedHex).
-  const [lineColors, setLineColors] = useState<Record<string, string>>(
-    () => saved?.lineColors ?? {},
-  );
+  // The player's outfit colours: the sprite's own (the clothesline swap is
+  // gone, so an older save's swapped colours aren't carried over)
+  const [outfit] = useState<Outfit>({});
   // First discoveries (quests.ts's DISCOVERIES): the ones already shown, and
   // the toasts waiting to show (one at a time, top centre)
   const [discoveries, setDiscoveries] = useState<string[]>(() => saved?.discoveries ?? []);
   const discoveriesRef = useRef(discoveries);
   const [discoveryQueue, setDiscoveryQueue] = useState<DiscoveryId[]>([]);
-  // Recovery hatch: `resetOutfit()` in the browser console puts the player
-  // and the clothesline back to their baked defaults. Goes through React
-  // state (not a raw localStorage edit) so it can't lose a race against the
-  // debounced autosave writing the OLD (still-customised) state back over a
-  // manual edit, and takes effect immediately — no reload needed. Not
-  // DEV-gated: this is a genuine player-facing recovery tool, not a dev aid.
-  useEffect(() => {
-    (window as unknown as { resetOutfit: () => void }).resetOutfit = () => {
-      setOutfit({});
-      setLineColors({});
-      console.info('[resetOutfit] outfit and clothesline reset to defaults.');
-    };
-    return () => {
-      delete (window as unknown as { resetOutfit?: () => void }).resetOutfit;
-    };
-  }, []);
   // ---- daily allowances (see time.ts daySeedOf) ----
   // Stored with the day they belong to; a stale day just reads as zero, so
   // nothing has to actively reset them — same idiom as removedIds/shaken.
@@ -1678,27 +1655,6 @@ function Game() {
     [growthWindow, removed, dynamicEnts, structEnts, placedItems, plot, mitchyPos, sailingBoatId, openGates],
   );
 
-  // House-sprite recolor for the wardrobe swap (interact.ts's 'outfit' act +
-  // wearFromLine above): whatever's currently hanging on the line gets
-  // painted onto the house's OWN baked sprite, not just the player's. Chained
-  // like applyOutfit does for shorts-then-shirt, one recolorGarment call per
-  // clothesline slot that's been swapped away from its baked default.
-  // Memoized on `lineColors` alone (the house's own STRUCT_ENTS sprite/colors
-  // /palette are static) so this only recomputes on an actual swap, not
-  // every render.
-  // the live house (the world editor's colour sliders included)
-  const houseBaseEnt = useMemo(() => structEnts.find((e) => e.id === 'house'), [structEnts]);
-  const houseRecolored = useMemo(() => {
-    if (!houseBaseEnt?.colors || !houseBaseEnt.palette || Object.keys(lineColors).length === 0) return null;
-    let colors = houseBaseEnt.colors;
-    let palette = houseBaseEnt.palette;
-    for (const [hotspotId, hex] of Object.entries(lineColors)) {
-      const region = HOUSE_GARMENT_REGIONS[hotspotId];
-      if (!region) continue;
-      ({ colors, palette } = recolorGarment(houseBaseEnt.sprite, colors, palette, region, hex));
-    }
-    return { colors, palette };
-  }, [houseBaseEnt, lineColors]);
 
   // dev-only: INTRO narration/timing editor ("E" panel's third tab) — see
   // src/devIntroNarration.ts/DevIntroTab.tsx. Self-contained (no fieldRef/
@@ -1771,7 +1727,6 @@ function Game() {
     tokenBuys,
     coinGrants,
     outfit,
-    lineColors,
     discoveries,
     playerName,
     introDone,
@@ -1950,11 +1905,13 @@ function Game() {
     for (const e of entsRef.current) {
       if (e.id === excludeId) continue;
       // 'hotspot': an invisible interaction zone painted over another sprite
-      // (the clothesline garments, the front door) — never an obstacle. Skip
+      // (the front door) — never an obstacle. Skip
       // it entirely rather than give it a blank solidMask, which would also
       // defeat hover/click hit-testing (that reuses entityBlocksTile against
       // the hotspot's REAL sprite shape).
       if (e.kind === 'hotspot') continue;
+      // sailing: stones in the water don't stop the boat
+      if (e.kind === 'boulder' && ridingRef.current) continue;
       // collisionBox() is only the RECTANGLE — the same full-sprite box for
       // every kind, no per-kind exceptions. It's a cheap broad-phase reject;
       // the narrowing below is what actually decides solidity, from whatever
@@ -1996,12 +1953,15 @@ function Game() {
     for (let tx = pbox.x0; tx <= pbox.x1; tx++) if (isCliffTile(tx, feetY)) return true;
     // painted map tiles (the editor's Colliders tab): walls for the feet, like
     // the buildings
-    for (let tx = pbox.x0; tx <= pbox.x1; tx++) {
-      if (blockedTilesRef.current.has(`${tx},${feetY}`)) return true;
+    // (not for a boat: on the water it only keeps to open water, below)
+    if (!ridingRef.current) {
+      for (let tx = pbox.x0; tx <= pbox.x1; tx++) {
+        if (blockedTilesRef.current.has(`${tx},${feetY}`)) return true;
+      }
+      // and the collider boxes drawn there: the same, for the feet
+      for (const b of colliderBoxesRef.current)
+        for (let tx = pbox.x0; tx <= pbox.x1; tx++) if (boxBlocksTile(b, tx, feetY)) return true;
     }
-    // and the collider boxes drawn there: the same, for the feet
-    for (const b of colliderBoxesRef.current)
-      for (let tx = pbox.x0; tx <= pbox.x1; tx++) if (boxBlocksTile(b, tx, feetY)) return true;
     // the garden fence blocks movement except through open doors
     if (gardenBlocks(nx, ny, PLAYER_T.wT, PLAYER_T.hT, doorsRef.current, plotRef.current)) return true;
     // sailing the quest's boat: only open water (landing goes through
@@ -3071,9 +3031,13 @@ function Game() {
   // glued to the boat's exact (fractional) spot every frame - the player's
   // drawn position goes straight through stepAnimRef, so nothing steps in
   // whole tiles while the boat glides.
-  function questSail(boatId: string, path: Pt[], speed: number, withMitchy: boolean): Promise<void> {
+  // `seats`: where the player and Mitchy stand, relative to the boat's
+  // top-left (the ship's final seats); without, the top-left and the right
+  function questSail(boatId: string, path: Pt[], speed: number, withMitchy: boolean, seats?: { p: Pt; m: Pt }): Promise<void> {
     const boat = placedItemsRef.current.find((p) => p.id === boatId);
     const { wT } = boat ? spriteTiles(boat.sprite, boat.scale, boat.rotation) : { wT: 4 };
+    const pOff = seats?.p ?? { x: 0, y: 0 };
+    const mOff = seats?.m ?? { x: Math.max(1.5, wT - 1.5), y: 0 };
     const route = boat ? smoothBoatPath(path, (x, y) => boatFloats(boat, x, y)) : path;
     const total = pathLength(route);
     // a trapezoid speed profile: up to speed over RAMP tiles, down again
@@ -3090,22 +3054,23 @@ function Game() {
         const d = distAt((now - t0) / 1000);
         const at = pointAt(route, d);
         setPlacedItems((ps) => ps.map((p) => (p.id === boatId ? { ...p, x: at.x, y: at.y } : p)));
-        // the player on the boat's top-left, drawn at its exact spot
-        stepAnimRef.current = { fromX: at.x, fromY: at.y, toX: at.x, toY: at.y, t0: now, durMs: 0 };
-        const rx = Math.round(at.x);
-        const ry = Math.round(at.y);
+        // the player on their seat, drawn at its exact spot
+        const px = at.x + pOff.x, py = at.y + pOff.y;
+        stepAnimRef.current = { fromX: px, fromY: py, toX: px, toY: py, t0: now, durMs: 0 };
+        const rx = Math.round(px);
+        const ry = Math.round(py);
         if (playerRef.current.x !== rx || playerRef.current.y !== ry) {
           playerRef.current = { x: rx, y: ry };
           setPlayer({ x: rx, y: ry });
         }
         if (withMitchy) {
-          const m = { x: at.x + Math.max(1.5, wT - 1.5), y: at.y };
+          const m = { x: at.x + mOff.x, y: at.y + mOff.y };
           mitchyPosRef.current = m;
           setMitchyPos(m);
         }
         if (d >= total) {
           // settle the drawn player onto its whole tile
-          stepAnimRef.current = { fromX: at.x, fromY: at.y, toX: rx, toY: ry, t0: now, durMs: 120 };
+          stepAnimRef.current = { fromX: px, fromY: py, toX: rx, toY: ry, t0: now, durMs: 120 };
           return resolve();
         }
         requestAnimationFrame(tick);
@@ -3189,10 +3154,50 @@ function Game() {
     const dist = Math.hypot(to.x - from.x, to.y - from.y);
     await Promise.all([mitchyHop(), tweenMitchyTo(to, Math.max(1, dist / (MITCHY_JUMP_MS / 1000)))]);
   }
-  async function playerJumpTo(to: Pt) {
+  // `exact`: land on the fractional spot (a ship's seat), not a whole tile
+  async function playerJumpTo(to: Pt, exact = false) {
     const hop = playerHop();
-    questStepPlayer(Math.round(to.x), Math.round(to.y), 420);
+    questStepPlayer(exact ? to.x : Math.round(to.x), exact ? to.y : Math.round(to.y), 420);
     await hop;
+  }
+  // The player walks (walk cycle on) in a straight line to a fractional
+  // spot: on a ship's deck, from the landing seat to the final one
+  async function questGlidePlayer(to: Pt, tilesPerSec: number) {
+    let p = playerRef.current;
+    const ms = 1000 / tilesPerSec;
+    while (Math.hypot(to.x - p.x, to.y - p.y) > 0.01) {
+      const dx = to.x - p.x, dy = to.y - p.y;
+      const d = Math.hypot(dx, dy);
+      const k = Math.min(1, d) / d;
+      const dir: WalkDir = Math.abs(dy) > Math.abs(dx) ? (dy < 0 ? 'up' : 'down') : dx < 0 ? 'left' : 'right';
+      if (walkDirRef.current !== dir) {
+        walkDirRef.current = dir;
+        setWalkDir(dir);
+        setWalkFrame(1);
+      }
+      const step = Math.min(1, d);
+      questStepPlayer(p.x + dx * k, p.y + dy * k, ms * step + 25);
+      await sleep(ms * step);
+      p = playerRef.current;
+    }
+    walkDirRef.current = null;
+    setWalkDir(null);
+  }
+  // The walkable spot (a w×h footprint on land, clear for the player) right
+  // at the water's edge nearest `target` (a spot on the ship): where someone
+  // stands to jump aboard
+  function shoreEdgeNear(target: Pt, w: number, h: number, player: boolean): Pt | null {
+    const cx = Math.round(target.x), cy = Math.round(target.y);
+    let best: { p: Pt; d: number } | null = null;
+    for (let y = cy - 14; y <= cy + 14; y++)
+      for (let x = cx - 14; x <= cx + 14; x++) {
+        let dry = true;
+        for (let ty = y; ty < y + h && dry; ty++) for (let tx = x; tx < x + w && dry; tx++) if (isWater(tx, ty)) dry = false;
+        if (!dry || (player && blocked(x, y, undefined, true))) continue;
+        const d = Math.hypot(x - target.x, y - target.y);
+        if (!best || d < best.d) best = { p: { x, y }, d };
+      }
+    return best?.p ?? null;
   }
 
   // The boat's tile box when its top-left is at (x, y)
@@ -3217,25 +3222,6 @@ function Game() {
           if (boatFloats(b, c.x, c.y)) return c;
         }
     return near;
-  }
-  // The land spot next to boat `b` (a w×h footprint with no open water under
-  // it, within 2 tiles of the boat) nearest `from`: where someone stands on
-  // the shore to jump in. `player`: also clear of anything solid.
-  function shoreSpotNear(b: PlacedItem, from: Pt, w: number, h: number, player: boolean): Pt | null {
-    const bb = boatBox(b);
-    let best: { p: Pt; d: number } | null = null;
-    for (let y = bb.y0 - h - 2; y <= bb.y1 + 2; y++)
-      for (let x = bb.x0 - w - 2; x <= bb.x1 + 2; x++) {
-        const gx = Math.max(bb.x0 - (x + w - 1), 0, x - bb.x1);
-        const gy = Math.max(bb.y0 - (y + h - 1), 0, y - bb.y1);
-        if (Math.max(gx, gy) < 1 || Math.max(gx, gy) > 2) continue;
-        let land = true;
-        for (let ty = y; ty < y + h && land; ty++) for (let tx = x; tx < x + w && land; tx++) if (isOpenWater(tx, ty)) land = false;
-        if (!land || (player && blocked(x, y, undefined, true))) continue;
-        const d = Math.hypot(x - from.x, y - from.y);
-        if (!best || d < best.d) best = { p: { x, y }, d };
-      }
-    return best?.p ?? null;
   }
   // Is a w×h footprint at (x, y) all on land?
   function onLand(x: number, y: number, w: number, h: number) {
@@ -3304,25 +3290,35 @@ function Game() {
     const shopT = shop ? spriteTiles(shop.sprite, shop.scale) : { wT: 8, hT: 6 };
     const cat = entsRef.current.find((e) => e.id === 'cat');
     const catT = cat ? spriteTiles(cat.sprite, cat.scale) : { wT: 4, hT: 4 };
-    // board: both walk to the boat's edge and jump in, Mitchy first
+    // board, Mitchy first: each walks to the very edge of the shore nearest
+    // their landing marker on the ship (shipSeats.ts, set in the editor),
+    // jumps onto it, then walks on deck to their final marker
     const startB = boatBox(placed);
-    const playerSeat = { x: startB.x0, y: startB.y0 };
-    const mitchySeat = { x: startB.x0 + Math.max(1.5, startB.wT - 1.5), y: startB.y0 };
-    // nobody walks on the water: Mitchy jumps in from the shore (walking up
-    // to it first only when she's too far for a jump), the player walks a
-    // little to the shore and jumps in after her
-    const onShore = { x: Math.round(playerRef.current.x), y: Math.round(playerRef.current.y) };
-    const mFrom = mitchyPosRef.current ?? onShore;
-    if (Math.hypot(mFrom.x - mitchySeat.x, mFrom.y - mitchySeat.y) > MITCHY_JUMP_REACH) {
-      const mShore = shoreSpotNear(placed, mFrom, catT.wT, catT.hT, false);
-      if (mShore) await tweenMitchyTo(mShore, WALK_SPEED_MITCHY);
-    }
-    await mitchyJumpTo(mitchySeat);
-    const pShore = shoreSpotNear(placed, onShore, PLAYER_T.wT, PLAYER_T.hT, true);
+    const seats = seatsFor(placed.refId);
+    const seatAt = (k: SeatKey, t: { wT: number; hT: number }): Pt | null => {
+      const st = seats[k];
+      if (!st) return null;
+      const fx = placed.refMirror ? 1 - st.x : st.x;
+      // the marker is the feet: the character's top-left from there
+      return { x: placed.x + fx * startB.wT - t.wT / 2, y: placed.y + st.y * startB.hT - t.hT };
+    };
+    const mitchyLand = seatAt('mitchyLand', catT) ?? { x: startB.x0 + Math.max(1.5, startB.wT - 1.5), y: startB.y0 };
+    const playerLand = seatAt('playerLand', PLAYER_T) ?? { x: startB.x0, y: startB.y0 };
+    const mitchyFinal = seatAt('mitchyFinal', catT) ?? mitchyLand;
+    const playerFinal = seatAt('playerFinal', PLAYER_T) ?? playerLand;
+    const mShore = shoreEdgeNear(mitchyLand, catT.wT, catT.hT, false);
+    if (mShore) await tweenMitchyTo(mShore, WALK_SPEED_MITCHY);
+    await mitchyJumpTo(mitchyLand);
+    if (mitchyFinal !== mitchyLand) await tweenMitchyTo(mitchyFinal, WALK_SPEED_MITCHY * 0.8);
+    const pShore = shoreEdgeNear(playerLand, PLAYER_T.wT, PLAYER_T.hT, true);
     if (pShore) await questWalkPlayer(pShore, WALK_SPEED_PLAYER);
-    await playerJumpTo(playerSeat);
+    await playerJumpTo(playerLand, true);
+    if (playerFinal !== playerLand) await questGlidePlayer(playerFinal, WALK_SPEED_PLAYER * 0.8);
     await sleep(300);
-    await questSail(placed.id, route.path, QUEST_SAIL_SPEED, true);
+    await questSail(placed.id, route.path, QUEST_SAIL_SPEED, true, {
+      p: { x: playerFinal.x - placed.x, y: playerFinal.y - placed.y },
+      m: { x: mitchyFinal.x - placed.x, y: mitchyFinal.y - placed.y },
+    });
     // disembark: both jump from the boat straight onto the land, Mitchy first
     const landP = landingSpotNear(route.land.x, route.land.y) ?? route.land;
     const landM =
@@ -3743,6 +3739,8 @@ function Game() {
         const o = bag.find((b) => b.ownedId === ownedId);
         if (o) equipOwned(o);
       },
+      // (tests) put an item in the bag
+      give: (item: OwnedItem) => setBag((b) => [...b, item]),
       water: () => waterCrops(),
       harvest: () => {
         const c = crops.find((x) => x.id === questRef.current?.seedCrop);
@@ -3988,6 +3986,11 @@ function Game() {
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       if (modalRef.current) return; // let modals scroll normally
+      // no zooming during a cinematic
+      if (cineLockRef.current) {
+        e.preventDefault();
+        return;
+      }
       // The world editor: its panel scrolls normally, and Alt+scroll scales
       // the selected object instead of zooming the camera.
       if (import.meta.env.DEV && editorOpenRef.current) {
@@ -4388,6 +4391,11 @@ function Game() {
   const [hintLock, setHintLock] = useState(false);
   const hintLockRef = useRef(false);
   hintLockRef.current = hintLock;
+  // a cinematic (quest boarding / sailing / landing, intro A/B/C) or the
+  // hint's camera glide: nothing can be clicked, hovered, zoomed or pressed
+  const cineLock = !!cinematic || introAActive || hintLock;
+  const cineLockRef = useRef(false);
+  cineLockRef.current = cineLock;
   const [hintMarks, setHintMarks] = useState<HintTarget[]>([]);
   const [hintSparkles, setHintSparkles] = useState<string[]>([]);
   const [blinkControls, setBlinkControls] = useState(false);
@@ -4428,6 +4436,7 @@ function Game() {
     if (t) setHintMarks((m) => m.filter((x) => x !== t));
   }
   function doInteraction(ref: InteractRef) {
+    if (cineLockRef.current) return; // nothing is interactable in a cinematic
     seenMark(ref);
     runInteraction(ref, interactCtx, interactActions);
   }
@@ -4602,7 +4611,7 @@ function Game() {
   // object literals over values already computed this render, not worth
   // memoizing) and used by the hover tooltip, the confirm modal's question
   // text, and the confirm modal's Yes handler.
-  const interactCtx: InteractCtx = { ents, crops, wt, fxFor, doors, lineColors, openGates };
+  const interactCtx: InteractCtx = { ents, crops, wt, fxFor, doors, openGates };
 
   // The tile gap between the player's box and an object's drawn box (its
   // blank sprite margins left out)
@@ -4774,16 +4783,6 @@ function Game() {
     toggleDoor,
     toggleGate,
     say: showToast,
-    // Two-way swap: wear `hangingHex`, and whatever was worn for that region
-    // takes its place on the line at `hotspotId` (see interact.ts).
-    wearFromLine: (hotspotId, region, hangingHex) => {
-      setOutfit((o) => {
-        const wornHex =
-          region === 'shorts' ? (o.shortsColor ?? DEFAULT_SHORTS_HEX) : (o.shirtColor ?? DEFAULT_SHIRT_HEX);
-        setLineColors((lc) => ({ ...lc, [hotspotId]: wornHex }));
-        return region === 'shorts' ? { ...o, shortsColor: hangingHex } : { ...o, shirtColor: hangingHex };
-      });
-    },
   };
 
   // ---- house storage actions ----
@@ -4820,7 +4819,7 @@ function Game() {
   }
 
   function toggleInventory() {
-    if (savingRef.current || cinematic || mapOpen) return;
+    if (savingRef.current || cineLockRef.current || mapOpen) return;
     setModal((m) => (m === null ? { t: 'inventory' } : m.t === 'inventory' ? null : m));
   }
 
@@ -4892,6 +4891,8 @@ function Game() {
 
   function equipOwned(owned: OwnedItem) {
     if (!owned.equip) return;
+    // a boat goes on the water, not in the hand
+    if (owned.equip.float && questRef.current) return;
     if (owned.equip.mode === 'pet') {
       setPetPos({ x: Math.max(0, player.x - 2), y: player.y });
     }
@@ -5088,11 +5089,12 @@ function Game() {
     // exclusion "Plant in garden" already uses — a token isn't a real object).
     const canPlace = owned.kind !== 'token';
     const labels: string[] = [];
-    if (owned.kind === 'token') labels.push('Use token');
-    else if (owned.equip) labels.push(isEquipped ? 'Unequip' : 'Equip');
-    if (canPlant) labels.push('Plant in garden');
-    // the quest's water vehicle goes straight onto the water
+    // the quest's water vehicle goes straight onto the water (a boat is
+    // never held in the hand)
     const launchIt = canPlace && !!owned.equip?.float && !!questRef.current;
+    if (owned.kind === 'token') labels.push('Use token');
+    else if (owned.equip && !launchIt) labels.push(isEquipped ? 'Unequip' : 'Equip');
+    if (canPlant) labels.push('Plant in garden');
     if (launchIt) labels.push(QL.launch);
     else if (canPlace) labels.push('Place in world');
     return {
@@ -5411,7 +5413,7 @@ function Game() {
       if (boatPrompt?.kind === 'board' && !cinematic && !hintLockRef.current) questStowBoat(boatPrompt.id);
     } else if (k === 'i') setModal({ t: 'inventory' });
     else if (k === MAP_KEY) {
-      if (!ev.repeat && !modal) setMapOpen(true);
+      if (!ev.repeat && !modal && !cineLockRef.current) setMapOpen(true);
     } else if (k === ' ') {
       ev.preventDefault(); // don't let the page scroll
       if (!ev.repeat) recentre(); // snap the camera back to the player
@@ -5704,7 +5706,7 @@ function Game() {
   );
 
   return (
-    <div className="app">
+    <div className={'app' + (cineLock ? ' cine-lock' : '')}>
       {/* HUD overlay — floats above the world; only its controls take clicks */}
       <div
         className="hud"
@@ -5882,13 +5884,6 @@ function Game() {
           </div>
         </div>
 
-        {/* the small centred panels' close button; the full-screen sheets
-            (inventory, shop, storage, crafting, talk) carry their own */}
-        {modal && !SHEET_MODALS.has(modal.t) && (
-          <button className="ds-iconbtn hud-x" onClick={xClose} aria-label="close">
-            <IconClose />
-          </button>
-        )}
       </div>
 
       <div
@@ -6179,11 +6174,9 @@ function Game() {
                         ? anim.colors
                         : bare
                           ? S.PALM_BARE_COLORS
-                          : e.kind === 'house' && houseRecolored
-                            ? houseRecolored.colors
-                            : e.colors
+                          : e.colors
                     }
-                    palette={e.kind === 'house' && houseRecolored ? houseRecolored.palette : themedPalette(e.palette)}
+                    palette={themedPalette(e.palette)}
                     // the flower's '█' petals are ambiguous-width — pin each
                     // to one cell, same fix as the waterfall tile's glyphs.
                     // The house and the cliff use the same density-ramp glyphs
@@ -6242,6 +6235,7 @@ function Game() {
                   color={p.color}
                   texture={p.textureModifier}
                   chargeFrac={pushCharge?.id === p.id ? pushCharge.frac : null}
+                  shadow={!!p.equip?.float}
                   onClick={(e) => {
                     if (placing) return;
                     e.stopPropagation();
@@ -6380,6 +6374,18 @@ function Game() {
                     (character.face, docs/character-sprite-parts's eye colour
                     predicate), a walk frame's at the cells eyesOf finds. */}
                 {rideBoat && (
+                  // its soft shadow on the water
+                  <div
+                    className="boat-shadow"
+                    style={{
+                      left: `${(Math.round(PLAYER_T.wT / 2 - rideBoatT.wT / 2) - rideBoatT.wT * 0.04) * TILE_CH}ch`,
+                      top: `${(Math.round(PLAYER_T.hT / 2 - rideBoatT.hT / 2) + rideBoatT.hT * 0.72) * TILE_LN}em`,
+                      width: `${rideBoatT.wT * 1.08 * TILE_CH}ch`,
+                      height: `${Math.max(1.2, rideBoatT.hT * 0.4) * TILE_LN}em`,
+                    }}
+                  />
+                )}
+                {rideBoat && (
                   // the quest's boat, carried along under the player while sailing
                   <ColoredSprite
                     className="rig-boat"
@@ -6404,10 +6410,14 @@ function Game() {
                 {!rideBoat && (
                   <PlayerShadow x={player.x} y={player.y} cx={(playerK * playerW) / 2} footEm={playerK * displaySprite.length} />
                 )}
-                {/* a held item: in the hand by its handle (a handle on its
-                    right = the left hand), behind the player so the hand shows
-                    on top of it, every item fitted into the same box (about a
-                    third of the player wide, a quarter tall) at hip height */}
+                {/* a held item: in the hand by its handle, behind the player so
+                    the hand shows on top of it, every item fitted into the same
+                    box (about a third of the player wide, a quarter tall). It
+                    hangs from the hand of the frame on screen (sprites.ts
+                    handsOf), so it swings with the walk: facing right it's
+                    flipped into the front hand, facing left in the front hand
+                    as drawn, walking up on the right side, down (and idle) in
+                    the hand its handle asks for */}
                 {equipped?.equip?.mode === 'hold' &&
                   !waterFrame &&
                   (() => {
@@ -6415,14 +6425,33 @@ function Game() {
                     const rows = Math.max(1, equipped.sprite.length);
                     const H = character.sprite.length;
                     const s = Math.min((HELD_BOX.w * idleW * playerK) / cols, (HELD_BOX.h * H * playerK) / rows);
-                    const leftHand = equipped.grip === 'right';
-                    // (the player's visible box starts at the rig's origin)
-                    const x = leftHand ? idleW * LEFT_HAND_FRAC * playerK - cols * s : HAND_X * playerK;
-                    const y = HAND_Y * playerK - (rows * s) / 2;
+                    // which way it reaches out from the hand as drawn (a
+                    // handle on its right reaches left), and which way now
+                    const natural: 'L' | 'R' = equipped.grip === 'right' ? 'L' : 'R';
+                    const frame = walkAnim ? walkAnim.frame : character;
+                    const hands = S.handsOf(frame, basePalette);
+                    const fw = Math.max(...frame.sprite.map((l) => l.length));
+                    const dir = walkAnim ? walkDir : null;
+                    let reach: 'L' | 'R' = natural;
+                    let hand: [number, number] | undefined;
+                    if (dir === 'right') (reach = 'R'), (hand = hands[hands.length - 1]);
+                    else if (dir === 'left') (reach = 'L'), (hand = hands[0]);
+                    else if (dir === 'up') (reach = 'R'), (hand = hands[0] ? [fw - hands[0][0], hands[0][1]] : undefined);
+                    else hand = natural === 'L' ? hands[0] : hands[hands.length - 1];
+                    const [hx, hy] = hand ?? (natural === 'L' ? [idleW * LEFT_HAND_FRAC - 1.8, HAND_Y - 2] : [HAND_X + 1.8, HAND_Y - 2]);
+                    // the handle overlaps the hand a little; it hangs just below it
+                    const x = reach === 'L' ? (hx + 1.8) * playerK - cols * s : (hx - 1.8) * playerK;
+                    const y = (hy + 2) * playerK - (rows * s) / 2 - hopEm;
+                    const flip = reach !== natural;
                     return (
                       <ColoredSprite
                         className="rig-held"
-                        style={{ left: `${x}ch`, top: `${y}em`, transform: `scale(${s})`, transformOrigin: '0 0' }}
+                        style={{
+                          left: `${x}ch`,
+                          top: `${y}em`,
+                          transform: flip ? `translateX(${cols * s}ch) scale(${-s}, ${s})` : `scale(${s})`,
+                          transformOrigin: '0 0',
+                        }}
                         sprite={equipped.sprite}
                         colors={equipped.colors}
                         palette={equipped.palette}
@@ -6569,26 +6598,21 @@ function Game() {
                 );
               })}
               {/* a hint's sparkles round the nearest resources */}
-              {hintSparkles.map((id) => {
-                const e = ents.find((x) => x.id === id);
-                if (!e) return null;
-                const { wT, hT } = spriteTiles(e.sprite, e.scale, e.rotation);
-                return (
-                  <div
-                    key={`spark-${id}`}
-                    className="hint-sparkle"
-                    style={{ left: `${e.x * TILE_CH}ch`, top: `${e.y * TILE_LN}em`, width: `${wT * TILE_CH}ch`, height: `${hT * TILE_LN}em` }}
-                  >
-                    <i>✦</i>
-                    <i>✧</i>
-                    <i>✦</i>
-                  </div>
-                );
-              })}
+              {hintSparkles.length > 0 && (
+                <HintSparkles
+                  boxes={hintSparkles.flatMap((id) => {
+                    const e = ents.find((x) => x.id === id);
+                    if (!e) return [];
+                    const { wT, hT } = spriteTiles(e.sprite, e.scale, e.rotation);
+                    return [{ key: id, x: e.x * TILE_CH, y: e.y * TILE_LN, w: wT * TILE_CH, h: hT * TILE_LN }];
+                  })}
+                />
+              )}
 
               {/* walking up to something: its name over the nearest thing in
                   reach, with the F key that does it (see promptTarget / pressF) */}
               {!modal &&
+                !cineLock &&
                 promptTarget &&
                 !boatPrompt &&
                 !pondPrompt &&
@@ -6875,6 +6899,9 @@ function Game() {
       <GameMap open={mapOpen} onClose={() => setMapOpen(false)} characters={mapCharacters} ents={ents} />
 
       {modal && (
+        // the small centred panels draw their own X inside (ui/Panel.tsx);
+        // the full-screen sheets carry theirs
+        <PanelCloseContext.Provider value={SHEET_MODALS.has(modal.t) ? null : xClose}>
         <div
           className="overlay"
           onClick={(e) => {
@@ -7044,7 +7071,6 @@ function Game() {
               sel={modal.sel}
               onSel={(i) => setModal({ t: 'dialog', sel: i })}
               onPick={confirmDialog}
-              hint="[↑/↓] select · [Enter] confirm · [Esc] close"
             />
           )}
 
@@ -7246,6 +7272,7 @@ function Game() {
               );
             })()}
         </div>
+        </PanelCloseContext.Provider>
       )}
     </div>
   );
@@ -7572,7 +7599,7 @@ function ShopSheet({
 
   const rail = (
     <>
-      {(['sell', 'buy'] as const).map((t) => (
+      {(['buy', 'sell'] as const).map((t) => (
         <button
           key={t}
           className={'ds-iconbtn ds-rail-btn' + (tab === t ? ' on' : '')}
@@ -7767,7 +7794,7 @@ function InventorySheet({
       tag: o.kind === 'token' ? 'TOKEN' : equippedId === o.ownedId ? 'EQ' : undefined,
       label: o.name,
       // payment takes resources only; equip-pick only what can be held
-      disabled: !!pay || (equipPick && (o.kind === 'token' || !o.equip)),
+      disabled: !!pay || (equipPick && (o.kind === 'token' || !o.equip || !!o.equip.float)),
     })),
   ];
   // Nothing picked yet: show the first item, like the reference does.
@@ -8072,6 +8099,7 @@ function PlacedItemView({
   texture,
   ghost,
   chargeFrac,
+  shadow,
   onClick,
 }: {
   x: number;
@@ -8085,12 +8113,15 @@ function PlacedItemView({
   texture?: TextureModifier;
   ghost?: 'valid' | 'invalid' | 'warn';
   chargeFrac?: number | null;
+  shadow?: boolean; // a boat: its soft shadow on the water under the hull
   onClick?: (e: React.MouseEvent) => void;
 }) {
   const k = scale ?? 1;
   const cw = Math.max(...sprite.map((l) => l.length));
+  // .ent.placed scales round its centre (its rotation's pivot), so the drawn
+  // box's top-left lands on (x, y) when shifted by half the shrink each way
   const offX = ((1 - k) * cw) / 2;
-  const offY = (1 - k) * sprite.length;
+  const offY = ((1 - k) * sprite.length) / 2;
   // The CSS transform rotates the element around ITS OWN centre (which is
   // fixed by its unrotated width/height). At 0°/180° a rectangle maps back
   // onto the SAME bounding box (no shift needed at all — 180° is point
@@ -8106,6 +8137,18 @@ function PlacedItemView({
   const { wT, hT } = spriteTiles(sprite, scale, rotation); // on-screen (rotated) tile box
   return (
     <>
+      {shadow && !ghost && (
+        <div
+          className="boat-shadow"
+          style={{
+            left: `${(x - wT * 0.04) * TILE_CH}ch`,
+            top: `${(y + hT * 0.72) * TILE_LN}em`,
+            width: `${wT * 1.08 * TILE_CH}ch`,
+            height: `${Math.max(1.2, hT * 0.4) * TILE_LN}em`,
+            zIndex: y + hT - 1,
+          }}
+        />
+      )}
       <ColoredSprite
         className={'ent placed' + (ghost ? ` ghost ${ghost}` : '') + (chargeFrac != null ? ' pushing' : '')}
         style={{

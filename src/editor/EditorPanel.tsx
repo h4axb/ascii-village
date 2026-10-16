@@ -3,9 +3,11 @@
 // through the hook in ./useWorldEditor.ts. See docs/Editor.md for the
 // workflow and the keys.
 // ---------------------------------------------------------------------------
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ColoredSprite } from '../ColoredSprite';
 import { MARKER_REGISTRY } from '../sceneMarkers';
+import { SEAT_KEYS, allShipSeats, saveShipSeats, setShipSeat, type SeatKey } from '../shipSeats';
+import { REFS, buildFromMatch, matchRefs } from '../craft/refCraft';
 import { DevImageTab } from '../DevImageTab';
 import { DevIntroTab } from '../DevIntroTab';
 import { ThemeTab } from './ThemeTab';
@@ -679,6 +681,7 @@ function StartTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): void 
 function MarkersTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): void }) {
   return (
     <div>
+      <ShipSeatsEditor />
       <div className="wed-hint">Named positions cutscenes read by id. Place, then drag on the map.</div>
       {MARKER_REGISTRY.map((cat) => (
         <div key={cat.id} className="wed-group">
@@ -904,6 +907,122 @@ export function EditorPanel({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ---- Ship seats: where the player and Mitchy land and stand on each ship ----
+// (shipSeats.ts; the boarding cinematic in App.tsx questTravel). Pick a
+// ship, pick a marker, click (or drag) on the ship to put it there.
+const SAIL_BOAT = { sprite: ['   |\\', '   |_\\', ' \\____/'] };
+const SEAT_COLOUR: Record<SeatKey, string> = { mitchyLand: '#ffb347', mitchyFinal: '#ffb347', playerLand: '#7fd3ff', playerFinal: '#7fd3ff' };
+type ShipLook = { lines: string[]; colors?: string[]; palette?: Record<string, string> };
+function ShipSeatsEditor() {
+  const ships = useMemo(() => ['default', ...REFS.filter((r) => r.role === 'body' && r.category === 'boat').map((r) => r.id)], []);
+  const [ship, setShip] = useState(ships[1] ?? 'default');
+  const [key, setKey] = useState<SeatKey>('mitchyLand');
+  const [look, setLook] = useState<ShipLook | null>(null);
+  const [, bump] = useState(0);
+  const [status, setStatus] = useState('');
+  const box = useRef<HTMLDivElement>(null);
+  const drag = useRef(false);
+  useEffect(() => {
+    let live = true;
+    setLook(null);
+    const ref = REFS.find((r) => r.id === ship);
+    if (!ref) setLook({ lines: SAIL_BOAT.sprite });
+    else void buildFromMatch(matchRefs('', ref)).then((sp) => live && setLook({ lines: sp.lines, colors: sp.colors, palette: sp.palette }));
+    return () => {
+      live = false;
+    };
+  }, [ship]);
+  const seats = allShipSeats()[ship] ?? {};
+  const put = (ev: React.PointerEvent) => {
+    const r = box.current!.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+    const y = Math.max(0, Math.min(1, (ev.clientY - r.top) / r.height));
+    setShipSeat(ship, key, { x, y });
+    setStatus('unsaved');
+    bump((n) => n + 1);
+  };
+  const cols = look ? Math.max(1, ...look.lines.map((l) => l.length)) : 1;
+  return (
+    <div className="wed-group">
+      <div className="wed-group-name">Ship seats</div>
+      <div className="wed-hint">
+        Where Mitchy and the player land after jumping onto a ship, and where they then walk to and stay while sailing (each
+        marker is the feet). Pick a marker, then click or drag on the ship.
+      </div>
+      <div className="wed-row">
+        <select value={ship} onChange={(e) => setShip(e.target.value)}>
+          {ships.map((s) => (
+            <option key={s} value={s}>
+              {s === 'default' ? 'default (other boats)' : s.replace(/^boat-/, '')}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="wed-btns wed-seat-keys">
+        {SEAT_KEYS.map((k) => (
+          <button key={k.key} className={key === k.key ? 'on' : ''} onClick={() => setKey(k.key)}>
+            <i className={'wed-seat-dot' + (k.key.endsWith('Land') ? ' ring' : '')} style={{ borderColor: SEAT_COLOUR[k.key], background: k.key.endsWith('Land') ? 'transparent' : SEAT_COLOUR[k.key] }} />
+            {k.label}
+            {seats[k.key] ? '' : ' ·'}
+          </button>
+        ))}
+      </div>
+      <div className="wed-seat-stage">
+        {look ? (
+          <div
+            ref={box}
+            className="wed-seat-ship"
+            style={{ fontSize: `${Math.min(14, 300 / (cols * 0.6))}px` }}
+            onPointerDown={(e) => {
+              drag.current = true;
+              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              put(e);
+            }}
+            onPointerMove={(e) => drag.current && put(e)}
+            onPointerUp={() => (drag.current = false)}
+          >
+            <ColoredSprite sprite={look.lines} colors={look.colors} palette={look.palette} solidCells />
+            {SEAT_KEYS.map((k) => {
+              const p = seats[k.key];
+              if (!p) return null;
+              return (
+                <span
+                  key={k.key}
+                  className={'wed-seat-pin' + (k.key.endsWith('Land') ? ' ring' : '') + (k.key === key ? ' on' : '')}
+                  style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%`, borderColor: SEAT_COLOUR[k.key], background: k.key.endsWith('Land') ? 'transparent' : SEAT_COLOUR[k.key] }}
+                  title={k.label}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="wed-dim">drawing the ship…</div>
+        )}
+      </div>
+      <div className="wed-row wed-btns">
+        <button
+          onClick={() => {
+            setShipSeat(ship, key, null);
+            setStatus('unsaved');
+            bump((n) => n + 1);
+          }}
+        >
+          clear marker
+        </button>
+        <button
+          onClick={async () => {
+            setStatus('saving…');
+            setStatus((await saveShipSeats()) ? 'saved' : 'save failed');
+          }}
+        >
+          save seats
+        </button>
+        <span className="wed-dim">{status}</span>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,12 @@
 // choice card (a question + options, e.g. "Do you want to shake this palm
 // tree?  Yes / No"). Same surface, lines and option buttons as <Dialogue>;
 // the owner handles keys (arrows / Enter / F / Esc).
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
+import { IconClose } from './icons';
+
+// The close (X) action for the panel shown as a modal: given, every Panel
+// draws its own X inside its top-right corner
+export const PanelCloseContext = createContext<(() => void) | null>(null);
 
 export function Panel({
   title,
@@ -15,8 +20,14 @@ export function Panel({
   hint?: ReactNode; // key hint line at the bottom
   className?: string;
 }) {
+  const close = useContext(PanelCloseContext);
   return (
-    <div className={'ds-panel' + (className ? ' ' + className : '')} role="dialog" aria-label={title}>
+    <div className={'ds-panel' + (close ? ' has-x' : '') + (className ? ' ' + className : '')} role="dialog" aria-label={title}>
+      {close && (
+        <button className="ds-iconbtn ds-panel-x" onClick={close} aria-label="close">
+          <IconClose />
+        </button>
+      )}
       {title && <div className="ds-panel-title">{title}</div>}
       {children}
       {hint && <div className="ds-panel-hint">{hint}</div>}

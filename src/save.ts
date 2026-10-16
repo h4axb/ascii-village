@@ -41,12 +41,9 @@ export interface SaveState {
   // than needing a reset pass anywhere.
   tokenBuys?: { day: number; n: number }; // craft tokens bought today (cap 3)
   coinGrants?: { day: number; total: number }; // coins granted by items today
-  // Player outfit colour override, set via the laundry-line interaction —
-  // see interact.ts/outfit.ts.
+  // Player outfit colours (outfit.ts); the clothesline swap is gone, so
+  // always the defaults now
   outfit?: Outfit;
-  // What's currently hanging on each clothesline hotspot (keyed by hotspot
-  // id) — the other half of the wardrobe swap. Absent = still baked default.
-  lineColors?: Record<string, string>;
   // the first discoveries already shown (quests.ts's DISCOVERIES ids)
   discoveries?: string[];
   // Player's chosen display name, set during Intro Part B's name-entry

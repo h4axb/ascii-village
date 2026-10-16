@@ -587,6 +587,23 @@
 .ds-panel button {
   font: inherit;
 }
+/* the panel's own close button, inside its top-right corner */
+.ds-panel-x {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 32px;
+  z-index: 1;
+}
+.ds-panel-x svg {
+  width: 16px;
+  height: 16px;
+}
+.ds-panel.has-x > .ds-panel-title,
+.ds-panel.has-x > .ds-settings-head {
+  padding-right: 40px;
+}
 .ds-panel-title {
   margin-bottom: 14px;
   padding-bottom: 12px;

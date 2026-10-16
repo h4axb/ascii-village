@@ -209,7 +209,8 @@ function bakedField(b: Baked): Float32Array {
     for (let x = 0; x < W; x++) {
       const r = y - BAKED_PAD.y, c = x - BAKED_PAD.x;
       const ch = r >= 0 && r < g.rows && c >= 0 && c < g.cols ? g.grid[r][c] : '.';
-      const isLand = ch !== '.' && ch !== undefined;
+      // (a stone in the water, 'r', is water for the coast: boats pass it)
+      const isLand = ch !== '.' && ch !== 'r' && ch !== undefined;
       land[y * W + x] = isLand ? 1 : 0;
       sea[y * W + x] = isLand ? 0 : 1;
     }
@@ -808,26 +809,11 @@ const STRUCT_ENTS_BASE: Ent[] = [
   },
   // The stone blocks flanking the stairs block through the house's own
   // collider (world.json's colliders.house), so the editor can paint them.
-  // Invisible hit-boxes over the parts of that one picture you can interact
-  // with: the front door and the four garments on the line. Positions are
-  // the master-grid cells each one occupies — taken directly from
-  // house_simplified_regions.json (the same file that marked the source
-  // image's regions), run through the anchor formula above, not eyeballed.
-  // They never block movement (blocked() skips 'hotspot').
-  //
-  // Column padding is intentionally asymmetric: the four garments sit only
-  // 1-2 master columns apart (cols 7-12 / 14-18 / 21-25 / 28-31), tighter than
-  // the old house's clothesline, so padding columns risks two hotspots
-  // overlapping and fighting over the same click. Padded ROWS instead (top
-  // and bottom, all four garments already share rows 25-29/26-29, so a row
-  // pad extends into the house body above and the porch below — harmless,
-  // nothing else claims that space).
+  // An invisible hit-box over the house picture's front door (the master-grid
+  // cells from house_simplified_regions.json, run through the anchor formula
+  // above). It never blocks movement (blocked() skips 'hotspot').
   ...(
     [
-      { id: 'house-cloth-shorts', col: 7, row: 24, w: 6, h: 7 },
-      { id: 'house-cloth-shirt-purple', col: 14, row: 25, w: 5, h: 6 },
-      { id: 'house-cloth-shirt-yellow', col: 21, row: 25, w: 5, h: 6 },
-      { id: 'house-cloth-shirt-green', col: 28, row: 25, w: 4, h: 6 },
       // front_door region (house_simplified_regions.json): cols[23,30] rows[30,40]
       { id: 'house-door', col: 23, row: 30, w: 8, h: 11 },
     ] as const

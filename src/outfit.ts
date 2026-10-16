@@ -29,7 +29,7 @@ export interface Outfit {
 // from walkDown.json frame 0 (its most common shorts/shirt key: 'S' for
 // shorts, the only key 'F' for shirt). Used as the "what you're currently
 // wearing" fallback when outfit.shortsColor/shirtColor is unset, so the
-// wardrobe swap (wearFromLine, App.tsx) has something concrete to hang back
+// wardrobe swap has something concrete to hang back
 // on the line.
 export const DEFAULT_SHORTS_HEX = '#669CB2';
 // '#ffe6cf' (the baked shirt's own warm-cream tone) was tried here earlier,
@@ -38,25 +38,6 @@ export const DEFAULT_SHORTS_HEX = '#669CB2';
 // yellow instead of white after a swap (shiftHue targets its hue exactly).
 // True white (h/s = 0) is what "white shirt" actually needs to mean here.
 export const DEFAULT_SHIRT_HEX = '#ffffff';
-
-// Row bands for recolouring the HOUSE's own baked sprite when a clothesline
-// garment gets swapped (see wearFromLine, App.tsx / interact.ts). Derived
-// like OUTFIT_REGIONS above, but with an extra constraint: recolorGarment
-// scans a full sprite ROW across every column, not just the garment's own
-// box, so any key+row combination that also occurs elsewhere on the house's
-// wide facade would bleed into unrelated parts of the picture. Every entry
-// below was verified (via this session's _tmp_house_key_leak_check.mjs) to
-// occur ONLY inside its own garment's column box, nowhere else in the house.
-// 'house-cloth-shorts' is narrower than its bake region's full row span
-// (26-27, not 25-29, and only key '9') because its most common cream key
-// ('8') is reused broadly across other window/highlight areas of the house
-// at the same rows — including it would have recoloured those too.
-export const HOUSE_GARMENT_REGIONS: Record<string, GarmentRegion> = {
-  'house-cloth-shorts': { keys: ['9'], rowMin: 26, rowMax: 27 },
-  'house-cloth-shirt-purple': { keys: ['X', 'U', 'Z'], rowMin: 26, rowMax: 29 },
-  'house-cloth-shirt-yellow': { keys: ['Y'], rowMin: 26, rowMax: 29 },
-  'house-cloth-shirt-green': { keys: ['N'], rowMin: 26, rowMax: 29 },
-};
 
 function hexToHsl(hex: string): { h: number; s: number; l: number } {
   const r = parseInt(hex.slice(1, 3), 16) / 255;

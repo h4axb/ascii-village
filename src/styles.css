@@ -548,13 +548,6 @@ pre {
   letter-spacing: 2px;
 }
 
-.hud-x {
-  /* a .ds-iconbtn, pinned to the top-right corner */
-  position: absolute;
-  top: 18px;
-  right: 20px;
-  pointer-events: auto;
-}
 
 /* on touch, lift the whole bottom cluster clear of the on-screen d-pad */
 @media (hover: none), (pointer: coarse) {
@@ -4742,27 +4735,74 @@ pre {
 }
 
 /* a hint's sparkles: three twinkling stars round a resource (App.tsx) */
-.hint-sparkle {
+.hint-spark {
   position: absolute;
   z-index: 480;
   pointer-events: none;
+  overflow: visible;
+  transform: translate(-50%, -50%);
 }
-.hint-sparkle i {
-  position: absolute;
-  font-style: normal;
-  color: #fff6c2;
-  text-shadow: 0 0 4px rgba(255, 236, 140, 0.95);
-  animation: hint-twinkle 1.1s ease-in-out infinite;
+.hint-spark .hs-star {
+  fill: #fff;
+  transform-origin: 0 0;
+  filter: drop-shadow(0 0 1.6px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 3.5px rgba(255, 140, 230, 0.6));
+  animation: hs-star 1.4s ease-out forwards;
 }
-.hint-sparkle i:nth-child(1) { left: -0.6ch; top: -0.4em; }
-.hint-sparkle i:nth-child(2) { right: -0.8ch; top: 10%; animation-delay: 0.35s; }
-.hint-sparkle i:nth-child(3) { left: 40%; bottom: -0.6em; animation-delay: 0.7s; }
-@keyframes hint-twinkle {
-  0%, 100% { opacity: 0.15; transform: scale(0.6); }
-  50% { opacity: 1; transform: scale(1.15); }
+.hint-spark.ring .hs-star {
+  animation: hs-star-ring 1.7s ease-out forwards;
+}
+.hint-spark .hs-ring,
+.hint-spark .hs-dash circle,
+.hint-spark .hs-dash path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 1;
+}
+.hint-spark .hs-ring {
+  opacity: 0;
+  animation: hs-ring 1.7s ease-out forwards;
+}
+.hint-spark .hs-dash {
+  opacity: 0;
+  animation: hs-dash 1.7s ease-out forwards;
+}
+.hint-spark .hs-dash circle {
+  stroke-dasharray: 9 8.3;
+}
+/* grows in white, peaks, turns magenta and shrinks to a twinkle */
+@keyframes hs-star {
+  0% { transform: scale(0); opacity: 0; fill: #fff; }
+  22% { transform: scale(1.15); opacity: 1; fill: #fff; }
+  45% { transform: scale(0.85); fill: #ffc8f2; }
+  70% { transform: scale(0.45); fill: #ff5ad9; opacity: 1; }
+  100% { transform: scale(0.15); fill: #ff5ad9; opacity: 0; }
+}
+/* the ring sparkle: the star stays bright in the ring, then goes */
+@keyframes hs-star-ring {
+  0% { transform: scale(0); opacity: 0; fill: #fff; }
+  18% { transform: scale(1.1); opacity: 1; fill: #fff; }
+  38% { transform: scale(0.7); fill: #ff5ad9; }
+  62% { transform: scale(0.6); fill: #ff5ad9; opacity: 1; }
+  78% { transform: scale(0.2); opacity: 0; }
+  100% { transform: scale(0); opacity: 0; }
+}
+/* spins open round the star (an edge-on ellipse turning to face us) */
+@keyframes hs-ring {
+  0%, 28% { opacity: 0; transform: rotate(-35deg) scale(0.2, 0.95); }
+  36% { opacity: 1; transform: rotate(-20deg) scale(0.35, 0.95); }
+  52% { opacity: 1; transform: rotate(0deg) scale(0.92); }
+  62% { opacity: 1; transform: scale(1); }
+  66%, 100% { opacity: 0; transform: scale(1.05); }
+}
+/* then breaks into dashes with ticks, widening away */
+@keyframes hs-dash {
+  0%, 62% { opacity: 0; transform: scale(1) rotate(0deg); }
+  66% { opacity: 1; transform: scale(1.05) rotate(8deg); }
+  100% { opacity: 0; transform: scale(1.45) rotate(24deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hint-sparkle i { animation: none; opacity: 0.9; }
+  .hint-spark .hs-star { animation: none; opacity: 0.6; transform: scale(0.6); }
+  .hint-spark .hs-ring, .hint-spark .hs-dash { display: none; }
 }
 /* a picture hint (the light bulb), centre of the screen */
 .hint-overlay {
@@ -4836,4 +4876,67 @@ pre {
 }
 .fpop.down {
   transform: translate(-50%, 0.3em);
+}
+
+/* a cinematic (or the hint's camera glide) is playing: the world and the HUD
+   can't be clicked or hovered (modals and the dialogue box stay usable) */
+.app.cine-lock .stage,
+.app.cine-lock .stage *,
+.app.cine-lock .hud,
+.app.cine-lock .hud * {
+  pointer-events: none !important;
+}
+
+/* a boat's soft shadow on the water, under its hull */
+.boat-shadow {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(8, 24, 40, 0.42), rgba(8, 24, 40, 0.18) 60%, rgba(8, 24, 40, 0));
+}
+
+/* the editor's ship seats (Markers tab) */
+.wed-seat-keys button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.wed-seat-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid;
+}
+.wed-seat-stage {
+  margin: 8px 0;
+  padding: 10px;
+  background: #1b2a33;
+  border-radius: 6px;
+  overflow: auto;
+}
+.wed-seat-ship {
+  position: relative;
+  display: inline-block;
+  line-height: 1;
+  cursor: crosshair;
+  touch-action: none;
+}
+.wed-seat-ship pre {
+  margin: 0;
+}
+.wed-seat-pin {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  border: 2px solid;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+.wed-seat-pin.on {
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
 }

@@ -32,6 +32,8 @@ export interface PlacedItem {
   kind: 'item'; // tokens are excluded at the UI gate, never reach here
   tool?: 'water';
   grip?: 'left' | 'right'; // see ShopItem.grip
+  refId?: string; // see ShopItem.refId
+  refMirror?: boolean;
   color?: string;
   palette?: Record<string, string>;
   colors?: string[];

@@ -390,13 +390,15 @@ export const KIND_MEADOW = 6;
 export const KIND_STONEGROUND = 7;
 export const KIND_SLAB = 8; // a stepping stone
 
-const out = { r: 0, g: 0, b: 0, kind: 0, ndv: 0, lit: 0, patch: 0, edge: 1 };
+// wet: a stone lying in the water (boats pass over it)
+const out = { r: 0, g: 0, b: 0, kind: 0, ndv: 0, lit: 0, patch: 0, edge: 1, wet: false };
 
 // `jit` nudges the coast distance per cell (a few thousandths of an nd), so
 // every colour boundary breaks into a ragged, dithered mosaic edge.
 function sample(fx: number, fy: number, jit: number) {
   const ndv = visualNd(fx, fy);
   out.ndv = ndv;
+  out.wet = false;
   out.lit = 0;
   out.patch = 0;
   const n = ndv + jit;
@@ -459,6 +461,7 @@ function sample(fx: number, fy: number, jit: number) {
       out.g += (rg - out.g) * w;
       out.b += (rb - out.b) * w;
       out.kind = KIND_ROCK;
+      out.wet = true;
     }
   }
   paintGround(fx, fy);
@@ -504,6 +507,7 @@ function sampleMain(mc: string, fx: number, fy: number, n: number) {
     out.g = P.rockDark[1] + (P.rock[1] - P.rockDark[1]) * t;
     out.b = P.rockDark[2] + (P.rock[2] - P.rockDark[2]) * t;
     out.kind = KIND_ROCK;
+    out.wet = mc === 'r';
     return;
   }
   // grass, with the broad light/dark patches
@@ -825,7 +829,7 @@ function computeBlock(F: TerrainField, blockWater: Uint8Array | null, bx: number
   const h3 = hash2(bx * 0.377 + 19, by * 1.27 + 41);
   sample(fx, fy, (h3 - 0.5) * 0.012);
   const v = (h3 - 0.5) * 10;
-  if (blockWater) blockWater[by * bgW + bx] = out.kind === KIND_WATER ? 1 : 0;
+  if (blockWater) blockWater[by * bgW + bx] = out.kind === KIND_WATER || out.wet ? 1 : 0;
   const k4 = (by * bgW + bx) * 4;
   // the shade around objects: steps of the ground's own colour, darker
   const sh = out.kind === KIND_WATER || out.kind === KIND_ROCK ? 1 : 1 - aoStep(bx, by) * AO.dark * groundShadow();

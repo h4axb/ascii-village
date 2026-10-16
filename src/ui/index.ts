@@ -22,6 +22,6 @@ export { DetailPanel, type Stat, type Action } from './DetailPanel';
 export { FitSprite, type SpriteLook } from './FitSprite';
 export { Dialogue, NextArrow } from './Dialogue';
 export { Row, Stepper } from './Controls';
-export { Panel, ChoicePanel } from './Panel';
+export { Panel, ChoicePanel, PanelCloseContext } from './Panel';
 export { ChatMessage, Bubble, Portrait, Frame, type Speaker } from './Chat';
 export * from './icons';

@@ -7,7 +7,6 @@ import type { Ent, EntityKind } from './world';
 import type { PlantedCrop, Doors, DoorId } from './farm';
 import { cropStatus } from './farm';
 import type { SlotEffect } from './farm';
-import { DEFAULT_SHORTS_HEX, DEFAULT_SHIRT_HEX } from './outfit';
 
 export type InteractRef =
   | { kind: 'entity'; id: string }
@@ -19,53 +18,17 @@ export interface InteractionCopy {
   question: string;
 }
 
-// What each invisible 'hotspot' entity over the house picture actually is.
-// The four garments are a two-way WARDROBE SWAP, not a one-way recolour:
-// clicking a hanging garment puts it on, and whatever you were wearing takes
-// its place on the line (visually recoloured on the house's own sprite — see
-// HOUSE_GARMENT_REGIONS, outfit.ts, and wearFromLine, App.tsx). `bakedHex` is
-// what that slot's garment looked like when the house was baked — the
-// fallback for "nothing's been hung there yet" — while the CURRENT colour
-// actually hanging there lives in runtime state (`lineColors`, App.tsx),
-// since it changes as the player swaps things in and out.
-//
-// bakedHex values are read off the same cells of house_simplified.svg that
-// painted them (dominant colour within each named region of
-// house_simplified_regions.json, filtered to the garment's own hue family
-// since the region boxes also catch a sliver of window/sky between the
-// pegs), so the cloth on the line and the outfit you get from it start out
-// the same colour.
-//
-// The front door (house_simplified_regions.json's front_door region) opens
-// the same 5-slot home storage menu the old house used — openHouseMenu()
-// already existed and worked, it just had nothing pointing at it.
-export type HotspotInfo =
-  | { act: 'outfit'; region: 'shorts' | 'shirt'; bakedHex: string }
-  | { name: string; question: string; act: 'house' };
+// What each invisible 'hotspot' entity over the house picture is: the front
+// door (house_simplified_regions.json's front_door region) opens the 5-slot
+// home storage menu.
+export type HotspotInfo = { name: string; question: string; act: 'house' };
 
 export const HOTSPOT_INFO: Record<string, HotspotInfo> = {
-  'house-cloth-shorts': { act: 'outfit', region: 'shorts', bakedHex: '#fef5e6' },
-  'house-cloth-shirt-purple': { act: 'outfit', region: 'shirt', bakedHex: '#cba7cb' },
-  'house-cloth-shirt-yellow': { act: 'outfit', region: 'shirt', bakedHex: '#ffd379' },
-  'house-cloth-shirt-green': { act: 'outfit', region: 'shirt', bakedHex: '#afb787' },
   'house-door': {
     name: 'the house',
     question: 'Do you want to check the house?',
     act: 'house',
   },
-};
-
-// The closed set of colours that can ever be hanging on the line or worn by
-// the player — 2 defaults (what you start in) + the 4 baked clothesline
-// colours. Used to name a garment by its CURRENT colour rather than a fixed
-// name, since a swap can put any of these on any slot.
-const COLOR_LABEL: Record<string, string> = {
-  [DEFAULT_SHORTS_HEX]: 'blue',
-  [DEFAULT_SHIRT_HEX]: 'white',
-  '#fef5e6': 'cream',
-  '#cba7cb': 'purple',
-  '#ffd379': 'yellow',
-  '#afb787': 'green',
 };
 
 const COLLECT_NAME: Partial<Record<EntityKind, string>> = {
@@ -84,10 +47,6 @@ export interface InteractCtx {
   wt: number;
   fxFor: (slot: number) => SlotEffect;
   doors: Doors;
-  // what's currently hanging on each clothesline hotspot id, keyed by hotspot
-  // id — absent means "still whatever it was baked with" (see HOTSPOT_INFO's
-  // bakedHex).
-  lineColors: Record<string, string>;
   // the fence gates standing open (by entity id)
   openGates: ReadonlySet<string>;
 }
@@ -144,14 +103,7 @@ export function describeInteraction(ref: InteractRef, ctx: InteractCtx): Interac
     case 'hotspot': {
       const info = HOTSPOT_INFO[e.id];
       if (!info) return null;
-      if (info.act !== 'outfit') return { name: info.name, question: info.question };
-      const hangingHex = ctx.lineColors[e.id] ?? info.bakedHex;
-      const label = COLOR_LABEL[hangingHex] ?? 'unknown';
-      const noun = info.region === 'shorts' ? 'shorts' : 'shirt';
-      return {
-        name: `the ${label} ${noun}`,
-        question: `Do you want to change your clothes to the ${label} ${noun}?`,
-      };
+      return { name: info.name, question: info.question };
     }
     default:
       return null;
@@ -169,9 +121,6 @@ export interface InteractActions {
   openCropPanel: (slot: number) => void;
   toggleDoor: (d: DoorId) => void;
   toggleGate: (id: string) => void; // a fence gate (src/fence.ts)
-  // Two-way swap: the player wears `hangingHex`, and whatever they were
-  // wearing for that region takes its place on the line at `hotspotId`.
-  wearFromLine: (hotspotId: string, region: 'shorts' | 'shirt', hangingHex: string) => void;
   say: (text: string) => void;
 }
 
@@ -212,10 +161,6 @@ export function runInteraction(ref: InteractRef, ctx: InteractCtx, actions: Inte
       const info = HOTSPOT_INFO[e.id];
       if (!info) break;
       if (info.act === 'house') actions.openHouseMenu();
-      else {
-        const hangingHex = ctx.lineColors[e.id] ?? info.bakedHex;
-        actions.wearFromLine(e.id, info.region, hangingHex);
-      }
       break;
     }
   }

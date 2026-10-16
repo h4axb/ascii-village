@@ -250,6 +250,53 @@ export const WALK_RIGHT_FRAMES: WalkFrame[] = walkRightData.frames;
 export const WALK_RIGHT_PALETTE: Record<string, string> = walkRightData.palette;
 export const WALK_RIGHT_PAD_TOP: number = (walkRightData as { padTop?: number }).padTop ?? 0;
 
+// The hands in a frame (walk frame or the idle portrait): skin-coloured
+// blobs from the shirt's top row down to a little below it (lower ones are
+// the knees), as cell centres [col, row], left to right. What a held item
+// hangs from, so it moves with the hand as the walk cycle swings it.
+const handCache = new WeakMap<object, [number, number][]>();
+const isSkin = (hex: string | undefined) => {
+  if (!hex) return false;
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  return r >= 235 && g >= 185 && g <= 235 && b >= 150 && b <= 215 && r - b > 25;
+};
+export function handsOf(f: { sprite: string[]; colors?: string[]; shirtMask?: string[] }, palette: Record<string, string>): [number, number][] {
+  const hit = handCache.get(f);
+  if (hit) return hit;
+  const top = f.shirtMask?.findIndex((l) => /[^ .]/.test(l)) ?? -1;
+  const out: [number, number][] = [];
+  if (top >= 0 && f.colors) {
+    const cells = new Set<string>();
+    f.sprite.forEach((l, r) => {
+      if (r < top) return;
+      for (let c = 0; c < l.length; c++) if (l[c] !== ' ' && isSkin(palette[f.colors![r]?.[c] ?? ''])) cells.add(`${r},${c}`);
+    });
+    for (const start of [...cells]) {
+      if (!cells.has(start)) continue;
+      cells.delete(start);
+      const stack = [start], comp: [number, number][] = [];
+      while (stack.length) {
+        const [r, c] = stack.pop()!.split(',').map(Number);
+        comp.push([r, c]);
+        for (let dr = -1; dr <= 1; dr++)
+          for (let dc = -1; dc <= 1; dc++) {
+            const k = `${r + dr},${c + dc}`;
+            if (cells.has(k)) {
+              cells.delete(k);
+              stack.push(k);
+            }
+          }
+      }
+      const row = comp.reduce((a, p) => a + p[0], 0) / comp.length + 0.5;
+      const col = comp.reduce((a, p) => a + p[1], 0) / comp.length + 0.5;
+      if (comp.length >= 2 && row <= top + 5) out.push([col, row]);
+    }
+  }
+  out.sort((a, b) => a[0] - b[0]);
+  handCache.set(f, out);
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // WATERING — player_watering_right.svg (frames ready, extend, pour; the walk
 // frames' 22x28 canvas, see waterRight.json's "source"). Each frame carries

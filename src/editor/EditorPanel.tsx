@@ -902,7 +902,7 @@ export function EditorPanel({
             {tab === 'islands' && <IslandsTab ed={ed} />}
           </div>
           <div className="wed-keys">
-            click select · drag move (Shift: ¼ tile) · empty drag / WASD pan · arrows nudge · R rotate · +/− or Alt+wheel
+            click select · drag move in ⅛ tiles (Shift: whole tiles) · empty drag / WASD pan · arrows nudge ⅛ tile (Shift: 1) · R rotate · +/− or Alt+wheel
             scale · Del delete · Ctrl+D duplicate · Ctrl+Z/Y undo/redo · Ctrl+S save · Esc deselect · E close
           </div>
         </>

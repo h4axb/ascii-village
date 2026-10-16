@@ -10,6 +10,9 @@
 #   side-right   the short side piece going back to the left
 #   gate         the arched gate between its two posts
 #   gate-open    the gate with its door taken out (only the posts)
+#   stick-left   one side picket with its rail stubs (from side-left): stacked
+#                down the screen they make the enclosure's left side
+#   stick-right  the same from side-right, for the right side
 # (The sheet's crossed-out corner piece is not used.)
 #
 #   python3 scripts/cut-fence.py <outdir>
@@ -27,6 +30,8 @@ pieces = {
     'side-left': crop(745, 158, 982, 530),
     'side-right': crop(1074, 158, 1310, 534),
     'gate': crop(720, 578, 1366, 952),
+    'stick-left': crop(862, 158, 982, 470),
+    'stick-right': crop(1074, 158, 1194, 470),
 }
 pieces['front-right'] = ImageOps.mirror(pieces['front-left'])
 g = np.array(pieces['gate'])

@@ -1616,7 +1616,8 @@ function Game() {
   // instead of sliding the picture off its own collider.
   const gardenX = gardenEnt?.x ?? GARDEN_HOME.x;
   const gardenY = gardenEnt?.y ?? GARDEN_HOME.y;
-  const plot: GardenPlot = useMemo(() => gardenAt(gardenX, gardenY), [gardenX, gardenY]);
+  const gardenScale = gardenEnt?.scale ?? GARDEN_BED_SCALE;
+  const plot: GardenPlot = useMemo(() => gardenAt(gardenX, gardenY, gardenScale), [gardenX, gardenY, gardenScale]);
   const plotRef = useRef(plot);
   plotRef.current = plot;
 
@@ -4685,9 +4686,10 @@ function Game() {
     {
       const { c0, c1 } = plot.door;
       const gy = plot.rect.y1;
-      // from outside or from inside the bed (where the fence row hides the
-      // feet a little further back), so it's never only one-way
-      const dy = feetY < gy ? Math.max(0, gy - feetY - 1) : feetY - gy;
+      // from inside the bed (feet just above the rail) or from outside
+      // (the top of the player just below it: the closed rail stops the
+      // body there, so the feet are a whole body below), never only one-way
+      const dy = feetY < gy ? Math.max(0, gy - feetY - 1) : Math.max(0, player.y - gy - 1);
       const gap = Math.max(Math.max(0, c0 - (player.x + PLAYER_T.wT - 1), player.x - c1), dy);
       const dist = Math.hypot((c0 + c1 + 1) / 2 - pcx, gy + 1 - pcy);
       if (gap <= 1 && (!best || gap < best.gap || (gap === best.gap && dist < best.dist)))
@@ -6003,7 +6005,7 @@ function Game() {
                 const open = doors.gate;
                 const bed = open ? S.GARDEN_BED : S.GARDEN_BED_SHUT;
                 const bedColors = open ? S.GARDEN_BED_COLORS : S.GARDEN_BED_SHUT_COLORS;
-                const k = GARDEN_BED_SCALE;
+                const k = gardenScale;
                 const cw = Math.max(...bed.map((l) => l.length));
                 const offX = ((1 - k) * cw) / 2;
                 const offY = (1 - k) * bed.length;

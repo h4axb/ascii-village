@@ -2,12 +2,12 @@
   "version": 2,
   "moved": {
     "house": {
-      "x": 30.5,
-      "y": 5
+      "x": 30.88,
+      "y": 4.88
     },
     "garden-bed": {
-      "x": 23,
-      "y": 17
+      "x": 23.5,
+      "y": 19.63
     },
     "shop": {
       "x": 64.5,
@@ -428,28 +428,28 @@
       "id": "picket-front-left-1",
       "asset": "picket-front-left",
       "x": 29,
-      "y": 15,
+      "y": 16.51,
       "scale": 0.08
     },
     {
       "id": "picket-gate-1",
       "asset": "picket-gate",
-      "x": 32,
-      "y": 15,
+      "x": 33.27,
+      "y": 16.38,
       "scale": 0.08
     },
     {
       "id": "picket-front-1",
       "asset": "picket-front",
-      "x": 36,
-      "y": 16,
+      "x": 31.38,
+      "y": 16.5,
       "scale": 0.08
     },
     {
       "id": "picket-front-right-1",
       "asset": "picket-front-right",
-      "x": 38,
-      "y": 16,
+      "x": 38.63,
+      "y": 16.75,
       "scale": 0.08
     },
     {
@@ -462,8 +462,148 @@
     {
       "id": "picket-front-right-2",
       "asset": "picket-front-right",
-      "x": 37,
+      "x": 36.75,
       "y": 9,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-left-1",
+      "asset": "picket-stick-left",
+      "x": 29,
+      "y": 14.13,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-left-2",
+      "asset": "picket-stick-left",
+      "x": 29.01,
+      "y": 13.38,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-left-3",
+      "asset": "picket-stick-left",
+      "x": 29.01,
+      "y": 12.38,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-left-4",
+      "asset": "picket-stick-left",
+      "x": 29.01,
+      "y": 11.38,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-left-5",
+      "asset": "picket-stick-left",
+      "x": 29.01,
+      "y": 10.38,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-left-6",
+      "asset": "picket-stick-left",
+      "x": 29.01,
+      "y": 9.38,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-left-7",
+      "asset": "picket-stick-left",
+      "x": 29.01,
+      "y": 15.01,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-front-2",
+      "asset": "picket-front",
+      "x": 35.63,
+      "y": 16.75,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-front-3",
+      "asset": "picket-front",
+      "x": 37.38,
+      "y": 16.76,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-right-1",
+      "asset": "picket-stick-right",
+      "x": 40.63,
+      "y": 14.88,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-right-2",
+      "asset": "picket-stick-right",
+      "x": 40.63,
+      "y": 14.01,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-right-3",
+      "asset": "picket-stick-right",
+      "x": 40.63,
+      "y": 13.26,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-front-right-3",
+      "asset": "picket-front-right",
+      "x": 38.63,
+      "y": 12.38,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-right-4",
+      "asset": "picket-stick-right",
+      "x": 38.77,
+      "y": 11.39,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-right-5",
+      "asset": "picket-stick-right",
+      "x": 38.77,
+      "y": 10.39,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-right-6",
+      "asset": "picket-stick-right",
+      "x": 38.77,
+      "y": 9.39,
+      "scale": 0.08
+    },
+    {
+      "id": "grasshalm-12",
+      "asset": "grasshalm",
+      "x": 29.75,
+      "y": 14.375,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-13",
+      "asset": "grasshalm",
+      "x": 29.875,
+      "y": 11.375,
+      "scale": 0.2
+    },
+    {
+      "id": "picket-stick-left-8",
+      "asset": "picket-stick-left",
+      "x": 29.02,
+      "y": 15.76,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-stick-left-9",
+      "asset": "picket-stick-left",
+      "x": 40.64,
+      "y": 15.76,
       "scale": 0.08
     }
   ],

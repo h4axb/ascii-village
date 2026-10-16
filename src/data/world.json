@@ -1002,22 +1002,6 @@
       "w": 2.75,
       "h": 1.5,
       "owner": "house"
-    },
-    {
-      "id": "box-mv83yufx",
-      "x": 1.9,
-      "y": 8,
-      "w": 0.75,
-      "h": 1.25,
-      "owner": "house"
-    },
-    {
-      "id": "box-mv8419vp",
-      "x": 5.15,
-      "y": 8.25,
-      "w": 1.75,
-      "h": 1,
-      "owner": "house"
     }
   ],
   "islands": {

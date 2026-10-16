@@ -221,6 +221,16 @@ const LOADED: Snapshot = {
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const round2 = (v: number) => Math.round(v * 100) / 100;
+// placing and moving objects snaps to an eighth of a tile (half a glyph on a
+// 0.125-scale fence piece), so pieces can sit right next to each other;
+// Shift snaps to whole tiles
+const FINE = 8;
+const snapTo = (v: number, coarse: boolean) => (coarse ? Math.round(v) : Math.round(v * FINE) / FINE);
+// an asset's exact size in tiles (spriteTiles rounds up)
+const exactTiles = (sprite: string[], scale = 1) => ({
+  w: (Math.max(...sprite.map((l) => l.length)) * scale) / TILE_CH,
+  h: (sprite.length * scale) / TILE_LN,
+});
 const SCALE_MIN = 0.05;
 const SCALE_MAX = 4;
 
@@ -1076,7 +1086,8 @@ export function useWorldEditor(opts: {
       if (e) setPose(selected, { scale: (e.scale ?? 1) * (k === '-' ? 1 / 1.1 : 1.1) });
       return;
     }
-    // arrows nudge the selection (Shift: 5 tiles); with nothing selected
+    // arrows nudge the selection by an eighth of a tile (Shift: a whole
+    // tile; markers whole tiles, Shift 5); with nothing selected
     // they pan like WASD
     const arrows: Record<string, [number, number]> = {
       arrowleft: [-1, 0],
@@ -1088,14 +1099,15 @@ export function useWorldEditor(opts: {
     if (arrows[k] && selected) {
       ev.preventDefault();
       const [dx, dy] = arrows[k];
-      const step = ev.shiftKey ? 5 : 1;
       if (selected.startsWith('marker:')) {
+        const step = ev.shiftKey ? 5 : 1;
         const id = selected.slice(7);
         const p = stateRef.current.markers[id];
         if (p) setMarker(id, { x: p.x + dx * step, y: p.y + dy * step });
       } else {
+        const step = ev.shiftKey ? 1 : 1 / FINE;
         const e = entOf(selected);
-        if (e) setPose(selected, { x: e.x + dx * step, y: e.y + dy * step });
+        if (e) setPose(selected, { x: snapTo(e.x + dx * step, false), y: snapTo(e.y + dy * step, false) });
       }
       return;
     }
@@ -1147,12 +1159,12 @@ export function useWorldEditor(opts: {
   function ghostFor(slug: string, wx: number, wy: number): EditorGhost | null {
     const def = assetMap.get(slug);
     if (!def) return null;
-    const { wT, hT } = spriteTiles(def.sprite, def.scale);
+    const { w: wT, h: hT } = exactTiles(def.sprite, def.scale);
     // the asset's base sits on the cursor, centred
     return {
       slug,
-      x: Math.max(0, Math.round(wx / TILE_CH - wT / 2)),
-      y: Math.max(0, Math.round(wy / TILE_LN - hT + 0.5)),
+      x: Math.max(0, snapTo(wx / TILE_CH - wT / 2, false)),
+      y: Math.max(0, snapTo(wy / TILE_LN - hT + 0.5, false)),
       sprite: def.sprite,
       colors: def.colors,
       palette: def.palette,
@@ -1174,7 +1186,9 @@ export function useWorldEditor(opts: {
         // a fence piece with Shift: drag out a row of it (see 'row' below)
         const def = assetMap.get(armed.id);
         if (g && def && ev.shiftKey && (def.kind === 'fence' || def.kind === 'gate')) {
-          const { wT, hT } = spriteTiles(def.sprite, def.scale);
+          // end to end by their exact size (to the eighth of a tile)
+          const ex = exactTiles(def.sprite, def.scale);
+          const wT = snapTo(ex.w, false), hT = snapTo(ex.h, false);
           dragRef.current = { type: 'row', slug: g.slug, x0: g.x, y0: g.y, wT, hT, ids: [], n: 0, horiz: true, moved: false };
           layRow(dragRef.current, 1, true);
           return;
@@ -1336,9 +1350,9 @@ export function useWorldEditor(opts: {
           y: d.pan0.y - (ev.clientY - d.py0) / k / cam.dims.lineH,
         });
       } else if (d.type === 'object') {
-        // whole-tile steps from where it started (keeps a fractional anchor
-        // like the house's 27.85); Shift = quarter tiles
-        const q = ev.shiftKey ? 4 : 1;
+        // eighth-tile steps from where it started (keeps a fractional anchor
+        // like the house's 27.85); Shift = whole tiles
+        const q = ev.shiftKey ? 1 : FINE;
         const dx = Math.round(((w.wx - d.wx0) / TILE_CH) * q) / q;
         const dy = Math.round(((w.wy - d.wy0) / TILE_LN) * q) / q;
         if (!d.moved && dx === 0 && dy === 0) return;

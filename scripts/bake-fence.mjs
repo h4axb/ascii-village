@@ -7,7 +7,7 @@ import fs from 'node:fs';
 const D = process.argv[2], OUT = process.argv[3];
 const P = 498 / 48; // source px per glyph cell: three pickets = 48 cells = 3 tiles
 const SCALE = 0.125;
-const names = ['front', 'front-left', 'front-right', 'side-left', 'side-right', 'gate', 'gate-open'];
+const names = ['front', 'front-left', 'front-right', 'side-left', 'side-right', 'stick-left', 'stick-right', 'gate', 'gate-open'];
 const b = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
 const p = await b.newPage();
 await p.goto('http://127.0.0.1:5173/0'); await p.waitForTimeout(800);
@@ -62,6 +62,7 @@ const feet = (sprite) => sprite.map((l, i) => (i >= sprite.length - FOOT_ROWS ? 
 const LABEL = {
   front: 'Picket fence', 'front-left': 'Picket fence, post on the left', 'front-right': 'Picket fence, post on the right',
   'side-left': 'Picket fence, side (left)', 'side-right': 'Picket fence, side (right)', gate: 'Picket fence gate',
+  'stick-left': 'Picket fence, left side stick', 'stick-right': 'Picket fence, right side stick',
 };
 // rows from the source's top line: pieces that sit lower get blank rows on top
 const ROW = 1.22 / P;

@@ -1950,11 +1950,11 @@
   align-items: flex-start;
   pointer-events: none;
   margin-left: -20px; /* flush with the screen edge, so the closed card hides fully */
-  margin-top: 14px; /* a little below the clock */
+  margin-top: 40px; /* a little below the clock */
 }
 .qp-card {
   pointer-events: auto;
-  width: 290px;
+  width: 370px;
   min-height: 150px;
   box-sizing: border-box;
   padding: 20px 16px 20px 22px;

@@ -80,7 +80,7 @@ export const PLACEABLE_KINDS: { kind: EntityKind; label: string }[] = [
 
 // What the game needs to stay itself: Mitchy and the garden are wired by id
 // all over App.tsx, so they can be moved but not removed, and the garden's
-// plot size is fixed. The house's hotspots follow it, so it doesn't rotate.
+// plot follows its bed's scale. The house's hotspots follow it, so it doesn't rotate.
 interface Locks {
   remove?: boolean;
   scale?: boolean;
@@ -89,7 +89,7 @@ interface Locks {
 }
 const LOCKS: Record<string, Locks> = {
   cat: { remove: true, duplicate: true, rotate: true },
-  'garden-bed': { remove: true, duplicate: true, scale: true, rotate: true },
+  'garden-bed': { remove: true, duplicate: true, rotate: true },
   house: { rotate: true },
 };
 export function locksOf(id: string): Locks {
@@ -582,6 +582,11 @@ export function useWorldEditor(opts: {
     if (patch.scale !== undefined) patch.scale = round2(Math.min(SCALE_MAX, Math.max(SCALE_MIN, patch.scale)));
     if (patch.x !== undefined) patch.x = round2(Math.min(MAP_W - 1, Math.max(0, patch.x)));
     if (patch.y !== undefined) patch.y = round2(Math.min(MAP_H - 1, Math.max(0, patch.y)));
+    // the garden keeps to whole tiles (its fence and gate collide tile by tile)
+    if (id === 'garden-bed') {
+      if (patch.x !== undefined) patch.x = Math.round(patch.x);
+      if (patch.y !== undefined) patch.y = Math.round(patch.y);
+    }
     updateDoc((d) => setPoseRaw(d, id, patch), record);
   }
 

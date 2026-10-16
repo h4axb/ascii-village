@@ -24,7 +24,7 @@ import worldDoc from './data/world.json';
 // A position saved by the world editor (src/data/world.json) wins over the
 // default corner here.
 const GARDEN_DEFAULT = { x: 28, y: 23 };
-const gardenMoved = (worldDoc as { moved?: Record<string, { x: number; y: number }> }).moved?.['garden-bed'];
+const gardenMoved = (worldDoc as { moved?: Record<string, { x: number; y: number; scale?: number }> }).moved?.['garden-bed'];
 export const GARDEN_HOME: { readonly x: number; readonly y: number } = gardenMoved
   ? { x: gardenMoved.x, y: gardenMoved.y }
   : GARDEN_DEFAULT;
@@ -67,18 +67,31 @@ export interface GardenPlot {
   slots: { x: number; y: number }[];
 }
 
-// The whole plot resolved against a corner. Everything that needs to know where
-// the garden IS goes through here, so a dragged bed moves its fence, its gate
-// and its beds together or not at all.
-export function gardenAt(x: number, y: number): GardenPlot {
+// The bed picture's own scale (world.ts GARDEN_BED_SCALE): the sizes above are
+// at this scale, and a bed scaled in the editor scales them with it.
+export const GARDEN_BASE_SCALE = 0.5;
+
+// The whole plot resolved against a corner (and the bed's scale). Everything
+// that needs to know where the garden IS goes through here, so a dragged or
+// scaled bed moves its fence, its gate and its beds together or not at all.
+// The plot keeps to whole tiles (its fence collides tile by tile), so a
+// corner between tiles is rounded to the nearest one.
+export function gardenAt(x: number, y: number, scale = GARDEN_BASE_SCALE): GardenPlot {
+  const r = scale / GARDEN_BASE_SCALE;
+  const X = Math.round(x), Y = Math.round(y);
+  const w = Math.max(5, Math.round(GARDEN_SIZE.w * r));
+  const h = Math.max(4, Math.round(GARDEN_SIZE.h * r));
+  // the gate: at least three tiles wide (the player is two), inside the rail
+  const c0 = Math.min(w - 4, Math.round(GATE_OFF.c0 * r));
+  const c1 = Math.min(w - 2, Math.max(c0 + 2, Math.round(GATE_OFF.c1 * r)));
   return {
-    rect: { x0: x, y0: y, x1: x + GARDEN_SIZE.w - 1, y1: y + GARDEN_SIZE.h - 1 },
-    door: { c0: x + GATE_OFF.c0, c1: x + GATE_OFF.c1 },
-    slots: BED_OFF.map((b) => ({ x: x + b.x, y: y + b.y })),
+    rect: { x0: X, y0: Y, x1: X + w - 1, y1: Y + h - 1 },
+    door: { c0: X + c0, c1: X + c1 },
+    slots: BED_OFF.map((b) => ({ x: X + Math.round(b.x * r), y: Y + Math.round(b.y * r) })),
   };
 }
 
-export const GARDEN_PLOT: GardenPlot = gardenAt(GARDEN_HOME.x, GARDEN_HOME.y);
+export const GARDEN_PLOT: GardenPlot = gardenAt(GARDEN_HOME.x, GARDEN_HOME.y, gardenMoved?.scale);
 export const GARDEN = GARDEN_PLOT.rect;
 export const DOOR_TILES = GARDEN_PLOT.door;
 export const SLOTS = GARDEN_PLOT.slots;

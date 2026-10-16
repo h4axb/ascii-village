@@ -423,6 +423,48 @@
       "x": 37,
       "y": 46,
       "scale": 0.5
+    },
+    {
+      "id": "picket-front-left-1",
+      "asset": "picket-front-left",
+      "x": 29,
+      "y": 15,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-gate-1",
+      "asset": "picket-gate",
+      "x": 32,
+      "y": 15,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-front-1",
+      "asset": "picket-front",
+      "x": 36,
+      "y": 16,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-front-right-1",
+      "asset": "picket-front-right",
+      "x": 38,
+      "y": 16,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-front-left-2",
+      "asset": "picket-front-left",
+      "x": 29,
+      "y": 9,
+      "scale": 0.08
+    },
+    {
+      "id": "picket-front-right-2",
+      "asset": "picket-front-right",
+      "x": 37,
+      "y": 9,
+      "scale": 0.08
     }
   ],
   "colliders": {

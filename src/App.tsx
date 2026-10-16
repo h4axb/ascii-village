@@ -6644,7 +6644,9 @@ function Game() {
                   .filter((e) => (e.kind === 'fence' || e.kind === 'gate') && !e.rotation)
                   .flatMap((e) => {
                     const k = e.scale ?? 1;
-                    const top = snapHalf((e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE);
+                    // the pixel row the piece's bottom edge falls in: the
+                    // shadow sits right at its bottom, never below it
+                    const top = Math.floor((e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE * 2) / 2;
                     return fenceShadowRuns(e.sprite).map(([c0, c1], i) => {
                       const x0 = snapHalf(e.x * TILE_CH + (c0 - 0.5) * k);
                       const x1 = Math.max(x0 + 0.5, snapHalf(e.x * TILE_CH + (c1 + 0.5) * k));

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useMitchyLook } from './useMitchyLook';
 import * as S from './sprites';
@@ -99,7 +99,7 @@ import { GATE_OPEN, GATE_OPEN_SOLID } from './fence';
 import { assetOf } from './assets';
 import { eyesOf } from './playerEyes';
 import { SPEECH_BUBBLE, SPEECH_BUBBLE_COLORS, SPEECH_BUBBLE_PALETTE } from './speechBubble';
-import { onThemeChange, themeRevision, pondLook } from './theme';
+import { onThemeChange, themeRevision, pondLook, themeSwatch } from './theme';
 import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
 import { groundBare } from './ground';
 import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, PanelCloseContext, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, type Slot, type Action } from './ui';
@@ -670,6 +670,26 @@ const LANDING_FADE_MS = 500;
 // assumes; a rotated one turns about the art's own centre on the centre of its
 // rotated tile box, the box collision and footprint use) and its depth. Used
 // by the game's entity map and the start screen's live view alike.
+// A fence piece's or gate's contact shadow: the glyph columns of its feet
+// (its bottom rows) as runs, gaps under 2 glyphs bridged, so a picket fence
+// gets one band, an open gate one under each post. Cached per sprite.
+const fenceShadowCache = new WeakMap<string[], [number, number][]>();
+function fenceShadowRuns(sprite: string[]): [number, number][] {
+  const hit = fenceShadowCache.get(sprite);
+  if (hit) return hit;
+  const rows = sprite.slice(-Math.max(2, Math.round(sprite.length * 0.12)));
+  const w = Math.max(...sprite.map((l) => l.length));
+  const runs: [number, number][] = [];
+  for (let c = 0; c < w; c++) {
+    if (!rows.some((l) => l[c] !== undefined && l[c] !== ' ')) continue;
+    const last = runs[runs.length - 1];
+    if (last && c - last[1] <= 2) last[1] = c + 1;
+    else runs.push([c, c + 1]);
+  }
+  fenceShadowCache.set(sprite, runs);
+  return runs;
+}
+
 function entPlacement(e: Ent): React.CSSProperties {
   const k = e.scale ?? 1;
   const cw = Math.max(...e.sprite.map((l) => l.length));
@@ -6152,7 +6172,28 @@ function Game() {
                 // its dates regrow, so the animation's ending state persists
                 const bare =
                   !anim && e.kind === 'palm' && shaken.has(`${e.id}@${growthWindow}`);
+                // fence pieces and gates: a small clean shadow at their feet
+                const place = entPlacement(e);
+                const shadows =
+                  (e.kind === 'fence' || e.kind === 'gate') && !e.rotation
+                    ? fenceShadowRuns(e.sprite).map(([c0, c1], i) => (
+                        <div
+                          key={`${e.id}-sh${i}`}
+                          className="fence-shadow"
+                          style={{
+                            left: `${e.x * TILE_CH + (c0 - 0.6) * k}ch`,
+                            width: `${(c1 - c0 + 1.2) * k}ch`,
+                            top: `${e.y * TILE_LN + e.sprite.length * k - TILE_LN * 0.12}em`,
+                            height: `${TILE_LN * 0.36}em`,
+                            zIndex: typeof place.zIndex === 'number' ? place.zIndex - 1 : undefined,
+                            background: themeSwatch('player.shadow'),
+                          }}
+                        />
+                      ))
+                    : null;
                 return (
+                  <Fragment key={e.id}>
+                  {shadows}
                   <EntSprite
                     key={e.id}
                     kind={e.kind}
@@ -6168,7 +6209,7 @@ function Game() {
                       (e.fallFrom ? ' falling' : '')
                     }
                     style={{
-                      ...entPlacement(e),
+                      ...place,
                       ...(e.fallFrom
                         ? ({ '--fall-from': `${-e.fallFrom}em` } as React.CSSProperties)
                         : {}),
@@ -6230,6 +6271,7 @@ function Game() {
                         : undefined
                     }
                   />
+                  </Fragment>
                 );
               })}
 

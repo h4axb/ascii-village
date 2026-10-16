@@ -2889,7 +2889,7 @@ pre {
 
 /* equipPick mode: slots that can't go in the hand */
 .slot.disabled {
-  opacity: 0.28;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -4939,4 +4939,13 @@ pre {
   width: 14px;
   height: 14px;
   margin: -7px 0 0 -7px;
+}
+
+/* a fence piece's or gate's small contact shadow, at its feet */
+.fence-shadow {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  opacity: 0.4;
+  filter: blur(1px);
 }

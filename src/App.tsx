@@ -6311,6 +6311,17 @@ function Game() {
                     left: `${petPos.x * TILE_CH}ch`,
                     top: `${petPos.y * TILE_LN}em`,
                     zIndex: petPos.y + 1,
+                    // a fine reference-built pet (a dog) is drawn at its own
+                    // small scale, standing on its tile
+                    // feet on the player's ground row
+                    ...(equipped.scale && equipped.scale < 0.4
+                      ? {
+                          scale: `${equipped.scale}`,
+                          transformOrigin: '0 100%',
+                          translate: `0 ${character.sprite.length * PLAYER_SCALE - equipped.sprite.length}em`,
+                          zIndex: petPos.y + PLAYER_T.hT,
+                        }
+                      : {}),
                     // glideDur (not raw stepDur) so the pet gets the same
                     // jitter margin as the rig/camera; the 1.2x keeps its
                     // deliberate trailing-follow lag, now direction-corrected

@@ -87,9 +87,18 @@ const SYNONYMS: Record<string, string[]> = {
   plant: ['plant', 'flower', 'pot', 'potted'],
   hat: ['hat', 'cap', 'helmet', 'crown'],
 };
-const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter(Boolean);
+// lowercase, accents folded ("schäferhund" = "schaferhund", ß = ss)
+const fold = (s: string) =>
+  s.toLowerCase().replace(/ß/g, 'ss').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s-]/g, ' ');
+const words = (s: string) => fold(s).split(/\s+/).filter(Boolean);
 const sing = (w: string) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
-const STOP = new Set(['a', 'an', 'the', 'with', 'and', 'of', 'on', 'in', 'for', 'to', 'my', 'some', 'little', 'big', 'small', 'tiny', 'very']);
+const STOP = new Set([
+  'a', 'an', 'the', 'with', 'and', 'of', 'on', 'in', 'for', 'to', 'my', 'some', 'little', 'big', 'small', 'tiny', 'very',
+  // the same little words in German, French, Spanish, Italian, Dutch
+  'ein', 'eine', 'einen', 'einem', 'der', 'die', 'das', 'den', 'dem', 'mit', 'und', 'mein', 'meine', 'kleiner', 'kleine', 'grosser', 'grosse',
+  'un', 'une', 'le', 'la', 'les', 'avec', 'et', 'mon', 'ma', 'el', 'los', 'las', 'uno', 'una', 'con', 'y', 'mi', 'il', 'lo', 'gli', 'e',
+  'een', 'het', 'met', 'en', 'de', 'des', 'du',
+]);
 
 export function colourOf(word: string): RGB | null {
   const p = PALETTE[word];
@@ -127,13 +136,47 @@ export interface RefMatch {
 
 const FUNCTION_WORDS = /\b(that|which|can|could|lets?|makes?|named|called|faster|fast|float|floats|fly|flies|shoots?|glows?|heals?)\b/;
 
+// ---- dogs: a breed named in any language (src/data/refs/pet-dog-*) -------------------
+// Each dog's tags carry its breed's names in several languages; a name in the
+// prompt (the longest one, so "german shepherd" beats "shepherd") picks that
+// dog. A dog word without a breed picks one at random; no dog word, no dog
+// (a cat stays a cat).
+const DOG_WORDS = ['dog', 'dogs', 'puppy', 'pup', 'doggo', 'doggy', 'hund', 'hundchen', 'welpe', 'chien', 'chiot', 'perro', 'perrito', 'cachorro', 'cane', 'cucciolo', 'hond', 'hondje', 'pies', 'kopek'];
+const isDogRef = (r: RefDoc) => r.id.startsWith('pet-dog-');
+export function dogOf(prompt: string): { ref: RefDoc; phrase: string } | null {
+  const p = ` ${fold(prompt).replace(/\s+/g, ' ')} `;
+  let best: { ref: RefDoc; phrase: string } | null = null;
+  for (const r of REFS.filter(isDogRef))
+    // its names (the last two tags are looks: "fluffy", "big ears")
+    for (const t of [r.title, ...r.tags.slice(0, -2)]) {
+      const f = fold(t).replace(/\s+/g, ' ').trim();
+      if (f.length < 3 || f === 'dog' || DOG_WORDS.includes(f)) continue;
+      if (p.includes(` ${f} `) || p.includes(` ${f}s `)) if (!best || f.length > best.phrase.length) best = { ref: r, phrase: f };
+    }
+  if (best) return best;
+  if (words(prompt).some((w) => DOG_WORDS.includes(w))) {
+    // a look asked for ("a white dog", "a fluffy dog"): one of the dogs with it
+    const ws = words(prompt);
+    const all = REFS.filter(isDogRef);
+    const looks = all.filter((r) => r.tags.slice(-2).some((t) => words(t).some((w) => ws.includes(w))));
+    const dogs = looks.length ? looks : all;
+    if (dogs.length) return { ref: dogs[Math.floor(Math.random() * dogs.length)], phrase: '' };
+  }
+  return null;
+}
+
 export function matchRefs(prompt: string): RefMatch {
   const ws = words(prompt).map(sing);
   const has = (w: string) => ws.includes(sing(w));
   const used = new Set<string>();
-  // body
-  let body: RefDoc | null = null, score = 0;
-  for (const r of REFS.filter((x) => x.role === 'body')) {
+  // body: a dog breed by name first, else the best scoring body
+  const dog = dogOf(prompt);
+  let body: RefDoc | null = dog?.ref ?? null, score = dog ? 10 : 0;
+  if (dog) {
+    for (const w of words(dog.phrase)) used.add(sing(w));
+    for (const w of DOG_WORDS) used.add(w);
+  }
+  for (const r of dog ? [] : REFS.filter((x) => x.role === 'body' && !isDogRef(x))) {
     let s = 0;
     const nouns = [...(SYNONYMS[r.category] ?? []), ...r.category.split('-')];
     if (nouns.some(has)) s += 3;
@@ -150,11 +193,12 @@ export function matchRefs(prompt: string): RefMatch {
     return res;
   }
   const b = res.body;
-  for (const n of [...(SYNONYMS[b.category] ?? []), ...b.category.split('-'), ...b.tags, ...words(b.title)]) used.add(sing(n));
+  for (const n of [...(SYNONYMS[b.category] ?? []), ...b.category.split('-'), ...b.tags, ...words(b.title)]) for (const w of words(n)) used.add(sing(w));
   const partNames = b.parts.map((p) => p.name);
   // colours: "<colour> <part>", "<part> in/of <colour>", "<colour> <body noun>" (all primary parts)
   ws.forEach((w, i) => {
-    const c = colourOf(w);
+    // a breed's own words aren't colours ("golden" retriever)
+    const c = dog && words(dog.phrase).includes(w) ? null : colourOf(w);
     if (!c) return;
     used.add(w);
     const next = ws[i + 1], next2 = ws[i + 2];
@@ -428,6 +472,10 @@ const SCREEN_W = { small: 9, medium: 13, large: 18 } as const; // on-screen widt
 // watering cans are drawn finer: 600-800 glyphs, the middle by default
 const CAN_SIGNS = { small: 600, medium: 700, large: 800 } as const;
 const CAN_SCREEN_W = { small: 11, medium: 13, large: 15 } as const;
+// a pet follows the player at about half the player's width
+const PET_SCREEN_W = { small: 3, medium: 4, large: 5.5 } as const;
+// categories built from the library on every link (not only REF_CRAFT_ON)
+export const isAlwaysRef = (m: RefMatch) => m.body?.category === 'watering-can' || m.body?.category === 'pet';
 
 export interface RefSprite {
   lines: string[];
@@ -453,13 +501,15 @@ export async function buildFromMatch(m: RefMatch & { details?: RefChoice['detail
     petals: m.petals,
   };
   const layer = compose(recipe);
-  const can = body.category === 'watering-can';
+  // watering cans and pets (the dogs) are drawn finer: 600-800 glyphs
+  const can = body.category === 'watering-can' || body.category === 'pet';
   const band = size ?? (can ? 'medium' : body.sizeBand ?? 'small');
   // references carry real transparency: gaps are meant (no hole filling)
   const b = bake(layer.img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs: (can ? CAN_SIGNS : SIGNS)[band] }, getAtlas());
   const g = bakedToSprite(b);
   const w = Math.max(1, ...g.sprite.map((l) => l.length));
-  return { lines: g.sprite, colors: g.colors, palette: g.palette, scale: (can ? CAN_SCREEN_W : SCREEN_W)[band] / w, signs: b.signs, body };
+  const screenW = body.category === 'pet' ? PET_SCREEN_W : can ? CAN_SCREEN_W : SCREEN_W;
+  return { lines: g.sprite, colors: g.colors, palette: g.palette, scale: screenW[band] / w, signs: b.signs, body };
 }
 
 // what a crafted item gets when no model wrote its text

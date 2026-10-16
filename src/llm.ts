@@ -61,6 +61,7 @@ import {
   gameCategoryOf,
   logRefCraft,
   isWateringCan,
+  isAlwaysRef,
   shapeWateringCan,
   colourOf,
   withoutDetails,
@@ -445,9 +446,9 @@ export async function craftItem(
   // From the reference library first (craft/refCraft.ts): 0 calls when the
   // matcher can place every word, 1 small call otherwise. Nothing in the
   // library fits -> the shape planner below, as before.
-  // (watering cans come from the library on every link: the three
-  // references in src/data/refs/watering-can-*)
-  if ((REF_CRAFT_ON || isWateringCan(matchRefs(prompt))) && hasRefBodies()) {
+  // (watering cans and dogs come from the library on every link:
+  // src/data/refs/watering-can-* and pet-dog-*)
+  if ((REF_CRAFT_ON || isAlwaysRef(matchRefs(prompt))) && hasRefBodies()) {
     const r = await craftWithRefs(prompt, ui, opts);
     if (r) return r;
   }

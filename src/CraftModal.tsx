@@ -184,6 +184,7 @@ export default function CraftModal({
   clarify = false,
   cond,
   launch,
+  resume,
   money,
   onSpend,
   onConsume,
@@ -202,6 +203,9 @@ export default function CraftModal({
   // the quest's water vehicle: an extra first option that takes the item
   // (into the inventory) and lets App set it on the water
   launch?: { label: string; go: () => void };
+  // a recraft (Mitchy's Recraft, already paid): that item's old chat comes
+  // back and she waits for the new prompt
+  resume?: { name: string; chat: ChatLine[] };
   money: number;
   onSpend: (coins: number) => void; // negative = refund
   onConsume: (equip: boolean, item: ShopItem) => void; // spend token, equip if asked — does NOT close
@@ -215,13 +219,24 @@ export default function CraftModal({
   const mitchy = mitchySpeaker();
   void token;
   const [phase, setPhase] = useState<Phase>('input');
-  const [thread, setThread] = useState<Turn[]>([
-    {
-      who: 'mitchy',
-      kind: 'text',
-      text: 'Welcome to the workshop! Tell me what you want and what it should do. Anything you like.',
-    },
-  ]);
+  const [thread, setThread] = useState<Turn[]>(() =>
+    resume
+      ? [
+          ...resume.chat.map((l): Turn => ({ who: l.who, kind: 'text', text: l.text })),
+          {
+            who: 'mitchy',
+            kind: 'text',
+            text: `Let's rework your ${resume.name}! Tell me the new prompt and I'll craft it again.`,
+          },
+        ]
+      : [
+          {
+            who: 'mitchy',
+            kind: 'text',
+            text: 'Welcome to the workshop! Tell me what you want and what it should do. Anything you like.',
+          },
+        ],
+  );
   const [input, setInput] = useState('');
   const [busyLine, setBusyLine] = useState<string | null>(null);
   const [stage, setStage] = useState<string | null>(null);

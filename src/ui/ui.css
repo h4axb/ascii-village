@@ -2453,3 +2453,94 @@
 .ds-panel ::-webkit-scrollbar-thumb:hover {
   background: var(--ds-line-strong);
 }
+
+/* an option with a line under it saying what it does (ChoicePanel details) */
+.ds-option.has-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ds-option-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ds-option-sub {
+  font-size: 0.82em;
+  color: var(--ds-text-muted);
+}
+
+/* Mitchy's Recraft (RecraftSheet in App.tsx): the crafted items like the
+   workshop's chat history, each with its Recraft button */
+.recraft {
+  width: min(760px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.recraft-title {
+  margin-bottom: 2px;
+}
+.recraft-sub {
+  margin: 0;
+}
+.recraft-list {
+  max-height: 56vh;
+  overflow-y: auto;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-dialogue);
+  padding: 0 14px;
+}
+.recraft-empty {
+  padding: 22px 4px;
+}
+.recraft-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--ds-line-soft);
+}
+.recraft-row:last-child {
+  border-bottom: none;
+}
+.recraft-thumb {
+  flex: none;
+  width: 78px;
+  height: 70px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius-sm);
+  background: rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.recraft-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.recraft-name {
+  color: var(--ds-text);
+}
+.recraft-prompt {
+  color: var(--ds-text);
+  opacity: 0.85;
+  font-size: 0.9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recraft-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  white-space: nowrap;
+}
+.recraft-line {
+  margin: 0;
+  color: var(--ds-text);
+}

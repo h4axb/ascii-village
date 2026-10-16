@@ -168,6 +168,7 @@ import CraftModal from './CraftModal';
 import { flushFeedbackOutbox, newFeedbackId, playerId, sendFeedback, SESSION } from './feedback/client';
 import { CraftPrefsSettings } from './CraftFeedback';
 import { LINK } from './link';
+import { loadHistory, ago, type CraftRecord, type ChatLine } from './craftHistory';
 import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
 import { QUEST_ENABLED, GATHER_TARGET, EXPLORE_TILES, SEED_CHOICES, type SeedKind, type HintTarget, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, DISCOVERIES, objectiveById, type StepId, type DiscoveryId } from './quest/quests';
 import { boatReachable, boatRoute, seaRoute, pathLength, pointAt, smoothBoatPath, type Pt } from './quest/route';
@@ -305,6 +306,8 @@ const PLAYER_Z_INDEX = 100000;
 // last transform the walk loop wrote to .world / .player-rig (see setMotion)
 const lastMotion = new WeakMap<HTMLElement, string>();
 
+// what Mitchy's Recraft costs (coins)
+const RECRAFT_PRICE = 12;
 // how long the checkpoint save chip shows (a new quest part)
 const CHECKPOINT_MS = 1600;
 // Intro Part C: how long the crafting token takes to fly to the player
@@ -520,7 +523,10 @@ type Modal =
     }
   // carry the whole token object (not just its id) so the modal survives the
   // token being consumed into an item during the success→folded flow
-  | { t: 'craft'; token: OwnedItem; confirmClose?: boolean }
+  // `recraft`: reworking a crafted item (Mitchy's Recraft, 12 coins paid):
+  // its old chat comes back, and the new result replaces that item
+  | { t: 'craft'; token: OwnedItem; confirmClose?: boolean; recraft?: { replaces: string; name: string; chat: ChatLine[] } }
+  | { t: 'recraft'; line?: string }
   | { t: 'houseMenu'; sel: number }
   | { t: 'storage'; slot: number; sel: number; menuOpen: boolean }
   | { t: 'crop'; slot: number; sel?: number }
@@ -564,7 +570,7 @@ const CONTROLS: [string, string[]][] = [
 ];
 
 // Modals drawn as a full-screen <Sheet> (with its own back / close buttons)
-const SHEET_MODALS = new Set<NonNullable<Modal>['t']>(['craft', 'inventory', 'detail', 'detailOwned', 'pay', 'shop', 'storage', 'talk']);
+const SHEET_MODALS = new Set<NonNullable<Modal>['t']>(['craft', 'recraft', 'inventory', 'detail', 'detailOwned', 'pay', 'shop', 'storage', 'talk']);
 
 const FRESH_SHOP: Modal = {
   t: 'shop',
@@ -1459,6 +1465,7 @@ function Game() {
   const talkedRef = useRef(false); // the first talk with Mitchy plugs the craft tokens (MitchyTalk)
   const craftBusyRef = useRef(false); // true while a craft generation is in flight
   const craftDoneRef = useRef(false); // true once the craft is finished (token spent) → exit is free
+  const recraftDoneRef = useRef(false); // a paid recraft produced its item (else leaving refunds it)
 
   const character = CHARACTERS[charIdx];
   const equippedRef = useRef(equipped);
@@ -2886,7 +2893,21 @@ function Game() {
   }, [questPaused]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mitchy's menu; "I'm done." only while reporting back
-  const dialogOptions = isStep(quest, 'report') ? ['Talk', 'Open Shop', QL.doneOption] : ['Talk', 'Open Shop'];
+  // Mitchy's menu: Talk, Recraft (12 coins), Sell Items (+ the quest's "done")
+  const dialogOptions = isStep(quest, 'report') ? ['Talk', 'Recraft', 'Sell Items', QL.doneOption] : ['Talk', 'Recraft', 'Sell Items'];
+  const dialogDetails = [
+    { sub: 'Chat with Mitchy about anything.' },
+    {
+      label: (
+        <>
+          Recraft <IconCoin size={16} /> {RECRAFT_PRICE} Gold
+        </>
+      ),
+      sub: "Change an existing item's prompt and craft it again.",
+    },
+    { sub: 'Exchange collected items for gold.' },
+    { sub: 'Tell Mitchy you’ve finished.' },
+  ];
 
   // the next objective, or nothing if `id` isn't the current one
   function questDone(id: StepId, patch: Partial<QuestState> = {}) {
@@ -4555,6 +4576,33 @@ function Game() {
   // text, and the confirm modal's Yes handler.
   const interactCtx: InteractCtx = { ents, crops, wt, fxFor, doors, lineColors, openGates };
 
+  // The tile gap between the player's box and an object's drawn box (its
+  // blank sprite margins left out)
+  function boxGap(e: Ent): number {
+    const k = e.scale ?? 1;
+    let x0 = e.x;
+    let x1: number;
+    let y0 = e.y;
+    let y1: number;
+    if (e.rotation) {
+      const t = spriteTiles(e.sprite, e.scale, e.rotation);
+      x1 = e.x + t.wT - 1;
+      y1 = e.y + t.hT - 1;
+    } else {
+      const rows = e.sprite.map((l, i) => [l, i] as const).filter(([l]) => l.trim());
+      if (!rows.length) return Infinity;
+      const lead = Math.min(...rows.map(([l]) => l.length - l.trimStart().length));
+      const end = Math.max(...rows.map(([l]) => l.trimEnd().length));
+      x0 = e.x + Math.floor((k * lead) / TILE_CH);
+      x1 = e.x + Math.ceil((k * end) / TILE_CH) - 1;
+      y0 = e.y + Math.floor((k * rows[0][1]) / TILE_LN);
+      y1 = e.y + Math.ceil((k * (rows[rows.length - 1][1] + 1)) / TILE_LN) - 1;
+    }
+    const gx = Math.max(x0 - (player.x + PLAYER_T.wT - 1), 0, player.x - x1);
+    const gy = Math.max(y0 - (player.y + PLAYER_T.hT - 1), 0, player.y - y1);
+    return Math.max(gx, gy);
+  }
+
   // The thing in reach, named over it with the F key (the hover label): every interactable within
   // a tile of the player's feet (2 for Mitchy and the buildings), the nearest
   // one winning - by tile gap, then by the distance between the two feet.
@@ -4565,7 +4613,10 @@ function Game() {
     let best: { ref: InteractRef; gap: number; dist: number } | null = null;
     for (const e of ents) {
       if (!canInteract(e)) continue;
-      const gap = near(e, player);
+      // from any side, all the way round: the nearer of the feet-to-base gap
+      // and the gap between the player's whole box and the object's drawn box
+      // (so the top of a palm's crown counts too)
+      const gap = Math.min(near(e, player), boxGap(e));
       if (gap > (e.kind === 'shop' ? 3 : PROMPT_WIDE_KINDS.has(e.kind) ? 2 : 1)) continue;
       const ref: InteractRef = { kind: 'entity', id: e.id };
       if (!describeInteraction(ref, interactCtx)) continue;
@@ -4747,11 +4798,13 @@ function Game() {
 
   // ---- dialog / shop actions ----
   function confirmDialog(sel: number) {
-    if (sel === 2 && isStep(questRef.current, 'report')) {
+    if (sel === 3 && isStep(questRef.current, 'report')) {
       void questReportDone();
       return;
     }
     if (sel === 1) {
+      setModal({ t: 'recraft' });
+    } else if (sel === 2) {
       setModal(FRESH_SHOP);
     } else {
       // Talk opens the chat window (MitchyTalk.tsx); her world speech
@@ -4760,6 +4813,27 @@ function Game() {
       setModal({ t: 'talk', first: !talkedRef.current });
       talkedRef.current = true;
     }
+  }
+
+  // ---- Mitchy's Recraft: pay 12, back into that item's chat ----
+  function startRecraft(item: OwnedItem, rec: CraftRecord | null) {
+    if (money < RECRAFT_PRICE) {
+      setModal({ t: 'recraft', line: `hmm, a recraft costs ${RECRAFT_PRICE} coins. u don’t have enough yet.` });
+      return;
+    }
+    setMoney((mo) => mo - RECRAFT_PRICE);
+    recraftDoneRef.current = false;
+    const token: OwnedItem = { ...universalToken(hourSeed), ownedId: `own-${Date.now()}-recraft` };
+    const chat: ChatLine[] = rec?.chat ?? (rec ? [{ who: 'me', text: rec.prompt }] : []);
+    setModal({ t: 'craft', token, recraft: { replaces: item.ownedId, name: item.name, chat } });
+  }
+  function closeCraft() {
+    const m = modalRef.current;
+    if (m?.t === 'craft' && m.recraft && !recraftDoneRef.current) {
+      setMoney((mo) => mo + RECRAFT_PRICE);
+      showToast(`no recraft this time - your ${RECRAFT_PRICE} coins are back.`);
+    }
+    setModal(null);
   }
 
   // ---- buy / craft / equip ----
@@ -4810,11 +4884,16 @@ function Game() {
   // close the modal — the workshop stays open on its folded/"done" screen, and
   // the player closes it themselves. (equip here mirrors equipOwned WITHOUT the
   // setModal(null), so the modal survives.)
-  function consumeCraft(tokenId: string, crafted: ShopItem, equip: boolean) {
+  function consumeCraft(tokenId: string, crafted: ShopItem, equip: boolean, replaces?: string) {
     const item = questCraftFit(crafted);
     const owned: OwnedItem = { ...item, ownedId: `own-${Date.now()}` };
     questCrafted(owned, equip);
-    setBag((b) => [...b.filter((x) => x.ownedId !== tokenId), owned]);
+    // a recraft: the new item takes the old one's place
+    if (replaces) {
+      recraftDoneRef.current = true;
+      if (equippedRef.current?.ownedId === replaces) unequip();
+    }
+    setBag((b) => [...b.filter((x) => x.ownedId !== tokenId && x.ownedId !== replaces), owned]);
     if (equip && owned.equip) {
       if (owned.equip.mode === 'pet') setPetPos({ x: Math.max(0, player.x - 2), y: player.y });
       setEquipped(owned);
@@ -6908,6 +6987,7 @@ function Game() {
                 </div>
               }
               options={dialogOptions}
+              details={dialogDetails}
               sel={modal.sel}
               onSel={(i) => setModal({ t: 'dialog', sel: i })}
               onPick={confirmDialog}
@@ -7026,6 +7106,17 @@ function Game() {
               );
             })()}
 
+          {modal.t === 'recraft' && (
+            <RecraftSheet
+              items={bag.filter((o) => o.kind !== 'token')}
+              money={money}
+              line={modal.line ?? null}
+              onRecraft={startRecraft}
+              onBack={() => setModal({ t: 'dialog', sel: 1 })}
+              onClose={() => setModal(null)}
+            />
+          )}
+
           {modal.t === 'craft' && (
             <CraftModal
               key={`${modal.token.ownedId}-${questCond ?? ''}`}
@@ -7043,8 +7134,9 @@ function Game() {
               }}
               money={money}
               onSpend={(coins) => setMoney((mo) => mo - coins)}
-              onConsume={(equip, item) => consumeCraft(modal.token.ownedId, item, equip)}
-              onClose={() => setModal(null)}
+              resume={modal.recraft ? { name: modal.recraft.name, chat: modal.recraft.chat } : undefined}
+              onConsume={(equip, item) => consumeCraft(modal.token.ownedId, item, equip, modal.recraft?.replaces)}
+              onClose={closeCraft}
               confirmClose={!!modal.confirmClose}
               onConfirmChange={(v) =>
                 setModal((m) => (m && m.t === 'craft' ? { ...m, confirmClose: v } : m))
@@ -7165,6 +7257,61 @@ function WaterBar({ level, style }: { level: { bar: number; drop: number }; styl
         return <rect key={k} x={x} y={y} width={1} height={1} fill={fill} />;
       })}
     </svg>
+  );
+}
+
+// Mitchy's Recraft: the crafted items in the bag, laid out like the
+// workshop's chat history (picture, prompt, when), each with its Recraft
+// button: 12 coins, then back into that item's chat to give a new prompt.
+function RecraftSheet({
+  items,
+  money,
+  line,
+  onRecraft,
+  onBack,
+  onClose,
+}: {
+  items: OwnedItem[];
+  money: number;
+  line: string | null;
+  onRecraft: (item: OwnedItem, rec: CraftRecord | null) => void;
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const history = useMemo(() => loadHistory(), []);
+  const recOf = (o: OwnedItem) =>
+    history.find((r) => r.name === o.name && r.sprite.join('\n') === o.sprite.join('\n')) ??
+    history.find((r) => r.name === o.name) ??
+    null;
+  return (
+    <Sheet label="Recraft" money={money} onBack={onBack} onClose={onClose}>
+      <div className="ds-panel-title recraft-title">Recraft</div>
+      <div className="recraft">
+        <p className="ds-muted recraft-sub">Change an existing item's prompt and craft it again.</p>
+        <div className="recraft-list">
+          {items.length === 0 && <div className="ds-muted recraft-empty">Nothing crafted in your bag yet.</div>}
+          {items.map((o) => {
+            const rec = recOf(o);
+            return (
+              <div key={o.ownedId} className="recraft-row">
+                <span className="recraft-thumb">
+                  <FitSprite look={{ sprite: o.sprite, color: o.color, palette: o.palette, colors: o.colors }} fill={0.8} maxScale={1.6} />
+                </span>
+                <span className="recraft-text">
+                  <span className="recraft-name">{o.name}</span>
+                  <span className="recraft-prompt">{rec ? `“${rec.prompt}”` : o.desc}</span>
+                  {rec && <span className="ds-muted">{ago(rec.at)}</span>}
+                </span>
+                <button className="ds-option recraft-btn" onClick={() => onRecraft(o, rec)}>
+                  Recraft <IconCoin size={16} /> {RECRAFT_PRICE} Gold
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        {line && <p className="recraft-line">{line}</p>}
+      </div>
+    </Sheet>
   );
 }
 

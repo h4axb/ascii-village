@@ -33,6 +33,7 @@ export function ChoicePanel({
   onPick,
   hint,
   art,
+  details,
 }: {
   title: string;
   question?: ReactNode;
@@ -42,6 +43,8 @@ export function ChoicePanel({
   onPick: (i: number) => void;
   hint?: ReactNode;
   art?: ReactNode; // optional picture above the question (e.g. Mitchy)
+  // per option: a richer label (an icon, a price) and a line saying what it does
+  details?: readonly ({ label?: ReactNode; sub?: ReactNode } | undefined)[];
 }) {
   return (
     <Panel title={title} hint={hint} className="ds-choice">
@@ -53,14 +56,21 @@ export function ChoicePanel({
             key={o}
             role="option"
             aria-selected={i === sel}
-            className={'ds-option' + (i === sel ? ' sel' : '')}
+            className={'ds-option' + (i === sel ? ' sel' : '') + (details?.[i]?.sub ? ' has-sub' : '')}
             onMouseEnter={() => onSel(i)}
             onClick={(e) => {
               e.stopPropagation();
               onPick(i);
             }}
           >
-            {o}
+            {details?.[i]?.sub ? (
+              <>
+                <span className="ds-option-label">{details[i]!.label ?? o}</span>
+                <span className="ds-option-sub">{details[i]!.sub}</span>
+              </>
+            ) : (
+              (details?.[i]?.label ?? o)
+            )}
           </button>
         ))}
       </div>

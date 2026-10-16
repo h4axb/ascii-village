@@ -4791,3 +4791,37 @@ pre {
   font-size: 12px;
   opacity: 0.7;
 }
+
+/* a plant's water bar (WaterBar in App.tsx), centred over its slot */
+.water-bar {
+  position: absolute;
+  height: 1.3em;
+  width: 5.07em;
+  transform: translateX(-50%);
+  pointer-events: none;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
+}
+
+/* the checkpoint save chip: like .hud-tc, but over every overlay */
+.checkpoint-chip {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #e6e6e6;
+  font-size: 14px;
+  letter-spacing: 1px;
+  pointer-events: none;
+  animation: save-flash 0.55s ease-out;
+}
+.checkpoint-chip .hud-tc-icon {
+  animation: save-icon-pulse 0.8s ease-in-out infinite;
+}

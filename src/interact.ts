@@ -111,7 +111,7 @@ export function describeInteraction(ref: InteractRef, ctx: InteractCtx): Interac
       c.stage === 'ready'
         ? `Do you want to harvest this ${c.name}?`
         : c.stage === 'failed'
-          ? `Do you want to clear this ${c.name}?`
+          ? `Do you want to pluck out this dried ${c.name}?`
           : st.thirsty
             ? `Do you want to water this ${c.name}?`
             : `Do you want to check on this ${c.name}?`;

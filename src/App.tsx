@@ -50,8 +50,6 @@ import type { Ent, ItemType, EntityKind } from './world';
 import {
   getFunFact,
   basePrice,
-  getShopStock,
-  CATEGORIES,
   universalToken,
   TOKENS_PER_DAY,
 } from './llm';
@@ -68,6 +66,10 @@ import {
   cropStatus,
   advanceStage,
   slotSprite,
+  waterLevel,
+  isFillCrop,
+  POUR_FILL_MS,
+  DRY_MS,
   tileDist,
   NO_EFFECT,
   EMPTY_SLOT,
@@ -82,7 +84,6 @@ import {
   formatWorldTime,
   isNightOf,
   daySeedOf,
-  HOUR_MS,
 } from './time';
 import type { TimeConfig } from './time';
 import { loadSave, writeSave, writeSaveForLink, parseSave, downloadSaveFile, deleteSave } from './save';
@@ -304,6 +305,8 @@ const PLAYER_Z_INDEX = 100000;
 // last transform the walk loop wrote to .world / .player-rig (see setMotion)
 const lastMotion = new WeakMap<HTMLElement, string>();
 
+// how long the checkpoint save chip shows (a new quest part)
+const CHECKPOINT_MS = 1600;
 // Intro Part C: how long the crafting token takes to fly to the player
 const TOKEN_FX_MS = 900;
 // the quest flow (src/quest/): how long QUEST COMPLETE stays, boat speed (tiles/s)
@@ -802,7 +805,7 @@ function LandingWorld({ portrait }: { portrait: boolean }) {
                   perCell={e.kind === 'flowerplus' || e.kind === 'house' || e.kind === 'cliff'}
                   sway={e.sway}
                   blend={e.blend}
-                  solidCells={['house', 'bridge', 'shop', 'palm', 'boulder', 'grasshalm', 'fence', 'gate'].includes(e.kind)}
+                  solidCells={['house', 'bridge', 'shop', 'palm', 'boulder', 'grasshalm', 'fence', 'gate', 'date'].includes(e.kind)}
                 />
               ),
             )}
@@ -1447,7 +1450,6 @@ function Game() {
   const [petPos, setPetPos] = useState<{ x: number; y: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [wt, setWt] = useState(() => worldTime(timeCfgRef.current));
-  const [stock, setStock] = useState<Record<Category, ShopItem[]> | null>(null);
   const nothingTimer = useRef<number | undefined>(undefined);
   const toastTimer = useRef<number | undefined>(undefined);
   const talkedRef = useRef(false); // the first talk with Mitchy plugs the craft tokens (MitchyTalk)
@@ -1461,7 +1463,9 @@ function Game() {
   // Today's remaining allowances. Reading through daySeedOf is what makes a
   // stored counter from a previous day self-invalidate.
   const today = daySeedOf(wt);
-  const tokensLeftToday = TOKENS_PER_DAY - (tokenBuys.day === today ? tokenBuys.n : 0);
+  // the quest links: at most TOKENS_PER_DAY (3) tokens from the shop in all
+  // (reset for the second crafting design); otherwise 3 a day
+  const tokensLeftToday = TOKENS_PER_DAY - (QUEST_ENABLED || tokenBuys.day === today ? tokenBuys.n : 0);
   const coinsGrantedToday = coinGrants.day === today ? coinGrants.total : 0;
 
   // ---- the world clock (worldTime) ticks once per second ----
@@ -1785,21 +1789,8 @@ function Game() {
     }
   }, [equipped]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // the shop restocks once every worldTime hour
+  // the shop's token (its look follows the worldTime hour)
   const hourSeed = hourSeedOf(wt);
-  useEffect(() => {
-    let alive = true;
-    setStock(null);
-    Promise.all(CATEGORIES.map((c) => getShopStock(c, hourSeed))).then((lists) => {
-      if (!alive) return;
-      const s = {} as Record<Category, ShopItem[]>;
-      CATEGORIES.forEach((c, i) => (s[c] = lists[i]));
-      setStock(s);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [hourSeed]);
 
   function showToast(text: string) {
     window.clearTimeout(toastTimer.current);
@@ -3580,7 +3571,7 @@ function Game() {
   const questTestRef = useRef<Record<string, (...a: never[]) => unknown>>({});
   if (import.meta.env.DEV) {
     questTestRef.current = {
-      state: () => ({ quest: questRef.current, inv, money, bag: bag.map((o) => `${o.name}|${o.kind}|${o.ownedId}`), cinematic, crops: crops.map((c) => `${c.name}:${c.stage}${c.dormant ? ':dormant' : ''}`), player, mitchyPos, equipped: equipped?.name ?? null, placed: placedItems.map((p) => `${p.name}@${p.x.toFixed(1)},${p.y.toFixed(1)}`) }),
+      state: () => ({ quest: questRef.current, inv, money, bag: bag.map((o) => `${o.name}|${o.kind}|${o.ownedId}`), cinematic, crops: crops.map((c) => `${c.name}:${c.stage}${c.dormant ? ':dormant' : ''}${c.fill !== undefined ? ':' + waterLevel(c, worldTime(timeCfgRef.current)).bar.toFixed(2) + '/' + waterLevel(c, worldTime(timeCfgRef.current)).drop.toFixed(2) : ''}`), player, mitchyPos, equipped: equipped?.name ?? null, placed: placedItems.map((p) => `${p.name}@${p.x.toFixed(1)},${p.y.toFixed(1)}`) }),
       collect: () => {
         const e = ents.find((x) => !removed.has(x.id) && (COLLECT_AS[x.kind] || ITEM_TYPES.includes(x.kind as ItemType)));
         if (e) collect(e);
@@ -3602,6 +3593,7 @@ function Game() {
       ghost: (x: number, y: number) => setPlacing((g) => (g ? { ...g, x, y } : g)),
       pond: () => fillAtPond(),
       plantSeed: () => plantBase('seed'),
+      setPart: (part: QuestState['part']) => questRef.current && setQuest({ ...questRef.current, part, step: 0 }),
       equip: (ownedId: string) => {
         const o = bag.find((b) => b.ownedId === ownedId);
         if (o) equipOwned(o);
@@ -3653,6 +3645,21 @@ function Game() {
   useEffect(() => {
     if (QUEST_ENABLED && quest) writeSave(snapRef.current());
   }, [quest, discoveries]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Checkpoints: a new quest part (questline 1 -> 2, the ratings, the switch
+  // to the second crafting design, the end) is saved with the save chip at
+  // the top centre, over every overlay. (Steps themselves save silently.)
+  const [checkpoint, setCheckpoint] = useState(0);
+  const prevPartRef = useRef(quest?.part);
+  useEffect(() => {
+    const prev = prevPartRef.current;
+    prevPartRef.current = quest?.part;
+    if (!QUEST_ENABLED || !quest || prev === undefined || prev === quest.part) return;
+    writeSave(snapRef.current());
+    setCheckpoint((n) => n + 1);
+    const t = window.setTimeout(() => setCheckpoint(0), CHECKPOINT_MS);
+    return () => window.clearTimeout(t);
+  }, [quest?.part]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The first time the player does one of the basics during the quests, a
   // toast says so (once each; saved, so a reload doesn't repeat it)
@@ -4386,6 +4393,31 @@ function Game() {
     return () => window.clearTimeout(t);
   }, [watering?.phase, watering?.held]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // While the pour is held, the plant's water bar rises (POUR_FILL_MS for an
+  // empty bar); letting go stops it, and a full bar ends the pour: grown.
+  useEffect(() => {
+    if (!watering || watering.phase !== 'pour' || !watering.held) return;
+    const slot = watering.slot;
+    const STEP = 100;
+    const iv = window.setInterval(() => {
+      const now = worldTime(timeCfgRef.current);
+      let full = false;
+      setCrops((cs) =>
+        cs.map((c) => {
+          if (c.slot !== slot || c.stage !== 'growing' || !isFillCrop(c)) return c;
+          const fill = Math.min(1, waterLevel(c, now).bar + STEP / POUR_FILL_MS);
+          full = fill >= 1;
+          return { ...c, lastWateredAt: now, fill, fillAt: now, ...(full ? { stage: 'ready' as const } : {}) };
+        }),
+      );
+      if (full) {
+        setWatering((w) => (w ? { ...w, held: false } : w));
+        showToast('fully grown! press F to harvest.');
+      }
+    }, STEP);
+    return () => window.clearInterval(iv);
+  }, [watering?.phase, watering?.held, watering?.slot]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function pressF() {
     if (cinematic || mapOpen || wateringRef.current || hintLockRef.current) return;
     if (modal && modal.t === 'interact') {
@@ -4408,7 +4440,9 @@ function Game() {
       if (promptTarget.ref.kind === 'crop') {
         const slot = promptTarget.ref.slot;
         seenMark(promptTarget.ref);
-        if (crops.find((c) => c.slot === slot)?.stage === 'ready') harvestCrop(slot);
+        const stage = crops.find((c) => c.slot === slot)?.stage;
+        if (stage === 'ready') harvestCrop(slot);
+        else if (stage === 'failed') clearCrop(slot);
         else startWatering(slot);
         return;
       }
@@ -4446,7 +4480,7 @@ function Game() {
     // a planted seed in reach, with the watering tool in hand: water it
     const feetY = player.y + PLAYER_T.hT - 1;
     for (const c of crops) {
-      if (!canWater(c) && c.stage !== 'ready') continue; // water it, or harvest it once grown
+      if (!canWater(c) && c.stage !== 'ready' && c.stage !== 'failed') continue; // water it, harvest it once grown, pluck it once dried
       const s = plot.slots[c.slot];
       if (!s) continue;
       const gap = Math.max(Math.max(0, s.x - (player.x + PLAYER_T.wT - 1), player.x - s.x), Math.abs(s.y - feetY));
@@ -4626,7 +4660,7 @@ function Game() {
     const m = modal;
     if (!m || m.t !== 'shop' || !m.confirm) return;
     const it = m.confirm;
-    if (it.kind === 'token' && tokensLeftToday <= 0 && !QUEST_ENABLED) {
+    if (it.kind === 'token' && tokensLeftToday <= 0) {
       setModal({ ...m, limited: true });
       return;
     }
@@ -4639,7 +4673,7 @@ function Game() {
     setBag((b) => [...b, owned]);
     if (it.kind === 'token') {
       const day = daySeedOf(wt);
-      setTokenBuys((t) => (t.day === day ? { day, n: t.n + 1 } : { day, n: 1 }));
+      setTokenBuys((t) => (QUEST_ENABLED || t.day === day ? { day, n: t.n + 1 } : { day, n: 1 }));
       // a bought token immediately asks what to craft
       setModal({ t: 'craft', token: owned });
     } else {
@@ -4944,14 +4978,20 @@ function Game() {
 
   // The watering itself, with no tool check — shared by the player's can and
   // by a placed item's water_area action (which has no equipment to check).
-  function soakCrops(ids: Set<string>) {
+  // A water-grown crop (its water bar) gets `add` on top of its live level
+  // and its drop refilled; the player's pour adds through pourTick instead.
+  function soakCrops(ids: Set<string>, add = 0.25) {
+    const now = worldTime(timeCfgRef.current);
     setCrops((cs) =>
-      cs.map((c) =>
-        ids.has(c.id)
-          ? // a dormant seed starts growing now
-            { ...c, lastWateredAt: wt, ...(c.dormant ? { dormant: false, plantedAt: wt, care: { ...c.care, waterEveryMs: 10 * 60_000 } } : {}) }
-          : c,
-      ),
+      cs.map((c) => {
+        if (!ids.has(c.id)) return c;
+        if (isFillCrop(c)) {
+          const fill = Math.min(1, waterLevel(c, now).bar + add);
+          return { ...c, lastWateredAt: now, fill, fillAt: now, ...(fill >= 1 ? { stage: 'ready' as const } : {}) };
+        }
+        // a dormant seed (an old save) starts growing now
+        return { ...c, lastWateredAt: now, ...(c.dormant ? { dormant: false, plantedAt: now, care: { ...c.care, waterEveryMs: 10 * 60_000 } } : {}) };
+      }),
     );
   }
 
@@ -4973,8 +5013,8 @@ function Game() {
       showToast('nothing to water right now.');
       return;
     }
-    soakCrops(new Set(targets.map((c) => c.id)));
-    showToast(`splash! watered ${targets.length} plant${targets.length > 1 ? 's' : ''}.`);
+    soakCrops(new Set(targets.map((c) => c.id)), slot === undefined ? 0.25 : 0);
+    if (slot === undefined || !targets.some(isFillCrop)) showToast(`splash! watered ${targets.length} plant${targets.length > 1 ? 's' : ''}.`);
     if (q?.seedCrop && targets.some((c) => c.id === q.seedCrop)) questDone('water');
   }
 
@@ -5020,7 +5060,7 @@ function Game() {
 
   // A plant's choices: its one action (water / harvest / clear), then Return
   function cropOptions(c: PlantedCrop): string[] {
-    return [c.stage === 'ready' ? 'Harvest' : c.stage === 'failed' ? 'Clear slot' : 'Water', 'Return'];
+    return [c.stage === 'ready' ? 'Harvest' : c.stage === 'failed' ? 'Pluck out' : 'Water', 'Return'];
   }
   function cropPick(c: PlantedCrop, i: number) {
     if (i === 1) return setModal(null);
@@ -5035,7 +5075,7 @@ function Game() {
   function clearCrop(slot: number) {
     setCrops((cs) => cs.filter((x) => x.slot !== slot));
     setModal(null);
-    showToast('cleared the withered plant.');
+    showToast('plucked out the dried plant.');
   }
 
   // ---- keyboard ----
@@ -5392,10 +5432,6 @@ function Game() {
   const avatarSprite = character.face.map((l) => l.padEnd(avatarCols, ' '));
 
   const timeStr = formatWorldTime(wt);
-  const secsToRefresh = Math.ceil((HOUR_MS - (wt % HOUR_MS)) / 1000);
-  const refreshStr = `${String(Math.floor(secsToRefresh / 60)).padStart(2, '0')}:${String(
-    secsToRefresh % 60,
-  ).padStart(2, '0')}`;
 
   // ---- GameMap's character registry (player + Mitchy today) ----
   // A future NPC is added here — id, display name, a live-position getter,
@@ -5480,8 +5516,8 @@ function Game() {
                 } else {
                   setQuestView('controls');
                   setQuestOpen(true);
-                  // points the way back to the quest
-                  setBlinkQuest(true);
+                  // points the way back to the quest - only on the first step
+                  setBlinkQuest(!!quest && isStep(quest, 'explore'));
                 }
               }}
             />
@@ -5802,6 +5838,18 @@ function Game() {
                 );
               })}
               {crops.map((c) => {
+                if (c.stage !== 'growing' || !isFillCrop(c)) return null;
+                const s = plot.slots[c.slot];
+                if (!s) return null;
+                return (
+                  <WaterBar
+                    key={`bar-${c.id}`}
+                    level={waterLevel(c, wt)}
+                    style={{ left: `${(s.x + 0.5) * TILE_CH}ch`, top: `${s.y * TILE_LN - 1.4}em`, zIndex: 450 }}
+                  />
+                );
+              })}
+              {crops.map((c) => {
                 const st = cropStatus(c, wt, fxFor(c.slot));
                 // no "water!" badge on a thirsty plant (taken out on request)
                 const badge = c.stage === 'ready' ? 'ready!' : c.stage === 'failed' ? 'x' : '';
@@ -5933,7 +5981,8 @@ function Game() {
                       e.kind === 'boulder' ||
                       e.kind === 'grasshalm' ||
                       e.kind === 'fence' ||
-                      e.kind === 'gate'
+                      e.kind === 'gate' ||
+                      e.kind === 'date'
                     }
                     onClick={
                       canInteract(e)
@@ -6319,7 +6368,10 @@ function Game() {
                       <kbd className="fpop-key">F</kbd>
                       <span className="fpop-name">
                         {ref.kind === 'crop'
-                          ? `${crops.find((c) => c.slot === ref.slot)?.stage === 'ready' ? 'harvest' : 'water'} ${copy.name.toLowerCase()}`
+                          ? (() => {
+                              const st = crops.find((c) => c.slot === ref.slot)?.stage;
+                              return `${st === 'ready' ? 'harvest' : st === 'failed' ? 'pluck out' : 'water'} ${copy.name.toLowerCase()}`;
+                            })()
                           : ref.kind === 'door'
                             ? doors[ref.door]
                               ? 'close the door'
@@ -6523,6 +6575,12 @@ function Game() {
         />
       )}
       {quest?.part === 'transition' && <TestTransition onBegin={questBeginSecond} />}
+      {checkpoint > 0 && (
+        <div className="checkpoint-chip" key={checkpoint}>
+          <SaveIcon className="hud-tc-icon" />
+          <span className="hud-tc-label">Saving…</span>
+        </div>
+      )}
       {saveScreen && (
         <div className="save-screen" role="status" aria-live="polite">
           {saveScreen === 'saving' ? (
@@ -6793,17 +6851,16 @@ function Game() {
               onClose={() => setModal(null)}
               buy={{
                 token: universalToken(hourSeed),
-                tokensLeft: QUEST_ENABLED ? null : tokensLeftToday,
-                stock,
-                cat: modal.cat,
-                restock: refreshStr,
+                tokensLeft: tokensLeftToday,
+                daily: !QUEST_ENABLED,
                 picked: modal.confirm,
                 line: modal.limited
-                  ? `that's all ${TOKENS_PER_DAY} tokens for today. come back tomorrow!`
+                  ? QUEST_ENABLED
+                    ? `that's all ${TOKENS_PER_DAY} tokens, sorry!`
+                    : `that's all ${TOKENS_PER_DAY} tokens for today. come back tomorrow!`
                   : modal.poor
                     ? 'hmm, u don’t have enough coins for that one yet.'
                     : modal.line,
-                onCat: (c) => setModal((m) => (m && m.t === 'shop' ? { ...m, cat: c } : m)),
                 onPick: (it) =>
                   setModal((m) => (m && m.t === 'shop' ? { ...m, confirm: it, csel: 0, poor: false, limited: false, line: null } : m)),
                 onBuy: buyConfirm,
@@ -6875,7 +6932,14 @@ function Game() {
                 c.stage === 'ready'
                   ? 'Fully grown and ready to harvest!'
                   : c.stage === 'failed'
-                    ? 'It withered from thirst. Clear the slot to replant.'
+                    ? 'It dried out. Pluck it out to replant.'
+                    : isFillCrop(c)
+                      ? (() => {
+                          const { bar, drop } = waterLevel(c, wt);
+                          return bar > 0
+                            ? `Water bar ${Math.round(bar * 100)}% - keep pouring until it's full and it's grown.`
+                            : `Thirsty! Water it within ${mins(drop * DRY_MS)} min or it dries out.`;
+                        })()
                     : c.dormant
                       ? 'A freshly planted seed. Water it to make it grow.'
                       : `${Math.round(st.progress * 100)}% grown, matures in about ${mins(st.msToMature)} min. ` +
@@ -6905,6 +6969,51 @@ function Game() {
   );
 }
 
+// A plant's water bar (pixel art): the drop on the left - its own level,
+// draining once the bar is empty - then 4 segments that fill with water
+// while it's poured (full = grown). See waterLevel in farm.ts.
+const DROP_PX = ['...oo...', '..oiio..', '..oiio..', '.oiiiio.', '.oiiiio.', 'oiiiiiio', 'oiiiiiio', 'oiiiiiio', '.oiiiio.', '..oooo..'];
+const WB = { line: '#3a2117', empty: '#241713', hi: '#a9e0ff', mid: '#4ea6e3', deep: '#2b6fb3', glint: '#e8f7ff' };
+function WaterBar({ level, style }: { level: { bar: number; drop: number }; style: React.CSSProperties }) {
+  const px: React.ReactElement[] = [];
+  const dot = (x: number, y: number, fill: string, w = 1, h = 1) =>
+    px.push(<rect key={px.length} x={x} y={y} width={w} height={h} fill={fill} />);
+  // the drop: interior rows 1..8 fill from the bottom
+  const dropRows = Math.round(level.drop * 8);
+  DROP_PX.forEach((row, y) =>
+    row.split('').forEach((ch, x) => {
+      if (ch === 'o') dot(x, y, WB.line);
+      else if (ch === 'i') {
+        const wet = y >= 9 - dropRows;
+        dot(x, y, wet ? (y === 9 - dropRows ? WB.hi : y >= 7 ? WB.deep : WB.mid) : WB.empty);
+      }
+    }),
+  );
+  if (dropRows >= 4) dot(2, 6, WB.glint);
+  // the bar: outline, then 4 segments of 6px with 1px dividers
+  const X0 = 10;
+  dot(X0, 1, WB.line, 29, 1);
+  dot(X0, 8, WB.line, 29, 1);
+  dot(X0, 1, WB.line, 1, 8);
+  dot(X0 + 28, 1, WB.line, 1, 8);
+  for (let i = 0; i < 4; i++) {
+    const sx = X0 + 1 + i * 7;
+    if (i > 0) dot(sx - 1, 2, WB.line, 1, 6);
+    dot(sx, 2, WB.empty, 6, 6);
+    const w = Math.round(Math.max(0, Math.min(1, level.bar * 4 - i)) * 6);
+    if (w > 0) {
+      dot(sx, 2, WB.hi, w, 1);
+      dot(sx, 3, WB.mid, w, 3);
+      dot(sx, 6, WB.deep, w, 2);
+    }
+  }
+  return (
+    <svg className="water-bar" viewBox="0 0 39 10" shapeRendering="crispEdges" style={style} aria-hidden>
+      {px}
+    </svg>
+  );
+}
+
 // A resource's description, as the Inventory shows it — the shop's sell
 // screen shows the very same text for the same item.
 function BaseItemText({ item, fact }: { item: ItemType; fact: string | null }) {
@@ -6922,37 +7031,31 @@ function BaseItemText({ item, fact }: { item: ItemType; fact: string | null }) {
 // mind column under the details. Prices are fixed: the coin value the
 // Inventory shows (basePrice). The rail under the back button switches to
 // Buy, which renders `children`.
-// The shop's Buy side, laid out like its Sell side: Mitchy's stock as slots
-// (the crafting token first, then the chosen category), the picked item's
-// details on the right, her line and Buy / Never mind underneath.
+// The shop's Buy side, laid out like its Sell side: just the crafting token
+// in the slots, the picked item's details on the right, her line and Buy /
+// Never mind underneath.
 interface ShopBuyProps {
   token: ShopItem;
-  tokensLeft: number | null; // null: no daily limit (the quest links)
-  stock: Record<Category, ShopItem[]> | null;
-  cat: Category;
-  restock: string; // mm:ss until the stock changes
+  tokensLeft: number; // tokens the shop still sells (3 in all, or 3 a day)
+  daily: boolean; // the limit is per day (not the quest links)
   picked: ShopItem | null;
   line: string | null;
-  onCat: (c: Category) => void;
   onPick: (it: ShopItem) => void;
   onBuy: () => void;
 }
 function ShopBuy({
   token,
   tokensLeft,
-  stock,
-  cat,
-  restock,
+  daily,
   picked,
   line,
-  onCat,
   onPick,
   onBuy,
   sel,
   onSel,
   onClose,
 }: ShopBuyProps & { sel: number; onSel: (i: number) => void; onClose: () => void }) {
-  const items = [token, ...(stock?.[cat] ?? [])];
+  const items = [token];
   const isToken = picked?.kind === 'token';
   return (
     <>
@@ -6960,25 +7063,7 @@ function ShopBuy({
         <div className="ds-buy">
           <div className="ds-buy-head">
             <span className="ds-sec-label">Mitchy’s stock</span>
-            <span className="ds-muted" title="the stock changes every hour">
-              {stock ? `new stock in ${restock}` : 'restocking…'}
-            </span>
-          </div>
-          <div className="ds-tabs" role="tablist" aria-label="Category">
-            {CATEGORIES.map((c) => (
-              <button
-                key={c}
-                role="tab"
-                aria-selected={cat === c}
-                className={'ds-tab' + (cat === c ? ' on' : '')}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCat(c);
-                }}
-              >
-                {c}
-              </button>
-            ))}
+            <span className="ds-muted">{`${Math.max(0, tokensLeft)} token${tokensLeft === 1 ? '' : 's'} left${daily ? ' today' : ''}`}</span>
           </div>
           <SlotGrid
             slots={items.map((it) => ({
@@ -7001,9 +7086,7 @@ function ShopBuy({
             title={picked.name}
             stats={[
               { icon: <IconCoin />, value: picked.price, label: 'Price' },
-              ...(isToken && tokensLeft !== null
-                ? [{ icon: <IconBag />, value: Math.max(0, tokensLeft), label: 'Left today' }]
-                : []),
+              ...(isToken ? [{ icon: <IconBag />, value: Math.max(0, tokensLeft), label: daily ? 'Left today' : 'Left' }] : []),
             ]}
           >
             <p>{picked.desc}</p>
@@ -7026,7 +7109,7 @@ function ShopBuy({
                 ? isToken
                   ? 'a crafting token! describe anything to it and it becomes real.'
                   : `the ${picked.name}? good eye.`
-                : 'anything catch ur eye? the crafting token is always the first slot.')}
+                : 'a crafting token, anyone? describe anything to it and it becomes real.')}
           </div>
         </div>
         <div className="ds-shop-actions">
@@ -7088,7 +7171,7 @@ function ShopSheet({
   onClose: () => void;
   buy: ShopBuyProps;
 }) {
-  const owned = ITEM_TYPES.filter((t) => inv[t] > 0);
+  const owned = ITEM_TYPES.filter((t) => inv[t] > 0 && t !== 'seed'); // seeds can't be sold
   const item = pick && inv[pick] > 0 ? pick : (owned[0] ?? null);
   const fact = useFunFact(tab === 'sell' ? item : null);
   const price = item ? basePrice(item) : 0;
@@ -7661,7 +7744,7 @@ function PlacedItemView({
 // editor's solid assets (stones, bushes, the glyph ponds) — hundreds of cells
 // each, so a canvas too. 'grasshalm': the grass tuft, filled like them (still
 // walked through: its collision mask is blank).
-const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder', 'grasshalm', 'fence', 'gate']);
+const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder', 'grasshalm', 'fence', 'gate', 'date']);
 function EntSprite({
   kind,
   charW,

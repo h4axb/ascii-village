@@ -144,6 +144,7 @@ export interface ShopItem {
   price: number;
   kind: 'item' | 'token';
   tool?: 'water'; // utensils that act as tools (e.g. the watering can)
+  grip?: 'left' | 'right'; // held items: the side its handle is on (right = held in the left hand)
   color?: string; // crafted items: base/default sprite colour (CSS colour)
   // crafted items: optional per-region colour ("paint by number"). palette maps
   // single-char keys → hex; colors is a grid the same shape as sprite, each cell
@@ -692,6 +693,8 @@ async function craftWithRefs(
   if (can) {
     item.tool = 'water';
     item.equip = { mode: 'hold' };
+    // the references have the spout left and the handle right
+    item.grip = m.mirror ? 'left' : 'right';
   }
   const spec = parseSpec(prompt);
   item.textureModifier = textureModifierFor(spec.finish);
@@ -730,8 +733,8 @@ export interface CraftClarify {
 }
 // The questions come from what the prompt leaves open, worked out locally
 // (craft/refCraft.ts unknownsOf, no model call): its size and colour when it
-// names none; the details no reference can draw (named from the prompt, a
-// yes/no); otherwise whether to add a surprise.
+// names none, whether to add a surprise, then the details no reference can
+// draw (named from the prompt, a yes/no).
 export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> {
   // a blocked prompt is refused by craftItem right after, without questions
   if (!checkPolicy(prompt).allowed) return [];
@@ -757,6 +760,15 @@ export function preQuestions(prompt: string): ClarifyQuestion[] {
       q: 'What colour should it be?',
       options: COLOUR_OPTIONS.map((c) => ({ label: c.label, effect: `Main colour: ${c.label.toLowerCase()}.`, colour: c.word })),
     });
+  // the surprise is always asked; the details no reference can draw last
+  qs.push({
+    topic: 'Surprise',
+    q: 'Should I add a little surprise?',
+    options: [
+      { label: 'Yes, surprise me', effect: 'Add one unexpected, charming little detail.', surprise: true },
+      { label: 'Keep it classic', effect: 'Keep it classic, no extras.', surprise: false },
+    ],
+  });
   if (u.refBody && u.details.length) {
     const many = u.details.length > 1;
     const names = u.details.map((d) => `the ${d}`);
@@ -771,15 +783,7 @@ export function preQuestions(prompt: string): ClarifyQuestion[] {
       ],
       noDecide: true,
     });
-  } else
-    qs.push({
-      topic: 'Surprise',
-      q: 'Should I add a little surprise?',
-      options: [
-        { label: 'Yes, surprise me', effect: 'Add one unexpected, charming little detail.', surprise: true },
-        { label: 'Keep it classic', effect: 'Keep it classic, no extras.', surprise: false },
-      ],
-    });
+  }
   return qs;
 }
 export async function preflightCraft(prompt: string): Promise<CraftPreflight> {

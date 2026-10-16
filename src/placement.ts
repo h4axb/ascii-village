@@ -31,6 +31,7 @@ export interface PlacedItem {
   price: number;
   kind: 'item'; // tokens are excluded at the UI gate, never reach here
   tool?: 'water';
+  grip?: 'left' | 'right'; // see ShopItem.grip
   color?: string;
   palette?: Record<string, string>;
   colors?: string[];

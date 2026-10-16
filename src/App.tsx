@@ -332,6 +332,10 @@ const lastMotion = new WeakMap<HTMLElement, string>();
 
 // what Mitchy's Recraft costs (coins)
 const RECRAFT_PRICE = 12;
+// a held item's box, in shares of the player's width / height, and where
+// the left hand is (share of the width from the left edge)
+const HELD_BOX = { w: 0.38, h: 0.26 };
+const LEFT_HAND_FRAC = 0.37;
 // how long the checkpoint save chip shows (a new quest part)
 const CHECKPOINT_MS = 1600;
 // Intro Part C: how long the crafting token takes to fly to the player
@@ -6389,6 +6393,34 @@ function Game() {
                 {!rideBoat && (
                   <PlayerShadow x={player.x} y={player.y} cx={(playerK * playerW) / 2} footEm={playerK * displaySprite.length} />
                 )}
+                {/* a held item: in the hand by its handle (a handle on its
+                    right = the left hand), behind the player so the hand shows
+                    on top of it, every item fitted into the same box (about a
+                    third of the player wide, a quarter tall) at hip height */}
+                {equipped?.equip?.mode === 'hold' &&
+                  !waterFrame &&
+                  (() => {
+                    const cols = Math.max(1, ...equipped.sprite.map((l) => l.length));
+                    const rows = Math.max(1, equipped.sprite.length);
+                    const H = character.sprite.length;
+                    const s = Math.min((HELD_BOX.w * idleW * playerK) / cols, (HELD_BOX.h * H * playerK) / rows);
+                    const leftHand = equipped.grip === 'right';
+                    // (the player's visible box starts at the rig's origin)
+                    const x = leftHand ? idleW * LEFT_HAND_FRAC * playerK - cols * s : HAND_X * playerK;
+                    const y = HAND_Y * playerK - (rows * s) / 2;
+                    return (
+                      <ColoredSprite
+                        className="rig-held"
+                        style={{ left: `${x}ch`, top: `${y}em`, transform: `scale(${s})`, transformOrigin: '0 0' }}
+                        sprite={equipped.sprite}
+                        colors={equipped.colors}
+                        palette={equipped.palette}
+                        color={equipped.color}
+                        texture={equipped.textureModifier}
+                        solidCells
+                      />
+                    );
+                  })()}
                 {/* watering: the tool in hand, behind the hand (drawn first),
                     held at the frame's hand and tipped as it pours; about 9
                     rows of the player's art tall, at most 16 chars wide */}
@@ -6466,22 +6498,6 @@ function Game() {
                   />
                 )}
 
-                {equipped?.equip?.mode === 'hold' && !waterFrame && (
-                  <ColoredSprite
-                    className="rig-held"
-                    style={{
-                      left: `${-playerOffX + HAND_X * playerK}ch`,
-                      top: `${-playerOffY + HAND_Y * playerK}em`,
-                      transform: `scale(${0.7 * playerK * (equipped.scale ?? 1)})`,
-                    }}
-                    sprite={equipped.sprite}
-                    colors={equipped.colors}
-                    palette={equipped.palette}
-                    color={equipped.color}
-                    texture={equipped.textureModifier}
-                    solidCells
-                  />
-                )}
               </div>
 
               {toast && (

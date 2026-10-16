@@ -50,6 +50,9 @@ export interface AssetDef {
   // a sign made of parts (the wayfinder): its boards turn and tilt per
   // placement (src/wayfinder.ts)
   layers?: SignLayers;
+  // kind 'gate': how it looks open (same size and palette; its `solid` what
+  // still blocks). Absent: the code gate's open look (fence.ts GATE_OPEN).
+  open?: { sprite: string[]; colors?: string[]; solid?: string[] };
 }
 
 export interface AssetMeta {
@@ -132,6 +135,8 @@ interface AssetFile extends AssetMeta {
   sway?: string;
   blend?: string;
   layers?: SignLayers;
+  group?: AssetDef['group'];
+  open?: AssetDef['open'];
 }
 const FILES = import.meta.glob<{ default: AssetFile }>('./data/assets/*.json', { eager: true });
 
@@ -159,7 +164,7 @@ function fileAssets(): AssetDef[] {
       // a file may carry its own defaults; assets.meta.json still wins
       label: d.label ?? slug,
       kind: d.kind ?? 'decor',
-      group: 'New',
+      group: d.group ?? 'New',
       sprite: d.sprite,
       colors: d.colors,
       palette: d.palette,
@@ -172,6 +177,7 @@ function fileAssets(): AssetDef[] {
       sway: d.sway ?? (/^pond/.test(slug) && d.palette ? waterKeys(d.palette) : undefined),
       blend: d.blend,
       layers: d.layers,
+      open: d.open,
     });
   }
   return out;

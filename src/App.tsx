@@ -96,6 +96,7 @@ import type { Outfit } from './outfit';
 import { SunIcon, MoonIcon, CoinIcon, SaveIcon, KeysIcon, SlidersIcon } from './icons';
 import { ColoredSprite, SolidSpriteCanvas, darken } from './ColoredSprite';
 import { GATE_OPEN, GATE_OPEN_SOLID } from './fence';
+import { assetOf } from './assets';
 import { eyesOf } from './playerEyes';
 import { SPEECH_BUBBLE, SPEECH_BUBBLE_COLORS, SPEECH_BUBBLE_PALETTE } from './speechBubble';
 import { onThemeChange, themeRevision, pondLook } from './theme';
@@ -260,6 +261,13 @@ const ITEM_SPRITES: Record<ItemType, string[]> = {
 };
 
 // resources Mitchy doesn't buy (shown greyed on the shop's Sell side)
+// an open gate: its own open look (a gate asset drawn from a picture), else
+// the code gate's leaves swung in; only what's left blocks
+function openGateLook(e: Ent): Ent {
+  const open = e.asset ? assetOf(e.asset)?.open : undefined;
+  if (open) return { ...e, sprite: open.sprite, colors: open.colors ?? e.colors, solidMask: open.solid ?? open.sprite };
+  return { ...e, sprite: GATE_OPEN.sprite, colors: GATE_OPEN.colors, solidMask: GATE_OPEN_SOLID };
+}
 const UNSELLABLE = new Set<ItemType>(['seed']);
 
 // A resource as the inventory, shop and storage show it: in its world
@@ -1635,7 +1643,7 @@ function Game() {
           ? { ...e, x: mitchyPos.x, y: mitchyPos.y }
           : // an open gate: its leaves swung in, only its posts block
             e.kind === 'gate' && openGates.has(e.id)
-            ? { ...e, sprite: GATE_OPEN.sprite, colors: GATE_OPEN.colors, solidMask: GATE_OPEN_SOLID }
+            ? openGateLook(e)
             : e,
       ),
       // wild spawns skip the garden footprint so nothing sprouts inside the

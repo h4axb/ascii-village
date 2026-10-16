@@ -4941,11 +4941,18 @@ pre {
   margin: -7px 0 0 -7px;
 }
 
-/* a fence piece's or gate's small contact shadow, at its feet */
-.fence-shadow {
+/* fence pieces' and gates' contact shadows: one row of ground-grid pixel
+   squares under their feet, in one layer just above the ground (one opacity,
+   so where pieces overlap the shadow stays even) */
+.fence-shadows {
   position: absolute;
+  inset: 0;
+  z-index: 1;
   pointer-events: none;
-  border-radius: 50%;
-  opacity: 0.4;
-  filter: blur(1px);
+  opacity: 0.3;
+}
+.fence-shadows > i {
+  position: absolute;
+  height: 0.5ch;
+  background: var(--fence-shadow, #1c2a12);
 }

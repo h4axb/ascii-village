@@ -670,6 +670,11 @@ const LANDING_FADE_MS = 500;
 // assumes; a rotated one turns about the art's own centre on the centre of its
 // rotated tile box, the box collision and footprint use) and its depth. Used
 // by the game's entity map and the start screen's live view alike.
+// the ground's pixel grid: blocks per text line (PlayerShadow's CELL_ASPECT),
+// snapped to half a block (the shadows' pixel square)
+const GROUND_PER_LINE = 14 / 8.4;
+const snapHalf = (v: number) => Math.round(v * 2) / 2;
+const SHADOW_COLOR = () => themeSwatch('player.shadow');
 // A fence piece's or gate's contact shadow: the glyph columns of its feet
 // (its bottom rows) as runs, gaps under 2 glyphs bridged, so a picket fence
 // gets one band, an open gate one under each post. Cached per sprite.
@@ -6172,28 +6177,9 @@ function Game() {
                 // its dates regrow, so the animation's ending state persists
                 const bare =
                   !anim && e.kind === 'palm' && shaken.has(`${e.id}@${growthWindow}`);
-                // fence pieces and gates: a small clean shadow at their feet
                 const place = entPlacement(e);
-                const shadows =
-                  (e.kind === 'fence' || e.kind === 'gate') && !e.rotation
-                    ? fenceShadowRuns(e.sprite).map(([c0, c1], i) => (
-                        <div
-                          key={`${e.id}-sh${i}`}
-                          className="fence-shadow"
-                          style={{
-                            left: `${e.x * TILE_CH + (c0 - 0.6) * k}ch`,
-                            width: `${(c1 - c0 + 1.2) * k}ch`,
-                            top: `${e.y * TILE_LN + e.sprite.length * k - TILE_LN * 0.12}em`,
-                            height: `${TILE_LN * 0.36}em`,
-                            zIndex: typeof place.zIndex === 'number' ? place.zIndex - 1 : undefined,
-                            background: themeSwatch('player.shadow'),
-                          }}
-                        />
-                      ))
-                    : null;
                 return (
                   <Fragment key={e.id}>
-                  {shadows}
                   <EntSprite
                     key={e.id}
                     kind={e.kind}
@@ -6650,6 +6636,22 @@ function Game() {
                   </div>
                 );
               })}
+              {/* fence pieces' and gates' contact shadows: one row of
+                  ground-grid pixel squares under their feet, all in one
+                  layer (one opacity) so overlapping pieces stay even */}
+              <div className="fence-shadows" style={{ '--fence-shadow': SHADOW_COLOR() } as React.CSSProperties}>
+                {ents
+                  .filter((e) => (e.kind === 'fence' || e.kind === 'gate') && !e.rotation)
+                  .flatMap((e) => {
+                    const k = e.scale ?? 1;
+                    const top = snapHalf((e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE);
+                    return fenceShadowRuns(e.sprite).map(([c0, c1], i) => {
+                      const x0 = snapHalf(e.x * TILE_CH + (c0 - 0.5) * k);
+                      const x1 = Math.max(x0 + 0.5, snapHalf(e.x * TILE_CH + (c1 + 0.5) * k));
+                      return <i key={`${e.id}-${i}`} style={{ left: `${x0}ch`, width: `${x1 - x0}ch`, top: `${top}ch` }} />;
+                    });
+                  })}
+              </div>
               {/* a hint's sparkles round the nearest resources */}
               {hintSparkles.length > 0 && (
                 <HintSparkles

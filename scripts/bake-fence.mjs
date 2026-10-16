@@ -90,7 +90,9 @@ for (const n of Object.keys(LABEL)) {
     const oSprite = [...Array(Math.max(0, ofs)).fill(''), ...os];
     const oColors = [...Array(Math.max(0, ofs)).fill(''), ...openColors];
     asset.palette = gate.palette;
-    asset.open = { sprite: oSprite, colors: oColors, solid: feet(oSprite) };
+    // open, the gate blocks nothing (the fence beside it still does), so the
+    // player always fits through whatever scale it's placed at
+    asset.open = { sprite: oSprite, colors: oColors, solid: oSprite.map((l) => ' '.repeat(l.length)) };
   }
   fs.writeFileSync(`${OUT}/picket-${n}.json`, JSON.stringify(asset) + '\n');
   console.log(n, 'cols', r.cols, 'rows', sprite.length, 'pad', pad, 'w', Math.max(...sprite.map((l) => l.length)) * SCALE / 4, 'tiles');

@@ -549,7 +549,11 @@ export function collisionBox(e: {
 // tile covers proportionally MORE of the underlying character grid (the art
 // is drawn smaller, so more of it fits per tile), which is why this divides
 // by scale rather than multiplying.
-function tileHasGlyph(sprite: string[], scale: number, tx: number, ty: number): boolean {
+// `half`: only when the glyphs cover at least half the tile's width (fence
+// pieces a tile wide or more, placed in eighth tiles: the sliver of a piece
+// reaching into the next tile doesn't close it; where two pieces meet, one
+// covers half)
+function tileHasGlyph(sprite: string[], scale: number, tx: number, ty: number, half = false): boolean {
   // Clamped at 0: tx/ty are tile-LOCAL and go negative for the tile straddling
   // a fractionally-placed entity's left/top edge (see collisionBox). Without
   // the clamp those read off the front of the string, and `undefined !== ' '`
@@ -559,6 +563,19 @@ function tileHasGlyph(sprite: string[], scale: number, tx: number, ty: number): 
   const x1 = Math.ceil(((tx + 1) * TILE_CH) / scale);
   const y0 = Math.max(0, Math.floor((ty * TILE_LN) / scale));
   const y1 = Math.ceil(((ty + 1) * TILE_LN) / scale);
+  if (half) {
+    const span = ((tx + 1) * TILE_CH) / scale - (tx * TILE_CH) / scale; // the tile's width in glyphs
+    let cols = 0;
+    for (let x = x0; x < x1; x++) {
+      for (let y = y0; y < y1 && y < sprite.length; y++) {
+        if (x < sprite[y].length && sprite[y][x] !== ' ') {
+          cols++;
+          break;
+        }
+      }
+    }
+    return cols * 2 >= span;
+  }
   for (let y = y0; y < y1 && y < sprite.length; y++) {
     const line = sprite[y];
     for (let x = x0; x < x1 && x < line.length; x++) {
@@ -583,6 +600,7 @@ export function entityBlocksTile(
     scale?: number;
     solidMask?: string[];
     rotation?: 0 | 1 | 2 | 3;
+    kind?: string;
   },
   tx: number,
   ty: number,
@@ -594,7 +612,9 @@ export function entityBlocksTile(
   // falls back to box-solid: always CONSERVATIVE (blocks slightly more than
   // the visible glyphs), never lets the player clip through drawn art.
   if ((e.rotation ?? 0) % 2 === 1) return true;
-  return tileHasGlyph(e.solidMask ?? e.sprite, e.scale ?? 1, tx - e.x, ty - e.y);
+  // (a piece narrower than a tile, a side stick, blocks every tile it touches)
+  const wide = (Math.max(...e.sprite.map((l) => l.length)) * (e.scale ?? 1)) / TILE_CH >= 1;
+  return tileHasGlyph(e.solidMask ?? e.sprite, e.scale ?? 1, tx - e.x, ty - e.y, wide && (e.kind === 'fence' || e.kind === 'gate'));
 }
 
 // Chebyshev distance between the player's footprint and an entity's.

@@ -261,11 +261,12 @@ const ITEM_SPRITES: Record<ItemType, string[]> = {
 };
 
 // resources Mitchy doesn't buy (shown greyed on the shop's Sell side)
-// an open gate: its own open look (a gate asset drawn from a picture), else
-// the code gate's leaves swung in; only what's left blocks
+// an open gate: its own open look (a gate asset drawn from a picture; it
+// blocks only what its `solid` marks, nothing without), else the code gate's
+// leaves swung in, only its posts blocking
 function openGateLook(e: Ent): Ent {
   const open = e.asset ? assetOf(e.asset)?.open : undefined;
-  if (open) return { ...e, sprite: open.sprite, colors: open.colors ?? e.colors, solidMask: open.solid ?? open.sprite };
+  if (open) return { ...e, sprite: open.sprite, colors: open.colors ?? e.colors, solidMask: open.solid ?? open.sprite.map((l) => ' '.repeat(l.length)) };
   return { ...e, sprite: GATE_OPEN.sprite, colors: GATE_OPEN.colors, solidMask: GATE_OPEN_SOLID };
 }
 const UNSELLABLE = new Set<ItemType>(['seed']);

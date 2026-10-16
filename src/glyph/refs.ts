@@ -239,8 +239,13 @@ export interface Recipe {
   colours: Record<string, RGB>; // part name -> new colour (the body's and swapped parts')
   swaps: { part: string; ref: RefDoc; img: Img }[]; // a part ref replaces the body's part of that name
   decorations: { ref: RefDoc; img: Img; area: string }[];
-  details: { area: string; regions: DetailRegion[] }[];
+  // `free`: the detail may paint where nothing is drawn yet (an emptied
+  // figurehead's place), not only on the object
+  details: { area: string; regions: DetailRegion[]; free?: boolean }[];
   mirror?: boolean;
+  // parts taken out before anything is added: cleared, or (`fill`) painted
+  // over in that part's main colour and joined to it (a sail's motif)
+  blank?: { part: string; fill?: string }[];
   // recolour only a part's blossom-coloured pixels (its leaves and stems,
   // the greens, keep theirs): a flower's petals in a new colour
   petals?: { part: string; rgb: RGB }[];
@@ -311,13 +316,13 @@ function inShape(p: string, u: number, v: number): boolean {
   }
 }
 
-function paintDetail(l: Layer, box: { x: number; y: number; w: number; h: number }, regions: DetailRegion[], clipPart?: string) {
+function paintDetail(l: Layer, box: { x: number; y: number; w: number; h: number }, regions: DetailRegion[], clipPart?: string, free = false) {
   const d = l.img.data;
   for (let py = box.y; py < box.y + box.h; py++)
     for (let px = box.x; px < box.x + box.w; px++) {
       if (px < 0 || py < 0 || px >= l.img.w || py >= l.img.h) continue;
       const i = py * l.img.w + px;
-      if (d[i * 4 + 3] < 128) continue; // only on the object
+      if (d[i * 4 + 3] < 128 && !free) continue; // only on the object
       if (clipPart && l.part[i] !== clipPart) continue;
       const fx = (px + 0.5 - box.x) / box.w, fy = (py + 0.5 - box.y) / box.h;
       for (const r of regions) {
@@ -328,6 +333,7 @@ function paintDetail(l: Layer, box: { x: number; y: number; w: number; h: number
         if (!inShape(r.primitive, u, v)) continue;
         const light = 1 - ((u + 1) / 2 + (v + 1) / 2) / 4; // light from the top-left
         for (let c = 0; c < 3; c++) d[i * 4 + c] = Math.min(255, r.rgb[c] * (0.75 + light * 0.4));
+        d[i * 4 + 3] = 255;
         l.part[i] = 'detail';
       }
     }
@@ -349,6 +355,7 @@ export function compose(r: Recipe): Layer {
   let l = padded(base, pad);
   const W0 = r.body.ref.w, H0 = r.body.ref.h;
 
+  for (const b of r.blank ?? []) blankPart(l, b.part, b.fill);
   for (const s of r.swaps) {
     const box = partBox(l, s.part);
     if (!box) continue;
@@ -377,10 +384,38 @@ export function compose(r: Recipe): Layer {
   for (const dt of r.details) {
     const a = r.body.ref.areas.find((x) => x.name === dt.area);
     if (!a) continue;
-    paintDetail(l, areaBox(a, W0, H0, pad, pad), dt.regions, a.part);
+    paintDetail(l, areaBox(a, W0, H0, pad, pad), dt.regions, dt.free ? undefined : a.part, !!dt.free);
   }
   if (r.mirror) l = mirror(l);
   return trim(l);
+}
+
+// Take a part out: cleared, or painted over in `fill`'s most common colour
+// (each pixel keeps its own shading against the motif's mean) and joined to it
+function blankPart(l: Layer, name: string, fill?: string) {
+  const d = l.img.data;
+  if (!fill) {
+    for (let i = 0; i < l.part.length; i++)
+      if (l.part[i] === name) {
+        d[i * 4 + 3] = 0;
+        l.part[i] = '';
+      }
+    return;
+  }
+  const counts = new Map<string, number>();
+  for (let i = 0; i < l.part.length; i++)
+    if (l.part[i] === fill) {
+      const k = `${d[i * 4] >> 3},${d[i * 4 + 1] >> 3},${d[i * 4 + 2] >> 3}`;
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+  const top = [...counts].sort((a, b) => b[1] - a[1])[0];
+  if (!top) return;
+  const rgb = top[0].split(',').map((v) => Number(v) * 8 + 4);
+  for (let i = 0; i < l.part.length; i++)
+    if (l.part[i] === name) {
+      for (let c = 0; c < 3; c++) d[i * 4 + c] = rgb[c];
+      l.part[i] = fill;
+    }
 }
 
 // The art as an Img with every part kept (no recipe): for previews

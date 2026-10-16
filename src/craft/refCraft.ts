@@ -80,7 +80,10 @@ const getAtlas = () => (atlas ??= buildAtlas(DEFAULTS.ramp + DEFAULTS.edgeGlyphs
 // ---- 1. the matcher ----------------------------------------------------------------------
 // extra nouns for a category, so "ship" finds the boats
 const SYNONYMS: Record<string, string[]> = {
-  boat: ['boat', 'ship', 'sloop', 'sailboat', 'raft', 'canoe', 'yacht', 'vessel', 'galleon', 'dinghy'],
+  boat: [
+    'boat', 'ship', 'sloop', 'sailboat', 'raft', 'canoe', 'yacht', 'vessel', 'galleon', 'dinghy',
+    'boot', 'schiff', 'segelschiff', 'piratenschiff', 'floss', 'bateau', 'navire', 'barco', 'barca', 'nave', 'schip', 'barque',
+  ],
   cart: ['cart', 'wagon', 'car', 'carriage', 'buggy'],
   'watering-can': ['watering', 'can', 'sprinkler'],
   pet: ['pet', 'cat', 'dog', 'puppy', 'kitten', 'bunny', 'critter', 'creature'],
@@ -97,7 +100,7 @@ const STOP = new Set([
   // the same little words in German, French, Spanish, Italian, Dutch
   'ein', 'eine', 'einen', 'einem', 'der', 'die', 'das', 'den', 'dem', 'mit', 'und', 'mein', 'meine', 'kleiner', 'kleine', 'grosser', 'grosse',
   'un', 'une', 'le', 'la', 'les', 'avec', 'et', 'mon', 'ma', 'el', 'los', 'las', 'uno', 'una', 'con', 'y', 'mi', 'il', 'lo', 'gli', 'e',
-  'een', 'het', 'met', 'en', 'de', 'des', 'du',
+  'een', 'het', 'met', 'en', 'de', 'des', 'du', 'einer', 'auf', 'am', 'im', 'vorne', 'sur', 'sobre', 'sul', 'op',
 ]);
 
 export function colourOf(word: string): RGB | null {
@@ -132,6 +135,8 @@ export interface RefMatch {
   leftover: string[]; // words the matcher could not place (a detail? a function?)
   needsModel: boolean;
   petals?: { part: string; rgb: RGB }[]; // a flower's petals recoloured (watering cans)
+  blank?: { part: string; fill?: string }[]; // parts taken out first (a ship's skull, its shark)
+  detailArea?: string; // where the asked-for details go (a ship's sail motif, its bow)
 }
 
 const FUNCTION_WORDS = /\b(that|which|can|could|lets?|makes?|named|called|faster|fast|float|floats|fly|flies|shoots?|glows?|heals?)\b/;
@@ -165,18 +170,19 @@ export function dogOf(prompt: string): { ref: RefDoc; phrase: string } | null {
   return null;
 }
 
-export function matchRefs(prompt: string): RefMatch {
+// `force`: match the words against this body (a ship chosen by its rules)
+export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
   const ws = words(prompt).map(sing);
   const has = (w: string) => ws.includes(sing(w));
   const used = new Set<string>();
   // body: a dog breed by name first, else the best scoring body
-  const dog = dogOf(prompt);
-  let body: RefDoc | null = dog?.ref ?? null, score = dog ? 10 : 0;
+  const dog = force ? null : dogOf(prompt);
+  let body: RefDoc | null = force ?? dog?.ref ?? null, score = force ? 10 : dog ? 10 : 0;
   if (dog) {
     for (const w of words(dog.phrase)) used.add(sing(w));
     for (const w of DOG_WORDS) used.add(w);
   }
-  for (const r of dog ? [] : REFS.filter((x) => x.role === 'body' && !isDogRef(x))) {
+  for (const r of dog || force ? [] : REFS.filter((x) => x.role === 'body' && !isDogRef(x))) {
     let s = 0;
     const nouns = [...(SYNONYMS[r.category] ?? []), ...r.category.split('-')];
     if (nouns.some(has)) s += 3;
@@ -267,7 +273,7 @@ export function unknownsOf(prompt: string): PromptUnknowns {
   const raw = prompt.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter(Boolean);
   const m = matchRefs(prompt);
   const can = isWateringCan(m);
-  const shaped = can ? shapeWateringCan(m, prompt) : m;
+  const shaped = can ? shapeWateringCan(m, prompt) : isShip(m) ? shapeShip(m, prompt) : m;
   const loose = new Set(shaped.leftover.filter((w) => !FILLER.has(w) && !FUNCTION_WORDS.test(w)));
   // runs of unplaceable words, in the prompt's own order and spelling
   const details: string[] = [];
@@ -446,6 +452,81 @@ export function shapeWateringCan(m: RefMatch, prompt: string, opts: { surprise?:
   return { ...m, body, colours, petals, leftover, needsModel: leftover.length > 0 || fnWish };
 }
 
+// ---- ships: a small modular system (src/data/refs/boat-*-ship, -galleon) ----------------
+//   a motif asked on a sail ............ the pirate ship: its skull taken out
+//                                         (unless a skull is asked), the motif
+//                                         drawn where it was (sail_motif)
+//   a bow / figurehead decoration ...... the shark ship: the shark taken out
+//                                         (unless a shark is asked), the new one
+//                                         drawn where it was (bow_head)
+//   the surprise ........................ the turtle ship (a giant sea turtle)
+//   asked by name (pirate, shark, turtle, galleon) that one; a plain ship one
+//   of the pirate ship, galleon and shark ship. Small boats (raft, canoe…)
+//   keep the little wooden boats.
+const SHIP_IDS = { pirate: 'boat-pirate-ship', shark: 'boat-shark-ship', galleon: 'boat-galleon', turtle: 'boat-turtle-ship' } as const;
+const SMALL_BOAT = ['raft', 'canoe', 'dinghy', 'rowboat', 'sailboat', 'kayak', 'floss', 'kanu', 'ruderboot', 'radeau', 'balsa', 'zattera', 'vlot'];
+const SAIL_WORDS = ['sail', 'sails', 'segel', 'voile', 'voiles', 'vela', 'velas', 'zeil', 'flag', 'flagge', 'banner', 'mainsail'];
+const BOW_WORDS = ['bow', 'figurehead', 'front', 'prow', 'bug', 'galionsfigur', 'proue', 'proa', 'prua', 'boeg', 'head', 'kopf'];
+const NAMED_SHIP: [keyof typeof SHIP_IDS, string[]][] = [
+  ['turtle', ['turtle', 'schildkrote', 'schildkroete', 'tortue', 'tortuga', 'tartaruga', 'schildpad']],
+  ['shark', ['shark', 'hai', 'haifisch', 'requin', 'tiburon', 'squalo', 'haai']],
+  ['pirate', ['pirate', 'pirat', 'piraten', 'piratenschiff', 'pirata', 'piraat', 'skull', 'totenkopf', 'jolly', 'roger', 'crane']],
+  ['galleon', ['galleon', 'galeone', 'galion', 'galeon', 'galjoen']],
+];
+export const isShip = (m: RefMatch) => m.body?.category === 'boat';
+
+export function shapeShip(m: RefMatch, prompt: string, opts: { surprise?: boolean; colour?: RGB | null } = {}): RefMatch {
+  if (!isShip(m)) return m;
+  const ws = words(prompt);
+  const has = (list: string[]) => list.some((w) => ws.includes(w) || ws.includes(sing(w)));
+  // a small boat: one of the little wooden boats
+  if (has(SMALL_BOAT)) {
+    const small = REFS.filter((r) => r.role === 'body' && r.category === 'boat' && !Object.values(SHIP_IDS).includes(r.id as never));
+    const pickSmall = small[Math.floor(Math.random() * small.length)];
+    return pickSmall ? matchRefs(prompt, pickSmall) : m;
+  }
+  const ref = (k: keyof typeof SHIP_IDS) => REFS.find((r) => r.id === SHIP_IDS[k]) ?? null;
+  const named = NAMED_SHIP.find(([, list]) => has(list))?.[0];
+  // what's asked beyond the ship itself, matched on the pirate ship (the
+  // most parts) to see the leftover words
+  const probe = matchRefs(prompt, ref('pirate') ?? m.body!);
+  const extra = probe.leftover.filter((w) => !SAIL_WORDS.includes(w) && !BOW_WORDS.includes(w) && !NAMED_SHIP.some(([, l]) => l.includes(w)));
+  const onSail = has(SAIL_WORDS);
+  const onBow = has(BOW_WORDS);
+  let pick: keyof typeof SHIP_IDS;
+  if (onBow && (extra.length || named === 'shark')) pick = 'shark';
+  else if (onSail || (extra.length && named !== 'turtle' && named !== 'galleon' && named !== 'shark')) pick = 'pirate';
+  else if (named) pick = named;
+  else if (opts.surprise) pick = 'turtle';
+  else pick = (['pirate', 'galleon', 'shark'] as const)[Math.floor(Math.random() * 3)];
+  if (opts.surprise && pick !== 'turtle' && !named && !extra.length) pick = 'turtle';
+  const body = ref(pick);
+  if (!body) return m;
+  const out = matchRefs(prompt, body);
+  // the place words aren't details ("head" stays: "a dragon head")
+  for (const w of [...SAIL_WORDS, ...BOW_WORDS].filter((x) => x !== 'head' && x !== 'kopf')) out.leftover = out.leftover.filter((x) => x !== w);
+  if (!out.leftover.some((w) => w !== 'head' && w !== 'kopf')) out.leftover = out.leftover.filter((w) => w !== 'head' && w !== 'kopf');
+  // the named ship's own words aren't details
+  out.leftover = out.leftover.filter((w) => !NAMED_SHIP.some(([, l]) => l.includes(w)));
+  if (opts.colour) {
+    const main = mainPart(body);
+    if (main) out.colours[main] = opts.colour;
+  }
+  // a new motif on the sail: the skull goes (painted over in the sail's colour)
+  if (pick === 'pirate' && extra.length && !has(['skull', 'totenkopf', 'jolly', 'crane'])) {
+    out.blank = [{ part: 'motif', fill: 'sail' }];
+    out.detailArea = 'sail_motif';
+  }
+  // a new bow decoration: the shark goes
+  if (pick === 'shark' && extra.length && !has(['shark', 'hai', 'haifisch', 'requin', 'tiburon', 'squalo', 'haai'])) {
+    out.blank = [{ part: 'figurehead' }];
+    out.detailArea = 'bow_head';
+  }
+  const fnWish = FUNCTION_WORDS.test(prompt.toLowerCase());
+  out.needsModel = out.leftover.length > 0 || fnWish;
+  return out;
+}
+
 // a flower colour that sits well on a can of colour `rgb`: of a few
 // blossom colours, the one whose hue is farthest from the can's (a grey or
 // white can keeps the pink)
@@ -475,7 +556,7 @@ const CAN_SCREEN_W = { small: 11, medium: 13, large: 15 } as const;
 // a pet follows the player at about half the player's width
 const PET_SCREEN_W = { small: 3, medium: 4, large: 5.5 } as const;
 // categories built from the library on every link (not only REF_CRAFT_ON)
-export const isAlwaysRef = (m: RefMatch) => m.body?.category === 'watering-can' || m.body?.category === 'pet';
+export const isAlwaysRef = (m: RefMatch) => m.body?.category === 'watering-can' || m.body?.category === 'pet' || m.body?.category === 'boat';
 
 export interface RefSprite {
   lines: string[];
@@ -496,19 +577,22 @@ export async function buildFromMatch(m: RefMatch & { details?: RefChoice['detail
     details: (m.details ?? []).map((d) => ({
       area: d.area,
       regions: d.regions.map((r): DetailRegion => ({ ...r, rgb: rgbOf(r.material) ?? MATERIALS.stone })),
+      // an emptied part's place: drawn freely there
+      free: !!m.blank?.some((b) => !b.fill) && d.area === m.detailArea,
     })),
     mirror: m.mirror,
     petals: m.petals,
+    blank: m.blank,
   };
   const layer = compose(recipe);
-  // watering cans and pets (the dogs) are drawn finer: 600-800 glyphs
-  const can = body.category === 'watering-can' || body.category === 'pet';
+  // watering cans, pets (the dogs) and ships are drawn finer: 600-800 glyphs
+  const can = body.category === 'watering-can' || body.category === 'pet' || body.category === 'boat';
   const band = size ?? (can ? 'medium' : body.sizeBand ?? 'small');
   // references carry real transparency: gaps are meant (no hole filling)
   const b = bake(layer.img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs: (can ? CAN_SIGNS : SIGNS)[band] }, getAtlas());
   const g = bakedToSprite(b);
   const w = Math.max(1, ...g.sprite.map((l) => l.length));
-  const screenW = body.category === 'pet' ? PET_SCREEN_W : can ? CAN_SCREEN_W : SCREEN_W;
+  const screenW = body.category === 'pet' ? PET_SCREEN_W : body.category === 'boat' ? SCREEN_W : can ? CAN_SCREEN_W : SCREEN_W;
   return { lines: g.sprite, colors: g.colors, palette: g.palette, scale: screenW[band] / w, signs: b.signs, body };
 }
 

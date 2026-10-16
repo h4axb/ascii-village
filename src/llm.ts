@@ -62,6 +62,8 @@ import {
   logRefCraft,
   isWateringCan,
   isAlwaysRef,
+  isShip,
+  shapeShip,
   shapeWateringCan,
   colourOf,
   withoutDetails,
@@ -633,11 +635,15 @@ async function craftWithRefs(
   opts: { prefs?: boolean; clarify?: CraftClarify },
 ): Promise<CraftResult | null> {
   const pickedColour = opts.clarify?.colour ? colourOf(opts.clarify.colour.toLowerCase().split(/\s+/).pop()!) : null;
-  let m: RefMatch & { details?: Parameters<typeof buildFromMatch>[0]['details']; mirror?: boolean } = shapeWateringCan(matchRefs(prompt), prompt, {
-    surprise: opts.clarify?.surprise,
-    colour: pickedColour,
-  });
-  const can = isWateringCan(m) ? { body: m.body!, colours: m.colours, petals: m.petals } : null;
+  const shape = { surprise: opts.clarify?.surprise, colour: pickedColour };
+  const first = matchRefs(prompt);
+  let m: RefMatch & { details?: Parameters<typeof buildFromMatch>[0]['details']; mirror?: boolean } = isShip(first)
+    ? shapeShip(first, prompt, shape)
+    : shapeWateringCan(first, prompt, shape);
+  // a watering can or a ship keeps what was picked here (variant, colours,
+  // what's taken out, where the details go); the model only adds the details
+  const can = isWateringCan(m) || isShip(m) ? { body: m.body!, colours: m.colours, petals: m.petals, blank: m.blank, detailArea: m.detailArea } : null;
+  const where = m.detailArea ? `\nDraw the details the player asked for (${m.leftover.join(', ')}) as regions in the area "${m.detailArea}" of the body "${m.body!.id}", and keep that body.` : '';
   let text: { description: string; tags: string[]; fn: ItemFunction; name?: string } | null = null;
   let via: 'match' | 'model' = 'match';
   if (m.needsModel && llmEnabled) {
@@ -645,7 +651,7 @@ async function craftWithRefs(
       const raw = await chatJSON<Record<string, unknown>>(
         [
           { role: 'system', content: refPrompt() },
-          { role: 'user', content: `Library: ${refCatalogue(m)}\n\nThe player asked for: "${prompt}"` },
+          { role: 'user', content: `Library: ${refCatalogue(m)}\n\nThe player asked for: "${prompt}"${where}` },
         ],
         { temperature: 0.5, maxTokens: 900, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
       );
@@ -658,7 +664,10 @@ async function craftWithRefs(
       m = chosen;
       // a watering can keeps the variant and colours picked above; the
       // model only adds the details
-      if (can) m = { ...m, body: can.body, colours: { ...m.colours, ...can.colours }, petals: can.petals };
+      if (can) {
+        const details = can.detailArea ? (m.details ?? []).map((d) => ({ ...d, area: can.detailArea! })) : m.details;
+        m = { ...m, body: can.body, colours: { ...m.colours, ...can.colours }, petals: can.petals, blank: can.blank, detailArea: can.detailArea, details };
+      }
       via = 'model';
       if (c?.description) text = { description: c.description, tags: c.tags ?? [], fn: c.fn!, name: c.name };
     } catch (err) {
@@ -690,8 +699,10 @@ async function craftWithRefs(
   item.scale = sp.scale;
   item.desc = t.description;
   item.tags = [...t.tags, `prompt: ${prompt.trim()}`];
+  // a ship from the library floats
+  if (isShip(m) && item.equip?.mode === 'vehicle') item.equip = { ...item.equip, float: true };
   // a watering can waters
-  if (can) {
+  if (can && isWateringCan(m)) {
     item.tool = 'water';
     item.equip = { mode: 'hold' };
     // the references have the spout left and the handle right

@@ -269,3 +269,27 @@ export async function planAndRender(
     };
   }
 }
+
+// A plan drawn exactly as a craft would be (the same canvas, renderer, crop
+// and colour preference as tryRender above), without the checks: the
+// preference previews (CraftFeedback.tsx) use it so what they show is what
+// a craft with that setting gets.
+export function renderPlan(prompt: string, plan: CraftPlan, opts: { multiplier?: number; color?: PrefValue } = {}): GeneratedSprite {
+  const mult = opts.multiplier ?? RESOLUTION_MULTIPLIER;
+  const canvas = resolveCanvasSize(plan.sizeClass, plan.width, plan.height, mult);
+  const regions = resolveRegions(plan.regions, canvas.width, canvas.height);
+  const rendered = renderRegions(canvas.width, canvas.height, regions, prompt, plan.face);
+  const cropped = cropBlankEdges(rendered.lines, rendered.colors);
+  const g: GeneratedSprite = {
+    name: plan.name,
+    sizeClass: plan.sizeClass,
+    parts: plan.parts,
+    lines: padLines(cropped.lines),
+    palette: rendered.palette,
+    colors: cropped.colors,
+    resolutionScale: 1 / mult,
+  };
+  sanitizeColors(g);
+  if (g.palette && opts.color) g.palette = applyColorPref(g.palette, opts.color);
+  return g;
+}

@@ -25,6 +25,7 @@ import {
   densityOf,
   temperatureOf,
   planPrefsText,
+  applyColorPref,
   isKind,
   type Prefs,
   planAndRender,
@@ -478,7 +479,7 @@ export async function craftItem(
       // `fit` field no longer gates anything: a universal token has no
       // category to mismatch against, so the only rejection left here is a
       // blocked prompt. `tokenHint` is still useful as a category guess.
-      // The preferences for the planner (interpretation, surprise) have to be
+      // The preferences for the planner (surprise) have to be
       // known before it runs; when some are saved for one KIND of thing, a
       // tiny call finds this request's kind first.
       let planPrefs: Prefs = {};
@@ -524,7 +525,6 @@ export async function craftItem(
       const postPrefs: Prefs = opts.prefs ? resolvePrefs(category) : {};
       const applied: Prefs = opts.prefs
         ? {
-            interpretation: planPrefs.interpretation,
             surprise: planPrefs.surprise,
             detail: postPrefs.detail,
             color: postPrefs.color,
@@ -669,15 +669,25 @@ async function craftWithRefs(
   // the clarify answer: its own hex ("Sky blue"), else its colour word
   const cc = opts.clarify?.colour?.trim().toLowerCase();
   const pickedColour = cc ? (/^#[0-9a-f]{6}$/.test(cc) ? fitToGame(hexRgb(cc)) : colourOf(cc.split(/\s+/).pop()!)) : null;
-  const shape = { surprise: opts.clarify?.surprise, colour: pickedColour };
   const first = matchRefs(prompt);
+  // the /2 preferences for this kind of thing (the body's category): detail
+  // and colour in the bake, surprise in the variant pick and the model call
+  const kind = first.body ? gameCategoryOf(first.body) : null;
+  const prefs: Prefs = opts.prefs ? resolvePrefs(isKind(kind) ? kind : null) : {};
+  const surprise = opts.clarify?.surprise ?? (prefs.surprise === 1 ? true : prefs.surprise === -1 ? false : undefined);
+  const shape = { surprise, colour: pickedColour };
   let m: RefMatch & { details?: Parameters<typeof buildFromMatch>[0]['details']; mirror?: boolean } = isShip(first)
     ? shapeShip(first, prompt, shape)
     : shapeWateringCan(first, prompt, shape);
   // a watering can or a ship keeps what was picked here (variant, colours,
   // what's taken out, where the details go); the model only adds the details
-  const can = isWateringCan(m) || isShip(m) ? { body: m.body!, colours: m.colours, petals: m.petals, blank: m.blank, detailArea: m.detailArea } : null;
-  const where = m.detailArea ? `\nDraw the details the player asked for (${m.leftover.join(', ')}) as regions in the area "${m.detailArea}" of the body "${m.body!.id}", and keep that body.` : '';
+  const can = isWateringCan(m) || isShip(m) ? { body: m.body!, colours: m.colours, petals: m.petals, blank: m.blank, detailArea: m.detailArea, styleDetails: m.styleDetails } : null;
+  // where the details go: the picked area first; a feature that belongs
+  // elsewhere on the body (a ship's hull, its bow) may use those areas
+  const others = m.body?.areas.filter((a) => a.type === 'detail' && a.name !== m.detailArea).map((a) => `"${a.name}"`) ?? [];
+  const where = m.detailArea
+    ? `\nDraw the details the player asked for (${m.leftover.join(', ')}) as regions in the area "${m.detailArea}" of the body "${m.body!.id}"${others.length ? ` (or, for a feature that belongs elsewhere, in ${others.join(' / ')})` : ''}, and keep that body.`
+    : '';
   let text: { description: string; tags: string[]; fn: ItemFunction; name?: string } | null = null;
   let via: 'match' | 'model' = 'match';
   if (m.needsModel && llmEnabled) {
@@ -685,9 +695,9 @@ async function craftWithRefs(
       const raw = await chatJSON<Record<string, unknown>>(
         [
           { role: 'system', content: refPrompt() },
-          { role: 'user', content: `Library: ${refCatalogue(m)}\n\nThe player asked for: "${prompt}"${where}` },
+          { role: 'user', content: `Library: ${refCatalogue(m)}\n\nThe player asked for: "${prompt}"${where}${prefs.surprise ? `\n\n${planPrefsText(prefs)}` : ''}` },
         ],
-        { temperature: 0.5, maxTokens: 900, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
+        { temperature: prefs.surprise ? temperatureOf(prefs) - 0.2 : 0.5, maxTokens: 900, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
       );
       const c = parseRefChoice(raw);
       const chosen = c ? choiceToMatch(c, m) : null;
@@ -699,8 +709,9 @@ async function craftWithRefs(
       // a watering can keeps the variant and colours picked above; the
       // model only adds the details
       if (can) {
-        const details = can.detailArea ? (m.details ?? []).map((d) => ({ ...d, area: can.detailArea! })) : m.details;
-        m = { ...m, body: can.body, colours: { ...m.colours, ...can.colours }, petals: can.petals, blank: can.blank, detailArea: can.detailArea, details };
+        const own = new Set(can.body.areas.filter((a) => a.type === 'detail').map((a) => a.name));
+        const details = can.detailArea ? (m.details ?? []).map((d) => (own.has(d.area) ? d : { ...d, area: can.detailArea! })) : m.details;
+        m = { ...m, body: can.body, colours: { ...m.colours, ...can.colours }, petals: can.petals, blank: can.blank, detailArea: can.detailArea, details, styleDetails: can.styleDetails };
       }
       via = 'model';
       if (c?.description) text = { description: c.description, tags: c.tags ?? [], fn: c.fn!, name: c.name };
@@ -726,7 +737,8 @@ async function craftWithRefs(
   ui?.onStage?.('drawing');
   // the size: the answer, else a size word in the prompt
   const said = /\b(tiny|small|little|mini)\b/i.test(prompt) ? 'small' : /\b(big|large|huge|giant)\b/i.test(prompt) ? 'large' : /\bmedium\b/i.test(prompt) ? 'medium' : undefined;
-  const sp = await buildFromMatch(m, opts.clarify?.size ?? said);
+  const sp = await buildFromMatch(m, opts.clarify?.size ?? said, prefs.detail ?? 0);
+  if (prefs.color) sp.palette = applyColorPref(sp.palette, prefs.color);
   sp.lines.forEach((line, i) => ui?.onLine?.(line, i, 0));
   logRefCraft(prompt, via, m.body.id, m.leftover);
   const category = gameCategoryOf(m.body);
@@ -760,7 +772,7 @@ async function craftWithRefs(
   const finish = opts.clarify?.finish ?? (opts.clarify?.mood ? MOOD_PRESETS[opts.clarify.mood].finish : undefined);
   if (finish) item.textureModifier = finish;
   console.info('[craft] from references', { body: m.body.id, via, signs: sp.signs, swaps: m.swaps.map((x) => x.ref.id), decorations: m.decorations.map((x) => x.ref.id) });
-  const out: CraftResult = opts.prefs ? { ok: true, item, kind: category, applied: {} } : { ok: true, item };
+  const out: CraftResult = opts.prefs ? { ok: true, item, kind: category, applied: { detail: prefs.detail, color: prefs.color, surprise: prefs.surprise } } : { ok: true, item };
   return note ? { ...out, note } : out;
 }
 

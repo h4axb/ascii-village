@@ -1657,16 +1657,19 @@
 .fb-glyph .t-ink { color: var(--ds-text); }
 .fb-glyph .t-soft { color: var(--ds-text-muted); }
 .fb-glyph .t-gold { color: var(--ds-coin); }
-/* the colour question's swatches: pastel / normal / vivid of one blue */
-.fb-glyph .t-p1 { color: #c9d6e6; }
-.fb-glyph .t-p2 { color: #b3c6dd; }
-.fb-glyph .t-p3 { color: #9fb8d6; }
-.fb-glyph .t-n1 { color: #8aa6c8; }
-.fb-glyph .t-n2 { color: #6d91ba; }
-.fb-glyph .t-n3 { color: #557ca9; }
-.fb-glyph .t-v1 { color: #4a9bf5; }
-.fb-glyph .t-v2 { color: #1f7fe8; }
-.fb-glyph .t-v3 { color: #0f64c4; }
+/* the detail and colour answers' pictures (CraftFeedback.tsx PrefPreview):
+   the game's palm / player / house, and the renderer's own blue flower */
+.fb-preview {
+  width: 120px;
+  height: 96px;
+  margin: 0 0 6px;
+  flex: none;
+}
+.fb-summary-item .fb-preview {
+  width: 64px;
+  height: 52px;
+  margin: 0;
+}
 .fb-summary {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

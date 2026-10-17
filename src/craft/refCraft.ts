@@ -138,6 +138,9 @@ export interface RefMatch {
   petals?: { part: string; rgb: RGB }[]; // a flower's petals recoloured (watering cans)
   blank?: { part: string; fill?: string }[]; // parts taken out first (a ship's skull, its shark)
   detailArea?: string; // where the asked-for details go (a ship's sail motif, its bow)
+  // a known style's own features (a viking ship's dragon prow and shields,
+  // SHIP_STYLES), drawn with whatever details the model adds
+  styleDetails?: RefChoice['details'];
 }
 
 const FUNCTION_WORDS = /\b(that|which|can|could|lets?|makes?|named|called|faster|fast|float|floats|fly|flies|shoots?|glows?|heals?)\b/;
@@ -356,6 +359,10 @@ export function refPrompt(): string {
     'Rules: only use ids, part names and area names from the library. Detail regions are in 0-1 of their area; ' +
     'keep a detail to 1-6 regions. If the player asks for something the library cannot express at all, body = null. ' +
     'Answer any other wish (a name, what it does) through name / narrative_function / gameplay_intent / modifiers.\n' +
+    'A word for a STYLE, culture or theme with no library picture (viking, steampunk, royal, candy, spooky, ...) is ' +
+    'never ignored: show its 2-4 most characteristic VISIBLE features — pick the body whose parts suit them, recolour ' +
+    'parts in the style\'s typical colours, and draw each feature as details in the detail area where it belongs ' +
+    '(use several areas when the body has them; e.g. a royal ship: a gold crown at the bow, purple sail, gold trim on the hull).\n' +
     gameColourHint() +
     '\n\n' +
     MODIFIER_PROMPT
@@ -503,6 +510,47 @@ const NAMED_SHIP: [keyof typeof SHIP_IDS, string[]][] = [
 ];
 export const isShip = (m: RefMatch) => m.body?.category === 'boat';
 
+// ---- ship styles: a style with no picture of its own, built from the ships
+// we have by its characteristic features (what makes it read as that style):
+// the body whose parts suit it, its typical colours, and its features drawn
+// into the body's detail areas. Areas are in 0..1 of the area; the shark
+// ship's bow is on the left. The model can add more on top (refPrompt).
+type Region = RefChoice['details'][number]['regions'][number];
+const reg = (primitive: string, cx: number, cy: number, width: number, height: number, material: string, rotation = 0): Region => ({ primitive, cx, cy, width, height, material, rotation });
+const SHIP_STYLES: { words: string[]; ship: keyof typeof SHIP_IDS; blank: string; colours: Record<string, RGB>; details: RefChoice['details'] }[] = [
+  {
+    // a longship: a carved dragon head on the bow, round shields along the
+    // hull, a red sail
+    words: ['viking', 'vikings', 'wikinger', 'vikinger', 'drakkar', 'longship', 'langschiff', 'drachenboot', 'dragonship', 'norse', 'nordic'],
+    ship: 'shark',
+    blank: 'figurehead',
+    colours: { sail: [186, 72, 58], hull: [120, 80, 50] },
+    details: [
+      {
+        area: 'bow_head',
+        regions: [
+          reg('rounded_rectangle', 0.68, 0.66, 0.22, 0.7, '#6e4628', -24), // the neck, rising from the hull
+          reg('ellipse', 0.42, 0.26, 0.6, 0.38, '#6e4628'), // the head
+          reg('triangle', 0.12, 0.32, 0.22, 0.3, '#6e4628', -90), // the snout, pointing forward
+          reg('triangle', 0.62, 0.08, 0.18, 0.24, '#e0b85a', 20), // a gilded horn
+          reg('point', 0.4, 0.2, 0.1, 0.12, '#f2d16b'), // the eye
+          reg('line', 0.18, 0.4, 0.26, 0.06, '#c0453a'), // the red mouth
+        ],
+      },
+      {
+        area: 'hull_detail',
+        // round shields: a dark rim, red and blue faces, a gold boss
+        regions: [0.13, 0.38, 0.63, 0.88].flatMap((cx, i) => [
+          reg('circle', cx, 0.5, 0.24, 0.52, '#3a2618'),
+          reg('circle', cx, 0.5, 0.17, 0.37, i % 2 ? '#3f6fa8' : '#c0453a'),
+          reg('point', cx, 0.5, 0.06, 0.13, '#e0b85a'),
+        ]),
+      },
+    ],
+  },
+];
+const styleOf = (ws: string[]) => SHIP_STYLES.find((st) => st.words.some((w) => ws.includes(w)));
+
 export function shapeShip(m: RefMatch, prompt: string, opts: { surprise?: boolean; colour?: RGB | null } = {}): RefMatch {
   if (!isShip(m)) return m;
   const ws = words(prompt);
@@ -514,6 +562,21 @@ export function shapeShip(m: RefMatch, prompt: string, opts: { surprise?: boolea
     return pickSmall ? matchRefs(prompt, pickSmall) : m;
   }
   const ref = (k: keyof typeof SHIP_IDS) => REFS.find((r) => r.id === SHIP_IDS[k]) ?? null;
+  // a known style (a viking ship): its own recipe; the style's words are
+  // then no detail, anything else asked still goes to the model
+  const style = styleOf(ws);
+  const styleBody = style ? ref(style.ship) : null;
+  if (style && styleBody) {
+    const out = matchRefs(prompt, styleBody);
+    out.leftover = out.leftover.filter((w) => !style.words.includes(w) && !SAIL_WORDS.includes(w) && !BOW_WORDS.includes(w) && w !== 'ship' && w !== 'boat');
+    out.colours = { ...out.colours, ...Object.fromEntries(Object.entries(style.colours).map(([k, v]) => [k, fitToGame(v)])) };
+    if (opts.colour) out.colours.sail = opts.colour;
+    out.blank = [{ part: style.blank }];
+    out.detailArea = style.details[0].area;
+    out.styleDetails = style.details;
+    out.needsModel = out.leftover.length > 0 || FUNCTION_WORDS.test(prompt.toLowerCase());
+    return out;
+  }
   const named = NAMED_SHIP.find(([, list]) => has(list))?.[0];
   // what's asked beyond the ship itself, matched on the pirate ship (the
   // most parts) to see the leftover words
@@ -662,14 +725,17 @@ export interface RefSprite {
   body: RefDoc;
 }
 
-export async function buildFromMatch(m: RefMatch & { details?: RefChoice['details']; mirror?: boolean }, size?: 'small' | 'medium' | 'large'): Promise<RefSprite> {
+// `detail` (the /2 link's detail preference, craft/prefs.ts): the same
+// picture baked with fewer (-1) or more (+1) glyphs, the same size on screen
+const DETAIL_SIGNS = { [-1]: 0.45, 0: 1, 1: 2 } as const;
+export async function buildFromMatch(m: RefMatch & { details?: RefChoice['details']; mirror?: boolean }, size?: 'small' | 'medium' | 'large', detail: -1 | 0 | 1 = 0): Promise<RefSprite> {
   const body = m.body!;
   const recipe: Recipe = {
     body: { ref: body, img: await loadArt(body.id) },
     colours: m.colours,
     swaps: await Promise.all(m.swaps.map(async (s) => ({ part: s.part, ref: s.ref, img: await loadArt(s.ref.id) }))),
     decorations: await Promise.all(m.decorations.map(async (d) => ({ ref: d.ref, img: await loadArt(d.ref.id), area: d.area }))),
-    details: (m.details ?? []).map((d) => ({
+    details: [...(m.styleDetails ?? []), ...(m.details ?? [])].map((d) => ({
       area: d.area,
       regions: d.regions.map((r): DetailRegion => ({ ...r, rgb: rgbOf(r.material) ?? MATERIALS.stone })),
       // an emptied part's place: drawn freely there
@@ -685,7 +751,7 @@ export async function buildFromMatch(m: RefMatch & { details?: RefChoice['detail
   const can = body.category === 'watering-can' || body.category === 'pet' || body.category === 'boat' || !!body.names?.length;
   const band = size ?? (can ? 'medium' : body.sizeBand ?? 'small');
   // references carry real transparency: gaps are meant (no hole filling)
-  const b = bake(layer.img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs: (can ? CAN_SIGNS : SIGNS)[band] }, getAtlas());
+  const b = bake(layer.img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs: Math.round((can ? CAN_SIGNS : SIGNS)[band] * DETAIL_SIGNS[detail]) }, getAtlas());
   const g = bakedToSprite(b);
   const w = Math.max(1, ...g.sprite.map((l) => l.length));
   // on screen by its game category: a pet follows at about half the

@@ -1998,7 +1998,7 @@
   pointer-events: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin-top: 10px;
   transform: translateX(-290px);
   transition: transform 260ms ease;
@@ -2007,8 +2007,15 @@
   transform: none;
 }
 .qp-tab {
-  width: 34px;
-  height: 38px;
+  /* the pixel icons (QuestPanel.tsx): the WASD keys' colours, cream letters
+     on olive caps, gold when the tab is on */
+  --qp-key-out: #0b0d07;
+  --qp-key-dark: #262b1b;
+  --qp-key-face: #48502f;
+  --qp-key-light: #8a9663;
+  --qp-key-letter: var(--ds-text);
+  width: 50px;
+  height: 56px;
   display: grid;
   place-items: center;
   background: var(--ds-dialogue);
@@ -2024,6 +2031,14 @@
 .qp-tab.on {
   color: var(--ds-name);
   border-color: var(--ds-line-strong);
+  --qp-key-letter: var(--ds-name);
+}
+.qp-tab svg {
+  opacity: 0.85;
+}
+.qp-tab:hover svg,
+.qp-tab.on svg {
+  opacity: 1;
 }
 .qp-line {
   font-size: 11px;
@@ -2241,6 +2256,10 @@
   }
   .qp-tabs {
     transform: translateX(-240px);
+  }
+  .qp-tab {
+    width: 46px;
+    height: 50px;
   }
 }
 

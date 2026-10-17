@@ -490,12 +490,23 @@ export async function craftItem(
       }
       const prefsText = [opts.prefs ? planPrefsText(planPrefs) : '', opts.clarify?.guidance ?? ''].filter(Boolean).join('\n\n');
       const temperature = opts.prefs ? temperatureOf(planPrefs) : undefined;
-      const plan = await planCraft(prompt, spec.category, chatJSON, {
-        model: MODELS.fast,
-        fallbackModel: MODELS.fastFallback,
-        prefsText,
-        temperature,
-      });
+      // the /1 link never ends without an item: a plan call that breaks
+      // (other than the AI being unreachable) goes on with no plan, and the
+      // pipeline's rescue draws it (spritePipeline.ts neverFail)
+      const neverFail = !!opts.noAlts;
+      let plan: Awaited<ReturnType<typeof planCraft>>;
+      try {
+        plan = await planCraft(prompt, spec.category, chatJSON, {
+          model: MODELS.fast,
+          fallbackModel: MODELS.fastFallback,
+          prefsText,
+          temperature,
+        });
+      } catch (err) {
+        if (!neverFail || err instanceof AiServiceError) throw err;
+        console.warn('[craft] plan call failed, rescuing:', err);
+        plan = { fit: true, sensitive: false, sizeAdjust: 'default', sizeClass: opts.clarify?.size ?? 'medium', name: '', width: 0, height: 0, parts: [], regions: [] };
+      }
       if (plan.sensitive) {
         // deliberately NO suggestions on blocked input
         return {
@@ -528,11 +539,13 @@ export async function craftItem(
       // craftDescribe runs after category is known, same dependency as
       // before, just no longer racing a Stage-2 call that no longer exists.
       ui?.onStage?.('drawing');
-      const { sprite, log, error } = await planAndRender(prompt, category, plan, {
+      const { sprite, log, error, rescue } = await planAndRender(prompt, category, plan, {
         chat: chatJSON,
         model: MODELS.fast,
         fallbackModel: MODELS.fastFallback,
         retry: opts.retry,
+        neverFail,
+        colour: pickedHex(opts.clarify?.colour),
         ...(opts.prefs
           ? { multiplier: densityOf(postPrefs), color: postPrefs.color, prefsText, temperature }
           : {}),
@@ -609,7 +622,11 @@ export async function craftItem(
       item.textureModifier = textureModifierFor(spec.finish);
       const finish = opts.clarify?.finish ?? (opts.clarify?.mood ? MOOD_PRESETS[opts.clarify.mood].finish : undefined);
       if (finish) item.textureModifier = finish;
-      return opts.prefs ? { ok: true, item, kind: category, applied } : { ok: true, item };
+      // /1: drawn without a reference picture (none fits the words) or
+      // rescued: Mitchy says it's a first try
+      const untrained = neverFail && (rescue || !matchRefs(prompt).body) ? UNTRAINED_NOTE : undefined;
+      const out: CraftResult = opts.prefs ? { ok: true, item, kind: category, applied } : { ok: true, item };
+      return untrained ? { ...out, note: untrained } : out;
     } catch (err) {
       console.warn('[craft] pipeline error:', err);
       if (err instanceof AiServiceError) return { ok: false, reply: '', aiDown: aiDownOf(err) };
@@ -747,6 +764,16 @@ async function craftWithRefs(
   return note ? { ...out, note } : out;
 }
 
+// what Mitchy says after an item drawn without a reference picture (/1)
+const UNTRAINED_NOTE = "I haven't crafted one of these before, so this is a first try. I still need more training for things like this.";
+// a picked colour ("#d65a4e") in the game's palette, as a hex for the shape
+// template; a colour word is left to the planner
+function pickedHex(c: string | undefined): string | undefined {
+  const h = c?.trim().toLowerCase();
+  if (!h || !/^#[0-9a-f]{6}$/.test(h)) return undefined;
+  return '#' + fitToGame(hexRgb(h)).map((v) => v.toString(16).padStart(2, '0')).join('');
+}
+
 const hexRgb = (h: string): [number, number, number] => {
   const n = parseInt(h.slice(1), 16);
   return [n >> 16, (n >> 8) & 255, n & 255];
@@ -810,12 +837,19 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> 
   if (!checkPolicy(prompt).allowed) return [];
   return preQuestions(prompt);
 }
-// (each with its own exact colour: no model call needed for these)
+// (each with its own exact colour: no model call needed for these): the
+// rainbow plus black and white, eased into the game's palette when used
 const COLOUR_OPTIONS: { label: string; word: string }[] = [
+  { label: 'Red', word: '#d65a4e' },
+  { label: 'Orange', word: '#e9954f' },
+  { label: 'Yellow', word: '#efcb5c' },
+  { label: 'Green', word: '#6cbf5a' },
   { label: 'Sky blue', word: '#7ec4ee' },
-  { label: 'Sunny yellow', word: '#ffd34e' },
-  { label: 'Rose pink', word: '#f39ac0' },
-  { label: 'Leaf green', word: '#6cbf5a' },
+  { label: 'Blue', word: '#4a74c9' },
+  { label: 'Purple', word: '#9a6cc9' },
+  { label: 'Pink', word: '#f39ac0' },
+  { label: 'Black', word: '#2b2b33' },
+  { label: 'White', word: '#f4f1e6' },
 ];
 export function preQuestions(prompt: string): ClarifyQuestion[] {
   const u = unknownsOf(prompt);

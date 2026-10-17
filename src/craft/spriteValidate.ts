@@ -224,7 +224,7 @@ const PRIMITIVE_VALIDATORS: Partial<Record<ShapePrimitive, (r: RegionSpec) => bo
     (r.endAngle === undefined || Number.isFinite(r.endAngle)),
 };
 
-function isStructurallyValidRegion(r: unknown): r is RegionSpec {
+export function isStructurallyValidRegion(r: unknown): r is RegionSpec {
   if (!r || typeof r !== 'object') return false;
   const region = r as Partial<RegionSpec>;
   if (typeof region.primitive !== 'string' || !VALID_PRIMITIVES.has(region.primitive)) return false;

@@ -179,6 +179,7 @@ import { HintSparkles } from './HintSparkles';
 import { seatsFor, type SeatKey } from './shipSeats';
 import { QuestComplete, RatingSequence, TestTransition } from './quest/TestScreens';
 import { resetPrefs } from './craft/prefs';
+import { CH_EM, WORLD_ASPECT } from './font';
 import {
   advance,
   condOf,
@@ -370,7 +371,7 @@ const POND_REACH = 1; // tiles from the player's feet to a pond's box to fill at
 // the old animated pond, or a glyph pond (an editor asset with water keys)
 const isPond = (e: Ent) => e.kind === 'pond' || !!e.sway;
 // the water kept between a sailing boat's hull and the sand: ~2-3 px each way
-// (a ch is ~8.4 px, an em 14)
+// (a ch is 7 px, an em 14)
 const BOAT_SHORE_GAP = { ch: 0.3, em: 0.2 };
 const BOARD_REACH = 3; // tiles from the player to the boat's edge to climb in // tiles from the boat to a shore click that lands
 const BOAT_SCALE = 1.9;
@@ -413,7 +414,7 @@ const GLIDE_SLOW = 1.75;
 // they'd finish in the exact same fixed duration and so visibly move at a
 // different true speed (diagonals fastest, vertical slowest). speedScale()
 // below normalizes every direction to the horizontal case's true px/sec.
-const CELL_ASPECT = 14 / 8.4;
+const CELL_ASPECT = WORLD_ASPECT;
 function speedScale(dx: number, dy: number): number {
   if (!dx && !dy) return 1;
   const dist = Math.hypot(dx * TILE_CH, dy * TILE_LN * CELL_ASPECT);
@@ -670,9 +671,9 @@ const LANDING_FADE_MS = 500;
 // assumes; a rotated one turns about the art's own centre on the centre of its
 // rotated tile box, the box collision and footprint use) and its depth. Used
 // by the game's entity map and the start screen's live view alike.
-// the terrain's ground rows per text line (terrain.ts CELL_ASPECT): a ground
-// square is 1ch wide and a fixed 1/GROUND_PER_LINE em tall, whatever the font
-const GROUND_PER_LINE = 14 / 8.4;
+// the terrain's ground rows per text line (font.ts WORLD_ASPECT): a ground
+// square is 1ch wide and a fixed 1/GROUND_PER_LINE em tall
+const GROUND_PER_LINE = WORLD_ASPECT;
 const SHADOW_COLOR = () => themeSwatch('player.shadow');
 // A fence piece's or gate's contact shadow: the glyph columns of its feet
 // (its bottom rows) as runs, gaps under 2 glyphs bridged, so a picket fence
@@ -796,7 +797,7 @@ function LandingWorld({ portrait }: { portrait: boolean }) {
     },
     [],
   );
-  const [dims, setDims] = useState({ w: 940, h: 560, scale: 1, viewW: VIEW_W, viewH: VIEW_H, charW: 8.4, lineH: 14 });
+  const [dims, setDims] = useState({ w: 940, h: 560, scale: 1, viewW: VIEW_W, viewH: VIEW_H, charW: 14 * CH_EM, lineH: 14 });
   useLayoutEffect(() => {
     // the same measuring and COVER fit as the game's (see Game's dims)
     const compute = () => {
@@ -1591,7 +1592,7 @@ function Game() {
     panY: 0,
     camX: 0,
     camY: 0,
-    dims: { scale: 1, charW: 8.4, lineH: 14, viewW: VIEW_W, viewH: VIEW_H, w: 940, h: 560 },
+    dims: { scale: 1, charW: 14 * CH_EM, lineH: 14, viewW: VIEW_W, viewH: VIEW_H, w: 940, h: 560 },
   });
 
   // dev-only: the world editor (press E; see src/editor/ and docs/Editor.md).
@@ -1868,7 +1869,7 @@ function Game() {
     scale: 1,
     viewW: VIEW_W,
     viewH: VIEW_H,
-    charW: 8.4, // measured px size of one character cell — the wheel handler
+    charW: 14 * CH_EM, // measured px size of one character cell — the wheel handler
     lineH: 14, //  needs it to turn a cursor pixel into a world coordinate
   });
   useLayoutEffect(() => {
@@ -5830,7 +5831,7 @@ function Game() {
                 palette={avatarRecolored.palette}
                 eyeRow={14}
                 shade={PLAYER_SHADE}
-                charW={HUD_AVATAR_FONT * 0.6}
+                charW={HUD_AVATAR_FONT * CH_EM}
                 lineH={HUD_AVATAR_FONT}
                 res={2 * (window.devicePixelRatio || 1)}
               />

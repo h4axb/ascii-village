@@ -16,6 +16,7 @@
 // ---------------------------------------------------------------------------
 import groundData from './data/ground.json';
 import { GROUND_W, GROUND_H, TILE_CH, TILE_LN } from './world';
+import { WORLD_ASPECT } from './font';
 
 export const MAT_NONE = 0;
 export const MAT_DIRT = 1;
@@ -24,10 +25,10 @@ export const MAT_STONE = 3;
 export const MAT_SAND = 4; // beach sand, like the coast's
 export type Material = typeof MAT_DIRT | typeof MAT_MEADOW | typeof MAT_STONE | typeof MAT_SAND;
 
-// what a cell measures on screen (8.4 x 14 px, see App.tsx) — brushes and
-// stones are round on screen, not in cells
-const CH_PX = 8.4;
+// what a cell measures in the world's proportions (font.ts WORLD_ASPECT) —
+// brushes and stones are round on the ground, not in cells
 const LN_PX = 14;
+const CH_PX = LN_PX / WORLD_ASPECT;
 const TILE_PX = 30; // one brush-size unit, about one map tile
 
 export interface Stone {

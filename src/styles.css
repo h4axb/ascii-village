@@ -38,6 +38,75 @@
      the same hand */
   --ui-petal: #F47F9D;
   --ui-petal-core: #FFD166;
+  /* the game font: set from src/font.ts GAME_FONT at startup; this copy is
+     only the default until then */
+  --game-font: 'Sarasa Mono', 'Sarasa Mono SC', 'Sarasa Fixed SC', 'Sarasa Term SC', 'Sarasa Fallback Iosevka',
+    'Sarasa Fallback Cascadia', 'Sarasa Fallback Consolas', 'Sarasa Fallback Menlo', 'Sarasa Fallback DejaVu',
+    'Sarasa Fallback Courier', monospace;
+}
+
+/* ---------- the game font ----------
+   'Sarasa Mono' itself is bundled and loaded by src/font.ts (FontFace, so the
+   game knows whether it really loaded). Below are the EMERGENCY faces, used
+   only when that load fails: a system monospace scaled to Sarasa's 0.5em
+   character width (size-adjust, from each font's own advance width) with
+   Sarasa's line metrics (ascent 96.7 %, descent 28.3 %, no gap; the
+   overrides are scaled by size-adjust too, hence divided by it), so the grid
+   and baseline hold and only the glyph shapes differ. The order is
+   src/font.ts GAME_FONT. */
+@font-face {
+  /* Iosevka Term: 0.500em wide */
+  font-family: 'Sarasa Fallback Iosevka';
+  src: local('Iosevka Term'), local('IosevkaTerm-Regular'), local('Iosevka'), local('Iosevka-Regular');
+  size-adjust: 100.00%;
+  ascent-override: 96.70%;
+  descent-override: 28.30%;
+  line-gap-override: 0%;
+}
+@font-face {
+  /* Cascadia Mono: 0.586em wide */
+  font-family: 'Sarasa Fallback Cascadia';
+  src: local('Cascadia Mono'), local('CascadiaMono-Regular'), local('Cascadia Code'), local('CascadiaCode-Regular');
+  size-adjust: 85.34%;
+  ascent-override: 113.31%;
+  descent-override: 33.16%;
+  line-gap-override: 0%;
+}
+@font-face {
+  /* Consolas: 0.550em wide */
+  font-family: 'Sarasa Fallback Consolas';
+  src: local('Consolas');
+  size-adjust: 90.94%;
+  ascent-override: 106.33%;
+  descent-override: 31.12%;
+  line-gap-override: 0%;
+}
+@font-face {
+  /* Menlo: 0.602em wide */
+  font-family: 'Sarasa Fallback Menlo';
+  src: local('Menlo'), local('Menlo-Regular');
+  size-adjust: 83.04%;
+  ascent-override: 116.45%;
+  descent-override: 34.08%;
+  line-gap-override: 0%;
+}
+@font-face {
+  /* DejaVu Sans Mono: 0.602em wide */
+  font-family: 'Sarasa Fallback DejaVu';
+  src: local('DejaVu Sans Mono'), local('DejaVuSansMono');
+  size-adjust: 83.04%;
+  ascent-override: 116.45%;
+  descent-override: 34.08%;
+  line-gap-override: 0%;
+}
+@font-face {
+  /* Courier New: 0.600em wide */
+  font-family: 'Sarasa Fallback Courier';
+  src: local('Courier New'), local('CourierNewPSMT');
+  size-adjust: 83.32%;
+  ascent-override: 116.06%;
+  descent-override: 33.97%;
+  line-gap-override: 0%;
 }
 
 html,
@@ -49,14 +118,11 @@ body,
 body {
   background: #0a0a0a;
   color: #ddd;
-  /* Sprite font. The FACE SET (kaomoji: ・ω・ etc.) must render SINGLE-WIDTH or
-     the sprite grid bends — a CJK-aware monospace does this. 'Sarasa Mono' is
-     the recommended install (halfwidth kaomoji); 'Cascadia Code' is a good
-     fallback. If neither is present the browser uses a generic monospace where
-     kaomoji may be fullwidth — in that case the runtime alignment check simply
-     rejects kaomoji sprites, so the grid never breaks. Plain ASCII is
-     single-width in every monospace, so existing sprites are unaffected. */
-  font-family: 'Sarasa Mono', 'Cascadia Code', 'Courier New', ui-monospace, Menlo, Consolas, monospace;
+  /* Sprite font: Sarasa Mono, bundled (src/font.ts). Every glyph a sprite can
+     hold is one column wide in it (scripts/subset-font.py checks), and no
+     ligatures, so '->' in a sprite stays two cells. */
+  font-family: var(--game-font);
+  font-variant-ligatures: none;
   overflow: hidden;
 }
 
@@ -3494,7 +3560,7 @@ pre {
 .introa-narration-text {
   margin: 0;
   text-align: center;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  font-family: var(--game-font);
   font-weight: 500;
   font-size: clamp(14px, 1.6vw, 19px);
   line-height: 1.6;
@@ -4956,4 +5022,40 @@ pre {
   position: absolute;
   height: 0.3em; /* one pixel: half a ground square (0.6em tall), as the player's shadow */
   background: var(--fence-shadow, #1c2a12);
+}
+
+/* ---------- font loading (src/main.tsx) ---------- */
+.font-gate {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--ui-body);
+}
+.font-gate div {
+  display: flex;
+  gap: 10px;
+}
+.font-gate button {
+  padding: 6px 14px;
+  border-radius: var(--ui-radius-sm);
+  border-color: var(--ui-border);
+  color: var(--ui-heading);
+}
+.font-note {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 8px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-bg);
+  color: var(--ui-body);
+  font-size: 12px;
+  z-index: 10000;
+  cursor: pointer;
 }

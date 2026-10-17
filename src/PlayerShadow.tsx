@@ -2,8 +2,9 @@
 // screen and the editor's Start screen tab.
 import { TILE_CH, TILE_LN } from './world';
 import { themeSwatch } from './theme';
+import { WORLD_ASPECT } from './font';
 
-const CELL_ASPECT = 14 / 8.4; // ground blocks per text line
+const CELL_ASPECT = WORLD_ASPECT; // ground blocks per text line
 
 // The player's shadow: a flat pixel oval on the ground under the feet, in
 // pixels of half a ground square (the terrain's background blocks are 1ch x

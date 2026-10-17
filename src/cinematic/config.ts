@@ -244,7 +244,7 @@ export const SCENE = {
 
 // the game's own glyph ramp (src/craft/materials.ts RAMP_DEFAULT)
 export const GLYPHS = '·:¬=+†‡*¤§%&¥Ø@';
-export const GLYPH_FONT = "'Sarasa Mono', 'Cascadia Code', 'Courier New', ui-monospace, Menlo, Consolas, monospace";
+export { GAME_FONT as GLYPH_FONT } from '../font';
 
 // ---- the shots, as the dev timeline lists them ----------------------------------------
 export const SHOT_LIST: { id: string; label: string; at: number; end: number }[] = [

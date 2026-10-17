@@ -325,7 +325,7 @@
   justify-content: center;
   color: #f1ece2;
   /* the game's own monospace (styles.css body) */
-  font-family: 'Sarasa Mono', 'Cascadia Code', 'Courier New', ui-monospace, Menlo, Consolas, monospace;
+  font-family: var(--game-font);
   font-size: clamp(16px, 1.8vw, 30px);
   font-weight: 400;
   letter-spacing: 0.08em;

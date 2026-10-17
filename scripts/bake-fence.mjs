@@ -10,7 +10,9 @@ const SCALE = 0.125;
 const names = ['front', 'front-left', 'front-right', 'side-left', 'side-right', 'stick-left', 'stick-right', 'gate', 'gate-open'];
 const b = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
 const p = await b.newPage();
-await p.goto('http://127.0.0.1:5173/0'); await p.waitForTimeout(800);
+await p.goto('http://127.0.0.1:5173/0');
+// the game mounts once its bundled font has loaded (src/main.tsx)
+await p.waitForFunction(() => document.documentElement.dataset.font);
 const imgs = Object.fromEntries(names.map((n) => [n, 'data:image/png;base64,' + fs.readFileSync(`${D}/${n}.png`).toString('base64')]));
 const res = await p.evaluate(async ({ imgs, P }) => {
   const B = await import('/src/glyph/bake.ts');

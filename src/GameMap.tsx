@@ -21,6 +21,7 @@ import type { Ent } from './world';
 import { terrainField, GLYPHS, KIND_WATER } from './terrain';
 import { IconClose } from './ui';
 import { themeColor } from './theme';
+import { WORLD_ASPECT } from './font';
 
 export interface MapCharacterEntry {
   id: string;
@@ -36,9 +37,9 @@ export interface MapCharacterEntry {
 }
 
 // Map drawing resolution: px per character cell, picked to match what the
-// screen shows (see pickCell) so glyphs stay crisp. A cell is 8.4 x 14 in
-// game, so the height follows the width.
-const cellH = (cw: number) => (cw * 14) / 8.4;
+// screen shows (see pickCell) so glyphs stay crisp. The height follows the
+// width in the world's proportions (font.ts WORLD_ASPECT).
+const cellH = (cw: number) => cw * WORLD_ASPECT;
 const pickCell = (pxPerCell: number) =>
   Math.max(4, Math.min(6, Math.ceil(pxPerCell * (window.devicePixelRatio || 1))));
 const ZOOM = 1.6; // how far past "whole width fits" the map is zoomed in
@@ -228,7 +229,7 @@ export default function GameMap({
   }, [open]);
 
   const pxPerCell = vp.w ? (ZOOM * vp.w) / GROUND_W : 0; // horizontal
-  const pxPerLine = (pxPerCell * 14) / 8.4;
+  const pxPerLine = pxPerCell * WORLD_ASPECT;
   const mapW = GROUND_W * pxPerCell;
   const mapH = GROUND_H * pxPerLine;
 

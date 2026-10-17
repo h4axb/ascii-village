@@ -5,6 +5,7 @@ import mainIslandData from './data/mainIsland.json';
 import shopIslandData from './data/shopIsland.json';
 import { assetOf, ASSET_OF_KIND } from './assets';
 import { signArt, type SignSettings } from './wayfinder';
+import { CH_EM, WORLD_ASPECT } from './font';
 
 // The map is a tile grid. Each tile is 4 characters wide and 2 lines tall, so
 // the ground layer is (MAP_W*4) x (MAP_H*2) characters. Entities are positioned
@@ -1102,8 +1103,8 @@ export function startScreenSize(): { w: number; h: number } {
 // the column's scale on a screen this wide
 export const startUiScale = (ss: StartScreen, screenW: number) => ss.ui.scale * (screenW / START_REF.w);
 export function startFrame(ss: StartScreen, scr: { w: number; h: number } = startScreenSize()) {
-  // the field's cell (14px font, a 0.6em glyph): only its aspect matters here
-  const { viewW, viewH } = coverView(scr.w, scr.h, 8.4, 14, ss.zoom);
+  // the field's cell (14px font, font.ts CH_EM): only its aspect matters here
+  const { viewW, viewH } = coverView(scr.w, scr.h, 14 * CH_EM, 14, ss.zoom);
   const x = clampCam(ss.view.x * TILE_CH, viewW, GROUND_W);
   const y = clampCam(ss.view.y * TILE_LN, viewH, GROUND_H);
   // screen px -> ch / lines
@@ -1536,14 +1537,14 @@ export function grassKeepOut(window: number): Uint8Array {
 // ===========================================================================
 // THE FOUR KNOBS. All four are in units you can SEE, and none of them disturbs
 // the others — change one and the rest hold. That matters because a character
-// cell is not square (8.4px wide, 14px tall), so raw noise numbers do not mean
+// cell is not square (font.ts WORLD_ASPECT: 5/3 as tall as wide), so raw noise numbers do not mean
 // what they look like: equal frequency per axis gives regions 1.67x TALLER
 // than wide, and equal drift per axis gives motion 1.67x faster vertically.
 // Every conversion below exists to cancel that out.
 // ===========================================================================
-const CELL_W = 8.4; // px, one character cell (must match dims in App.tsx)
 const CELL_H = 14;
-const ASPECT = CELL_H / CELL_W; // 1.667 — the correction factor everywhere below
+const CELL_W = CELL_H / WORLD_ASPECT; // px, one character cell in the world's design proportions
+const ASPECT = WORLD_ASPECT; // 1.667 — the correction factor everywhere below
 
 // How magnified the whole picture is. 1 = the reference exactly.
 const OCEAN_ZOOM = 2.5;
@@ -1598,7 +1599,7 @@ export const OCEAN_CFG = {
   //
   // Reference: scrollX = t*0.007, scrollY = t*0.010 — an oblique bottom-to-top
   // scroll, mostly upward with a leftward lean. In SCREEN terms that lean is
-  // weak: because a cell is 8.4px wide but 14px tall, those numbers come out
+  // weak: because a cell is 5/3 as tall as it is wide, those numbers come out
   // 2.38x faster VERTICALLY than horizontally, so it reads as "up, tilted"
   // rather than as a real diagonal.
   //

@@ -1199,7 +1199,18 @@
   gap: 10px;
 }
 .ds-rail-btn {
+  /* the pixel-art bookmarks (cart / coin), sized like the quest panel's
+     .qp-tab, a little dimmed until on or hovered */
+  width: 50px;
+  height: 56px;
   color: var(--ds-text-muted);
+}
+.ds-rail-btn svg {
+  opacity: 0.85;
+}
+.ds-rail-btn:hover svg,
+.ds-rail-btn.on svg {
+  opacity: 1;
 }
 .ds-rail-btn.on {
   color: var(--ds-text);
@@ -2257,7 +2268,8 @@
   .qp-tabs {
     transform: translateX(-240px);
   }
-  .qp-tab {
+  .qp-tab,
+  .ds-rail-btn {
     width: 46px;
     height: 50px;
   }
@@ -2607,4 +2619,10 @@
 }
 .recraft-row.away .recraft-btn {
   cursor: default;
+}
+
+/* the pixel coin in a line of text (prices, Buy for / Sell for) */
+.ds-coin-icon {
+  flex: none;
+  vertical-align: -3px;
 }

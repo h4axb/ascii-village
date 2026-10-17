@@ -597,8 +597,9 @@ pre {
 }
 
 .hud-coin-icon {
-  width: 21px;
-  height: 21px;
+  /* the pixel coin at its own 16 px, whole pixels (ui/pixelIcons.ts) */
+  width: 16px;
+  height: 16px;
 }
 
 .hud-coin-amount {

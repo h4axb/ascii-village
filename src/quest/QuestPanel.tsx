@@ -5,6 +5,7 @@
 // state and decides when it shows.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Objective } from './quests';
+import { PixelIcon } from '../ui/PixelIcon';
 
 // A finished step's beat (see QuestPanel): crossed out, then slid out, then
 // the next step slides in. Played only while the quest view is showing.
@@ -41,28 +42,6 @@ function MouseIcon({ wheel }: { wheel?: boolean }) {
       ) : (
         <path d="M2 8V7.5A6 6 0 0 1 8 2v6z" fill="currentColor" opacity="0.55" />
       )}
-    </svg>
-  );
-}
-
-// A pixel-art icon: one character per pixel ('.' = clear), each colour by
-// key (CSS colours, design-system variables too), every pixel `px` CSS px
-// square so it stays crisp.
-function PixelIcon({ map, colors, px = 2 }: { map: string[]; colors: Record<string, string>; px?: number }) {
-  const rects: ReactNode[] = [];
-  map.forEach((row, y) => {
-    for (let x = 0; x < row.length; ) {
-      const k = row[x];
-      let n = 1;
-      while (row[x + n] === k) n++;
-      if (colors[k]) rects.push(<rect key={`${x},${y}`} x={x} y={y} width={n} height={1} fill={colors[k]} />);
-      x += n;
-    }
-  });
-  const w = Math.max(...map.map((r) => r.length));
-  return (
-    <svg viewBox={`0 0 ${w} ${map.length}`} width={w * px} height={map.length * px} shapeRendering="crispEdges" aria-hidden>
-      {rects}
     </svg>
   );
 }

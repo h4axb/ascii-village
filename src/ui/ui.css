@@ -2118,9 +2118,9 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  margin: -5px -6px 0 0;
+  width: 34px;
+  height: 34px;
+  margin: -8px -6px 0 0;
   border: 1px solid var(--ds-line);
   border-radius: var(--ds-radius-sm);
   background: transparent;

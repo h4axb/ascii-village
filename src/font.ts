@@ -34,12 +34,13 @@ export const GAME_FONT = [
 // measuring
 export const CH_EM = 0.5;
 
-// The proportions the world was designed with: a text line is this many
-// ground rows tall (the terrain's square-ish blocks), and the shapes built on
-// that (coast and ocean noise, iso tiles, minimap cells, the diagonal walk
-// speed, the player's and fences' shadows) use the same number. It dates
-// from a 0.6em font (14 / 8.4); a 0.5em font makes a true square ratio 2.
-export const WORLD_ASPECT = 14 / 8.4;
+// How much taller a text line is than a character is wide (1 / CH_EM): a
+// line is this many ground rows tall, so the terrain's blocks are true 1:1
+// squares, and the shapes built on that (ocean noise, bush clumps, minimap
+// cells, the diagonal walk speed, the player's and fences' shadows) use the
+// same number. (It was 14 / 8.4, from a 0.6em font, until the game bundled
+// its 0.5em one.)
+export const WORLD_ASPECT = 1 / CH_EM;
 
 // --game-font for the CSS, from the one copy above
 if (typeof document !== 'undefined') document.documentElement.style.setProperty('--game-font', GAME_FONT);

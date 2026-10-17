@@ -5028,7 +5028,7 @@ pre {
 }
 .fence-shadows > i {
   position: absolute;
-  height: 0.3em; /* one pixel: half a ground square (0.6em tall), as the player's shadow */
+  height: 0.25em; /* one pixel: half a ground square (0.5em tall), as the player's shadow */
   background: var(--fence-shadow, #1c2a12);
 }
 

@@ -413,8 +413,8 @@ const FRESH_START_FRAME_MARGIN_MS = 30;
 // step cadence + transition are multiplied by this while gliding along a
 // collider, so wall-hugging is noticeably gentler than open-field movement
 const GLIDE_SLOW = 1.75;
-// Physical shape of one character cell in this font (established tuning the
-// generated assets: a line is ~1.667x the width of a character). A tile is
+// Physical shape of one character cell in this font (font.ts WORLD_ASPECT: a
+// line is 2x the width of a character). A tile is
 // TILE_CH chars wide but TILE_LN lines tall, so a vertical-only step and a
 // diagonal step cover MORE true pixels than a horizontal one — without this,
 // they'd finish in the exact same fixed duration and so visibly move at a

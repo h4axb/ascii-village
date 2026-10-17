@@ -95,7 +95,7 @@ export function planPrompt(): string {
       'the object\'s proportions (e.g. 3 and 1 for a long thin snake, 1 and 1 for something roughly as ' +
       'wide as tall). These are NOT literal cell counts — code picks the actual canvas size afterward, ' +
       'using your numbers only as a shape hint, so do not worry about hitting an exact number. Character ' +
-      'CELLS are taller than wide (about 1.667x) — a round or wide subject (ball, coin, wheel) needs a ' +
+      'CELLS are taller than wide (2x) — a round or wide subject (ball, coin, wheel) needs a ' +
       'bigger width number than height to read as round, not equal width/height.',
 
     'SILHOUETTE FIRST. Before anything else, identify the 3-6 largest recognizable masses of the object — ' +

@@ -670,8 +670,8 @@ const LANDING_FADE_MS = 500;
 // assumes; a rotated one turns about the art's own centre on the centre of its
 // rotated tile box, the box collision and footprint use) and its depth. Used
 // by the game's entity map and the start screen's live view alike.
-// the ground's pixel grid: blocks (1ch x 1ch squares) per text line
-// (PlayerShadow's CELL_ASPECT)
+// the terrain's ground rows per text line (terrain.ts CELL_ASPECT): a ground
+// square is 1ch wide and a fixed 1/GROUND_PER_LINE em tall, whatever the font
 const GROUND_PER_LINE = 14 / 8.4;
 const SHADOW_COLOR = () => themeSwatch('player.shadow');
 // A fence piece's or gate's contact shadow: the glyph columns of its feet
@@ -6648,6 +6648,11 @@ function Game() {
                     // grid, a flat stepped oval two pixels tall under the
                     // feet (the feet in its upper row, so most of it shows)
                     const half = (v: number) => Math.round(v * 2) / 2;
+                    // vertically in the terrain's own ground rows: GROUND_PER_LINE
+                    // of them per text line whatever the font (a ground
+                    // square is 1ch wide but a fixed 1/GROUND_PER_LINE em tall),
+                    // so positions go in em, not ch (Sarasa Mono's ch is
+                    // 0.5em: ch-based tops landed far from the pieces)
                     const top = half((e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE - 0.35);
                     return fenceShadowRuns(e.sprite).flatMap(([c0, c1], i) => {
                       // the feet plus half a pixel each side, at least two
@@ -6659,8 +6664,8 @@ function Game() {
                       // pixel at each end (one pixel: a short run keeps it)
                       const inset = x1 - x0 >= 2 ? 0.5 : 0;
                       return [
-                        <i key={`${e.id}-${i}a`} style={{ left: `${x0}ch`, width: `${x1 - x0}ch`, top: `${top}ch` }} />,
-                        <i key={`${e.id}-${i}b`} style={{ left: `${x0 + inset}ch`, width: `${x1 - x0 - 2 * inset}ch`, top: `${top + 0.5}ch` }} />,
+                        <i key={`${e.id}-${i}a`} style={{ left: `${x0}ch`, width: `${x1 - x0}ch`, top: `${top / GROUND_PER_LINE}em` }} />,
+                        <i key={`${e.id}-${i}b`} style={{ left: `${x0 + inset}ch`, width: `${x1 - x0 - 2 * inset}ch`, top: `${(top + 0.5) / GROUND_PER_LINE}em` }} />,
                       ];
                     });
                   })}

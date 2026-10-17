@@ -32,7 +32,10 @@ export function PlayerShadow({ x, y, cx, footEm }: { x: number; y: number; cx: n
       viewBox="0 0 12 4"
       shapeRendering="crispEdges"
       aria-hidden="true"
-      style={{ left: `${bx0 - rigX}ch`, top: `${by0 - rigY}ch`, width: '6ch', height: '2ch', opacity: PLAYER_SHADOW.opacity }}
+      // ground rows are a fixed 1/CELL_ASPECT em tall (1ch only when the
+      // font's ch is 0.6em), so the vertical goes in em
+      preserveAspectRatio="none"
+      style={{ left: `${bx0 - rigX}ch`, top: `${(by0 - rigY) / CELL_ASPECT}em`, width: '6ch', height: `${2 / CELL_ASPECT}em`, opacity: PLAYER_SHADOW.opacity }}
     >
       {SHADOW_ROWS.map(([x0, n], row) => (
         <rect key={row} x={x0} y={row} width={n} height={1} fill={themeSwatch('player.shadow')} />

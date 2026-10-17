@@ -80,6 +80,7 @@ glyph editor: pnpm ref
 + libraries: vite, react 
 + assets: uploaded svg (assets), rendered in json (src/data)
 First the text signs in json are translated to letters and each letter has a predefined color (ColoredSprite.tsx). 
++ Asset font: Sarasa Mono, Iosevka (fallback)
 
 ## Deployment
 + hosting provider: cloudflare (https://dash.cloudflare.com/c09514d3d422733cfb67e78b94475238/workers/services/view/asciia-bay-2/production)

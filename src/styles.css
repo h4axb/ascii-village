@@ -4941,8 +4941,8 @@ pre {
   margin: -7px 0 0 -7px;
 }
 
-/* fence pieces' and gates' contact shadows: one row of ground-grid pixel
-   squares under their feet, in one layer just above the ground (one opacity,
+/* fence pieces' and gates' contact shadows: one row of whole ground squares
+   (1:1) at their feet, in one layer just above the ground (one opacity,
    so where pieces overlap the shadow stays even) */
 .fence-shadows {
   position: absolute;
@@ -4953,6 +4953,6 @@ pre {
 }
 .fence-shadows > i {
   position: absolute;
-  height: 0.5ch;
+  height: 1ch; /* one full ground square */
   background: var(--fence-shadow, #1c2a12);
 }

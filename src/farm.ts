@@ -10,6 +10,7 @@
 import type { ItemType } from './world';
 import type { Category, ShopItem } from './llm';
 import worldDoc from './data/world.json';
+import cropsData from './data/crops.json';
 
 // ---- garden geometry (tile coordinates) -----------------------------------
 // A fenced plot NORTH (above) of the house. The house sits at y32-35, so the
@@ -229,6 +230,8 @@ export interface PlantedCrop {
   // then the drop drains (DRY_MS) and the plant dries out. See waterLevel.
   fill?: number;
   fillAt?: number;
+  // the fullest its water bar has been (its sprout stays once grown)
+  peak?: number;
 }
 
 // A full water bar runs dry in this long; then the drop empties in DRY_MS.
@@ -310,6 +313,30 @@ const SPROUT_2 = [' v ', ' | '];
 const SPROUT_3 = ['\\|/', ' | '];
 const WILTED = ['x_x', '/|\\'];
 
+// The crops' pixel art (src/data/crops.json, baked by
+// scripts/bake-crops.mjs from assets/refs/crops), in its own colours
+export interface CropLook {
+  sprite: string[];
+  colors?: string[];
+  palette?: Record<string, string>;
+}
+type CropArt = 'sprout' | 'strawberryPlant' | 'pumpkin' | 'strawberry';
+export const CROP_ART = cropsData as unknown as Record<CropArt, Required<CropLook>>;
+// a seed sprouts once its water bar has been a quarter full
+export const SPROUT_AT = 0.25;
+
+// How a crop looks in its bed slot: a seed sprouts into a leaf once its bar
+// was a quarter full, and grows into a strawberry plant or a pumpkin by what
+// it was; the rest (glyph stages, other plants) as text.
+export function cropLook(c: PlantedCrop, wt: number, fx: SlotEffect = NO_EFFECT): CropLook {
+  if (c.stage === 'ready' && c.harvest.kind === 'base') {
+    if (c.harvest.it === 'strawberry') return CROP_ART.strawberryPlant;
+    if (c.harvest.it === 'pumpkin') return CROP_ART.pumpkin;
+  }
+  if (c.stage === 'growing' && isFillCrop(c) && (c.peak ?? c.fill ?? 0) >= SPROUT_AT) return CROP_ART.sprout;
+  return { sprite: slotSprite(c, wt, fx) };
+}
+
 // The little sprite shown in a bed slot for the crop's current state.
 export function slotSprite(c: PlantedCrop, wt: number, fx: SlotEffect = NO_EFFECT): string[] {
   if (c.stage === 'failed') return WILTED;
@@ -344,9 +371,9 @@ export function createCrop(
   };
 }
 
-// Base world items that make sense to plant (stone, dates and the harvested
-// Sunbloom are excluded).
-export const PLANTABLE_BASE: ItemType[] = ['seed', 'flower', 'cactus', 'fern', 'iceflower'];
+// Base world items that make sense to plant (stones, dates, flowers and the
+// harvests are excluded).
+export const PLANTABLE_BASE: ItemType[] = ['seed', 'cactus', 'fern', 'iceflower'];
 
 // A seed grows by water (its water bar, see waterLevel) into a Sunbloom: it
 // dries out if it's left without water (DRY_MS after the bar runs empty).

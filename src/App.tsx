@@ -66,7 +66,9 @@ import {
   seedCrop,
   cropStatus,
   advanceStage,
-  slotSprite,
+  cropLook,
+  CROP_ART,
+  GARDEN_BASE_SCALE,
   waterLevel,
   isFillCrop,
   POUR_FILL_MS,
@@ -288,6 +290,9 @@ const BASE_COLOUR: Partial<Record<ItemType, string>> = {
 };
 function baseLook(it: ItemType): { sprite: string[]; colors?: string[]; palette?: Record<string, string>; color?: string } {
   if (it === 'date') return { sprite: S.DATE_FRUIT, colors: S.DATE_COLORS, palette: S.DATE_PALETTE };
+  // the harvests in their pixel art (farm.ts CROP_ART)
+  if (it === 'strawberry') return CROP_ART.strawberry;
+  if (it === 'pumpkin') return CROP_ART.pumpkin;
   if (it === 'flower' && Object.keys(S.FLOWER_PLUS_PALETTE).length)
     return { sprite: S.FLOWER_PLUS, colors: S.FLOWER_PLUS_COLORS, palette: S.FLOWER_PLUS_PALETTE };
   return { sprite: ITEM_SPRITES[it], color: BASE_COLOUR[it] ?? '#8dae59' };
@@ -3845,6 +3850,12 @@ function Game() {
         return t ? (describeInteraction(t, interactCtx)?.name ?? null) : null;
       },
       sitting: () => sittingRef.current?.id ?? null,
+      // (tests) plant one of Mitchy's gift seeds, and harvest one bed slot
+      plantGift: (kind: 'strawberry' | 'pumpkin') => {
+        const slot = freeSlot();
+        if (slot >= 0) setCrops((cs) => [...cs, seedCrop(slot, ITEM_SPRITES[kind], wt, kind)]);
+      },
+      harvestSlot: (slot: number) => harvestCrop(slot),
       water: () => waterCrops(),
       harvest: () => {
         const c = crops.find((x) => x.id === questRef.current?.seedCrop);
@@ -5323,7 +5334,8 @@ function Game() {
         if (!ids.has(c.id)) return c;
         if (isFillCrop(c)) {
           const fill = Math.min(1, waterLevel(c, now).bar + add);
-          return { ...c, lastWateredAt: now, fill, fillAt: now, ...(fill >= 1 ? { stage: 'ready' as const } : {}) };
+          const peak = Math.max(c.peak ?? c.fill ?? 0, fill);
+          return { ...c, lastWateredAt: now, fill, fillAt: now, peak, ...(fill >= 1 ? { stage: 'ready' as const } : {}) };
         }
         // a dormant seed (an old save) starts growing now
         return { ...c, lastWateredAt: now, ...(c.dormant ? { dormant: false, plantedAt: now, care: { ...c.care, waterEveryMs: 10 * 60_000 } } : {}) };
@@ -5366,8 +5378,9 @@ function Game() {
     setCrops((cs) => cs.filter((x) => x.slot !== slot));
     if (c.harvest.kind === 'base') {
       const it = c.harvest.it;
-      // a seed grows into ONE Sunbloom (20 coins, one crafting token)
-      const n = (it === 'bloom' || it === 'strawberry' || it === 'pumpkin' ? 1 : 2) + bonus;
+      // a seed grows into ONE Sunbloom (20 coins, one crafting token), one
+      // pumpkin (21) or three strawberries (7 each)
+      const n = (it === 'strawberry' ? 3 : it === 'bloom' || it === 'pumpkin' ? 1 : 2) + bonus;
       setInv((v) => ({ ...v, [it]: v[it] + n }));
       return `${n} ${ITEM_INFO[it].name.toLowerCase()}`;
     }
@@ -5388,7 +5401,11 @@ function Game() {
     if (!yielded) return;
     if (seed) {
       questDone('harvest');
-      window.setTimeout(() => showToast(`${yielded} sell for 20 coins at the shop, just enough for a crafting token!`), 1800);
+      // what the harvest fetches at the shop (three berries or one plant)
+      const c = crops.find((x) => x.slot === slot);
+      const it = c?.harvest.kind === 'base' ? c.harvest.it : null;
+      const worth = it ? (it === 'strawberry' ? 3 : 1) * basePrice(it) : 20;
+      window.setTimeout(() => showToast(`${yielded} sell for ${worth} coins at the shop, just enough for a crafting token!`), 1800);
     }
     showToast(`harvested ${yielded}!`);
     setModal(null);
@@ -6167,7 +6184,37 @@ function Game() {
               />
               {plot.slots.map((s, i) => {
                 const c = crops.find((cr) => cr.slot === i);
-                const spr = c ? slotSprite(c, wt, fxFor(i)) : EMPTY_SLOT;
+                // the pixel-art stages (the sprout, the strawberry plant, the
+                // pumpkin): standing on the slot, sized to the bed
+                const look = c ? cropLook(c, wt, fxFor(i)) : null;
+                if (c && look?.palette) {
+                  const cols = Math.max(...look.sprite.map((l) => l.length));
+                  const rows = look.sprite.length;
+                  const wide = (look === CROP_ART.sprout ? 1 : 1.75) * (gardenScale / GARDEN_BASE_SCALE);
+                  const k = (wide * TILE_CH) / cols;
+                  return (
+                    <SolidSpriteCanvas
+                      key={`slot-${i}`}
+                      className="crop-art"
+                      style={{
+                        left: `${(s.x + 0.5) * TILE_CH - cols / 2}ch`,
+                        top: `${(s.y + 1) * TILE_LN - rows}em`,
+                        zIndex: s.y + 1,
+                        scale: `${k}`,
+                        transformOrigin: '50% 100%',
+                      }}
+                      sprite={look.sprite}
+                      colors={look.colors ?? []}
+                      palette={look.palette}
+                      charW={dims.charW}
+                      lineH={dims.lineH}
+                      res={dims.scale * zoom * k * (window.devicePixelRatio || 1)}
+                      outline={null}
+                      onClick={() => setModal({ t: 'crop', slot: i, sel: 0 })}
+                    />
+                  );
+                }
+                const spr = look ? look.sprite : EMPTY_SLOT;
                 const thirsty = c && c.stage === 'growing' && cropStatus(c, wt, fxFor(i)).thirsty;
                 return (
                   <pre
@@ -7422,7 +7469,10 @@ function Game() {
                   title={c.name}
                   art={
                     <div className="ds-portrait-box ds-panel-face">
-                      <FitSprite look={{ sprite: slotSprite(c, wt, fxFor(c.slot)) }} fill={0.8} maxScale={3} />
+                      {(() => {
+                        const look = cropLook(c, wt, fxFor(c.slot));
+                        return <FitSprite look={look} fill={0.8} maxScale={3} cells={!!look.palette} />;
+                      })()}
                     </div>
                   }
                   question={status}

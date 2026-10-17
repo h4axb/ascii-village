@@ -40,72 +40,63 @@
   --ui-petal-core: #FFD166;
   /* the game font: set from src/font.ts GAME_FONT at startup; this copy is
      only the default until then */
-  --game-font: 'Sarasa Mono', 'Sarasa Mono SC', 'Sarasa Fixed SC', 'Sarasa Term SC', 'Sarasa Fallback Iosevka',
-    'Sarasa Fallback Cascadia', 'Sarasa Fallback Consolas', 'Sarasa Fallback Menlo', 'Sarasa Fallback DejaVu',
-    'Sarasa Fallback Courier', monospace;
+  --game-font: 'Asciia Mono', 'Sarasa Mono', 'Game Fallback Cascadia', 'Game Fallback Consolas',
+    'Game Fallback Menlo', 'Game Fallback DejaVu', 'Game Fallback Courier', monospace;
 }
 
 /* ---------- the game font ----------
-   'Sarasa Mono' itself is bundled and loaded by src/font.ts (FontFace, so the
-   game knows whether it really loaded). Below are the EMERGENCY faces, used
-   only when that load fails: a system monospace scaled to Sarasa's 0.5em
-   character width (size-adjust, from each font's own advance width) with
-   Sarasa's line metrics (ascent 96.7 %, descent 28.3 %, no gap; the
-   overrides are scaled by size-adjust too, hence divided by it), so the grid
-   and baseline hold and only the glyph shapes differ. The order is
-   src/font.ts GAME_FONT. */
+   The bundled fonts are loaded by src/font.ts (FontFace, so the game knows
+   whether they really loaded): 'Asciia Mono' (Cascadia Code, renamed) and
+   'Sarasa Mono' as its fallback, both on the game's 0.6em cell
+   (scripts/subset-font.py). Below are the EMERGENCY faces, used only when
+   that load fails: a system monospace scaled to the 0.6em character width
+   (size-adjust, from each font's own advance width) with the main font's
+   line metrics (ascent 92.77 %, descent 23.44 %, no gap; the overrides are
+   scaled by size-adjust too, hence divided by it), so the grid and baseline
+   hold and only the glyph shapes differ. The order is src/font.ts GAME_FONT. */
 @font-face {
-  /* Iosevka Term: 0.500em wide */
-  font-family: 'Sarasa Fallback Iosevka';
-  src: local('Iosevka Term'), local('IosevkaTerm-Regular'), local('Iosevka'), local('Iosevka-Regular');
-  size-adjust: 100.00%;
-  ascent-override: 96.70%;
-  descent-override: 28.30%;
-  line-gap-override: 0%;
-}
-@font-face {
-  /* Cascadia Mono: 0.586em wide */
-  font-family: 'Sarasa Fallback Cascadia';
-  src: local('Cascadia Mono'), local('CascadiaMono-Regular'), local('Cascadia Code'), local('CascadiaCode-Regular');
-  size-adjust: 85.34%;
-  ascent-override: 113.31%;
-  descent-override: 33.16%;
+  /* Cascadia Code: 0.586em wide */
+  font-family: 'Game Fallback Cascadia';
+  src: local('Cascadia Code'), local('CascadiaCode-Regular'), local('Cascadia Mono'), local('CascadiaMono-Regular');
+  size-adjust: 102.41%;
+  ascent-override: 90.59%;
+  descent-override: 22.89%;
   line-gap-override: 0%;
 }
 @font-face {
   /* Consolas: 0.550em wide */
-  font-family: 'Sarasa Fallback Consolas';
+  font-family: 'Game Fallback Consolas';
   src: local('Consolas');
-  size-adjust: 90.94%;
-  ascent-override: 106.33%;
-  descent-override: 31.12%;
+  size-adjust: 109.13%;
+  ascent-override: 85.01%;
+  descent-override: 21.48%;
   line-gap-override: 0%;
 }
 @font-face {
   /* Menlo: 0.602em wide */
-  font-family: 'Sarasa Fallback Menlo';
+  font-family: 'Game Fallback Menlo';
   src: local('Menlo'), local('Menlo-Regular');
-  size-adjust: 83.04%;
-  ascent-override: 116.45%;
-  descent-override: 34.08%;
+  size-adjust: 99.65%;
+  ascent-override: 93.10%;
+  descent-override: 23.52%;
   line-gap-override: 0%;
 }
 @font-face {
   /* DejaVu Sans Mono: 0.602em wide */
-  font-family: 'Sarasa Fallback DejaVu';
+  font-family: 'Game Fallback DejaVu';
   src: local('DejaVu Sans Mono'), local('DejaVuSansMono');
-  size-adjust: 83.04%;
-  ascent-override: 116.45%;
-  descent-override: 34.08%;
+  size-adjust: 99.65%;
+  ascent-override: 93.10%;
+  descent-override: 23.52%;
   line-gap-override: 0%;
 }
 @font-face {
   /* Courier New: 0.600em wide */
-  font-family: 'Sarasa Fallback Courier';
+  font-family: 'Game Fallback Courier';
   src: local('Courier New'), local('CourierNewPSMT');
-  size-adjust: 83.32%;
-  ascent-override: 116.06%;
-  descent-override: 33.97%;
+  size-adjust: 99.98%;
+  ascent-override: 92.79%;
+  descent-override: 23.44%;
   line-gap-override: 0%;
 }
 
@@ -118,8 +109,9 @@ body,
 body {
   background: #0a0a0a;
   color: #ddd;
-  /* Sprite font: Sarasa Mono, bundled (src/font.ts). Every glyph a sprite can
-     hold is one column wide in it (scripts/subset-font.py checks), and no
+  /* The game font: Asciia Mono (Cascadia Code) with Sarasa Mono as its
+     fallback, both bundled (src/font.ts). Every glyph a sprite can hold is
+     one column wide in them (scripts/subset-font.py checks), and no
      ligatures, so '->' in a sprite stays two cells. */
   font-family: var(--game-font);
   font-variant-ligatures: none;
@@ -5028,7 +5020,7 @@ pre {
 }
 .fence-shadows > i {
   position: absolute;
-  height: 0.25em; /* one pixel: half a ground square (0.5em tall), as the player's shadow */
+  height: 0.3em; /* one pixel: half a ground square (0.6em tall), as the player's shadow */
   background: var(--fence-shadow, #1c2a12);
 }
 

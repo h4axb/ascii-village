@@ -1,45 +1,50 @@
-// The game's one font and the ratios that come with it. Everything that draws
+// The game's fonts and the ratios that come with them. Everything that draws
 // glyphs or turns ch / em into on-screen proportions takes them from here.
 //
-// The font ships with the game (src/fonts, cut down by
-// scripts/subset-font.py), so every player draws with the same glyphs.
+// Two fonts ship with the game (src/fonts, cut down by
+// scripts/subset-font.py), so every player draws with the same glyphs:
+//   Asciia Mono  the main font: Cascadia Code (the look the game was made
+//                in), renamed as its licence asks of a modified copy
+//   Sarasa Mono  ONLY the fallback, for what Cascadia lacks (‡ ∘ ◆ ◇ ● ◯ ※ …)
 // Sizes in px are never fixed here: the game measures a real cell at runtime
 // (App.tsx's dims probe) and follows zoom and scale from that.
-import regularUrl from './fonts/sarasa-mono-regular.woff2';
-import boldUrl from './fonts/sarasa-mono-bold.woff2';
+import main400 from './fonts/asciia-mono-400.woff2';
+import main500 from './fonts/asciia-mono-500.woff2';
+import main600 from './fonts/asciia-mono-600.woff2';
+import main700 from './fonts/asciia-mono-700.woff2';
+import fallbackRegular from './fonts/sarasa-mono-regular.woff2';
+import fallbackBold from './fonts/sarasa-mono-bold.woff2';
 
-export const FONT_FAMILY = 'Sarasa Mono';
+export const FONT_FAMILY = 'Asciia Mono';
+export const FALLBACK_FAMILY = 'Sarasa Mono';
 
-// The bundled face first; then a locally installed Sarasa; then the
-// emergency faces (styles.css "Sarasa Fallback …"), each a system monospace
-// scaled to Sarasa's 0.5em width and given Sarasa's line metrics, so the grid
-// holds even if only the glyph shapes differ. Keep the CSS default for
-// --game-font (styles.css :root) the same.
+// The bundled main font, then the bundled fallback for the characters it
+// lacks; then the emergency faces (styles.css "Game Fallback …"), each a
+// system monospace scaled to the 0.6em cell and given the main font's line
+// metrics, so the grid holds even if only the glyph shapes differ. (A locally
+// installed Sarasa isn't listed: its 0.5em cells would squeeze the grid.)
+// Keep the CSS default for --game-font (styles.css :root) the same.
 export const GAME_FONT = [
   `'${FONT_FAMILY}'`,
-  "'Sarasa Mono SC'",
-  "'Sarasa Fixed SC'",
-  "'Sarasa Term SC'",
-  "'Sarasa Fallback Iosevka'",
-  "'Sarasa Fallback Cascadia'",
-  "'Sarasa Fallback Consolas'",
-  "'Sarasa Fallback Menlo'",
-  "'Sarasa Fallback DejaVu'",
-  "'Sarasa Fallback Courier'",
+  `'${FALLBACK_FAMILY}'`,
+  "'Game Fallback Cascadia'",
+  "'Game Fallback Consolas'",
+  "'Game Fallback Menlo'",
+  "'Game Fallback DejaVu'",
+  "'Game Fallback Courier'",
   'monospace',
 ].join(', ');
 
-// a character's width in em: an invariant of the bundled font (checked by
-// scripts/subset-font.py for every sprite glyph), not a stand-in for
-// measuring
-export const CH_EM = 0.5;
+// a character's width in em: an invariant of the bundled fonts (both centred
+// in 0.6em cells by scripts/subset-font.py, the cell every sprite and the
+// terrain were drawn for), not a stand-in for measuring
+export const CH_EM = 0.6;
 
-// How much taller a text line is than a character is wide (1 / CH_EM): a
-// line is this many ground rows tall, so the terrain's blocks are true 1:1
-// squares, and the shapes built on that (ocean noise, bush clumps, minimap
-// cells, the diagonal walk speed, the player's and fences' shadows) use the
-// same number. (It was 14 / 8.4, from a 0.6em font, until the game bundled
-// its 0.5em one.)
+// How much taller a text line is than a character is wide (1 / CH_EM, 5/3):
+// a line is this many ground rows tall, so the terrain's blocks are true 1:1
+// squares (8.4 px at the 14 px font), and the shapes built on that (ocean
+// noise, bush clumps, minimap cells, the diagonal walk speed, the player's
+// and fences' shadows) use the same number.
 export const WORLD_ASPECT = 1 / CH_EM;
 
 // --game-font for the CSS, from the one copy above
@@ -47,13 +52,19 @@ if (typeof document !== 'undefined') document.documentElement.style.setProperty(
 
 export type FontLoad = 'ok' | 'failed' | 'timeout';
 
-// Loads both bundled faces; 'ok' only when both actually loaded (FontFace
+// Loads every bundled face; 'ok' only when all actually loaded (FontFace
 // .load() rejects on a network or decode error). document.fonts.check() is
 // no proof: it says true when no face of that name exists at all.
 export async function loadGameFont(timeoutMs = 5000): Promise<FontLoad> {
+  const face = (family: string, url: string, weight: string) =>
+    new FontFace(family, `url(${url}) format('woff2')`, { weight, style: 'normal' });
   const faces = [
-    new FontFace(FONT_FAMILY, `url(${regularUrl}) format('woff2')`, { weight: '1 550', style: 'normal' }),
-    new FontFace(FONT_FAMILY, `url(${boldUrl}) format('woff2')`, { weight: '551 1000', style: 'normal' }),
+    face(FONT_FAMILY, main400, '1 450'),
+    face(FONT_FAMILY, main500, '451 550'),
+    face(FONT_FAMILY, main600, '551 650'),
+    face(FONT_FAMILY, main700, '651 1000'),
+    face(FALLBACK_FAMILY, fallbackRegular, '1 550'),
+    face(FALLBACK_FAMILY, fallbackBold, '551 1000'),
   ];
   let timer = 0;
   let late = false;

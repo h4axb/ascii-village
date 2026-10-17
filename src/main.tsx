@@ -37,7 +37,7 @@ function mount(font: FontLoad) {
 
 // Mount only once the bundled font has loaded, so every measurement, canvas
 // and glyph atlas uses it. If it fails: say so and offer a retry, or play
-// with the emergency fallback (styles.css "Sarasa Fallback …").
+// with the emergency fallback (styles.css "Game Fallback …").
 async function start() {
   if (DASHBOARD) return mount(await loadGameFont());
   rootEl.innerHTML = '<div class="font-gate"><p>loading…</p></div>';

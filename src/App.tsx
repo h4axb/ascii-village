@@ -377,7 +377,7 @@ const POND_REACH = 1; // tiles from the player's feet to a pond's box to fill at
 // the old animated pond, or a glyph pond (an editor asset with water keys)
 const isPond = (e: Ent) => e.kind === 'pond' || !!e.sway;
 // the water kept between a sailing boat's hull and the sand: ~2-3 px each way
-// (a ch is 7 px, an em 14)
+// (a ch is 8.4 px, an em 14)
 const BOAT_SHORE_GAP = { ch: 0.3, em: 0.2 };
 const BOARD_REACH = 3; // tiles from the player to the boat's edge to climb in // tiles from the boat to a shore click that lands
 const BOAT_SCALE = 1.9;
@@ -414,7 +414,7 @@ const FRESH_START_FRAME_MARGIN_MS = 30;
 // collider, so wall-hugging is noticeably gentler than open-field movement
 const GLIDE_SLOW = 1.75;
 // Physical shape of one character cell in this font (font.ts WORLD_ASPECT: a
-// line is 2x the width of a character). A tile is
+// line is ~1.667x the width of a character). A tile is
 // TILE_CH chars wide but TILE_LN lines tall, so a vertical-only step and a
 // diagonal step cover MORE true pixels than a horizontal one — without this,
 // they'd finish in the exact same fixed duration and so visibly move at a

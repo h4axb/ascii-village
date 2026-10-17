@@ -50,7 +50,7 @@ function systemPrompt(): string {
       'art, or any square-unit source), double every column — both the glyph and ' +
       'its colour key — before transcribing. One square source cell becomes two ' +
       'characters wide, one line tall, since this game\'s character cells render ' +
-      '2x taller than wide.',
+      'about 1.667x taller than wide.',
 
     'CHARSET: plain ASCII only — @ # * o O . , \' " ` ~ - _ = + | / \\ ( ) < > ^ v ' +
       '; : ! % & and space. No block/geometric Unicode glyphs (they render ' +

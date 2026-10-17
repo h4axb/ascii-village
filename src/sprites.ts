@@ -34,7 +34,7 @@ import type { PondAnim } from './pondAnim';
 // k-means++, no deps) — glyphs themselves are kept exact, only colour is
 // approximated. As with HOUSE, this SVG's cells are square (20x20,
 // centre-anchored), so every column is doubled to correct for this game's
-// own non-square 2:1 (tall:wide) character cell.
+// own non-square ~1.667:1 (tall:wide) character cell.
 //
 // At 48x28 characters (post-doubling) it's still too big to draw at native
 // size (see PLAYER_SCALE, world.ts) — every place that draws the player (the

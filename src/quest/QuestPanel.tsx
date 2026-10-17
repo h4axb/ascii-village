@@ -45,12 +45,96 @@ function MouseIcon({ wheel }: { wheel?: boolean }) {
   );
 }
 
-function BookmarkIcon() {
+// A pixel-art icon: one character per pixel ('.' = clear), each colour by
+// key (CSS colours, design-system variables too), every pixel `px` CSS px
+// square so it stays crisp.
+function PixelIcon({ map, colors, px = 2 }: { map: string[]; colors: Record<string, string>; px?: number }) {
+  const rects: ReactNode[] = [];
+  map.forEach((row, y) => {
+    for (let x = 0; x < row.length; ) {
+      const k = row[x];
+      let n = 1;
+      while (row[x + n] === k) n++;
+      if (colors[k]) rects.push(<rect key={`${x},${y}`} x={x} y={y} width={n} height={1} fill={colors[k]} />);
+      x += n;
+    }
+  });
+  const w = Math.max(...map.map((r) => r.length));
   return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
-      <path d="M7 3.5h10v17l-5-4-5 4z" strokeLinejoin="round" />
+    <svg viewBox={`0 0 ${w} ${map.length}`} width={w * px} height={map.length * px} shapeRendering="crispEdges" aria-hidden>
+      {rects}
     </svg>
   );
+}
+
+// The quest bookmark: a clipboard with its list ticked off in green
+const CLIPBOARD = [
+  '......OOOOO......',
+  '......OgOgO......',
+  '.OOOOOgggggOOOOO.',
+  '.OBBBOGGGGGOBBBO.',
+  '.OBOOOOOOOOOOOBO.',
+  '.OBOPPPPPPPPPOBO.',
+  '.OBOPPPPCPPPPOBO.',
+  '.OBOPCPCPPKKKOBO.',
+  '.OBOPPCPPPPPPOBO.',
+  '.OBOPPPPPPPPPOBO.',
+  '.OBOPPPPCPPPPOBO.',
+  '.OBOPCPCPPKKKOBO.',
+  '.OBOPPCPPPPPPOBO.',
+  '.OBOPPPPPPPPPOBO.',
+  '.OBOPPPPCPPPPOBO.',
+  '.OBOPCPCPPKKKOBO.',
+  '.OBOPPCPPPPPPOBO.',
+  '.OBOPPPPPPPPPOBO.',
+  '.OBOOOOOOOOOOOBO.',
+  '.OBBBBBBBBBBBBBO.',
+  '.OOOOOOOOOOOOOOO.',
+];
+const CLIPBOARD_COLORS = {
+  O: '#2a1f17',
+  B: '#8a5a35',
+  G: '#5f5f5c',
+  g: '#8f8f8a',
+  P: 'var(--ds-select)',
+  K: '#2a1f17',
+  C: 'var(--ds-go)',
+};
+function ClipboardIcon() {
+  return <PixelIcon map={CLIPBOARD} colors={CLIPBOARD_COLORS} />;
+}
+
+// The controls bookmark: the W A S D keycaps, bevelled like real keys, in
+// the panel's own olive and cream (ui.css .qp-tab sets the --qp-key-*)
+const WASD = [
+  '........OOOOO........',
+  '.......OLLLLLO.......',
+  '.......OTFFFTO.......',
+  '.......OTFFFTO.......',
+  '.......OTFTFTO.......',
+  '.......OTTFTTO.......',
+  '.......OTFFFTO.......',
+  '.......ODDDDDO.......',
+  '........OOOOO........',
+  '.OOOOO..OOOOO..OOOOO.',
+  'OLLLLLOOLLLLLOOLLLLLO',
+  'OFFTFFOOFTTTFOOFTTFFO',
+  'OFTFTFOOFTFFFOOFTFTFO',
+  'OFTTTFOOFTTTFOOFTFTFO',
+  'OFTFTFOOFFFTFOOFTFTFO',
+  'OFTFTFOOFTTTFOOFTTFFO',
+  'ODDDDDOODDDDDOODDDDDO',
+  '.OOOOO..OOOOO..OOOOO.',
+];
+const WASD_COLORS = {
+  O: 'var(--qp-key-out)',
+  L: 'var(--qp-key-light)',
+  F: 'var(--qp-key-face)',
+  D: 'var(--qp-key-dark)',
+  T: 'var(--qp-key-letter)',
+};
+function WasdIcon() {
+  return <PixelIcon map={WASD} colors={WASD_COLORS} />;
 }
 function BulbIcon() {
   return (
@@ -59,15 +143,6 @@ function BulbIcon() {
     </svg>
   );
 }
-function KeyboardIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-      <rect x="2.5" y="6.5" width="19" height="11" rx="2" />
-      <path d="M6 10h1M9.5 10h1M13 10h1M16.5 10h1M7 14h10" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 export function QuestPanel({
   objective,
   task,
@@ -188,7 +263,7 @@ export function QuestPanel({
           aria-label={open && view === 'quest' ? 'hide the quest' : 'show the quest'}
           title="Quest"
         >
-          <BookmarkIcon />
+          <ClipboardIcon />
         </button>
         <button
           className={'qp-tab' + (open && view === 'controls' ? ' on' : '') + (blinkControls ? ' blink' : '')}
@@ -196,7 +271,7 @@ export function QuestPanel({
           aria-label="controls"
           title="Controls"
         >
-          <KeyboardIcon />
+          <WasdIcon />
         </button>
       </div>
     </div>

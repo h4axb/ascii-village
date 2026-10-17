@@ -1973,6 +1973,9 @@
 
 /* ---- the quest overlay under the clock (quest/QuestPanel.tsx) ------------ */
 .qp {
+  /* the card's width: the closed tabs slide back by exactly this, so they
+     end flush with the screen edge */
+  --qp-card-w: 370px;
   position: relative;
   display: flex;
   align-items: flex-start;
@@ -1982,7 +1985,7 @@
 }
 .qp-card {
   pointer-events: auto;
-  width: 370px;
+  width: var(--qp-card-w);
   min-height: 150px;
   box-sizing: border-box;
   padding: 20px 16px 20px 22px;
@@ -2011,7 +2014,7 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 10px;
-  transform: translateX(-290px);
+  transform: translateX(calc(-1 * var(--qp-card-w)));
   transition: transform 260ms ease;
 }
 .qp.open .qp-tabs {
@@ -2262,11 +2265,8 @@
   }
 }
 @media (max-width: 700px) {
-  .qp-card {
-    width: 240px;
-  }
-  .qp-tabs {
-    transform: translateX(-240px);
+  .qp {
+    --qp-card-w: 240px;
   }
   .qp-tab,
   .ds-rail-btn {

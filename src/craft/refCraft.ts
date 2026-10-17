@@ -25,7 +25,7 @@ import { compose, decodeMask, type DetailRegion, type Recipe, type RefDoc } from
 import { bakedToSprite } from '../glyph/sprite';
 import { MATERIALS } from './materials';
 import { PALETTE } from './vocab';
-import { colourPhrases, isColourWord, type ColourPhrase } from './colours';
+import { colourPhrases, fitToGame, gameColourHint, isColourWord, type ColourPhrase } from './colours';
 import { parseGameplayIntent, parseItemFunction, MODIFIER_PROMPT, NEUTRAL_MODIFIERS, type ItemFunction } from './functions';
 import type { Category } from '../llm';
 import { LINK } from '../link';
@@ -355,7 +355,9 @@ export function refPrompt(): string {
     '"narrative_function": one short sentence on what it does for the player, "gameplay_intent": {...}, "modifiers": {...}}\n' +
     'Rules: only use ids, part names and area names from the library. Detail regions are in 0-1 of their area; ' +
     'keep a detail to 1-6 regions. If the player asks for something the library cannot express at all, body = null. ' +
-    'Answer any other wish (a name, what it does) through name / narrative_function / gameplay_intent / modifiers.\n\n' +
+    'Answer any other wish (a name, what it does) through name / narrative_function / gameplay_intent / modifiers.\n' +
+    gameColourHint() +
+    '\n\n' +
     MODIFIER_PROMPT
   );
 }
@@ -410,7 +412,8 @@ export function parseRefChoice(raw: Record<string, unknown> | null | undefined):
 
 function rgbOf(spec: string): RGB | null {
   const s = spec.toLowerCase().trim();
-  if (/^#[0-9a-f]{6}$/.test(s)) return [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
+  // an exact colour (the model's, or a picked one) in the game's soft palette
+  if (/^#[0-9a-f]{6}$/.test(s)) return fitToGame([parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)]);
   return colourOf(s) ?? colourOf(s.split(/\s+/)[0]) ?? null;
 }
 
@@ -589,7 +592,8 @@ Reply with JSON only: {"<part name>": "#rrggbb", ...} for exactly the parts that
 - Match the player's colour words precisely: "baby blue" is a soft light blue (#9fd3f5), not plain blue; "dunkelrot" a dark red; "the colour of the sea" a sea blue-green; "rainbow" gives the parts different rainbow colours.
 - A colour said for the whole thing ("a baby blue dragon") goes on every primary and secondary part; a colour said with a part ("red wings") only on that part.
 - Never change parts in zone "fixed" (eyes, faces, outlines). Keep "trim" parts unless the words name them.
-- Use only the part names given.`;
+- Use only the part names given.
+${gameColourHint()}`;
 }
 export function parseColours(raw: Record<string, unknown> | null | undefined, body: RefDoc): Record<string, RGB> | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -600,7 +604,7 @@ export function parseColours(raw: Record<string, unknown> | null | undefined, bo
     const mt = typeof v === 'string' ? v.trim().match(/^#?([0-9a-f]{6})$/i) : null;
     if (!part || part.zone === 'fixed' || !mt) continue;
     const n = parseInt(mt[1], 16);
-    out[part.name] = [n >> 16, (n >> 8) & 255, n & 255];
+    out[part.name] = fitToGame([n >> 16, (n >> 8) & 255, n & 255]);
   }
   return Object.keys(out).length ? out : null;
 }

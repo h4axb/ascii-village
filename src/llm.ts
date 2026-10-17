@@ -48,7 +48,7 @@ import {
   type ItemFunction,
 } from './craft/functions';
 import { checkPolicy } from './craft/policy';
-import { fallbackNote } from './craft/colours';
+import { fallbackNote, fitToGame } from './craft/colours';
 import {
   REF_CRAFT_ON,
   hasRefBodies,
@@ -651,7 +651,7 @@ async function craftWithRefs(
 ): Promise<CraftResult | null> {
   // the clarify answer: its own hex ("Sky blue"), else its colour word
   const cc = opts.clarify?.colour?.trim().toLowerCase();
-  const pickedColour = cc ? (/^#[0-9a-f]{6}$/.test(cc) ? hexRgb(cc) : colourOf(cc.split(/\s+/).pop()!)) : null;
+  const pickedColour = cc ? (/^#[0-9a-f]{6}$/.test(cc) ? fitToGame(hexRgb(cc)) : colourOf(cc.split(/\s+/).pop()!)) : null;
   const shape = { surprise: opts.clarify?.surprise, colour: pickedColour };
   const first = matchRefs(prompt);
   let m: RefMatch & { details?: Parameters<typeof buildFromMatch>[0]['details']; mirror?: boolean } = isShip(first)

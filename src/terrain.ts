@@ -35,6 +35,7 @@ import {
   islandClass,
 } from './world';
 import { RAMP_DEFAULT } from './craft/materials';
+import { WORLD_ASPECT } from './font';
 import { onThemeChange, themeRgb, groundShadow } from './theme';
 import { MAT_DIRT, MAT_MEADOW, MAT_STONE, MAT_SAND, groundMat, groundWgt, onGroundEdit, slabAt } from './ground';
 
@@ -174,9 +175,10 @@ function stopsAt(stops: { nd: number; c: RGB }[], n: number) {
 export const WATERLINE_ND = 1.082; // where the visible water starts (foam rides here)
 export const SAND_START_ND = 1.01;
 
-// Tile units are near-square on screen (4 chars x 8.4px = 33.6px wide, 2 lines
-// x 14px = 28px tall); multiplying y by this makes round things round.
-const ISO_Y = (TILE_LN * 14) / (TILE_CH * 8.4);
+// Tile units are near-square in the world's design proportions (font.ts
+// WORLD_ASPECT: 4 chars wide, 2 lines tall); multiplying y by this makes
+// round things round.
+const ISO_Y = (TILE_LN * WORLD_ASPECT) / TILE_CH;
 
 // ---- visual coast distance --------------------------------------------------
 
@@ -253,11 +255,11 @@ export const AO = {
 const AO_KINDS = new Set(['palm', 'boulder', 'stone', 'cactus', 'fern', 'date']);
 let AO_FIELD: Float32Array | null = null;
 const AO_W = GROUND_W;
-const AO_H = Math.round(GROUND_H * (14 / 8.4));
+const AO_H = Math.round(GROUND_H * WORLD_ASPECT);
 function aoField(): Float32Array {
   if (AO_FIELD) return AO_FIELD;
   const f = new Float32Array(AO_W * AO_H);
-  const ASP = 14 / 8.4; // blocks per character row
+  const ASP = WORLD_ASPECT; // blocks per character row
   for (const e of liveStructEnts()) {
     if (!AO_KINDS.has(e.kind) || (e.asset && /^pond/.test(e.asset)) || e.rotation) continue;
     const k = e.scale ?? 1;
@@ -653,8 +655,8 @@ onThemeChange(() => {
   FIELD = null;
 });
 
-// a character cell's height / width (14px line / 8.4px char, see App.tsx)
-const CELL_ASPECT = 14 / 8.4;
+// ground rows per text line (font.ts WORLD_ASPECT)
+const CELL_ASPECT = WORLD_ASPECT;
 
 // Of the grass cells that carry a sign (LAND_SIGNS), how likely it's a tuft
 // (in their clusters over the darker patches) rather than a foliage mark
@@ -857,10 +859,9 @@ export function terrainField(): TerrainField {
   };
   const { kind, glyph } = F;
   for (let y = 0; y < GROUND_H; y++) for (let x = 0; x < GROUND_W; x++) computeCell(F, x, y);
-  // Mosaic: its own grid of SQUARE blocks. A character cell is 5/3 as tall
-  // as it is wide (8.4 x 14 px), so one block per cell drew tall
-  // rectangles; with 5/3 as many rows each block is one cell wide and one
-  // cell-width tall. Same colour field, sampled at the block centres, each
+  // Mosaic: its own grid of blocks, WORLD_ASPECT (5/3) rows per character
+  // row, so each block is one cell wide and 1/WORLD_ASPECT of a line tall
+  // instead of one tall rectangle per cell. Same colour field, sampled at the block centres, each
   // block slightly varied like a painted tile.
   const { blockWater } = F;
   for (let by = 0; by < bgH; by++) for (let bx = 0; bx < bgW; bx++) computeBlock(F, blockWater, bx, by);

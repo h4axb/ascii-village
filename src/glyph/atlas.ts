@@ -2,9 +2,11 @@
 // (the game doubles columns) in one 2ch x 1-line cell, in the game's font,
 // reduced to SUB_W x SUB_H ink coverage. bake.ts matches cell patterns
 // against these.
+import { GAME_FONT } from '../font';
 import { SUB_H, SUB_W, type GlyphShape } from './bake';
 
-export const GAME_FONT = "'Sarasa Mono', 'Cascadia Code', 'Courier New', ui-monospace, Menlo, Consolas, monospace";
+// (re-exported for the Glyph Generator; src/font.ts holds the one copy)
+export { GAME_FONT };
 
 export function buildAtlas(glyphs: string): GlyphShape[] {
   const px = 48;

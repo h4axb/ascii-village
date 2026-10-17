@@ -19,6 +19,7 @@ import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from 'r
 import { createRoot } from 'react-dom/client';
 import { bake, DEFAULTS, SIGN_PRESETS, hex, type Baked, type BakeOptions, type Img } from '../../src/glyph/bake';
 import { buildAtlas, GAME_FONT } from '../../src/glyph/atlas';
+import { loadGameFont } from '../../src/font';
 import { cellParts, bakedToSprite } from '../../src/glyph/sprite';
 import { decodeMask, encodeMask, ZONES, GAME_CATEGORIES, type RefArea, type RefPart, type Zone, type GameCategory, type RefRole } from '../../src/glyph/refs';
 import { readZipImages } from './zip';
@@ -961,8 +962,13 @@ function Slider({ label, value, min, max, step, onChange }: { label: string; val
 // keep the unused-but-exported helper referenced for tooling
 void bakedToSprite;
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+// the game's bundled font first: the atlas and every preview measure it
+loadGameFont().then((r) => {
+  if (r !== 'ok') console.warn(`[glyph-ref] game font ${r}: baking with a fallback font`);
+  document.documentElement.dataset.font = r;
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+});

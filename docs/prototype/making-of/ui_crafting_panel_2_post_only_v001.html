@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asciia Bay – Craft Feedback Loop</title>
+<style>
+:root{
+  --bg:#202817;
+  --panel:#1b2415;
+  --panel2:#202a19;
+  --panel3:#26311e;
+  --line:#7c8268;
+  --line2:#a6a78a;
+  --text:#e6e3bd;
+  --muted:#949a78;
+  --gold:#c3a742;
+  --gold2:#dfc653;
+  --green:#9fbd7b;
+  --red:#c98e7d;
+  --cream:#e9e4c8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Consolas,"Courier New",monospace}
+body{
+  background:
+    radial-gradient(circle at 8% 18%,rgba(137,151,88,.09),transparent 24%),
+    radial-gradient(circle at 92% 25%,rgba(94,137,142,.13),transparent 27%),
+    linear-gradient(90deg,#4c5940 0 11%,#222b1a 11% 89%,#5d8586 89% 100%);
+  min-height:100vh;
+}
+button,input{font:inherit}
+.world{
+  position:fixed;inset:0;pointer-events:none;opacity:.55;
+  background:
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px) 0 0/8px 8px,
+    radial-gradient(circle at 10% 40%,rgba(209,197,96,.18) 0 1px,transparent 1.5px) 0 0/27px 31px;
+}
+.overlay{position:fixed;inset:0;background:rgba(16,20,12,.22);pointer-events:none}
+.shell{
+  width:min(1320px,92vw);
+  height:min(760px,88vh);
+  margin:6vh auto;
+  border:1px solid var(--line2);
+  border-radius:18px;
+  background:rgba(25,34,19,.97);
+  box-shadow:0 24px 70px rgba(0,0,0,.38);
+  position:relative;
+  overflow:hidden;
+}
+.shell:before{
+  content:"";position:absolute;inset:12px;border:2px dashed rgba(166,167,138,.42);border-radius:9px;pointer-events:none
+}
+.inner{
+  position:absolute;inset:32px 36px 24px;
+  display:flex;flex-direction:column;min-height:0;
+}
+.top{
+  display:flex;gap:18px;align-items:flex-start;flex:0 0 auto
+}
+.avatarWrap{width:102px;text-align:center;flex:0 0 102px}
+.avatar{
+  width:92px;height:92px;border:1px solid #525c45;border-radius:11px;background:#141b11;
+  display:grid;place-items:center;color:#c1a753;white-space:pre;line-height:.9;font-size:13px
+}
+.name{color:#dfc94d;font-weight:700;margin-top:8px}
+.bubble{
+  max-width:630px;padding:16px 22px;border:1px solid var(--line2);border-radius:11px;background:#202918;
+  line-height:1.55;font-weight:700;position:relative
+}
+.bubble:before{
+  content:"";position:absolute;width:16px;height:16px;left:-9px;top:30px;background:#202918;
+  border-left:1px solid var(--line2);border-bottom:1px solid var(--line2);transform:rotate(45deg)
+}
+.stage{
+  flex:1;min-height:0;position:relative;margin-top:15px;border-top:1px solid rgba(112,119,92,.28);overflow:hidden
+}
+.view{
+  position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:18px 8px 8px
+}
+.view.active{display:flex}
+.bottom{
+  flex:0 0 74px;border-top:1px solid rgba(112,119,92,.35);display:flex;align-items:center;gap:16px;padding-top:16px
+}
+.bottomInfo{
+  flex:1;border:1px solid #777f66;border-radius:10px;background:#171f13;height:56px;
+  display:flex;align-items:center;padding:0 18px;color:#7f8766
+}
+.primary{
+  min-width:220px;height:56px;border:1px solid #8f8750;border-radius:10px;background:#222a1b;color:#b9a14b;
+  cursor:pointer;font-size:17px;font-weight:700
+}
+.primary.ready{border-color:#b4a24f;color:#e0c858}
+.primary:disabled{opacity:.4;cursor:not-allowed}
+
+/* STEP 1 */
+.voteBox{width:min(660px,86%);text-align:center}
+.voteTitle{font-size:24px;font-weight:700;margin-bottom:8px}
+.voteSub{color:var(--muted);margin-bottom:24px}
+.voteRow{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:480px;margin:auto}
+.vote{
+  border:1px solid #737b60;background:#222c1b;color:var(--text);border-radius:12px;padding:17px 14px;cursor:pointer;
+  transition:.15s ease;font-weight:700
+}
+.vote:hover{border-color:#a6aa89;transform:translateY(-1px)}
+.vote.selected.up{border-color:var(--green);background:#2b3822;color:#d9e7ad}
+.vote.selected.down{border-color:var(--red);background:#3a2b25;color:#e6b9a8}
+.adjustBtn{
+  display:none;margin:18px auto 0;border:1px solid #968849;background:#1b2416;color:#c8ae53;border-radius:9px;padding:12px 18px;cursor:pointer
+}
+.adjustBtn.show{display:inline-block}
+
+/* STEP 2 */
+.prefWrap{
+  width:min(1040px,96%);max-height:100%;overflow-y:auto;padding:4px 10px 24px;
+  scrollbar-width:thin;scrollbar-color:#626b50 #1a2215
+}
+.prefWrap::-webkit-scrollbar{width:8px}
+.prefWrap::-webkit-scrollbar-thumb{background:#626b50;border-radius:8px}
+.prefHeader{text-align:center;margin-bottom:18px}
+.prefHeader h2{margin:0 0 6px;font-size:22px}
+.prefHeader p{margin:0;color:var(--muted);font-size:13px}
+.choiceGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.prefCard{
+  border:1px solid #596247;border-radius:13px;background:#202919;padding:14px 14px 16px;position:relative;
+}
+.prefTop{
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:10px
+}
+.prefLabel{font-weight:700}
+.prefHint{font-size:11px;color:#7f8766}
+.optionRow{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px
+}
+.option{
+  border:1px solid #5f684f;background:#182014;color:#aeb293;border-radius:10px;
+  padding:10px 7px 9px;cursor:pointer;text-align:center;transition:.12s ease;min-height:120px
+}
+.option:hover{
+  border-color:#9a9d80;background:#1d2718;transform:translateY(-1px)
+}
+.option.selected{
+  border-color:#c3ad55;background:#2b321d;color:#e8deaa;
+  box-shadow:inset 0 0 0 1px rgba(222,198,83,.18)
+}
+.optionVisual{
+  height:72px;display:grid;place-items:center;margin-bottom:7px
+}
+.optionLabel{font-size:11px;line-height:1.25}
+.tooltip{
+  position:absolute;left:50%;bottom:calc(100% + 9px);transform:translateX(-50%);
+  width:250px;background:#10170e;border:1px solid #8f9276;border-radius:9px;padding:10px 12px;
+  color:#dcdab7;font-size:11px;line-height:1.45;opacity:0;pointer-events:none;transition:.12s;z-index:20
+}
+.prefCard:hover .tooltip{opacity:1}
+.scope{
+  margin:18px auto 0;border:1px solid #596247;border-radius:11px;background:#202919;padding:14px 16px;
+  display:flex;justify-content:space-between;align-items:center;gap:16px
+}
+.scopeOpts{display:flex;gap:18px;color:#a3a88a;font-size:12px}
+
+/* visual preference icons */
+.visualIcon{width:72px;height:72px;position:relative;display:grid;place-items:center}
+.flowerIcon{position:relative;width:62px;height:62px}
+.flowerIcon .center{position:absolute;left:25px;top:25px;width:12px;height:12px;background:#dfb74d;box-shadow:0 0 0 2px #a56b37}
+.flowerIcon .petal{position:absolute;width:14px;height:14px;background:#e07a96;box-shadow:inset -3px -3px 0 rgba(120,42,66,.28)}
+.flowerIcon .p1{left:24px;top:5px}.flowerIcon .p2{left:43px;top:18px}.flowerIcon .p3{left:39px;top:40px}.flowerIcon .p4{left:9px;top:40px}.flowerIcon .p5{left:4px;top:18px}
+.flowerIcon.low .p2,.flowerIcon.low .p4{display:none}
+.flowerIcon.high .p6{display:block;left:24px;top:47px}.flowerIcon.high .p7{display:block;left:45px;top:33px}.flowerIcon.high .p8{display:block;left:4px;top:33px}
+.flowerIcon .extra{display:none}
+
+.colorIcon{width:58px;height:58px;border-radius:50%;border:3px solid #ddd9b8;background:#6d91ba;box-shadow:0 4px 0 rgba(0,0,0,.18)}
+.colorIcon.low{background:#bfd3e7}.colorIcon.high{background:#176ec0}
+
+.interpretIcon{position:relative;width:70px;height:62px}
+.interpretIcon .sheet{position:absolute;left:4px;top:13px;width:26px;height:36px;border:3px solid #ddd9b8;border-radius:4px}
+.interpretIcon .line{position:absolute;height:3px;background:#989d7c;left:9px;width:16px}
+.interpretIcon .l1{top:23px}.interpretIcon .l2{top:31px}.interpretIcon .l3{top:39px}
+.interpretIcon .arrow{position:absolute;left:33px;top:29px;width:23px;height:3px;background:#d5b84d}
+.interpretIcon .arrow:after{content:"";position:absolute;right:-1px;top:-4px;border-left:7px solid #d5b84d;border-top:5px solid transparent;border-bottom:5px solid transparent}
+.interpretIcon .branch{display:none;position:absolute;width:20px;height:3px;background:#d5b84d;left:38px;top:26px;transform-origin:left center}
+.interpretIcon.mid .branch.b1{display:block;transform:rotate(-25deg)}
+.interpretIcon.high .branch{display:block}
+.interpretIcon.high .b1{transform:rotate(-32deg)}.interpretIcon.high .b2{transform:rotate(0)}.interpretIcon.high .b3{transform:rotate(32deg)}
+.interpretIcon.high .spark{display:block}
+.interpretIcon .spark{display:none;position:absolute;color:#e2c95a;font-size:15px;right:0;top:5px}
+
+.surpriseIcon{position:relative;width:68px;height:62px}
+.surpriseIcon .box{position:absolute;left:14px;bottom:6px;width:40px;height:30px;background:#9b7449;border:3px solid #d7bd78;border-radius:3px}
+.surpriseIcon .lid{position:absolute;left:11px;bottom:34px;width:46px;height:9px;background:#b48a59;border:3px solid #d7bd78;border-radius:3px;transform-origin:left bottom}
+.surpriseIcon.mid .lid{transform:rotate(-13deg) translateY(-2px)}
+.surpriseIcon.high .lid{transform:rotate(-31deg) translate(-2px,-5px)}
+.surpriseIcon .burst{display:none;position:absolute;color:#e3c94d;font-size:17px}
+.surpriseIcon.high .burst{display:block}
+.surpriseIcon .s1{left:5px;top:2px}.surpriseIcon .s2{right:3px;top:8px}.surpriseIcon .s3{left:30px;top:-5px}
+
+.appliedIcon{width:42px;height:42px;transform:scale(.55);transform-origin:top left;margin-right:-18px;margin-bottom:-18px}
+
+/* STEP 3 */
+.nextWrap{
+  width:min(980px,94%);max-height:100%;overflow-y:auto;padding:6px 8px 20px
+}
+.nextHeader{display:flex;justify-content:space-between;align-items:end;margin-bottom:14px}
+.nextHeader h2{margin:0;font-size:22px}
+.nextHeader p{margin:3px 0 0;color:var(--muted);font-size:12px}
+.craftCard{
+  display:grid;grid-template-columns:220px 1fr;gap:18px;border:1px solid #5e674d;background:#202919;border-radius:13px;padding:16px
+}
+.preview{
+  border:1px solid #727a61;border-radius:11px;background:#171f13;min-height:240px;
+  display:grid;place-items:center;white-space:pre;text-align:center;color:#d7c46a;font-size:14px;line-height:1.05
+}
+.insights h3{margin:0 0 10px;font-size:16px}
+.insight{
+  border:1px solid #566048;border-radius:9px;background:#182014;padding:11px 12px;margin-bottom:9px;
+  display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start
+}
+.insightIcon{font-size:24px}
+.insightTitle{font-weight:700;font-size:13px}
+.insightText{color:#aeb293;font-size:12px;line-height:1.4;margin-top:3px}
+.none{
+  border:1px dashed #5c654d;border-radius:10px;padding:14px;color:#8c9273;text-align:center
+}
+
+
+/* visual preference icons */
+.visualIcon{width:72px;height:72px;position:relative;display:grid;place-items:center}
+.flowerIcon{position:relative;width:62px;height:62px}
+.flowerIcon .center{position:absolute;left:25px;top:25px;width:12px;height:12px;background:#dfb74d;box-shadow:0 0 0 2px #a56b37}
+.flowerIcon .petal{position:absolute;width:14px;height:14px;background:#e07a96;box-shadow:inset -3px -3px 0 rgba(120,42,66,.28)}
+.flowerIcon .p1{left:24px;top:5px}.flowerIcon .p2{left:43px;top:18px}.flowerIcon .p3{left:39px;top:40px}.flowerIcon .p4{left:9px;top:40px}.flowerIcon .p5{left:4px;top:18px}
+.flowerIcon.low .p2,.flowerIcon.low .p4{display:none}
+.flowerIcon.high .p6{display:block;left:24px;top:47px}.flowerIcon.high .p7{display:block;left:45px;top:33px}.flowerIcon.high .p8{display:block;left:4px;top:33px}
+.flowerIcon .extra{display:none}
+
+.colorIcon{width:58px;height:58px;border-radius:50%;border:3px solid #ddd9b8;background:#6d91ba;box-shadow:0 4px 0 rgba(0,0,0,.18)}
+.colorIcon.low{background:#bfd3e7}.colorIcon.high{background:#176ec0}
+
+.interpretIcon{position:relative;width:70px;height:62px}
+.interpretIcon .sheet{position:absolute;left:4px;top:13px;width:26px;height:36px;border:3px solid #ddd9b8;border-radius:4px}
+.interpretIcon .line{position:absolute;height:3px;background:#989d7c;left:9px;width:16px}
+.interpretIcon .l1{top:23px}.interpretIcon .l2{top:31px}.interpretIcon .l3{top:39px}
+.interpretIcon .arrow{position:absolute;left:33px;top:29px;width:23px;height:3px;background:#d5b84d}
+.interpretIcon .arrow:after{content:"";position:absolute;right:-1px;top:-4px;border-left:7px solid #d5b84d;border-top:5px solid transparent;border-bottom:5px solid transparent}
+.interpretIcon .branch{display:none;position:absolute;width:20px;height:3px;background:#d5b84d;left:38px;top:26px;transform-origin:left center}
+.interpretIcon.mid .branch.b1{display:block;transform:rotate(-25deg)}
+.interpretIcon.high .branch{display:block}
+.interpretIcon.high .b1{transform:rotate(-32deg)}.interpretIcon.high .b2{transform:rotate(0)}.interpretIcon.high .b3{transform:rotate(32deg)}
+.interpretIcon.high .spark{display:block}
+.interpretIcon .spark{display:none;position:absolute;color:#e2c95a;font-size:15px;right:0;top:5px}
+
+.surpriseIcon{position:relative;width:68px;height:62px}
+.surpriseIcon .box{position:absolute;left:14px;bottom:6px;width:40px;height:30px;background:#9b7449;border:3px solid #d7bd78;border-radius:3px}
+.surpriseIcon .lid{position:absolute;left:11px;bottom:34px;width:46px;height:9px;background:#b48a59;border:3px solid #d7bd78;border-radius:3px;transform-origin:left bottom}
+.surpriseIcon.mid .lid{transform:rotate(-13deg) translateY(-2px)}
+.surpriseIcon.high .lid{transform:rotate(-31deg) translate(-2px,-5px)}
+.surpriseIcon .burst{display:none;position:absolute;color:#e3c94d;font-size:17px}
+.surpriseIcon.high .burst{display:block}
+.surpriseIcon .s1{left:5px;top:2px}.surpriseIcon .s2{right:3px;top:8px}.surpriseIcon .s3{left:30px;top:-5px}
+
+.appliedIcon{width:42px;height:42px;transform:scale(.55);transform-origin:top left;margin-right:-18px;margin-bottom:-18px}
+
+@media(max-width:1000px){
+  .choiceGrid{grid-template-columns:1fr}
+  .shell{height:90vh}
+}
+@media(max-width:650px){
+  .choiceGrid{grid-template-columns:1fr}
+  .voteRow{grid-template-columns:1fr}
+  .craftCard{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="world"></div>
+<div class="overlay"></div>
+
+<section class="shell">
+  <div class="inner">
+    <div class="top">
+      <div class="avatarWrap">
+        <div class="avatar"> /\_/\
+( o.o )
+ > ^ <</div>
+        <div class="name">Mitchy</div>
+      </div>
+      <div class="bubble" id="speech">Choose how you want future crafts to lean.</div>
+    </div>
+
+    <div class="stage">
+
+
+      <!-- 2 -->
+      <div class="view active" id="prefView">
+        <div class="prefWrap">
+          <div class="prefHeader">
+            <h2>Shape future crafts to your taste</h2>
+            <p>Pick the version that best matches how you want future crafts to lean.</p>
+          </div>
+
+          <div class="choiceGrid">
+            <div class="prefCard" data-key="detail">
+              <div class="tooltip">Controls how much extra decoration and secondary detail the generator adds beyond the core object.</div>
+              <div class="prefTop"><span class="prefLabel">Detail</span><span class="prefHint">extra decoration</span></div>
+              <div class="optionRow">
+                <button class="option" data-value="-1">
+                  <div class="optionVisual"><div class="visualIcon"><div class="flowerIcon low">
+                    <span class="center"></span><span class="petal p1"></span><span class="petal p2"></span><span class="petal p3"></span><span class="petal p4"></span><span class="petal p5"></span>
+                    <span class="petal extra p6"></span><span class="petal extra p7"></span><span class="petal extra p8"></span>
+                  </div></div></div>
+                  <div class="optionLabel">Less detail</div>
+                </button>
+                <button class="option selected" data-value="0">
+                  <div class="optionVisual"><div class="visualIcon"><div class="flowerIcon mid">
+                    <span class="center"></span><span class="petal p1"></span><span class="petal p2"></span><span class="petal p3"></span><span class="petal p4"></span><span class="petal p5"></span>
+                    <span class="petal extra p6"></span><span class="petal extra p7"></span><span class="petal extra p8"></span>
+                  </div></div></div>
+                  <div class="optionLabel">Keep</div>
+                </button>
+                <button class="option" data-value="1">
+                  <div class="optionVisual"><div class="visualIcon"><div class="flowerIcon high">
+                    <span class="center"></span><span class="petal p1"></span><span class="petal p2"></span><span class="petal p3"></span><span class="petal p4"></span><span class="petal p5"></span>
+                    <span class="petal extra p6"></span><span class="petal extra p7"></span><span class="petal extra p8"></span>
+                  </div></div></div>
+                  <div class="optionLabel">More detail</div>
+                </button>
+              </div>
+            </div>
+
+            <div class="prefCard" data-key="color">
+              <div class="tooltip">Controls color intensity: softer pastel tones on the left, more vivid saturated tones on the right.</div>
+              <div class="prefTop"><span class="prefLabel">Color</span><span class="prefHint">saturation</span></div>
+              <div class="optionRow">
+                <button class="option" data-value="-1">
+                  <div class="optionVisual"><div class="visualIcon"><div class="colorIcon low"></div></div></div>
+                  <div class="optionLabel">Pastel</div>
+                </button>
+                <button class="option selected" data-value="0">
+                  <div class="optionVisual"><div class="visualIcon"><div class="colorIcon mid"></div></div></div>
+                  <div class="optionLabel">Keep</div>
+                </button>
+                <button class="option" data-value="1">
+                  <div class="optionVisual"><div class="visualIcon"><div class="colorIcon high"></div></div></div>
+                  <div class="optionLabel">Vivid</div>
+                </button>
+              </div>
+            </div>
+
+            <div class="prefCard" data-key="interpretation">
+              <div class="tooltip">Controls how closely the generator sticks to the prompt versus reinterpreting it more freely.</div>
+              <div class="prefTop"><span class="prefLabel">Interpretation</span><span class="prefHint">prompt freedom</span></div>
+              <div class="optionRow">
+                <button class="option" data-value="-1">
+                  <div class="optionVisual"><div class="visualIcon"><div class="interpretIcon low">
+                    <span class="sheet"></span><span class="line l1"></span><span class="line l2"></span><span class="line l3"></span>
+                    <span class="arrow"></span><span class="branch b1"></span><span class="branch b2"></span><span class="branch b3"></span><span class="spark">✦</span>
+                  </div></div></div>
+                  <div class="optionLabel">Literal</div>
+                </button>
+                <button class="option selected" data-value="0">
+                  <div class="optionVisual"><div class="visualIcon"><div class="interpretIcon mid">
+                    <span class="sheet"></span><span class="line l1"></span><span class="line l2"></span><span class="line l3"></span>
+                    <span class="arrow"></span><span class="branch b1"></span><span class="branch b2"></span><span class="branch b3"></span><span class="spark">✦</span>
+                  </div></div></div>
+                  <div class="optionLabel">Keep</div>
+                </button>
+                <button class="option" data-value="1">
+                  <div class="optionVisual"><div class="visualIcon"><div class="interpretIcon high">
+                    <span class="sheet"></span><span class="line l1"></span><span class="line l2"></span><span class="line l3"></span>
+                    <span class="arrow"></span><span class="branch b1"></span><span class="branch b2"></span><span class="branch b3"></span><span class="spark">✦</span>
+                  </div></div></div>
+                  <div class="optionLabel">Creative</div>
+                </button>
+              </div>
+            </div>
+
+            <div class="prefCard" data-key="surprise">
+              <div class="tooltip">Controls how much freedom the model gets to add its own unexpected ideas beyond what you explicitly asked for.</div>
+              <div class="prefTop"><span class="prefLabel">Surprise</span><span class="prefHint">model freedom</span></div>
+              <div class="optionRow">
+                <button class="option" data-value="-1">
+                  <div class="optionVisual"><div class="visualIcon"><div class="surpriseIcon low">
+                    <span class="box"></span><span class="lid"></span><span class="burst s1">✦</span><span class="burst s2">✧</span><span class="burst s3">•</span>
+                  </div></div></div>
+                  <div class="optionLabel">Controlled</div>
+                </button>
+                <button class="option selected" data-value="0">
+                  <div class="optionVisual"><div class="visualIcon"><div class="surpriseIcon mid">
+                    <span class="box"></span><span class="lid"></span><span class="burst s1">✦</span><span class="burst s2">✧</span><span class="burst s3">•</span>
+                  </div></div></div>
+                  <div class="optionLabel">Keep</div>
+                </button>
+                <button class="option" data-value="1">
+                  <div class="optionVisual"><div class="visualIcon"><div class="surpriseIcon high">
+                    <span class="box"></span><span class="lid"></span><span class="burst s1">✦</span><span class="burst s2">✧</span><span class="burst s3">•</span>
+                  </div></div></div>
+                  <div class="optionLabel">Unexpected</div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="scope">
+            <div>
+              <div style="font-weight:700">Apply these preferences to</div>
+              <div style="font-size:11px;color:#7f8766;margin-top:3px">You can change this later.</div>
+            </div>
+            <div class="scopeOpts">
+              <label><input type="radio" name="scope" value="similar" checked> Similar crafts</label>
+              <label><input type="radio" name="scope" value="all"> All future crafts</label>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="bottom">
+      <div class="bottomInfo" id="bottomInfo">Adjust only the categories that matter to you.</div>
+      <button class="primary ready" id="primaryBtn">Save preferences</button>
+    </div>
+  </div>
+</section>
+
+<script>
+const state = {
+  prefs:{detail:0,color:0,interpretation:0,surprise:0},
+  scope:"similar"
+};
+
+const speech = document.getElementById('speech');
+const primaryBtn = document.getElementById('primaryBtn');
+const bottomInfo = document.getElementById('bottomInfo');
+
+document.querySelectorAll('.prefCard').forEach(card=>{
+  const key=card.dataset.key;
+  card.querySelectorAll('.option').forEach(option=>{
+    option.addEventListener('click',()=>{
+      card.querySelectorAll('.option').forEach(x=>x.classList.remove('selected'));
+      option.classList.add('selected');
+      state.prefs[key]=Number(option.dataset.value);
+      bottomInfo.textContent='Preference changed. Save when you are ready.';
+    });
+  });
+});
+
+document.querySelectorAll('input[name="scope"]').forEach(r=>{
+  r.addEventListener('change',()=>{
+    state.scope=r.value;
+    bottomInfo.textContent='Preference scope changed. Save when you are ready.';
+  });
+});
+
+primaryBtn.addEventListener('click',()=>{
+  speech.textContent='Good. I’ll keep those preferences in mind for future crafts.';
+  bottomInfo.textContent=`Preferences saved for ${state.scope==='similar'?'similar crafts':'all future crafts'}.`;
+});
+</script>
+</body>
+</html>

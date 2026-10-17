@@ -1,0 +1,121 @@
+# Why this project?
+During my internship I worked on an mobile escape game which uses an LLM to bring more variety in a characters text response. 
+
+The two biggest impacts of the project were: 
+-developing six web pages for that game, evoke my interest in UI/UX design
+-taking it further to a visual-heavier UI/UX design of an LLM based mechanic in a game: using a text prompt to craft new things and generate fitting sprites on scratch. 
+
+What made this idea super interesting to me was the need of adjustable UI/UX design for non-deterministic output.
+
+That's where the game design started. 
+
+
+# Cozy Island Games Research
+
+Games: Animal Crossing, Stardew Valley
+Vision: A cozy island where player can farm simple ressources and CRAFT things.
+
+Next, I built a prototype to test fast the technical side of the project. 
+
+Shortly after experimenting with different color palettes it became clear that the ASCII's edgy sign style on dark bg-color was clashing hard with the cozy feeling. A dystopian Sci-Fi setting on an island made the story and art style more coherent together.
+
+Games: ASCIIA (webgame), Hello Kitty Island, Animal Crossing, Stardew Valley
+
+Reasearching on games with similar genre I noticed that there weren't many games like that. The idea was still uncontested.
+
+
+# Usertesting Survey
+Tally
++ Method: A/B within & counterbalance (using Likerts scale, direct comparative preference, UEQ-S)
+=> test direct and relative A&Bs preception of control, expectation management and frustration
++ Personas: no (not relevant for validiation of my thesis rather define different participant groups: casual-gamers, hobby gamer, game designer)
+
+In-Game after each crafting variant A&B
++ Goal: get short feedback about the instant impression
+
+# What is the right sample size?
+1. Comparing two products? Or just overall playtesting
+2. How confident do I have to be?
+Source: ASQ doc
+
+# How to choose a font?
+Determining what is the games identity? Cozy/Cute, welcoming
+Title design: One color font with cute detailes like plant growing out of letters, an island shape replacing a letter, each letter playfully aligned.
+Keeping it simple since the game contains a lot of details with the text sign texture.
+
+# What motif to choose for the start screen?
+Best is for a start screen to tease the game's vibe and resembling the title. Since it's "ASCIIA BAY" show character walking a little along the shore. Put buttons and title to left on the grass area. Add little motion of waves.
+Ideally not create a seperate asset.
+
+Idea 1: Slightly open door from intro where you can see the isle and light beam coming out as only light source. 
+=> mysterious but too dark
+Idea 2: Character walking along the coast.
+
+# What door design in intro clip?
+- wood door + little vegetation matches islands ressources
+- not making it look too ancient but welcoming
+
+green wooden door.
+
+# How to adjust the quest design?
+The games quest flow feels like a linear to-do list. In order to change that, increase player's agency.
+
+1. Give feedback when player prefinished future quests.
+2. For their firsts give immediate feedback.
+3. Articulate the quests as intentions rather then literal work tasks.
+4. Add hint systems. Instead text use camera zooms to objectives and short anim clips.
+
+# How to determine Quest text tone?
+Rather than making it feel funtional use a little humor and playful punchy text to follow the mood of game. 
+
+# What did I learn designing the game?
+- When coming up with ideas use as a base another positive exmaple from something familiar and think how to bring in a little twist to it. 90% base + 10% own idea.
+Most of the times creating something completely new takes a lot of research and iteration.
+- Rather work with visual feedback rather then text (most people don't like to read)
+- keep player agency high
+
++ What worked well
+- the in-game editor for env building
+- generating imgs and translating it to ascii/glyph design
+
+# What to expect from Usertesting?
+
+I would structure your actual empirical analysis like this:
+Primary
+A vs. B perceived control
+Paired Likert comparison + direct comparative question.
+Secondary
+A vs. B expectation management
+A vs. B handling of unexpected output/frustration
+A vs. B willingness to reuse / overall preference
+Timing
+Preference for before / after / both / neither
+- usefulness ratings for pre-clarification and post-feedback.
+Overall UX
+Context
+AI usage
+Gaming frequency
+Cozy-game interest
+Age
+Profession
+Qualitative explanation
+One open preference reason → thematic categories.
+Experimental check
+AB vs BA → inspect for obvious order effects.
+
+
+# Which research questions can your questionnaire answer?
+1. Which variant gave the player more the feel of control.
+2. 
+
+# How will you compare Variants A and B?
+Let all participants test both variants but with order counterbalance.
+
+# How will you analyze Likert-scale responses, UEQ-S scores, and qualitative feedback?
+
+
+# What conclusions can you reasonably draw from approximately 12 participants?
+First inputs depending on how strong the statistical numbers are.
+
+# Case Study Ref
+Epic Games Redesign: https://www.behance.net/gallery/249371075/Epic-Game-Luncher-UX-Redesign?tracking_source=search_projects|epic+games+redesign&l=1

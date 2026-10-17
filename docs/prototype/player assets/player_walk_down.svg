@@ -1,0 +1,532 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -40 480 600" width="240" height="300"
+     role="img" aria-label="Player character walk cycle, facing down" xmlns:c2pa="http://c2pa.org/manifest"><metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTozZjQ1OTk1OC00NmIyLTQwYjQtOTNiNi1lNGIyMTMzNTMxN2MAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaH98LWCp/onrf18OJxXjVQIAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDo2NmIzMGNlOS1hZTg5LTRiYjYtOGYyNS00N2M4ZjhlOGI4MzVscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoRtPXF4shmyNH5ivoRSckxwAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg2YqG7palsetZMyWOE42r99VVPYK1SDvPDiMpAEyoeuKkZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaLjTaHKsbAW8Izb4sCCOhNoAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRMAAAAAAAAAAAAAAAAZGhhc2hYIAB/RHQagnq1affGKUu5A49aPAdUv9+j8zNk5i2a0EsaZG5hbWVuanVtYmYgbWFuaWZlc3RqZXhjbHVzaW9uc4GiZXN0YXJ0GQEFZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjNmNDU5OTU4LTQ2YjItNDBiNC05M2I2LWU0YjIxMzM1MzE3Yy9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjk5YTRhNDY2LTdmYjMtNDJkMC1hMzdlLTA4NjdjOWI5ZGY5NnJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCDZiobulqWx61kzJY4Tjav31VU9grVIO88OIykATKh64qJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFggKE3Q6ecB+KKYm+i56/QH928iPOJqTKSdiYlUqWXFXryiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFgghZFn2Tux2MgqHT/+FAc6bqzYQedCs0UH4rLe5iSxZSB0Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQBfOeHEaTkz1yqb7AxqW/N40cyPnzNtvGnLanYvmQewwZtdBFZfAwVvRRHg0rNlM1mE9zLfnCLSwtxAlrrjB3XE=</c2pa:manifest></metadata>
+  <style>
+    text {
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+      font-size: 15px;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+    .body, .head, .armL, .armR, .legL, .legR, .shoeL, .shoeR { animation: 0.64s steps(1, end) infinite }
+    .body { animation-name: body }
+    .head { animation-name: head }
+    .armL { animation-name: armL }
+    .armR { animation-name: armR }
+    .legL { animation-name: legL }
+    .legR { animation-name: legR }
+    .shoeL { animation-name: shoeL }
+    .shoeR { animation-name: shoeR }
+    @keyframes body {
+      0.00%, 24.99% { transform: translateY(0px); opacity: 1 }
+      25.00%, 49.99% { transform: translateY(0px); opacity: 1 }
+      50.00%, 74.99% { transform: translateY(0px); opacity: 1 }
+      75.00%, 99.99% { transform: translateY(0px); opacity: 1 }
+    }
+    @keyframes head {
+      0.00%, 24.99% { transform: translateY(0px); opacity: 1 }
+      25.00%, 49.99% { transform: translateY(-20px); opacity: 1 }
+      50.00%, 74.99% { transform: translateY(0px); opacity: 1 }
+      75.00%, 99.99% { transform: translateY(-20px); opacity: 1 }
+    }
+    @keyframes armL {
+      0.00%, 24.99% { transform: translateY(0px); opacity: 1 }
+      25.00%, 49.99% { transform: translateY(-20px); opacity: 1 }
+      50.00%, 74.99% { transform: translateY(0px); opacity: 1 }
+      75.00%, 99.99% { transform: translateY(0px); opacity: 1 }
+    }
+    @keyframes armR {
+      0.00%, 24.99% { transform: translateY(0px); opacity: 1 }
+      25.00%, 49.99% { transform: translateY(0px); opacity: 1 }
+      50.00%, 74.99% { transform: translateY(0px); opacity: 1 }
+      75.00%, 99.99% { transform: translateY(-20px); opacity: 1 }
+    }
+    @keyframes legL {
+      0.00%, 24.99% { transform: translateY(0px); opacity: 1 }
+      25.00%, 49.99% { transform: translateY(0px); opacity: 1 }
+      50.00%, 74.99% { transform: translateY(0px); opacity: 1 }
+      75.00%, 99.99% { transform: translateY(-20px); opacity: 1 }
+    }
+    @keyframes legR {
+      0.00%, 24.99% { transform: translateY(0px); opacity: 1 }
+      25.00%, 49.99% { transform: translateY(-20px); opacity: 1 }
+      50.00%, 74.99% { transform: translateY(0px); opacity: 1 }
+      75.00%, 99.99% { transform: translateY(0px); opacity: 1 }
+    }
+    @keyframes shoeL {
+      0.00%, 24.99% { transform: translateY(0px); opacity: 1 }
+      25.00%, 49.99% { transform: translateY(0px); opacity: 1 }
+      50.00%, 74.99% { transform: translateY(0px); opacity: 1 }
+      75.00%, 99.99% { transform: translateY(0px); opacity: 0 }
+    }
+    @keyframes shoeR {
+      0.00%, 24.99% { transform: translateY(0px); opacity: 1 }
+      25.00%, 49.99% { transform: translateY(0px); opacity: 0 }
+      50.00%, 74.99% { transform: translateY(0px); opacity: 1 }
+      75.00%, 99.99% { transform: translateY(0px); opacity: 1 }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .body, .head, .armL, .armR, .legL, .legR, .shoeL, .shoeR { animation: none }
+    }
+  </style>
+  <rect x="0" y="-40" width="480" height="600" fill="#16100d"/>
+  <g class="body">
+    <text x="50" y="330" fill="#e66460">¬</text>
+    <text x="90" y="330" fill="#e05f5d">¬</text>
+    <text x="110" y="330" fill="#d4565b">:</text>
+    <text x="130" y="330" fill="#e25f5d">¬</text>
+    <text x="150" y="330" fill="#ab5353">·</text>
+    <text x="170" y="330" fill="#ffab9c">*</text>
+    <text x="190" y="330" fill="#ffe6ce">¥</text>
+    <text x="210" y="330" fill="#ffe6ce">¥</text>
+    <text x="230" y="330" fill="#ffe8d1">¥</text>
+    <text x="250" y="330" fill="#ffe7d0">¥</text>
+    <text x="270" y="330" fill="#ffe7d0">¥</text>
+    <text x="290" y="330" fill="#ffe7d0">¥</text>
+    <text x="310" y="330" fill="#ffab9b">*</text>
+    <text x="330" y="330" fill="#ab5454">·</text>
+    <text x="350" y="330" fill="#e3605f">¬</text>
+    <text x="370" y="330" fill="#d05359">:</text>
+    <text x="390" y="330" fill="#e15f5d">¬</text>
+    <text x="430" y="330" fill="#e66562">¬</text>
+    <text x="70" y="350" fill="#e1625f">¬</text>
+    <text x="90" y="350" fill="#fe8271">+</text>
+    <text x="110" y="350" fill="#de5f5e">¬</text>
+    <text x="130" y="350" fill="#d95b5c">:</text>
+    <text x="150" y="350" fill="#d3545a">:</text>
+    <text x="170" y="350" fill="#cc5357">:</text>
+    <text x="190" y="350" fill="#a65452">·</text>
+    <text x="210" y="350" fill="#a55953">·</text>
+    <text x="230" y="350" fill="#fdb99b">¤</text>
+    <text x="250" y="350" fill="#ffbf9f">§</text>
+    <text x="270" y="350" fill="#a35651">·</text>
+    <text x="290" y="350" fill="#a75452">·</text>
+    <text x="310" y="350" fill="#c65356">:</text>
+    <text x="330" y="350" fill="#d0545a">:</text>
+    <text x="350" y="350" fill="#dc5f5e">¬</text>
+    <text x="370" y="350" fill="#de5f5e">¬</text>
+    <text x="390" y="350" fill="#ff8372">+</text>
+    <text x="410" y="350" fill="#e16260">¬</text>
+    <text x="70" y="370" fill="#ef6f67">=</text>
+    <text x="90" y="370" fill="#ff8776">†</text>
+    <text x="110" y="370" fill="#db5d5e">:</text>
+    <text x="130" y="370" fill="#f3736a">=</text>
+    <text x="150" y="370" fill="#e56361">¬</text>
+    <text x="170" y="370" fill="#ac5554">·</text>
+    <text x="190" y="370" fill="#ffffff">@</text>
+    <text x="210" y="370" fill="#a66550">:</text>
+    <text x="230" y="370" fill="#fffffc">@</text>
+    <text x="250" y="370" fill="#fffffc">@</text>
+    <text x="270" y="370" fill="#fffffc">@</text>
+    <text x="290" y="370" fill="#fffffe">@</text>
+    <text x="310" y="370" fill="#ab5454">·</text>
+    <text x="330" y="370" fill="#f4756b">=</text>
+    <text x="350" y="370" fill="#db5d5e">:</text>
+    <text x="370" y="370" fill="#de5f5f">¬</text>
+    <text x="390" y="370" fill="#ff8473">†</text>
+    <text x="410" y="370" fill="#f07067">=</text>
+    <text x="90" y="390" fill="#e0605f">¬</text>
+    <text x="130" y="390" fill="#ef6d66">=</text>
+    <text x="150" y="390" fill="#d15359">:</text>
+    <text x="170" y="390" fill="#ffffff">@</text>
+    <text x="190" y="390" fill="#dddcdc">%</text>
+    <text x="210" y="390" fill="#fffffe">@</text>
+    <text x="230" y="390" fill="#a46550">:</text>
+    <text x="250" y="390" fill="#fffffc">@</text>
+    <text x="270" y="390" fill="#fffffc">@</text>
+    <text x="290" y="390" fill="#dcdbdb">%</text>
+    <text x="310" y="390" fill="#ffffff">@</text>
+    <text x="330" y="390" fill="#d5565a">:</text>
+    <text x="350" y="390" fill="#f17067">=</text>
+    <text x="390" y="390" fill="#e1615f">¬</text>
+    <text x="150" y="410" fill="#a85252">·</text>
+    <text x="170" y="410" fill="#ffd0b1">%</text>
+    <text x="190" y="410" fill="#a0a9b5">†</text>
+    <text x="210" y="410" fill="#fffffc">@</text>
+    <text x="230" y="410" fill="#fffffc">@</text>
+    <text x="250" y="410" fill="#a1634f">:</text>
+    <text x="270" y="410" fill="#fffffc">@</text>
+    <text x="290" y="410" fill="#a1aab5">†</text>
+    <text x="310" y="410" fill="#ffd1b2">%</text>
+    <text x="330" y="410" fill="#a95353">·</text>
+    <text x="130" y="430" fill="#d48f6a">+</text>
+    <text x="190" y="430" fill="#7490ac">=</text>
+    <text x="210" y="430" fill="#9bbfdd">*</text>
+    <text x="230" y="430" fill="#9abddb">*</text>
+    <text x="250" y="430" fill="#98bbda">*</text>
+    <text x="270" y="430" fill="#a16450">:</text>
+    <text x="290" y="430" fill="#a16450">:</text>
+    <text x="350" y="430" fill="#c88362">=</text>
+    <text x="170" y="450" fill="#7996b3">=</text>
+    <text x="190" y="450" fill="#9bbedc">*</text>
+    <text x="210" y="450" fill="#9cbfdc">*</text>
+    <text x="230" y="450" fill="#7593af">=</text>
+    <text x="250" y="450" fill="#9abddb">*</text>
+    <text x="270" y="450" fill="#7996b3">=</text>
+    <text x="290" y="450" fill="#d88860">+</text>
+    <text x="310" y="450" fill="#a96751">:</text>
+    <text x="170" y="470" fill="#7894af">=</text>
+    <text x="190" y="470" fill="#caddf1">%</text>
+    <text x="210" y="470" fill="#cadef3">%</text>
+    <text x="230" y="470" fill="#7996b2">=</text>
+    <text x="250" y="470" fill="#c9dbef">%</text>
+    <text x="270" y="470" fill="#c8dcf1">%</text>
+    <text x="290" y="470" fill="#a66550">:</text>
+    <text x="310" y="470" fill="#a16350">:</text>
+  </g>
+  <g class="head">
+    <text x="170" y="10" fill="#bb6d5b">¬</text>
+    <text x="190" y="10" fill="#ebae7f">*</text>
+    <text x="210" y="10" fill="#ebad7e">*</text>
+    <text x="230" y="10" fill="#e9ad7e">*</text>
+    <text x="250" y="10" fill="#ebae7f">*</text>
+    <text x="270" y="10" fill="#eaad7d">*</text>
+    <text x="290" y="10" fill="#ebaf7f">*</text>
+    <text x="310" y="10" fill="#b76a59">:</text>
+    <text x="130" y="30" fill="#b8675a">:</text>
+    <text x="150" y="30" fill="#b8695a">:</text>
+    <text x="170" y="30" fill="#fbca95">§</text>
+    <text x="190" y="30" fill="#ffe5bd">&amp;</text>
+    <text x="210" y="30" fill="#f9c792">§</text>
+    <text x="230" y="30" fill="#f9c794">§</text>
+    <text x="250" y="30" fill="#f8c691">§</text>
+    <text x="270" y="30" fill="#f8c692">§</text>
+    <text x="290" y="30" fill="#ffe5bd">&amp;</text>
+    <text x="310" y="30" fill="#f8c794">§</text>
+    <text x="330" y="30" fill="#b86959">:</text>
+    <text x="350" y="30" fill="#b7695a">:</text>
+    <text x="110" y="50" fill="#faca95">§</text>
+    <text x="130" y="50" fill="#ffd5a5">%</text>
+    <text x="150" y="50" fill="#ffe5bd">&amp;</text>
+    <text x="170" y="50" fill="#f9c692">§</text>
+    <text x="190" y="50" fill="#f9c692">§</text>
+    <text x="210" y="50" fill="#ffe6bf">&amp;</text>
+    <text x="230" y="50" fill="#ffe5be">&amp;</text>
+    <text x="250" y="50" fill="#ffe6bf">&amp;</text>
+    <text x="270" y="50" fill="#ffe5be">&amp;</text>
+    <text x="290" y="50" fill="#f9c793">§</text>
+    <text x="310" y="50" fill="#ffe4bd">&amp;</text>
+    <text x="330" y="50" fill="#ffe3bb">&amp;</text>
+    <text x="350" y="50" fill="#fed2a2">%</text>
+    <text x="370" y="50" fill="#f9c893">§</text>
+    <text x="90" y="70" fill="#ebaf7f">*</text>
+    <text x="110" y="70" fill="#f8c692">§</text>
+    <text x="130" y="70" fill="#ffe6bf">&amp;</text>
+    <text x="150" y="70" fill="#f9c794">§</text>
+    <text x="170" y="70" fill="#ffe5be">&amp;</text>
+    <text x="190" y="70" fill="#ffe6bf">&amp;</text>
+    <text x="210" y="70" fill="#ffe6bf">&amp;</text>
+    <text x="230" y="70" fill="#ffe6bf">&amp;</text>
+    <text x="250" y="70" fill="#ffe6be">&amp;</text>
+    <text x="270" y="70" fill="#ffe5be">&amp;</text>
+    <text x="290" y="70" fill="#ffe5bd">&amp;</text>
+    <text x="310" y="70" fill="#fdd09e">§</text>
+    <text x="330" y="70" fill="#fed1a1">%</text>
+    <text x="350" y="70" fill="#ffe5bf">&amp;</text>
+    <text x="370" y="70" fill="#f8c590">§</text>
+    <text x="390" y="70" fill="#ecb081">*</text>
+    <text x="90" y="90" fill="#ebaf80">*</text>
+    <text x="110" y="90" fill="#fccb98">§</text>
+    <text x="130" y="90" fill="#ffe6bf">&amp;</text>
+    <text x="150" y="90" fill="#ea595b">¬</text>
+    <text x="170" y="90" fill="#e9575a">:</text>
+    <text x="190" y="90" fill="#e95559">:</text>
+    <text x="210" y="90" fill="#e95357">:</text>
+    <text x="230" y="90" fill="#e95357">:</text>
+    <text x="250" y="90" fill="#e85457">:</text>
+    <text x="270" y="90" fill="#ea565a">:</text>
+    <text x="290" y="90" fill="#e85459">:</text>
+    <text x="310" y="90" fill="#e85659">:</text>
+    <text x="330" y="90" fill="#ea5a5c">¬</text>
+    <text x="350" y="90" fill="#ffe5bd">&amp;</text>
+    <text x="370" y="90" fill="#fac995">§</text>
+    <text x="390" y="90" fill="#ecae7f">*</text>
+    <text x="70" y="110" fill="#b66557">:</text>
+    <text x="90" y="110" fill="#e56662">¬</text>
+    <text x="110" y="110" fill="#e76461">¬</text>
+    <text x="130" y="110" fill="#ca5259">:</text>
+    <text x="150" y="110" fill="#ce5257">:</text>
+    <text x="170" y="110" fill="#e9545a">:</text>
+    <text x="190" y="110" fill="#ea5459">:</text>
+    <text x="210" y="110" fill="#e95155">:</text>
+    <text x="230" y="110" fill="#e95559">:</text>
+    <text x="250" y="110" fill="#e85457">:</text>
+    <text x="270" y="110" fill="#e95559">:</text>
+    <text x="290" y="110" fill="#e85457">:</text>
+    <text x="310" y="110" fill="#e95559">:</text>
+    <text x="330" y="110" fill="#cc5357">:</text>
+    <text x="350" y="110" fill="#c95359">:</text>
+    <text x="370" y="110" fill="#e76963">¬</text>
+    <text x="390" y="110" fill="#e76663">¬</text>
+    <text x="410" y="110" fill="#b86659">:</text>
+    <text x="70" y="130" fill="#b46356">:</text>
+    <text x="90" y="130" fill="#cc5157">:</text>
+    <text x="110" y="130" fill="#cf5259">:</text>
+    <text x="130" y="130" fill="#ffe5be">&amp;</text>
+    <text x="150" y="130" fill="#fccd9b">§</text>
+    <text x="170" y="130" fill="#ffe5be">&amp;</text>
+    <text x="190" y="130" fill="#ffe5bd">&amp;</text>
+    <text x="210" y="130" fill="#ffe6be">&amp;</text>
+    <text x="230" y="130" fill="#ffe4bc">&amp;</text>
+    <text x="250" y="130" fill="#ffe6be">&amp;</text>
+    <text x="270" y="130" fill="#ffe6be">&amp;</text>
+    <text x="290" y="130" fill="#ffe5be">&amp;</text>
+    <text x="310" y="130" fill="#ffe4bb">&amp;</text>
+    <text x="330" y="130" fill="#fccd9b">§</text>
+    <text x="350" y="130" fill="#ffe5bd">&amp;</text>
+    <text x="370" y="130" fill="#cd5259">:</text>
+    <text x="390" y="130" fill="#cf5257">:</text>
+    <text x="410" y="130" fill="#b56459">:</text>
+    <text x="30" y="150" fill="#ecb080">*</text>
+    <text x="50" y="150" fill="#eeb282">*</text>
+    <text x="70" y="150" fill="#ffecc5">¥</text>
+    <text x="90" y="150" fill="#ffebc5">¥</text>
+    <text x="110" y="150" fill="#ffe6bf">&amp;</text>
+    <text x="130" y="150" fill="#fac894">§</text>
+    <text x="150" y="150" fill="#ffe6be">&amp;</text>
+    <text x="170" y="150" fill="#b46356">:</text>
+    <text x="190" y="150" fill="#b46356">:</text>
+    <text x="210" y="150" fill="#b56355">:</text>
+    <text x="230" y="150" fill="#b26255">:</text>
+    <text x="250" y="150" fill="#b36356">:</text>
+    <text x="270" y="150" fill="#b26255">:</text>
+    <text x="290" y="150" fill="#b16256">:</text>
+    <text x="310" y="150" fill="#b46456">:</text>
+    <text x="330" y="150" fill="#ffe5bd">&amp;</text>
+    <text x="350" y="150" fill="#fac995">§</text>
+    <text x="370" y="150" fill="#ffe4be">&amp;</text>
+    <text x="390" y="150" fill="#ffe9c3">¥</text>
+    <text x="410" y="150" fill="#ffe8c1">¥</text>
+    <text x="430" y="150" fill="#ecb080">*</text>
+    <text x="450" y="150" fill="#eeb283">*</text>
+    <text x="10" y="170" fill="#ebaf80">*</text>
+    <text x="30" y="170" fill="#ffeac4">¥</text>
+    <text x="50" y="170" fill="#ffe5be">&amp;</text>
+    <text x="70" y="170" fill="#fdd09e">§</text>
+    <text x="90" y="170" fill="#f9c995">§</text>
+    <text x="110" y="170" fill="#b36355">:</text>
+    <text x="130" y="170" fill="#b36356">:</text>
+    <text x="150" y="170" fill="#b56456">:</text>
+    <text x="170" y="170" fill="#da5a5c">:</text>
+    <text x="190" y="170" fill="#dd545a">:</text>
+    <text x="210" y="170" fill="#eb6762">¬</text>
+    <text x="230" y="170" fill="#df5d5d">¬</text>
+    <text x="250" y="170" fill="#e7625f">¬</text>
+    <text x="270" y="170" fill="#df5c5c">¬</text>
+    <text x="290" y="170" fill="#de565b">:</text>
+    <text x="310" y="170" fill="#db5c5e">:</text>
+    <text x="330" y="170" fill="#b46557">:</text>
+    <text x="350" y="170" fill="#b36357">:</text>
+    <text x="370" y="170" fill="#b56557">:</text>
+    <text x="390" y="170" fill="#f8c692">§</text>
+    <text x="410" y="170" fill="#fcce9c">§</text>
+    <text x="430" y="170" fill="#ffe4bd">&amp;</text>
+    <text x="450" y="170" fill="#ffeac5">¥</text>
+    <text x="470" y="170" fill="#ecb181">*</text>
+    <text x="10" y="190" fill="#e9ab7c">‡</text>
+    <text x="30" y="190" fill="#ffe4bd">&amp;</text>
+    <text x="50" y="190" fill="#f8c692">§</text>
+    <text x="70" y="190" fill="#b86a59">:</text>
+    <text x="90" y="190" fill="#b15f55">:</text>
+    <text x="110" y="190" fill="#cd5259">:</text>
+    <text x="130" y="190" fill="#f37269">=</text>
+    <text x="150" y="190" fill="#f87569">=</text>
+    <text x="170" y="190" fill="#fd806f">+</text>
+    <text x="190" y="190" fill="#cc5257">:</text>
+    <text x="210" y="190" fill="#ff8372">+</text>
+    <text x="230" y="190" fill="#fe8272">+</text>
+    <text x="250" y="190" fill="#fc7e6f">+</text>
+    <text x="270" y="190" fill="#f06f67">=</text>
+    <text x="290" y="190" fill="#cd5257">:</text>
+    <text x="310" y="190" fill="#fd8070">+</text>
+    <text x="330" y="190" fill="#f8786c">+</text>
+    <text x="350" y="190" fill="#f27269">=</text>
+    <text x="370" y="190" fill="#cc5259">:</text>
+    <text x="390" y="190" fill="#c85459">:</text>
+    <text x="410" y="190" fill="#b56657">:</text>
+    <text x="430" y="190" fill="#f9c893">§</text>
+    <text x="450" y="190" fill="#ffe4bc">&amp;</text>
+    <text x="470" y="190" fill="#e8ac7e">*</text>
+    <text x="10" y="210" fill="#e5a87a">‡</text>
+    <text x="30" y="210" fill="#efb282">*</text>
+    <text x="50" y="210" fill="#f8c793">§</text>
+    <text x="70" y="210" fill="#b66659">:</text>
+    <text x="90" y="210" fill="#bf5256">·</text>
+    <text x="110" y="210" fill="#f9796c">+</text>
+    <text x="130" y="210" fill="#f7756a">=</text>
+    <text x="150" y="210" fill="#fd8271">+</text>
+    <text x="170" y="210" fill="#e7605f">¬</text>
+    <text x="190" y="210" fill="#ffe7d0">¥</text>
+    <text x="210" y="210" fill="#fd7f6f">+</text>
+    <text x="230" y="210" fill="#fd8171">+</text>
+    <text x="250" y="210" fill="#f6756a">=</text>
+    <text x="270" y="210" fill="#e76662">¬</text>
+    <text x="290" y="210" fill="#ffe7cf">¥</text>
+    <text x="310" y="210" fill="#f17169">=</text>
+    <text x="330" y="210" fill="#ff8372">+</text>
+    <text x="350" y="210" fill="#f7766c">=</text>
+    <text x="370" y="210" fill="#fb7c6e">+</text>
+    <text x="390" y="210" fill="#c85257">:</text>
+    <text x="410" y="210" fill="#b66659">:</text>
+    <text x="430" y="210" fill="#f8c793">§</text>
+    <text x="450" y="210" fill="#eeb383">*</text>
+    <text x="470" y="210" fill="#e4a67b">‡</text>
+    <text x="30" y="230" fill="#b76957">:</text>
+    <text x="50" y="230" fill="#f8c691">§</text>
+    <text x="70" y="230" fill="#f26f68">=</text>
+    <text x="90" y="230" fill="#c55156">·</text>
+    <text x="110" y="230" fill="#e06060">¬</text>
+    <text x="130" y="230" fill="#ff8372">+</text>
+    <text x="150" y="230" fill="#e5615e">¬</text>
+    <text x="170" y="230" fill="#ffe6ce">¥</text>
+    <text x="190" y="230" fill="#ffe7d0">¥</text>
+    <text x="210" y="230" fill="#f47367">=</text>
+    <text x="230" y="230" fill="#ff8371">+</text>
+    <text x="250" y="230" fill="#e86561">¬</text>
+    <text x="270" y="230" fill="#ffe7d0">¥</text>
+    <text x="290" y="230" fill="#ffe7d0">¥</text>
+    <text x="310" y="230" fill="#f06c66">=</text>
+    <text x="330" y="230" fill="#df6260">¬</text>
+    <text x="350" y="230" fill="#ff8574">†</text>
+    <text x="370" y="230" fill="#de5c5d">:</text>
+    <text x="390" y="230" fill="#ca5357">:</text>
+    <text x="410" y="230" fill="#f17069">=</text>
+    <text x="430" y="230" fill="#f8c692">§</text>
+    <text x="450" y="230" fill="#bd705d">¬</text>
+    <text x="50" y="250" fill="#b36356">:</text>
+    <text x="70" y="250" fill="#f9796c">+</text>
+    <text x="90" y="250" fill="#c64f55">·</text>
+    <text x="110" y="250" fill="#b15e55">:</text>
+    <text x="130" y="250" fill="#de5d5d">¬</text>
+    <text x="150" y="250" fill="#ffe7cf">¥</text>
+    <text x="170" y="250" fill="#ffe8d1">¥</text>
+    <text x="190" y="250" fill="#ffe8d1">¥</text>
+    <text x="210" y="250" fill="#ffe7d0">¥</text>
+    <text x="230" y="250" fill="#e2625f">¬</text>
+    <text x="250" y="250" fill="#e76561">¬</text>
+    <text x="270" y="250" fill="#e56361">¬</text>
+    <text x="290" y="250" fill="#ffe7cf">¥</text>
+    <text x="310" y="250" fill="#ffe6cf">¥</text>
+    <text x="330" y="250" fill="#ffe7d0">¥</text>
+    <text x="350" y="250" fill="#df5e5d">¬</text>
+    <text x="370" y="250" fill="#ae5d55">:</text>
+    <text x="390" y="250" fill="#ca5257">:</text>
+    <text x="410" y="250" fill="#f8796c">+</text>
+    <text x="430" y="250" fill="#b36457">:</text>
+    <text x="70" y="270" fill="#fa7a6b">+</text>
+    <text x="90" y="270" fill="#cb5257">:</text>
+    <text x="110" y="270" fill="#ffe7cf">¥</text>
+    <text x="130" y="270" fill="#de5d5d">¬</text>
+    <text x="150" y="270" fill="#ffe7cf">¥</text>
+    <text x="170" y="270" fill="#ffe7d0">¥</text>
+    <text x="190" y="270" fill="#ffe7d0">¥</text>
+    <text x="210" y="270" fill="#ffe7d0">¥</text>
+    <text x="230" y="270" fill="#ffe7d0">¥</text>
+    <text x="250" y="270" fill="#ffe8d1">¥</text>
+    <text x="270" y="270" fill="#ffe7d0">¥</text>
+    <text x="290" y="270" fill="#ffe7d0">¥</text>
+    <text x="310" y="270" fill="#ffe7d0">¥</text>
+    <text x="330" y="270" fill="#ffe6cf">¥</text>
+    <text x="350" y="270" fill="#df5f5e">¬</text>
+    <text x="370" y="270" fill="#ffe7d0">¥</text>
+    <text x="390" y="270" fill="#ca5359">:</text>
+    <text x="410" y="270" fill="#fa7c6d">+</text>
+    <text x="70" y="290" fill="#f16f67">=</text>
+    <text x="90" y="290" fill="#e0615f">¬</text>
+    <text x="110" y="290" fill="#ffe6ce">¥</text>
+    <text x="130" y="290" fill="#ec6562">¬</text>
+    <text x="150" y="290" fill="#ffe7cf">¥</text>
+    <text x="170" y="290" fill="#9f614d">·</text>
+    <text x="190" y="290" fill="#9c604c">·</text>
+    <text x="210" y="290" fill="#ffe8d1">¥</text>
+    <text x="230" y="290" fill="#ffe8d2">¥</text>
+    <text x="250" y="290" fill="#ffe8d1">¥</text>
+    <text x="270" y="290" fill="#ffe7d0">¥</text>
+    <text x="290" y="290" fill="#9d614d">·</text>
+    <text x="310" y="290" fill="#9f614d">·</text>
+    <text x="330" y="290" fill="#ffe6cf">¥</text>
+    <text x="350" y="290" fill="#e36260">¬</text>
+    <text x="370" y="290" fill="#ffe6cf">¥</text>
+    <text x="390" y="290" fill="#e05f5e">¬</text>
+    <text x="410" y="290" fill="#f27169">=</text>
+    <text x="50" y="310" fill="#ef6e66">=</text>
+    <text x="90" y="310" fill="#f7776a">+</text>
+    <text x="110" y="310" fill="#cf545a">:</text>
+    <text x="130" y="310" fill="#e05f5e">¬</text>
+    <text x="150" y="310" fill="#ffe7d0">¥</text>
+    <text x="170" y="310" fill="#ffe6cf">¥</text>
+    <text x="190" y="310" fill="#ffe8d1">¥</text>
+    <text x="210" y="310" fill="#ffe5cd">&amp;</text>
+    <text x="230" y="310" fill="#ffe7d0">¥</text>
+    <text x="250" y="310" fill="#ffe7d0">¥</text>
+    <text x="270" y="310" fill="#ffe6ce">¥</text>
+    <text x="290" y="310" fill="#ffe7d0">¥</text>
+    <text x="310" y="310" fill="#ffe7d0">¥</text>
+    <text x="330" y="310" fill="#ffe6cf">¥</text>
+    <text x="350" y="310" fill="#e56360">¬</text>
+    <text x="370" y="310" fill="#cf5459">:</text>
+    <text x="390" y="310" fill="#f8776a">+</text>
+    <text x="430" y="310" fill="#f06d66">=</text>
+    <text x="50" y="330" fill="#e66460">¬</text>
+    <text x="90" y="330" fill="#e05f5d">¬</text>
+    <text x="110" y="330" fill="#d4565b">:</text>
+    <text x="130" y="330" fill="#e25f5d">¬</text>
+    <text x="150" y="330" fill="#ab5353">·</text>
+    <text x="170" y="330" fill="#ffab9c">*</text>
+    <text x="190" y="330" fill="#ffe6ce">¥</text>
+    <text x="210" y="330" fill="#ffe6ce">¥</text>
+    <text x="230" y="330" fill="#ffe8d1">¥</text>
+    <text x="250" y="330" fill="#ffe7d0">¥</text>
+    <text x="270" y="330" fill="#ffe7d0">¥</text>
+    <text x="290" y="330" fill="#ffe7d0">¥</text>
+    <text x="310" y="330" fill="#ffab9b">*</text>
+    <text x="330" y="330" fill="#ab5454">·</text>
+    <text x="350" y="330" fill="#e3605f">¬</text>
+    <text x="370" y="330" fill="#d05359">:</text>
+    <text x="390" y="330" fill="#e15f5d">¬</text>
+    <text x="430" y="330" fill="#e66562">¬</text>
+  </g>
+  <g class="armL">
+    <text x="170" y="410" fill="#ffd0b1">%</text>
+    <text x="150" y="430" fill="#ffe4cc">&amp;</text>
+    <text x="170" y="430" fill="#ffe6cf">¥</text>
+    <text x="150" y="450" fill="#ffd5b6">%</text>
+  </g>
+  <g class="armR">
+    <text x="310" y="410" fill="#ffd1b2">%</text>
+    <text x="310" y="430" fill="#ffe7d0">¥</text>
+    <text x="330" y="430" fill="#ffd0b1">%</text>
+    <text x="330" y="450" fill="#ffd0b1">%</text>
+  </g>
+  <g class="legL">
+    <text x="190" y="490" fill="#ffdec5">&amp;</text>
+    <text x="210" y="490" fill="#ffdabe">&amp;</text>
+  </g>
+  <g class="legR">
+    <text x="250" y="490" fill="#ffdfc6">&amp;</text>
+    <text x="270" y="490" fill="#ffd8bc">%</text>
+    <text x="290" y="490" fill="#be7759">¬</text>
+  </g>
+  <g class="shoeL">
+    <text x="190" y="510" fill="#d1c4bc">¤</text>
+    <text x="210" y="510" fill="#ffffff">@</text>
+    <text x="230" y="510" fill="#daccc2">§</text>
+    <text x="190" y="530" fill="#ffffff">@</text>
+    <text x="210" y="530" fill="#e7dcd5">%</text>
+    <text x="230" y="530" fill="#fffffe">@</text>
+    <text x="190" y="550" fill="#d0c4be">¤</text>
+    <text x="210" y="550" fill="#d0c5bf">¤</text>
+    <text x="230" y="550" fill="#d0c5bf">¤</text>
+  </g>
+  <g class="shoeR">
+    <text x="250" y="510" fill="#d8ccc3">§</text>
+    <text x="270" y="510" fill="#ffffff">@</text>
+    <text x="290" y="510" fill="#d0c2ba">¤</text>
+    <text x="250" y="530" fill="#ffffff">@</text>
+    <text x="270" y="530" fill="#e7dcd6">%</text>
+    <text x="290" y="530" fill="#ffffff">@</text>
+    <text x="250" y="550" fill="#d1c5bf">¤</text>
+    <text x="270" y="550" fill="#d0c5be">¤</text>
+    <text x="290" y="550" fill="#d0c5be">¤</text>
+  </g>
+</svg>

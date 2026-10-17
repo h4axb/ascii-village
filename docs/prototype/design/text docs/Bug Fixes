@@ -1,0 +1,60 @@
+15.10.26-
+
+~~- ! add boat shadow~~
+~~- !! add strawberry/pumpkin plant growing~~
+- !! add left/up/down watering anim
+
+
+~~- give feedback when one quest was completed !!!~~
+~~- feedback pace a bit more slow !!!~~
+~~- keep the dates bg fill~~
+~~- quest panel bigger !!!~~
+~~- anim sequence: mitchy should jump from shore to boat so does player, make player play walk anim~~
+~~- shop interact modal~~
+- collision of island
+~~- seed is unsellable~~
+- show equiped item in hand visually
+~~- show disembark interact modal in the direction of shore~~ 
+~~- pond add interaction modal and add function that it provides water for watering tools~~
+~~- slow down pond water anim -> add in editor~~
+-~~ geld icon~~, crafting token design, ~~item icon update~~
+- animated img in hints
+~~- in shop buy section just crafting token~~
+- player profile ui
+~~- player can always return to crafting and rechange the craft for 12 gold~~
+
+- //hide the img insert for hint gifs now
+~~- make bed scalable~~
+~~- delete interaction with clothing line~~
+~~- disable zoom curing cinematics~~
+~~- make watering can dynamically follow the hand~~
+~~- delete collision of stones in water~~
+~~- open buy page first in shop~~
+~~- new fence~~
+~~- vfx for ressources hint~~
+//- delete on click open modal function
+
+~~- at checkpoints save game~~
+
+- assets: ~~fence~~, flower clay brush, steg, muscheln, ~~bank~~, moving cloud shadows
+
+~~- leave an option by mitchy - rechange old crafting so player can always change prompt for 12 gold. and add a sell option player can always sell mitchy items for gold. Text for buttons: “Recraft icon and 12 Gold” and “Sell Items” write subtext what each option does like this for rest think of a simple sentence: Sell: Exchange collected items for gold. Recraft: Change an existing item's prompt and craft it again.~~
+~~- delete the controls text in a panel and put x btn inside the panel~~
+~~- cinematic entering ship mitchy & player should walk to shore last px and then jump. remark the areas where they stand. and make the walk to shop as linear as possible~~
+
+- Sell Buy Title
+- when having to plant seed -> hint should camera zoom to bed
+when loading BA the A dates on shop island are fallen?
+
+
+- Bachelortext Proposal
+
+- make key settings icons more visable + shop buy/sell
+- make craftings color palette theme cuter
+- play in intro 1&2 link the intro once and after completing first quest and reloading that state dont show intro again.
+
+- map design
+- crafting design
+- delete in feedback db my responses
+
+

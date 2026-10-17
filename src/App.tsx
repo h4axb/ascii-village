@@ -6643,12 +6643,16 @@ function Game() {
                   .filter((e) => (e.kind === 'fence' || e.kind === 'gate') && !e.rotation)
                   .flatMap((e) => {
                     const k = e.scale ?? 1;
-                    // one full ground square tall: the square row the
-                    // piece's bottom edge falls in, so it covers its feet
-                    const top = Math.floor((e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE);
+                    // one full ground square tall, right at the piece's own
+                    // bottom edge (tucked a sliver under its feet): pieces
+                    // a pixel or two apart each keep theirs visible
+                    const top = (e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE - 0.2;
                     return fenceShadowRuns(e.sprite).map(([c0, c1], i) => {
-                      const x0 = Math.floor(e.x * TILE_CH + c0 * k);
-                      const x1 = Math.max(x0 + 1, Math.ceil(e.x * TILE_CH + c1 * k));
+                      // the feet's width to the nearest squares; one square
+                      // centred under anything narrower (a stick, a post)
+                      const a = e.x * TILE_CH + c0 * k, z = e.x * TILE_CH + c1 * k;
+                      let x0 = Math.round(a), x1 = Math.round(z);
+                      if (x1 - x0 < 1) (x0 = Math.round((a + z) / 2 - 0.5)), (x1 = x0 + 1);
                       return <i key={`${e.id}-${i}`} style={{ left: `${x0}ch`, width: `${x1 - x0}ch`, top: `${top}ch` }} />;
                     });
                   })}

@@ -76,6 +76,7 @@ export const PLACEABLE_KINDS: { kind: EntityKind; label: string }[] = [
   { kind: 'fern', label: 'collectable fern' },
   { kind: 'iceflower', label: 'collectable ice flower' },
   { kind: 'date', label: 'collectable dates' },
+  { kind: 'bench', label: 'bench — F sits on its seat' },
 ];
 
 // What the game needs to stay itself: Mitchy and the garden are wired by id

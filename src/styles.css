@@ -5006,6 +5006,14 @@ pre {
   height: 14px;
   margin: -7px 0 0 -7px;
 }
+/* a bench's seat (Seats): the feet go on its bottom edge */
+.wed-seat-area {
+  position: absolute;
+  border: 2px dashed #7fd3ff;
+  border-bottom-style: solid;
+  background: rgba(127, 211, 255, 0.18);
+  pointer-events: none;
+}
 
 /* fence pieces' and gates' contact shadows, built like the player's: half-
    square pixels on the half-square ground grid, a flat stepped oval at

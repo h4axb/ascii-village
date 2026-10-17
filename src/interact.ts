@@ -49,6 +49,8 @@ export interface InteractCtx {
   doors: Doors;
   // the fence gates standing open (by entity id)
   openGates: ReadonlySet<string>;
+  // the bench the player is sitting on (by entity id), if any
+  sittingOn?: string | null;
 }
 
 // Pure — given a ref and read-only world state, what should hover/click show?
@@ -96,6 +98,10 @@ export function describeInteraction(ref: InteractRef, ctx: InteractCtx): Interac
       const open = ctx.openGates.has(e.id);
       return { name: open ? 'close the gate' : 'open the gate', question: open ? 'Do you want to close the gate?' : 'Do you want to open the gate?' };
     }
+    case 'bench':
+      return ctx.sittingOn === e.id
+        ? { name: 'stand up', question: 'Do you want to stand up?' }
+        : { name: 'the bench', question: 'Do you want to sit down?' };
     case 'cat':
       return { name: 'Mitchy', question: 'Do you want to talk to Mitchy?' };
     case 'shop':
@@ -121,6 +127,7 @@ export interface InteractActions {
   openCropPanel: (slot: number) => void;
   toggleDoor: (d: DoorId) => void;
   toggleGate: (id: string) => void; // a fence gate (src/fence.ts)
+  sit: (e: Ent) => void; // sit down on a bench, or stand up from it
   say: (text: string) => void;
 }
 
@@ -150,6 +157,9 @@ export function runInteraction(ref: InteractRef, ctx: InteractCtx, actions: Inte
       break;
     case 'gate':
       actions.toggleGate(e.id);
+      break;
+    case 'bench':
+      actions.sit(e);
       break;
     case 'cat':
       actions.openDialog();

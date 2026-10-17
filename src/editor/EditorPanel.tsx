@@ -15,7 +15,8 @@ import { GroundTab } from './GroundTab';
 import type { IntroNarrationTool } from '../devIntroNarration';
 import type { ColorLook, Ent, EntityKind } from '../world';
 import { ISLAND_COUNT } from '../world';
-import { FIXED_ASSETS, type AssetDef } from '../assets';
+import { ASSETS, FIXED_ASSETS, type AssetDef } from '../assets';
+import { allSeats, saveSeats, setSeat, type SeatArea } from '../seats';
 import { PLACEABLE_KINDS, locksOf, isEditable, ISLAND_NAMES } from './useWorldEditor';
 import type { WorldEditor, EditorTab } from './useWorldEditor';
 import { SIGN_TILT_MAX, type SignSettings } from '../wayfinder';
@@ -682,6 +683,7 @@ function MarkersTab({ ed, onFocus }: { ed: WorldEditor; onFocus(id: string): voi
   return (
     <div>
       <ShipSeatsEditor />
+      <SeatsEditor />
       <div className="wed-hint">Named positions cutscenes read by id. Place, then drag on the map.</div>
       {MARKER_REGISTRY.map((cat) => (
         <div key={cat.id} className="wed-group">
@@ -1017,6 +1019,96 @@ function ShipSeatsEditor() {
           onClick={async () => {
             setStatus('saving…');
             setStatus((await saveShipSeats()) ? 'saved' : 'save failed');
+          }}
+        >
+          save seats
+        </button>
+        <span className="wed-dim">{status}</span>
+      </div>
+    </div>
+  );
+}
+
+// ---- Seats: where the player sits on a bench (seats.ts; App.tsx sitDown) ----
+// Pick a bench asset, drag the seat's area on its picture. The bottom edge is
+// where the sitter's feet go, left and right how far along they can sit.
+function SeatsEditor() {
+  const benches = useMemo(() => ASSETS.filter((a) => a.kind === 'bench'), []);
+  const [slug, setSlug] = useState(benches[0]?.slug ?? '');
+  const [, bump] = useState(0);
+  const [status, setStatus] = useState('');
+  const box = useRef<HTMLDivElement>(null);
+  const from = useRef<{ x: number; y: number } | null>(null);
+  const asset = benches.find((a) => a.slug === slug);
+  if (!asset) return null;
+  const area = allSeats()[slug];
+  const at = (ev: React.PointerEvent) => {
+    const r = box.current!.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (ev.clientY - r.top) / r.height)) };
+  };
+  const drag = (ev: React.PointerEvent) => {
+    if (!from.current) return;
+    const p = at(ev);
+    const a: SeatArea = { x0: from.current.x, y0: from.current.y, x1: p.x, y1: p.y };
+    setSeat(slug, a);
+    setStatus('unsaved');
+    bump((n) => n + 1);
+  };
+  const cols = Math.max(1, ...asset.sprite.map((l) => l.length));
+  return (
+    <div className="wed-group">
+      <div className="wed-group-name">Seats</div>
+      <div className="wed-hint">
+        Where the player sits on a bench: drag the seat's area. Its bottom edge is where their feet go, its left and right ends how far
+        along they can sit.
+      </div>
+      <div className="wed-row">
+        <select value={slug} onChange={(e) => setSlug(e.target.value)}>
+          {benches.map((a) => (
+            <option key={a.slug} value={a.slug}>
+              {a.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="wed-seat-stage">
+        <div
+          ref={box}
+          className="wed-seat-ship"
+          style={{ fontSize: `${Math.min(14, 300 / (cols * 0.5))}px` }}
+          onPointerDown={(e) => {
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            from.current = at(e);
+          }}
+          onPointerMove={drag}
+          onPointerUp={(e) => {
+            drag(e);
+            from.current = null;
+          }}
+        >
+          <ColoredSprite sprite={asset.sprite} colors={asset.colors} palette={asset.palette} solidCells />
+          {area && (
+            <span
+              className="wed-seat-area"
+              style={{ left: `${area.x0 * 100}%`, top: `${area.y0 * 100}%`, width: `${(area.x1 - area.x0) * 100}%`, height: `${(area.y1 - area.y0) * 100}%` }}
+            />
+          )}
+        </div>
+      </div>
+      <div className="wed-row wed-btns">
+        <button
+          onClick={() => {
+            setSeat(slug, null);
+            setStatus('unsaved');
+            bump((n) => n + 1);
+          }}
+        >
+          clear seat
+        </button>
+        <button
+          onClick={async () => {
+            setStatus('saving…');
+            setStatus((await saveSeats()) ? 'saved' : 'save failed');
           }}
         >
           save seats

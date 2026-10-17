@@ -37,7 +37,7 @@ export interface AssetDef {
   solid?: string[];
   scale: number;
   interactable: boolean;
-  group: 'Buildings' | 'Nature' | 'Fences' | 'Items' | 'Water' | 'New';
+  group: 'Buildings' | 'Nature' | 'Fences' | 'Furniture' | 'Items' | 'Water' | 'New';
   file?: string; // src/data/assets/<file> for file assets
   // kind 'cat' only: a look for Mitchy, never placed on its own (see
   // applyMitchyLook in world.ts); the rows of his head, for portraits

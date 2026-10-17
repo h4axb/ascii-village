@@ -218,6 +218,8 @@ const themeSavePlugin = () =>
   });
 const shipSeatsSavePlugin = () =>
   jsonSavePlugin('ship-seats-save', '/__dev/save-ship-seats', 'src/data/shipSeats.json', (v) => !!v && typeof v === 'object' && !Array.isArray(v));
+const seatsSavePlugin = () =>
+  jsonSavePlugin('seats-save', '/__dev/save-seats', 'src/data/seats.json', (v) => !!v && typeof v === 'object' && !Array.isArray(v));
 const groundSavePlugin = () =>
   jsonSavePlugin('ground-save', '/__dev/save-ground', 'src/data/ground.json', (v) => {
     const d = v as { cells?: unknown; stones?: unknown };
@@ -319,7 +321,7 @@ function participantDevPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), worldEditorSavePlugin(), startTitleUploadPlugin(), introNarrationSavePlugin(), themeSavePlugin(), groundSavePlugin(), shipSeatsSavePlugin(), feedbackDevStorePlugin(), participantDevPlugin()],
+  plugins: [react(), worldEditorSavePlugin(), startTitleUploadPlugin(), introNarrationSavePlugin(), themeSavePlugin(), groundSavePlugin(), shipSeatsSavePlugin(), seatsSavePlugin(), feedbackDevStorePlugin(), participantDevPlugin()],
   server: {
     // Pinned so a dev server never silently drifts onto a different port
     // (Vite's default is to auto-increment on conflict) — localStorage is

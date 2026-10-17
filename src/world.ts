@@ -63,6 +63,8 @@ export type EntityKind =
   | 'fence'
   // a fence gate: F opens and closes it (open, only its posts block)
   | 'gate'
+  // furniture to sit on (the bench): F sits down on its seat (src/seats.ts)
+  | 'bench'
   | 'placed'; // a player-placed decoration/furniture entity (see placement.ts)
 
 // ---------------------------------------------------------------------------

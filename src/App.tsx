@@ -177,6 +177,7 @@ import { boatReachable, boatRoute, seaRoute, pathLength, pointAt, smoothBoatPath
 import { QuestPanel, type QuestView } from './quest/QuestPanel';
 import { HintSparkles } from './HintSparkles';
 import { seatsFor, type SeatKey } from './shipSeats';
+import { seatOf } from './seats';
 import { QuestComplete, RatingSequence, TestTransition } from './quest/TestScreens';
 import { resetPrefs } from './craft/prefs';
 import { CH_EM, WORLD_ASPECT } from './font';
@@ -585,7 +586,8 @@ const MITCHY_BUBBLE_TILES = 6;
 const MITCHY_BUBBLE_SCALE = 0.3;
 const MITCHY_BUBBLE_H = SPEECH_BUBBLE.length * MITCHY_BUBBLE_SCALE + 0.4;
 // the big ones: offered from a little further away
-const PROMPT_WIDE_KINDS = new Set<EntityKind>(['cat', 'house', 'shop', 'hotspot']);
+// (dates: they lie at the palm's foot, its trunk keeps the player back)
+const PROMPT_WIDE_KINDS = new Set<EntityKind>(['cat', 'house', 'shop', 'hotspot', 'date']);
 // The F label's bottom-left goes on an object's top-right corner, except for
 // these kinds: there it's beside the drawn shape this far down (of its height)
 const LABEL_BESIDE: Partial<Record<EntityKind, number>> = { palm: 0.78 };
@@ -877,7 +879,7 @@ function LandingWorld({ portrait }: { portrait: boolean }) {
                   perCell={e.kind === 'flowerplus' || e.kind === 'house' || e.kind === 'cliff'}
                   sway={e.sway}
                   blend={e.blend}
-                  solidCells={['house', 'bridge', 'shop', 'palm', 'boulder', 'grasshalm', 'fence', 'gate', 'date'].includes(e.kind)}
+                  solidCells={['house', 'bridge', 'shop', 'palm', 'boulder', 'grasshalm', 'fence', 'gate', 'date', 'bench'].includes(e.kind)}
                 />
               ),
             )}
@@ -1318,6 +1320,14 @@ function Game() {
   const [doors, setDoors] = useState<Doors>(() => saved?.doors ?? { gate: false });
   // the fence gates standing open (src/fence.ts): F opens and closes one
   const [openGates, setOpenGates] = useState<ReadonlySet<string>>(() => new Set(saved?.openGates ?? []));
+  // the bench the player sits on (src/seats.ts; sitDown below): where they
+  // stood before, to step back to on getting up. Not saved: a reload starts
+  // standing.
+  const [sitting, setSitting] = useState<{ id: string; stand: { x: number; y: number } } | null>(null);
+  const sittingRef = useRef(sitting);
+  sittingRef.current = sitting;
+  const sitBusyRef = useRef(false); // walking onto the seat
+  const [sitFrame, setSitFrame] = useState(0);
   const toggleGate = (id: string) =>
     setOpenGates((g) => {
       const n = new Set(g);
@@ -2110,6 +2120,12 @@ function Game() {
   // timer on a move that didn't happen (see lastStepRef below).
   function tryMove(dx: number, dy: number): boolean {
     if (wateringRef.current || hintLockRef.current) return false; // standing still while watering / a hint plays
+    // seated: a move key gets up first (the next step, key still held, walks)
+    if (sitBusyRef.current) return false;
+    if (sittingRef.current) {
+      standUp();
+      return false;
+    }
     const p = playerRef.current;
     const n = resolveMove(p, dx, dy);
     const moved = n.x !== p.x || n.y !== p.y;
@@ -3218,6 +3234,51 @@ function Game() {
     walkDirRef.current = null;
     setWalkDir(null);
   }
+  // ---- sitting on a bench ----
+  // Where the player sits on `e`: their feet on the seat's front edge (its
+  // marked area, src/seats.ts), as near along it as where they stand now
+  function seatSpot(e: Ent): Pt | null {
+    const a = seatOf(e.asset ?? e.kind);
+    if (!a) return null;
+    const k = e.scale ?? 1;
+    const wT = (Math.max(...e.sprite.map((l) => l.length)) * k) / TILE_CH;
+    const hT = (e.sprite.length * k) / TILE_LN;
+    // the DRAWN player (as PlayerShadow measures it): its middle and its
+    // feet from the rig's top-left, in tiles
+    const half = (PLAYER_SCALE * Math.max(...character.sprite.map((l) => l.length))) / 2 / TILE_CH;
+    const feet = (PLAYER_SCALE * character.sprite.length) / TILE_LN;
+    const lo = e.x + a.x0 * wT + half;
+    const hi = e.x + a.x1 * wT - half;
+    const pc = playerRef.current.x + half;
+    const cx = lo <= hi ? Math.max(lo, Math.min(hi, pc)) : (lo + hi) / 2;
+    return { x: cx - half, y: e.y + a.y1 * hT - feet };
+  }
+  async function sitDown(e: Ent) {
+    if (sittingRef.current) return standUp();
+    const to = seatSpot(e);
+    if (!to || sitBusyRef.current) return;
+    sitBusyRef.current = true;
+    const s = { id: e.id, stand: { ...playerRef.current } };
+    sittingRef.current = s;
+    setSitting(s);
+    setSitFrame(0);
+    await questGlidePlayer(to, 5);
+    sitBusyRef.current = false;
+    // the sit frames (sprites.ts SIT_ANIM) play once, the last one stays
+    const n = S.SIT_ANIM?.frames.length ?? 0;
+    for (let i = 1; i < n && sittingRef.current === s; i++) {
+      await sleep(120);
+      if (sittingRef.current === s) setSitFrame(i);
+    }
+  }
+  function standUp() {
+    const s = sittingRef.current;
+    if (!s || sitBusyRef.current) return;
+    sittingRef.current = null;
+    setSitting(null);
+    questStepPlayer(s.stand.x, s.stand.y, 220);
+  }
+
   // The walkable spot (a w×h footprint on land, clear for the player) right
   // at the water's edge nearest `target` (a spot on the ship): where someone
   // stands to jump aboard
@@ -3776,6 +3837,14 @@ function Game() {
       },
       // (tests) put an item in the bag
       give: (item: OwnedItem) => setBag((b) => [...b, item]),
+      // (tests) an extra entity in the world (not saved), and what the [F]
+      // prompt offers right now
+      addEnt: (e: Ent) => setDynamicEnts((es) => [...es, e]),
+      prompt: () => {
+        const t = promptTarget?.ref;
+        return t ? (describeInteraction(t, interactCtx)?.name ?? null) : null;
+      },
+      sitting: () => sittingRef.current?.id ?? null,
       water: () => waterCrops(),
       harvest: () => {
         const c = crops.find((x) => x.id === questRef.current?.seedCrop);
@@ -4646,7 +4715,7 @@ function Game() {
   // object literals over values already computed this render, not worth
   // memoizing) and used by the hover tooltip, the confirm modal's question
   // text, and the confirm modal's Yes handler.
-  const interactCtx: InteractCtx = { ents, crops, wt, fxFor, doors, openGates };
+  const interactCtx: InteractCtx = { ents, crops, wt, fxFor, doors, openGates, sittingOn: sitting?.id ?? null };
 
   // The tile gap between the player's box and an object's drawn box (its
   // blank sprite margins left out)
@@ -4670,6 +4739,12 @@ function Game() {
       y0 = e.y + Math.floor((k * rows[0][1]) / TILE_LN);
       y1 = e.y + Math.ceil((k * (rows[rows.length - 1][1] + 1)) / TILE_LN) - 1;
     }
+    // out to the whole tiles it touches: a thing lying between tiles (a
+    // dropped date bunch) is as near as the tiles it covers
+    x0 = Math.floor(x0);
+    y0 = Math.floor(y0);
+    x1 = Math.ceil(x1 + 1) - 1;
+    y1 = Math.ceil(y1 + 1) - 1;
     const gx = Math.max(x0 - (player.x + PLAYER_T.wT - 1), 0, player.x - x1);
     const gy = Math.max(y0 - (player.y + PLAYER_T.hT - 1), 0, player.y - y1);
     return Math.max(gx, gy);
@@ -4680,6 +4755,8 @@ function Game() {
   // one winning - by tile gap, then by the distance between the two feet.
   const promptTarget = (() => {
     if (modal || cinematic || mapOpen || editorOpen || placing || riding || watering || hintLock || hintCard) return null;
+    // seated: only getting up
+    if (sitting) return { ref: { kind: 'entity', id: sitting.id } as InteractRef, gap: 0, dist: 0 };
     const pcx = player.x + PLAYER_T.wT / 2;
     const pcy = player.y + PLAYER_T.hT;
     let best: { ref: InteractRef; gap: number; dist: number } | null = null;
@@ -4702,7 +4779,9 @@ function Game() {
       if (!canWater(c) && c.stage !== 'ready' && c.stage !== 'failed') continue; // water it, harvest it once grown, pluck it once dried
       const s = plot.slots[c.slot];
       if (!s) continue;
-      const gap = Math.max(Math.max(0, s.x - (player.x + PLAYER_T.wT - 1), player.x - s.x), Math.abs(s.y - feetY));
+      // beside any part of the body (a seed level with the head counts:
+      // in a small bed the feet can't get near the top row)
+      const gap = Math.max(Math.max(0, s.x - (player.x + PLAYER_T.wT - 1), player.x - s.x), Math.max(0, s.y - feetY, player.y - s.y));
       if (gap > 1) continue;
       const dist = Math.hypot(s.x + 0.5 - pcx, s.y + 1 - pcy);
       if (!best || gap < best.gap || (gap === best.gap && dist < best.dist)) best = { ref: { kind: 'crop', slot: c.slot }, gap, dist };
@@ -4711,13 +4790,17 @@ function Game() {
     {
       const { c0, c1 } = plot.door;
       const gy = plot.rect.y1;
-      // from inside the bed (feet just above the rail) or from outside
-      // (the top of the player just below it: the closed rail stops the
-      // body there, so the feet are a whole body below), never only one-way
-      const dy = feetY < gy ? Math.max(0, gy - feetY - 1) : Math.max(0, player.y - gy - 1);
-      const gap = Math.max(Math.max(0, c0 - (player.x + PLAYER_T.wT - 1), player.x - c1), dy);
+      // from outside (the top of the player just below the rail: the closed
+      // rail stops the body there, so the feet are a whole body below), or
+      // from inside only right at it: feet on the row next to the rail and
+      // standing in the gateway, and a plant just as near wins (in a small
+      // bed the bottom plants are right by the gate)
+      const inside = feetY < gy;
+      const gx = Math.max(0, c0 - (player.x + PLAYER_T.wT - 1), player.x - c1);
+      const dy = inside ? gy - feetY - 1 : Math.max(0, player.y - gy - 1);
+      const gap = inside ? 0.5 : Math.max(gx, dy);
       const dist = Math.hypot((c0 + c1 + 1) / 2 - pcx, gy + 1 - pcy);
-      if (gap <= 1 && (!best || gap < best.gap || (gap === best.gap && dist < best.dist)))
+      if ((inside ? dy === 0 && gx === 0 : gap <= 1) && (!best || gap < best.gap || (gap === best.gap && dist < best.dist)))
         best = { ref: { kind: 'door', door: 'gate' }, gap, dist };
     }
     return best;
@@ -4818,6 +4901,7 @@ function Game() {
     openCropPanel: (slot) => setModal({ t: 'crop', slot }),
     toggleDoor,
     toggleGate,
+    sit: (e) => void sitDown(e),
     say: showToast,
   };
 
@@ -5568,9 +5652,13 @@ function Game() {
   // grow or shrink the instant you start/stop walking.
   // sailing the boat: the player stands still in it, no walk cycle
   const cycle = walkDir && !(quest?.riding && quest.boat) && !watering ? WALK_CYCLES[walkDir] : null;
-  const walkAnim = cycle
-    ? { frame: cycle.frames[walkFrame], palette: cycle.palette, padTop: cycle.padTop }
-    : null;
+  // seated on a bench (once there): the sit frames, when they exist
+  const sit = sitting && !walkDir && S.SIT_ANIM ? S.SIT_ANIM : null;
+  const walkAnim = sit
+    ? { frame: sit.frames[Math.min(sitFrame, sit.frames.length - 1)], palette: sit.palette, padTop: sit.padTop }
+    : cycle
+      ? { frame: cycle.frames[walkFrame], palette: cycle.palette, padTop: cycle.padTop }
+      : null;
   // watering: its frame instead (same canvas as the walk frames)
   const waterFrame = watering ? watering.anim.frames[WATER_POSE[watering.phase]] : null;
   const baseSprite = waterFrame ? waterFrame.sprite : walkAnim ? walkAnim.frame.sprite : character.sprite;
@@ -6246,7 +6334,8 @@ function Game() {
                       e.kind === 'grasshalm' ||
                       e.kind === 'fence' ||
                       e.kind === 'gate' ||
-                      e.kind === 'date'
+                      e.kind === 'date' ||
+                      e.kind === 'bench'
                     }
                     onClick={
                       canInteract(e)
@@ -8267,7 +8356,7 @@ function PlacedItemView({
 // editor's solid assets (stones, bushes, the glyph ponds) — hundreds of cells
 // each, so a canvas too. 'grasshalm': the grass tuft, filled like them (still
 // walked through: its collision mask is blank).
-const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder', 'grasshalm', 'fence', 'gate', 'date']);
+const CANVAS_KINDS = new Set(['house', 'bridge', 'palm', 'gardenbed', 'cat', 'shop', 'boulder', 'grasshalm', 'fence', 'gate', 'date', 'bench']);
 function EntSprite({
   kind,
   charW,

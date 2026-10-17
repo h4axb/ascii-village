@@ -1,7 +1,7 @@
 // Small name-entry panel shown once, mid Intro Part B (after Mitchy asks
 // "What's your name?"). A design-system panel (src/ui): the same surface,
 // field and option button as the birthday question in MitchyTalk.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AUTO_ADVANCE_MS, DEFAULT_PLAYER_NAME } from './introPartB';
 
 const MAX_NAME_LEN = 18;
@@ -15,9 +15,24 @@ export default function NameEntryPanel({
   locked?: boolean;
 }) {
   const [value, setValue] = useState('');
+  // a name is required: trying to go on without one says so and shakes the
+  // field
+  const [missing, setMissing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   function submit() {
-    onSubmit(value.trim().slice(0, MAX_NAME_LEN) || DEFAULT_PLAYER_NAME);
+    const name = value.trim().slice(0, MAX_NAME_LEN);
+    if (!name) {
+      setMissing(true);
+      const el = inputRef.current;
+      el?.focus();
+      el?.animate(
+        [0, -6, 5, -3, 2, 0].map((x) => ({ transform: `translateX(${x}px)` })),
+        { duration: 380, easing: 'ease' },
+      );
+      return;
+    }
+    onSubmit(name);
   }
 
   useEffect(() => {
@@ -32,13 +47,17 @@ export default function NameEntryPanel({
       <div className="ds-panel introb-name-entry" role="dialog" aria-label="What's your name?">
         <div className="ds-panel-title">What's your name?</div>
         <input
+          ref={inputRef}
           autoFocus
           disabled={locked}
           className="introb-name-input"
           value={value}
           maxLength={MAX_NAME_LEN}
-          placeholder={DEFAULT_PLAYER_NAME}
-          onChange={(e) => setValue(e.target.value)}
+          placeholder="your name"
+          onChange={(e) => {
+            setValue(e.target.value);
+            if (e.target.value.trim()) setMissing(false);
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit();
           }}
@@ -48,9 +67,13 @@ export default function NameEntryPanel({
             Confirm
           </button>
         </div>
-        <div className="ds-panel-hint">
-          {locked ? `continuing automatically as "${DEFAULT_PLAYER_NAME}"…` : `leave blank for "${DEFAULT_PLAYER_NAME}"`}
-        </div>
+        {locked ? (
+          <div className="ds-panel-hint">continuing automatically as "{DEFAULT_PLAYER_NAME}"…</div>
+        ) : missing ? (
+          <div className="ds-panel-hint" role="alert">
+            Please enter a name.
+          </div>
+        ) : null}
       </div>
     </div>
   );

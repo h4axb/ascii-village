@@ -250,6 +250,15 @@ export const WALK_RIGHT_FRAMES: WalkFrame[] = walkRightData.frames;
 export const WALK_RIGHT_PALETTE: Record<string, string> = walkRightData.palette;
 export const WALK_RIGHT_PAD_TOP: number = (walkRightData as { padTop?: number }).padTop ?? 0;
 
+// SITTING (on the bench, App.tsx sitDown): drop src/data/sit.json in, the
+// same shape as walkDown.json (frames + palette, optional padTop), facing
+// the viewer. Its frames play once as the player sits down and the last one
+// stays while seated. Until the file exists the player sits in their idle
+// frame.
+const SIT_FILES = import.meta.glob<{ default: { frames: WalkFrame[]; palette: Record<string, string>; padTop?: number } }>('./data/sit.json', { eager: true });
+const sitData = Object.values(SIT_FILES)[0]?.default;
+export const SIT_ANIM = sitData?.frames?.length ? { frames: sitData.frames, palette: sitData.palette, padTop: sitData.padTop ?? 0 } : null;
+
 // The hands in a frame (walk frame or the idle portrait): skin-coloured
 // blobs from the shirt's top row down to a little below it (lower ones are
 // the knees), as cell centres [col, row], left to right. What a held item

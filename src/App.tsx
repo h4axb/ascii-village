@@ -670,10 +670,9 @@ const LANDING_FADE_MS = 500;
 // assumes; a rotated one turns about the art's own centre on the centre of its
 // rotated tile box, the box collision and footprint use) and its depth. Used
 // by the game's entity map and the start screen's live view alike.
-// the ground's pixel grid: blocks per text line (PlayerShadow's CELL_ASPECT),
-// snapped to half a block (the shadows' pixel square)
+// the ground's pixel grid: blocks (1ch x 1ch squares) per text line
+// (PlayerShadow's CELL_ASPECT)
 const GROUND_PER_LINE = 14 / 8.4;
-const snapHalf = (v: number) => Math.round(v * 2) / 2;
 const SHADOW_COLOR = () => themeSwatch('player.shadow');
 // A fence piece's or gate's contact shadow: the glyph columns of its feet
 // (its bottom rows) as runs, gaps under 2 glyphs bridged, so a picket fence
@@ -6637,19 +6636,19 @@ function Game() {
                 );
               })}
               {/* fence pieces' and gates' contact shadows: one row of
-                  ground-grid pixel squares under their feet, all in one
+                  whole ground squares at their feet, all in one
                   layer (one opacity) so overlapping pieces stay even */}
               <div className="fence-shadows" style={{ '--fence-shadow': SHADOW_COLOR() } as React.CSSProperties}>
                 {ents
                   .filter((e) => (e.kind === 'fence' || e.kind === 'gate') && !e.rotation)
                   .flatMap((e) => {
                     const k = e.scale ?? 1;
-                    // the pixel row the piece's bottom edge falls in: the
-                    // shadow sits right at its bottom, never below it
-                    const top = Math.floor((e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE * 2) / 2;
+                    // one full ground square tall: the square row the
+                    // piece's bottom edge falls in, so it covers its feet
+                    const top = Math.floor((e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE);
                     return fenceShadowRuns(e.sprite).map(([c0, c1], i) => {
-                      const x0 = snapHalf(e.x * TILE_CH + (c0 - 0.5) * k);
-                      const x1 = Math.max(x0 + 0.5, snapHalf(e.x * TILE_CH + (c1 + 0.5) * k));
+                      const x0 = Math.floor(e.x * TILE_CH + c0 * k);
+                      const x1 = Math.max(x0 + 1, Math.ceil(e.x * TILE_CH + c1 * k));
                       return <i key={`${e.id}-${i}`} style={{ left: `${x0}ch`, width: `${x1 - x0}ch`, top: `${top}ch` }} />;
                     });
                   })}

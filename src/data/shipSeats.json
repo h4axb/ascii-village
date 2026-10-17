@@ -1,1 +1,92 @@
-{}
+{
+  "boat-galleon": {
+    "mitchyLand": {
+      "x": 0.303,
+      "y": 0.699
+    },
+    "mitchyFinal": {
+      "x": 0.7,
+      "y": 0.717
+    },
+    "playerLand": {
+      "x": 0.298,
+      "y": 0.689
+    },
+    "playerFinal": {
+      "x": 0.503,
+      "y": 0.721
+    }
+  },
+  "boat-pirate-ship": {
+    "mitchyLand": {
+      "x": 0.224,
+      "y": 0.663
+    },
+    "mitchyFinal": {
+      "x": 0.853,
+      "y": 0.676
+    },
+    "playerLand": {
+      "x": 0.226,
+      "y": 0.663
+    },
+    "playerFinal": {
+      "x": 0.573,
+      "y": 0.735
+    }
+  },
+  "boat-shark-ship": {
+    "mitchyLand": {
+      "x": 0.32,
+      "y": 0.738
+    },
+    "mitchyFinal": {
+      "x": 0.69,
+      "y": 0.823
+    },
+    "playerLand": {
+      "x": 0.325,
+      "y": 0.741
+    },
+    "playerFinal": {
+      "x": 0.445,
+      "y": 0.82
+    }
+  },
+  "boat-turtle-ship": {
+    "mitchyLand": {
+      "x": 0.402,
+      "y": 0.317
+    },
+    "mitchyFinal": {
+      "x": 0.789,
+      "y": 0.361
+    },
+    "playerLand": {
+      "x": 0.402,
+      "y": 0.317
+    },
+    "playerFinal": {
+      "x": 0.551,
+      "y": 0.358
+    }
+  },
+  "default": {
+    "mitchyLand": {
+      "x": 0.218,
+      "y": 0.538
+    },
+    "mitchyFinal": {
+      "x": 0.762,
+      "y": 0.557
+    },
+    "playerLand": {
+      "x": 0.231,
+      "y": 0.5
+    },
+    "playerFinal": {
+      "x": 0.381,
+      "y": 0.576
+    }
+  }
+}

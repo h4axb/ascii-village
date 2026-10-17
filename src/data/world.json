@@ -610,9 +610,72 @@
     {
       "id": "bench-1",
       "asset": "bench",
-      "x": 30.875,
-      "y": 56.875,
+      "x": 31.75,
+      "y": 50.26,
       "scale": 0.13
+    },
+    {
+      "id": "bush-simple-5",
+      "asset": "bush-simple",
+      "x": 28.88,
+      "y": 53.63,
+      "scale": 0.3
+    },
+    {
+      "id": "bush-simple-6",
+      "asset": "bush-simple",
+      "x": 35.13,
+      "y": 48.75,
+      "scale": 0.3
+    },
+    {
+      "id": "flowerplus-7",
+      "asset": "flowerplus",
+      "x": 35.125,
+      "y": 57.125,
+      "scale": 0.5
+    },
+    {
+      "id": "grasshalm-14",
+      "asset": "grasshalm",
+      "x": 38.75,
+      "y": 49.625,
+      "scale": 0.2
+    },
+    {
+      "id": "grasshalm-15",
+      "asset": "grasshalm",
+      "x": 25.25,
+      "y": 53,
+      "scale": 0.2
+    },
+    {
+      "id": "bush-1-1",
+      "asset": "bush-1",
+      "x": 36.375,
+      "y": 65.125,
+      "scale": 0.26
+    },
+    {
+      "id": "flowerplus-orange-2",
+      "asset": "flowerplus-orange",
+      "x": 34.75,
+      "y": 66.25,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-orange-3",
+      "asset": "flowerplus-orange",
+      "x": 33.75,
+      "y": 67.875,
+      "scale": 0.5
+    },
+    {
+      "id": "flowerplus-orange-4",
+      "asset": "flowerplus-orange",
+      "x": 34.625,
+      "y": 67.375,
+      "scale": 0.5
     }
   ],
   "colliders": {

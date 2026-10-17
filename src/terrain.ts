@@ -859,7 +859,7 @@ export function terrainField(): TerrainField {
   };
   const { kind, glyph } = F;
   for (let y = 0; y < GROUND_H; y++) for (let x = 0; x < GROUND_W; x++) computeCell(F, x, y);
-  // Mosaic: its own grid of SQUARE blocks, WORLD_ASPECT (2) rows per
+  // Mosaic: its own grid of SQUARE blocks, WORLD_ASPECT (5/3) rows per
   // character row, so each block is one cell wide and one cell-width tall
   // instead of one tall rectangle per cell. Same colour field, sampled at the block centres, each
   // block slightly varied like a painted tile.

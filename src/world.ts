@@ -1539,14 +1539,14 @@ export function grassKeepOut(window: number): Uint8Array {
 // ===========================================================================
 // THE FOUR KNOBS. All four are in units you can SEE, and none of them disturbs
 // the others — change one and the rest hold. That matters because a character
-// cell is not square (font.ts WORLD_ASPECT: twice as tall as wide), so raw noise numbers do not mean
+// cell is not square (font.ts WORLD_ASPECT: 5/3 as tall as wide), so raw noise numbers do not mean
 // what they look like: equal frequency per axis gives regions 1.67x TALLER
 // than wide, and equal drift per axis gives motion 1.67x faster vertically.
 // Every conversion below exists to cancel that out.
 // ===========================================================================
 const CELL_H = 14;
 const CELL_W = CELL_H / WORLD_ASPECT; // px, one character cell in the world's design proportions
-const ASPECT = WORLD_ASPECT; // 2 — the correction factor everywhere below
+const ASPECT = WORLD_ASPECT; // 1.667 — the correction factor everywhere below
 
 // How magnified the whole picture is. 1 = the reference exactly.
 const OCEAN_ZOOM = 2.5;
@@ -1601,8 +1601,8 @@ export const OCEAN_CFG = {
   //
   // Reference: scrollX = t*0.007, scrollY = t*0.010 — an oblique bottom-to-top
   // scroll, mostly upward with a leftward lean. In SCREEN terms that lean is
-  // weak: because a cell is twice as tall as it is wide, those numbers come
-  // out 2.86x faster VERTICALLY than horizontally, so it reads as "up, tilted"
+  // weak: because a cell is 5/3 as tall as it is wide, those numbers come out
+  // 2.38x faster VERTICALLY than horizontally, so it reads as "up, tilted"
   // rather than as a real diagonal.
   //
   // Both values here come from OCEAN_RAKE and DRIFT_Y above — see the note

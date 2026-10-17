@@ -1,5 +1,6 @@
 Sarasa Mono SC 0.36.0 (subset: sarasa-mono-regular.woff2, sarasa-mono-bold.woff2;
-made by scripts/subset-font.py)
+made by scripts/subset-font.py, which also widens every character's cell to
+0.6em, the glyph shapes unchanged)
 
 Copyright (c) 2015-2022, Renzhi Li (aka. Belleve Invis, belleve@typeof.net).
 Portions Copyright (c) 2016-2020 The Inter Project Authors.

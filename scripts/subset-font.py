@@ -21,6 +21,11 @@ Checks:
     glyph spills into its neighbours).
 Ligatures are left out of the subset, so '->' or '==' in a sprite stay two
 characters.
+
+Widened: Sarasa's characters are 0.5em wide, but the game was drawn and
+tuned for a 0.6em cell (every sprite, the terrain grid, the camera). So every
+glyph keeps its shape and gets a 0.6em-wide cell, centred in it (WIDEN): the
+grid comes out exactly as the art was made for, in Sarasa's letters.
 """
 import glob
 import io
@@ -40,6 +45,8 @@ OUT = os.path.join(ROOT, 'src', 'fonts')
 PKG = '@fontpkg/sarasa-mono-sc'
 VERSION = '0.36.0'
 FACES = {'regular': 'sarasa-mono-sc-regular.ttf', 'bold': 'sarasa-mono-sc-bold.ttf'}
+# a column's width after widening: 0.6em (src/font.ts CH_EM)
+WIDEN = 1.2
 
 # always in, whatever the source says today: Basic Latin, Latin-1, general
 # punctuation, arrows, maths operators, box drawing, block elements, geometric
@@ -130,6 +137,33 @@ def emit_chars():
     return out
 
 
+def widen(font):
+    """Every glyph's advance x WIDEN, its outline centred in the wider cell."""
+    glyf, hmtx = font['glyf'], font['hmtx']
+    shift = {}
+    for name in font.getGlyphOrder():
+        adv, _ = hmtx[name]
+        new = round(adv * WIDEN)
+        shift[name] = (new - adv) // 2
+        hmtx[name] = (new, hmtx[name][1])
+    # simple glyphs move by their own shift; a composite's parts were already
+    # moved with their own glyphs, so they only take the difference
+    for name in font.getGlyphOrder():
+        g = glyf[name]
+        if g.isComposite():
+            for c in g.components:
+                c.x += shift[name] - shift.get(c.glyphName, 0)
+        elif g.numberOfContours > 0:
+            g.coordinates.translate((shift[name], 0))
+    for name in font.getGlyphOrder():
+        g = glyf[name]
+        if g.numberOfContours != 0:
+            g.recalcBounds(glyf)
+            hmtx[name] = (hmtx[name][0], g.xMin)
+    font['hhea'].advanceWidthMax = max(a for a, _ in hmtx.metrics.values())
+    font['OS/2'].xAvgCharWidth = round(font['OS/2'].xAvgCharWidth * WIDEN)
+
+
 def main():
     src = sys.argv[1] if len(sys.argv) > 1 else fetch(tempfile.mkdtemp(prefix='sarasa-'))
     used = source_chars()
@@ -182,6 +216,7 @@ def main():
         sub = subset.Subsetter(opts)
         sub.populate(unicodes=wanted)
         sub.subset(font)
+        widen(font)
         dest = os.path.join(OUT, f'sarasa-mono-{face}.woff2')
         font.flavor = 'woff2'
         font.save(dest)

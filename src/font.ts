@@ -10,17 +10,14 @@ import boldUrl from './fonts/sarasa-mono-bold.woff2';
 
 export const FONT_FAMILY = 'Sarasa Mono';
 
-// The bundled face first; then a locally installed Sarasa; then the
-// emergency faces (styles.css "Sarasa Fallback …"), each a system monospace
-// scaled to Sarasa's 0.5em width and given Sarasa's line metrics, so the grid
-// holds even if only the glyph shapes differ. Keep the CSS default for
-// --game-font (styles.css :root) the same.
+// The bundled face first; then the emergency faces (styles.css "Sarasa
+// Fallback …"), each a system monospace scaled to the 0.6em cell and given
+// Sarasa's line metrics, so the grid holds even if only the glyph shapes
+// differ. (A locally installed Sarasa isn't listed: its 0.5em cells would
+// squeeze the grid.) Keep the CSS default for --game-font (styles.css :root)
+// the same.
 export const GAME_FONT = [
   `'${FONT_FAMILY}'`,
-  "'Sarasa Mono SC'",
-  "'Sarasa Fixed SC'",
-  "'Sarasa Term SC'",
-  "'Sarasa Fallback Iosevka'",
   "'Sarasa Fallback Cascadia'",
   "'Sarasa Fallback Consolas'",
   "'Sarasa Fallback Menlo'",
@@ -29,17 +26,16 @@ export const GAME_FONT = [
   'monospace',
 ].join(', ');
 
-// a character's width in em: an invariant of the bundled font (checked by
-// scripts/subset-font.py for every sprite glyph), not a stand-in for
-// measuring
-export const CH_EM = 0.5;
+// a character's width in em: an invariant of the bundled font (Sarasa's
+// 0.5em glyphs centred in 0.6em cells by scripts/subset-font.py, the cell
+// every sprite and the terrain were drawn for), not a stand-in for measuring
+export const CH_EM = 0.6;
 
-// How much taller a text line is than a character is wide (1 / CH_EM): a
-// line is this many ground rows tall, so the terrain's blocks are true 1:1
-// squares, and the shapes built on that (ocean noise, bush clumps, minimap
-// cells, the diagonal walk speed, the player's and fences' shadows) use the
-// same number. (It was 14 / 8.4, from a 0.6em font, until the game bundled
-// its 0.5em one.)
+// How much taller a text line is than a character is wide (1 / CH_EM, 5/3):
+// a line is this many ground rows tall, so the terrain's blocks are true 1:1
+// squares (8.4 px at the 14 px font), and the shapes built on that (ocean
+// noise, bush clumps, minimap cells, the diagonal walk speed, the player's
+// and fences' shadows) use the same number.
 export const WORLD_ASPECT = 1 / CH_EM;
 
 // --game-font for the CSS, from the one copy above

@@ -606,6 +606,18 @@
       "x": 40.64,
       "y": 15.76,
       "scale": 0.08
+    },
+    {
+      "id": "bench-1",
+      "asset": "bench",
+      "x": 28.38,
+      "y": 54.5,
+      "scale": 0.12,
+      "look": {
+        "sat": 113,
+        "bright": 115,
+        "tint": 2
+      }
     }
   ],
   "colliders": {

@@ -1325,10 +1325,9 @@ function Game() {
   const [doors, setDoors] = useState<Doors>(() => saved?.doors ?? { gate: false });
   // the fence gates standing open (src/fence.ts): F opens and closes one
   const [openGates, setOpenGates] = useState<ReadonlySet<string>>(() => new Set(saved?.openGates ?? []));
-  // the bench the player sits on (src/seats.ts; sitDown below): where they
-  // stood before, to step back to on getting up. Not saved: a reload starts
-  // standing.
-  const [sitting, setSitting] = useState<{ id: string; stand: { x: number; y: number } } | null>(null);
+  // the bench the player sits on (src/seats.ts; sitDown below) and the spot
+  // in front of it they get up to. Not saved: a reload starts standing.
+  const [sitting, setSitting] = useState<{ id: string; front: { x: number; y: number } } | null>(null);
   const sittingRef = useRef(sitting);
   sittingRef.current = sitting;
   const sitBusyRef = useRef(false); // walking onto the seat
@@ -2128,7 +2127,7 @@ function Game() {
     // seated: a move key gets up first (the next step, key still held, walks)
     if (sitBusyRef.current) return false;
     if (sittingRef.current) {
-      standUp();
+      void standUp();
       return false;
     }
     const p = playerRef.current;
@@ -2672,7 +2671,19 @@ function Game() {
   // only — it never calls writeSave/any persistence function; the save
   // stays exclusively a Settings -> Save Game action.
   function finishIntro() {
+    if (sittingRef.current) void standUp(true); // a skip mid-intro
     setIntroDone(true);
+  }
+  // The bench the intro starts on: the nearest one to PLAYER START, within
+  // 10 tiles (none: the player starts standing there, as before)
+  function introBench(at: Pt): Ent | null {
+    let best: { e: Ent; d: number } | null = null;
+    for (const e of entsRef.current) {
+      if (e.kind !== 'bench' || !seatOf(e.asset ?? e.kind)) continue;
+      const d = Math.hypot(e.x - at.x, e.y - at.y);
+      if (d <= 10 && (!best || d < best.d)) best = { e, d };
+    }
+    return best?.e ?? null;
   }
 
   async function runIntro(markers: {
@@ -2707,6 +2718,9 @@ function Game() {
     };
     mitchyPosRef.current = entranceStart;
     setMitchyPos(entranceStart);
+    // the player wakes up sitting on the bench by PLAYER START
+    const bench = introBench(markers.playerStart);
+    if (bench) seatAt(bench);
 
     setDialogue({ speaker: UNKNOWN_SPEAKER, text: WAKE_LINE });
     await sleepOrAdvance(BLACK_SCREEN_MS);
@@ -2722,6 +2736,8 @@ function Game() {
     await sleep(EYE_OPEN_MS);
     await entrancePromise;
     await mitchyHop();
+    // Mitchy's here: the player gets up off the bench to talk
+    if (sittingRef.current) await standUp(skipCinematicRef.current);
 
     for (const line of MITCHY_INTRO_LINES) {
       setDialogue({ speaker: line.speaker, text: line.text });
@@ -3258,30 +3274,98 @@ function Game() {
     const cx = lo <= hi ? Math.max(lo, Math.min(hi, pc)) : (lo + hi) / 2;
     return { x: cx - half, y: e.y + a.y1 * hT - feet };
   }
+  // Where the player stands in front of `e` to sit down (and lands when
+  // getting up): the first row below the bench, under the seat spot, the
+  // nearest free one along it
+  function benchFront(e: Ent, seat: Pt): Pt {
+    const hT = (e.sprite.length * (e.scale ?? 1)) / TILE_LN;
+    const y = Math.ceil(e.y + hT) - PLAYER_T.hT + 1;
+    const x = Math.round(seat.x);
+    for (const dx of [0, -1, 1, -2, 2, -3, 3]) if (!blocked(x + dx, y, e.id)) return { x: x + dx, y };
+    return { x, y };
+  }
+  // A short walk on free tiles (breadth-first, 4-way, within 12 tiles):
+  // the steps from the player's tile to `to`, or null when there's no way
+  function walkPath(to: Pt, ignore?: string): Pt[] | null {
+    const p = playerRef.current;
+    const from = { x: Math.round(p.x), y: Math.round(p.y) };
+    const key = (q: Pt) => `${q.x},${q.y}`;
+    const prev = new Map<string, Pt | null>([[key(from), null]]);
+    const queue: Pt[] = [from];
+    while (queue.length) {
+      const q = queue.shift()!;
+      if (q.x === to.x && q.y === to.y) {
+        const path: Pt[] = [];
+        for (let c: Pt | null = q; c && key(c) !== key(from); c = prev.get(key(c)) ?? null) path.unshift(c);
+        return path;
+      }
+      for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        const n = { x: q.x + dx, y: q.y + dy };
+        if (prev.has(key(n)) || Math.abs(n.x - from.x) > 12 || Math.abs(n.y - from.y) > 12) continue;
+        if (blocked(n.x, n.y, ignore) && !(n.x === to.x && n.y === to.y)) continue;
+        prev.set(key(n), q);
+        queue.push(n);
+      }
+    }
+    return null;
+  }
+  // Sit on a bench: walk round to its front, then hop up onto the seat;
+  // seated again: get up
   async function sitDown(e: Ent) {
     if (sittingRef.current) return standUp();
-    const to = seatSpot(e);
-    if (!to || sitBusyRef.current) return;
+    const seat = seatSpot(e);
+    if (!seat || sitBusyRef.current) return;
     sitBusyRef.current = true;
-    const s = { id: e.id, stand: { ...playerRef.current } };
+    const front = benchFront(e, seat);
+    const path = walkPath(front, e.id);
+    if (path) {
+      const ms = 1000 / 6;
+      for (const step of path) {
+        const p = playerRef.current;
+        const dir: WalkDir = step.y < p.y ? 'up' : step.y > p.y ? 'down' : step.x < p.x ? 'left' : 'right';
+        if (walkDirRef.current !== dir) {
+          walkDirRef.current = dir;
+          setWalkDir(dir);
+          setWalkFrame(1);
+        }
+        questStepPlayer(step.x, step.y, ms + 25);
+        await sleep(ms);
+      }
+      walkDirRef.current = null;
+      setWalkDir(null);
+    } else await questGlidePlayer(front, 6);
+    await playerJumpTo(seatSpot(e) ?? seat, true);
+    // seated: the sit frames (sprites.ts SIT_ANIM) play once, the last stays
+    const s = { id: e.id, front };
     sittingRef.current = s;
     setSitting(s);
     setSitFrame(0);
-    await questGlidePlayer(to, 5);
     sitBusyRef.current = false;
-    // the sit frames (sprites.ts SIT_ANIM) play once, the last one stays
     const n = S.SIT_ANIM?.frames.length ?? 0;
     for (let i = 1; i < n && sittingRef.current === s; i++) {
       await sleep(120);
       if (sittingRef.current === s) setSitFrame(i);
     }
   }
-  function standUp() {
+  // Get up: a hop down to the bench's front (instant when `now`)
+  async function standUp(now = false) {
     const s = sittingRef.current;
     if (!s || sitBusyRef.current) return;
     sittingRef.current = null;
     setSitting(null);
-    questStepPlayer(s.stand.x, s.stand.y, 220);
+    if (now) questStepPlayer(s.front.x, s.front.y, 0);
+    else await playerJumpTo(s.front);
+  }
+  // Seated on `e` at once, no walk (the intro's start)
+  function seatAt(e: Ent) {
+    const seat = seatSpot(e);
+    if (!seat) return false;
+    const s = { id: e.id, front: benchFront(e, seat) };
+    sittingRef.current = s;
+    setSitting(s);
+    setSitFrame(Math.max(0, (S.SIT_ANIM?.frames.length ?? 1) - 1));
+    questStepPlayer(seat.x, seat.y, 0);
+    return true;
   }
 
   // The walkable spot (a w×h footprint on land, clear for the player) right

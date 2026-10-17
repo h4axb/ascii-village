@@ -5,6 +5,12 @@
 # scripts/bake-bench.mjs: every patch of near-white is background (the
 # outside and the gaps between the backrest's slats; the blanket's cream is
 # darker than the threshold, so it stays), then cropped to the bench.
+# Then made to fit the game's look:
+#   - no black outline: the near-black pixels that touch the outside go
+#     (the outline round the bench and its legs; dark shading inside stays)
+#   - the game's colours: every colour a little less saturated and lifted,
+#     so the wood reads like the fences' and the house's weathered browns and
+#     the blanket's red like the game's dusty rose
 #
 #   python3 scripts/cut-bench.py <outdir>
 # ---------------------------------------------------------------------------
@@ -41,6 +47,57 @@ for sy, sx in zip(*np.nonzero(light)):
 alpha = np.where(bg, 0, 255).astype(np.uint8)
 ys, xs = np.nonzero(alpha)
 y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-rgba = np.dstack([a.astype(np.uint8), alpha])[y0:y1, x0:x1]
+a, bg = a[y0:y1, x0:x1], bg[y0:y1, x0:x1]
+
+# down to the art's own pixels (it is pixel art, ~17 px each): one clean
+# colour per art pixel, transparent where mostly background
+COLS, ROWS = 60, 40
+H, W = bg.shape
+art = np.zeros((ROWS, COLS, 3), int)
+solid = np.zeros((ROWS, COLS), bool)
+for r in range(ROWS):
+    for c in range(COLS):
+        ys0, ys1 = r * H // ROWS, (r + 1) * H // ROWS
+        xs0, xs1 = c * W // COLS, (c + 1) * W // COLS
+        m = ~bg[ys0:ys1, xs0:xs1]
+        if m.mean() > 0.5:
+            solid[r, c] = True
+            art[r, c] = np.median(a[ys0:ys1, xs0:xs1][m], axis=0)
+
+# no black outline: the near-black art pixels on the outside edge go (two
+# rings: the outline is up to two art pixels thick; the bench's own dark
+# shading further in stays)
+OUTLINE = 60
+removed = 0
+for _ in range(2):
+    edge = np.zeros_like(solid)
+    for r in range(ROWS):
+        for c in range(COLS):
+            if not solid[r, c] or art[r, c].max() >= OUTLINE:
+                continue
+            for nr, nc in ((r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1)):
+                if not (0 <= nr < ROWS and 0 <= nc < COLS) or not solid[nr, nc]:
+                    edge[r, c] = True
+    solid &= ~edge
+    removed += int(edge.sum())
+
+# the game's colours: saturation down, value lifted a touch, so the wood
+# reads like the fences' and the house's weathered browns and the blanket's
+# red like the game's dusty rose
+SAT, LIFT = 0.62, 0.08
+f = art / 255.0
+mx, mn = f.max(axis=2, keepdims=True), f.min(axis=2, keepdims=True)
+grey = (mx + mn) / 2
+f = grey + (f - grey) * SAT
+f = f * (1 - LIFT) + LIFT
+art = (f.clip(0, 1) * 255).round().astype(np.uint8)
+
+# back up to a clean bitmap for the baker: CELL px per art pixel
+CELL = 8
+rgba = np.zeros((ROWS * CELL, COLS * CELL, 4), np.uint8)
+for r in range(ROWS):
+    for c in range(COLS):
+        if solid[r, c]:
+            rgba[r * CELL:(r + 1) * CELL, c * CELL:(c + 1) * CELL] = [*art[r, c], 255]
 Image.fromarray(rgba, 'RGBA').save(f'{OUT}/bench.png')
-print('bench', (x1 - x0, y1 - y0), 'box in the reference', (x0, y0, x1, y1))
+print('bench', (COLS, ROWS), 'art pixels;', removed, 'outline pixels removed')

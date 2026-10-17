@@ -610,14 +610,9 @@
     {
       "id": "bench-1",
       "asset": "bench",
-      "x": 28.38,
-      "y": 54.5,
-      "scale": 0.12,
-      "look": {
-        "sat": 113,
-        "bright": 115,
-        "tint": 2
-      }
+      "x": 30.875,
+      "y": 56.875,
+      "scale": 0.13
     }
   ],
   "colliders": {

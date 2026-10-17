@@ -109,21 +109,21 @@
     {
       "id": "bush-simple-2",
       "asset": "bush-simple",
-      "x": 41,
-      "y": 13,
+      "x": 41.88,
+      "y": 13.5,
       "scale": 0.3
     },
     {
       "id": "bush-simple-3",
       "asset": "bush-simple",
-      "x": 45,
-      "y": 32,
+      "x": 43.25,
+      "y": 31.5,
       "scale": 0.3
     },
     {
       "id": "palm-1",
       "asset": "palm",
-      "x": 49,
+      "x": 48.38,
       "y": 8,
       "scale": 1
     },
@@ -131,7 +131,7 @@
       "id": "palm-2",
       "asset": "palm",
       "x": 46,
-      "y": 22,
+      "y": 20.38,
       "scale": 1
     },
     {

@@ -6635,25 +6635,33 @@ function Game() {
                   </div>
                 );
               })}
-              {/* fence pieces' and gates' contact shadows: one row of
-                  whole ground squares at their feet, all in one
+              {/* fence pieces' and gates' contact shadows: pixel ovals
+                  like the player's, at their feet, all in one
                   layer (one opacity) so overlapping pieces stay even */}
               <div className="fence-shadows" style={{ '--fence-shadow': SHADOW_COLOR() } as React.CSSProperties}>
                 {ents
                   .filter((e) => (e.kind === 'fence' || e.kind === 'gate') && !e.rotation)
                   .flatMap((e) => {
                     const k = e.scale ?? 1;
-                    // one full ground square tall, right at the piece's own
-                    // bottom edge (tucked a sliver under its feet): pieces
-                    // a pixel or two apart each keep theirs visible
-                    const top = (e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE - 0.2;
-                    return fenceShadowRuns(e.sprite).map(([c0, c1], i) => {
-                      // the feet's width to the nearest squares; one square
-                      // centred under anything narrower (a stick, a post)
+                    // built like the player's shadow (PlayerShadow): pixels
+                    // of half a ground square, snapped to that half-square
+                    // grid, a flat stepped oval two pixels tall under the
+                    // feet (the feet in its upper row, so most of it shows)
+                    const half = (v: number) => Math.round(v * 2) / 2;
+                    const top = half((e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE - 0.35);
+                    return fenceShadowRuns(e.sprite).flatMap(([c0, c1], i) => {
+                      // the feet plus half a pixel each side, at least two
+                      // pixels wide, centred on them
                       const a = e.x * TILE_CH + c0 * k, z = e.x * TILE_CH + c1 * k;
-                      let x0 = Math.round(a), x1 = Math.round(z);
-                      if (x1 - x0 < 1) (x0 = Math.round((a + z) / 2 - 0.5)), (x1 = x0 + 1);
-                      return <i key={`${e.id}-${i}`} style={{ left: `${x0}ch`, width: `${x1 - x0}ch`, top: `${top}ch` }} />;
+                      let x0 = half(a - 0.25), x1 = half(z + 0.25);
+                      if (x1 - x0 < 1) (x0 = half((a + z) / 2 - 0.5)), (x1 = x0 + 1);
+                      // upper row the full width, lower row stepped in a
+                      // pixel at each end (one pixel: a short run keeps it)
+                      const inset = x1 - x0 >= 2 ? 0.5 : 0;
+                      return [
+                        <i key={`${e.id}-${i}a`} style={{ left: `${x0}ch`, width: `${x1 - x0}ch`, top: `${top}ch` }} />,
+                        <i key={`${e.id}-${i}b`} style={{ left: `${x0 + inset}ch`, width: `${x1 - x0 - 2 * inset}ch`, top: `${top + 0.5}ch` }} />,
+                      ];
                     });
                   })}
               </div>

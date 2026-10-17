@@ -4941,18 +4941,19 @@ pre {
   margin: -7px 0 0 -7px;
 }
 
-/* fence pieces' and gates' contact shadows: one row of whole ground squares
-   (1:1) at their feet, in one layer just above the ground (one opacity,
-   so where pieces overlap the shadow stays even) */
+/* fence pieces' and gates' contact shadows, built like the player's: half-
+   square pixels on the half-square ground grid, a flat stepped oval at
+   their feet, in one layer just above the ground (one opacity, so where
+   pieces overlap the shadow stays even) */
 .fence-shadows {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  opacity: 0.38;
+  opacity: 0.3; /* the player's shadow's */
 }
 .fence-shadows > i {
   position: absolute;
-  height: 1ch; /* one full ground square */
+  height: 0.5ch; /* one pixel: half a ground square, as the player's shadow */
   background: var(--fence-shadow, #1c2a12);
 }

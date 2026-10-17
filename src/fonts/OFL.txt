@@ -1,11 +1,20 @@
-Sarasa Mono SC 0.36.0 (subset: sarasa-mono-regular.woff2, sarasa-mono-bold.woff2;
-made by scripts/subset-font.py, which also widens every character's cell to
-0.6em, the glyph shapes unchanged)
+The game's bundled fonts, made by scripts/subset-font.py: cut down to the
+characters the game uses and widened to a 0.6em character cell, the glyph
+shapes unchanged. Both are licensed under the SIL Open Font License 1.1,
+copied below.
 
-Copyright (c) 2015-2022, Renzhi Li (aka. Belleve Invis, belleve@typeof.net).
-Portions Copyright (c) 2016-2020 The Inter Project Authors.
-Portions Copyright (c) 2014, 2015 Adobe Systems Incorporated (http://www.adobe.com/).
-Portions Copyright (c) 2012 Google Inc.
+asciia-mono-400/500/600/700.woff2 ("Asciia Mono")
+  Modified from Cascadia Code (version 2407.024, via @fontsource/cascadia-code
+  5.3.0). Copyright (c) 2019 - Present, Microsoft Corporation, with Reserved
+  Font Name Cascadia Code. As a Modified Version it does not use the Reserved
+  Font Name and is called "Asciia Mono" instead.
+
+sarasa-mono-regular.woff2, sarasa-mono-bold.woff2 ("Sarasa Mono")
+  Modified from Sarasa Mono SC 0.36.0.
+  Copyright (c) 2015-2022, Renzhi Li (aka. Belleve Invis, belleve@typeof.net).
+  Portions Copyright (c) 2016-2020 The Inter Project Authors.
+  Portions Copyright (c) 2014, 2015 Adobe Systems Incorporated (http://www.adobe.com/).
+  Portions Copyright (c) 2012 Google Inc.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

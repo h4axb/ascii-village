@@ -1,31 +1,42 @@
 #!/usr/bin/env python3
-"""Cut Sarasa Mono SC down to the characters the game uses -> src/fonts/*.woff2.
+"""The game's two bundled fonts, cut down to the characters it uses:
+
+  Cascadia Code  the main font (src/fonts/asciia-mono-<weight>.woff2): the
+                 look the game was made in (Windows 11's own coding font).
+                 Its licence reserves the name "Cascadia Code" for the
+                 original, so this cut-down, widened copy is renamed
+                 "Asciia Mono" (OFL 1.1 condition 3)
+  Sarasa Mono    ONLY the fallback (src/fonts/sarasa-mono-<face>.woff2): it
+                 draws what Cascadia lacks (the ramp's ‡, the terrain's ∘, the
+                 sprites' ◆◇●◯※ …)
 
 Run when new characters show up in the game (the build doesn't need it):
 
     pip install fonttools brotli
-    python3 -I scripts/subset-font.py            # downloads the font itself
-    python3 -I scripts/subset-font.py <dir>      # or: a folder with the two .ttf
+    python3 -I scripts/subset-font.py                   # downloads both itself
+    python3 -I scripts/subset-font.py <sarasa> <cascadia>
+        # or: a folder with Sarasa's two .ttf, and an unpacked
+        # @fontsource/cascadia-code package
 
-The font is NOT a package dependency: the npm tarball of
-@fontpkg/sarasa-mono-sc is fetched into a temp folder, only Regular and Bold
-are used, and only the small woff2 files are committed.
+Neither font is a package dependency: their npm tarballs
+(@fontpkg/sarasa-mono-sc, @fontsource/cascadia-code) are fetched into a temp
+folder and only the small woff2 files are committed.
+
+Both are put on the game's 0.6em cell (src/font.ts CH_EM, the cell every
+sprite, the terrain grid and the camera were made for): every glyph keeps its
+shape and is centred in a cell that wide (Cascadia's own is 0.586em, Sarasa's
+0.5em), so a character from either font fills exactly one column.
 
 Checks:
   - fails if a character crafting or the terrain can emit (crafting's
     ALLOWED_CHARS, terrain GLYPHS, the reference baker's ramp and edge
-    glyphs) is missing or isn't ONE column wide
-    (500 / 1000 em), so the grid can't drift whatever the AI crafts;
+    glyphs) is in neither font one column wide, so the grid can't drift
+    whatever the AI crafts;
   - warns about sprite rows in src/data that use a wide or missing character
     (canvas sprites centre each glyph in its cell, so the grid holds, but the
     glyph spills into its neighbours).
-Ligatures are left out of the subset, so '->' or '==' in a sprite stay two
-characters.
-
-Widened: Sarasa's characters are 0.5em wide, but the game was drawn and
-tuned for a 0.6em cell (every sprite, the terrain grid, the camera). So every
-glyph keeps its shape and gets a 0.6em-wide cell, centred in it (WIDEN): the
-grid comes out exactly as the art was made for, in Sarasa's letters.
+Ligatures and contextual alternates are left out (Cascadia Code is full of
+them), so '->' or '==' in a sprite stay two characters.
 """
 import glob
 import io
@@ -38,15 +49,19 @@ import tempfile
 import urllib.request
 
 from fontTools import subset
+from fontTools.merge import Merger, Options as MergeOptions
 from fontTools.ttLib import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'src', 'fonts')
-PKG = '@fontpkg/sarasa-mono-sc'
-VERSION = '0.36.0'
-FACES = {'regular': 'sarasa-mono-sc-regular.ttf', 'bold': 'sarasa-mono-sc-bold.ttf'}
-# a column's width after widening: 0.6em (src/font.ts CH_EM)
-WIDEN = 1.2
+CELL = 0.6  # a column, in em (src/font.ts CH_EM)
+
+SARASA = ('@fontpkg/sarasa-mono-sc', '0.36.0')
+SARASA_FACES = {'regular': 'sarasa-mono-sc-regular.ttf', 'bold': 'sarasa-mono-sc-bold.ttf'}
+CASCADIA = ('@fontsource/cascadia-code', '5.3.0')
+CASCADIA_WEIGHTS = (400, 500, 600, 700)  # the weights the game's CSS uses
+# fontsource splits the font by script; these hold the game's characters
+CASCADIA_PARTS = ('latin', 'latin-ext', 'greek', 'symbols2')
 
 # always in, whatever the source says today: Basic Latin, Latin-1, general
 # punctuation, arrows, maths operators, box drawing, block elements, geometric
@@ -60,16 +75,51 @@ RANGES = [
 GRID_KEYS = {'sprite', 'solid', 'grid', 'base', 'frond'}
 
 
-def fetch(tmp):
-    meta = json.load(urllib.request.urlopen(f'https://registry.npmjs.org/{PKG}/{VERSION}'))
-    print('downloading', meta['dist']['tarball'], '(~130 MB, once)')
-    data = urllib.request.urlopen(meta['dist']['tarball']).read()
-    with tarfile.open(fileobj=io.BytesIO(data)) as tar:
-        for f in FACES.values():
-            m = tar.getmember('package/' + f)
+def tarball(pkg):
+    name, version = pkg
+    meta = json.load(urllib.request.urlopen(f'https://registry.npmjs.org/{name}/{version}'))
+    print('downloading', meta['dist']['tarball'])
+    return tarfile.open(fileobj=io.BytesIO(urllib.request.urlopen(meta['dist']['tarball']).read()))
+
+
+def fetch_sarasa(tmp):
+    with tarball(SARASA) as tar:
+        for f in SARASA_FACES.values():
             with open(os.path.join(tmp, f), 'wb') as out:
-                out.write(tar.extractfile(m).read())
+                out.write(tar.extractfile(tar.getmember('package/' + f)).read())
     return tmp
+
+
+def fetch_cascadia(tmp):
+    with tarball(CASCADIA) as tar:
+        tar.extractall(tmp, members=[m for m in tar.getmembers() if m.name.startswith('package/files/') and m.name.endswith('-normal.woff2')])
+    return os.path.join(tmp, 'package')
+
+
+def cascadia(pkgdir, weight):
+    """One Cascadia Code weight, its script parts merged into one font."""
+    tmp = tempfile.mkdtemp(prefix='cascadia-')
+    paths = []
+    for part in CASCADIA_PARTS:
+        f = TTFont(os.path.join(pkgdir, 'files', f'cascadia-code-{part}-{weight}-normal.woff2'))
+        # no ligatures / alternates, no hinting: the merge can't join those
+        for t in ('GSUB', 'GPOS', 'GDEF', 'STAT', 'fpgm', 'prep', 'cvt ', 'gasp'):
+            if t in f:
+                del f[t]
+        f.flavor = None
+        paths.append(os.path.join(tmp, f'{part}.ttf'))
+        f.save(paths[-1])
+    return Merger(options=MergeOptions(drop_tables=['vhea', 'vmtx'])).merge(paths)
+
+
+def one_column(font, ch):
+    cmap = font.getBestCmap()
+    return ord(ch) in cmap and font['hmtx'][cmap[ord(ch)]][0] == base_width(font)
+
+
+def base_width(font):
+    """The font's own column width (its 'M')."""
+    return font['hmtx'][font.getBestCmap()[ord('M')]][0]
 
 
 def source_chars():
@@ -138,12 +188,13 @@ def emit_chars():
 
 
 def widen(font):
-    """Every glyph's advance x WIDEN, its outline centred in the wider cell."""
+    """Every glyph centred in a cell CELL em wide (a two-column glyph in two)."""
     glyf, hmtx = font['glyf'], font['hmtx']
+    k = CELL * font['head'].unitsPerEm / base_width(font)
     shift = {}
     for name in font.getGlyphOrder():
         adv, _ = hmtx[name]
-        new = round(adv * WIDEN)
+        new = round(adv * k)
         shift[name] = (new - adv) // 2
         hmtx[name] = (new, hmtx[name][1])
     # simple glyphs move by their own shift; a composite's parts were already
@@ -161,11 +212,36 @@ def widen(font):
             g.recalcBounds(glyf)
             hmtx[name] = (hmtx[name][0], g.xMin)
     font['hhea'].advanceWidthMax = max(a for a, _ in hmtx.metrics.values())
-    font['OS/2'].xAvgCharWidth = round(font['OS/2'].xAvgCharWidth * WIDEN)
+    font['OS/2'].xAvgCharWidth = round(font['OS/2'].xAvgCharWidth * k)
+
+
+def rename(font, old, new):
+    """The font's own names (family, full, PostScript) from `old` to `new`."""
+    for rec in font['name'].names:
+        if rec.nameID in (1, 3, 4, 6, 16, 17, 21, 22):
+            s = rec.toUnicode()
+            rec.string = s.replace(old, new).replace(old.replace(' ', ''), new.replace(' ', ''))
+
+
+def cut(font, wanted, dest):
+    opts = subset.Options()
+    # no ligatures or contextual alternates: a sprite's '->' stays two cells
+    opts.layout_features = ['ccmp', 'locl', 'kern', 'mark', 'mkmk']
+    opts.name_IDs = ['*']
+    opts.notdef_outline = True
+    opts.hinting = False
+    sub = subset.Subsetter(opts)
+    sub.populate(unicodes=wanted & set(font.getBestCmap()))
+    sub.subset(font)
+    widen(font)
+    font.flavor = 'woff2'
+    font.save(dest)
+    print(f'{os.path.relpath(dest, ROOT)}: {len(font.getBestCmap())} chars, {os.path.getsize(dest) // 1024} KB')
 
 
 def main():
-    src = sys.argv[1] if len(sys.argv) > 1 else fetch(tempfile.mkdtemp(prefix='sarasa-'))
+    sarasa_dir = sys.argv[1] if len(sys.argv) > 1 else fetch_sarasa(tempfile.mkdtemp(prefix='sarasa-'))
+    cascadia_dir = sys.argv[2] if len(sys.argv) > 2 else fetch_cascadia(tempfile.mkdtemp(prefix='cascadia-'))
     used = source_chars()
     data = data_chars()
     grid = emit_chars()
@@ -173,54 +249,39 @@ def main():
     for a, b in RANGES:
         wanted.update(range(a, b + 1))
 
+    casc = {w: cascadia(cascadia_dir, w) for w in CASCADIA_WEIGHTS}
+    sara = {face: TTFont(os.path.join(sarasa_dir, f)) for face, f in SARASA_FACES.items()}
+    main_font, fallback = casc[400], sara['regular']
     bad = []
-    for face, fname in FACES.items():
-        font = TTFont(os.path.join(src, fname), lazy=True)
-        cmap = font.getBestCmap()
-        hmtx = font['hmtx']
-        upm = font['head'].unitsPerEm
-        for ch, f in sorted(grid.items()):
-            if ord(ch) not in cmap:
-                bad.append(f'{face}: sprite char {ch!r} (U+{ord(ch):04X}, {f}) is not in the font')
-            elif hmtx[cmap[ord(ch)]][0] * 2 != upm:
-                bad.append(f'{face}: sprite char {ch!r} (U+{ord(ch):04X}, {f}) is not one column wide')
-        if face == 'regular':
-            for ch, f in sorted(data.items()):
-                if ch not in grid and (ord(ch) not in cmap or hmtx[cmap[ord(ch)]][0] * 2 != upm):
-                    print(f'warning: sprite char {ch!r} (U+{ord(ch):04X}, {f}) is '
-                          + ('not in the font' if ord(ch) not in cmap else 'two columns wide'))
-        for ch, f in sorted(used.items()):
-            # emoji and other symbols the UI draws are fine from a system font;
-            # private-use characters are colour keys, never drawn
-            if ord(ch) not in cmap and ord(ch) < 0x1F000 and ord(ch) not in (0xFE0F, 0x200D, 0xFEFF) and not 0xE000 <= ord(ch) <= 0xF8FF:
-                print(f'note: {ch!r} (U+{ord(ch):04X}, {f}) is not in Sarasa; a system font draws it')
-        if face == 'regular':
-            os2 = font['OS/2']
-            print(f'metrics: upm {upm}, typo ascender {os2.sTypoAscender}, descender {os2.sTypoDescender}, '
-                  f'line gap {os2.sTypoLineGap} (fallback overrides in styles.css)')
-        font.close()
+    for ch, f in sorted(grid.items()):
+        if not (one_column(main_font, ch) or (ord(ch) not in main_font.getBestCmap() and one_column(fallback, ch))):
+            bad.append(f'sprite char {ch!r} (U+{ord(ch):04X}, {f}) is in neither font one column wide')
+    for ch, f in sorted(data.items()):
+        if ch in grid:
+            continue
+        drawn_by = main_font if ord(ch) in main_font.getBestCmap() else fallback
+        if not one_column(drawn_by, ch):
+            print(f'warning: sprite char {ch!r} (U+{ord(ch):04X}, {f}) is '
+                  + ('in neither font' if ord(ch) not in drawn_by.getBestCmap() else 'two columns wide'))
+    for ch, f in sorted(used.items()):
+        # emoji and other symbols the UI draws are fine from a system font;
+        # private-use characters are colour keys, never drawn
+        if (ord(ch) not in main_font.getBestCmap() and ord(ch) not in fallback.getBestCmap() and ord(ch) < 0x1F000
+                and ord(ch) not in (0xFE0F, 0x200D, 0xFEFF) and not 0xE000 <= ord(ch) <= 0xF8FF):
+            print(f'note: {ch!r} (U+{ord(ch):04X}, {f}) is in neither font; a system font draws it')
     if bad:
         print('\n'.join(bad))
-        sys.exit('subset-font: fix the characters above (or pick ones the font draws one column wide)')
+        sys.exit('subset-font: fix the characters above (or pick ones a font draws one column wide)')
+    os2 = main_font['OS/2']
+    print(f'Cascadia metrics: upm {main_font["head"].unitsPerEm}, typo ascender {os2.sTypoAscender}, '
+          f'descender {os2.sTypoDescender}, line gap {os2.sTypoLineGap} (fallback overrides in styles.css)')
 
     os.makedirs(OUT, exist_ok=True)
-    for face, fname in FACES.items():
-        opts = subset.Options()
-        opts.flavor = 'woff2'
-        # no ligatures or contextual alternates: a sprite's '->' stays two cells
-        opts.layout_features = ['ccmp', 'locl', 'kern', 'mark', 'mkmk']
-        opts.name_IDs = ['*']
-        opts.notdef_outline = True
-        opts.hinting = False
-        font = TTFont(os.path.join(src, fname))
-        sub = subset.Subsetter(opts)
-        sub.populate(unicodes=wanted)
-        sub.subset(font)
-        widen(font)
-        dest = os.path.join(OUT, f'sarasa-mono-{face}.woff2')
-        font.flavor = 'woff2'
-        font.save(dest)
-        print(f'{os.path.relpath(dest, ROOT)}: {len(font.getBestCmap())} chars, {os.path.getsize(dest) // 1024} KB')
+    for w, font in casc.items():
+        rename(font, 'Cascadia Code', 'Asciia Mono')
+        cut(font, wanted, os.path.join(OUT, f'asciia-mono-{w}.woff2'))
+    for face, font in sara.items():
+        cut(font, wanted, os.path.join(OUT, f'sarasa-mono-{face}.woff2'))
 
 
 if __name__ == '__main__':

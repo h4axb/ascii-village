@@ -3256,9 +3256,9 @@ function Game() {
     setWalkDir(null);
   }
   // ---- sitting on a bench ----
-  // Where the player sits on `e`: the bottom of their shorts on the seat's
-  // front edge (its marked area, src/seats.ts), the legs hanging below it,
-  // as near along it as where they stand now
+  // Where the player sits on `e`: in the middle of its marked seat
+  // (src/seats.ts), the bottom of their shorts on the seat's front edge, the
+  // legs hanging below it
   function seatSpot(e: Ent): Pt | null {
     const a = seatOf(e.asset ?? e.kind);
     if (!a) return null;
@@ -3274,15 +3274,12 @@ function Game() {
     const frame = S.SIT_ANIM?.frames[S.SIT_ANIM.frames.length - 1];
     const lastShorts = frame?.shortsMask ? frame.shortsMask.reduce((r, l, i) => (l.trim() ? i : r), -1) : -1;
     const below = frame && lastShorts >= 0 ? (feet * (frame.sprite.length - lastShorts - 1)) / frame.sprite.length : 0;
-    const lo = e.x + a.x0 * wT + half;
-    const hi = e.x + a.x1 * wT - half;
-    const pc = playerRef.current.x + half;
-    const cx = lo <= hi ? Math.max(lo, Math.min(hi, pc)) : (lo + hi) / 2;
+    const cx = e.x + ((a.x0 + a.x1) / 2) * wT;
     return { x: cx - half, y: e.y + a.y1 * hT - feet + below };
   }
   // Where the player stands in front of `e` to sit down (and lands when
-  // getting up): the first row below the bench, under the seat spot, the
-  // nearest free one along it
+  // getting up): the first row below the bench, right under the seat spot
+  // (the nearest free one along it)
   function benchFront(e: Ent, seat: Pt): Pt {
     const hT = (e.sprite.length * (e.scale ?? 1)) / TILE_LN;
     const y = Math.ceil(e.y + hT) - PLAYER_T.hT + 1;
@@ -3290,7 +3287,7 @@ function Game() {
     for (const dx of [0, -1, 1, -2, 2, -3, 3]) if (!blocked(x + dx, y, e.id)) return { x: x + dx, y };
     return { x, y };
   }
-  // A short walk on free tiles (breadth-first, 4-way, within 12 tiles):
+  // A short walk on free tiles (breadth-first, 4-way, within 20 tiles):
   // the steps from the player's tile to `to`, or null when there's no way
   function walkPath(to: Pt, ignore?: string): Pt[] | null {
     const p = playerRef.current;
@@ -3307,7 +3304,7 @@ function Game() {
       }
       for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
         const n = { x: q.x + dx, y: q.y + dy };
-        if (prev.has(key(n)) || Math.abs(n.x - from.x) > 12 || Math.abs(n.y - from.y) > 12) continue;
+        if (prev.has(key(n)) || Math.abs(n.x - from.x) > 20 || Math.abs(n.y - from.y) > 20) continue;
         if (blocked(n.x, n.y, ignore) && !(n.x === to.x && n.y === to.y)) continue;
         prev.set(key(n), q);
         queue.push(n);
@@ -3315,8 +3312,9 @@ function Game() {
     }
     return null;
   }
-  // Sit on a bench: walk round to its front, then hop up onto the seat;
-  // seated again: get up
+  // Sit on a bench: walk (the walk cycle, unhurried) round to the spot
+  // in front of its seat, turn to it, then hop up onto the seat; seated
+  // again: get up
   async function sitDown(e: Ent) {
     if (sittingRef.current) return standUp();
     const seat = seatSpot(e);
@@ -3325,7 +3323,6 @@ function Game() {
     const front = benchFront(e, seat);
     const path = walkPath(front, e.id);
     if (path) {
-      const ms = 1000 / 6;
       for (const step of path) {
         const p = playerRef.current;
         const dir: WalkDir = step.y < p.y ? 'up' : step.y > p.y ? 'down' : step.x < p.x ? 'left' : 'right';
@@ -3334,13 +3331,20 @@ function Game() {
           setWalkDir(dir);
           setWalkFrame(1);
         }
+        // an unhurried walk: the cinematics' walking pace
+        const ms = (1000 / WALK_SPEED_PLAYER) * speedScale(step.x - p.x, step.y - p.y);
         questStepPlayer(step.x, step.y, ms + 25);
         await sleep(ms);
       }
-      walkDirRef.current = null;
-      setWalkDir(null);
-    } else await questGlidePlayer(front, 6);
-    await playerJumpTo(seatSpot(e) ?? seat, true);
+    } else await questGlidePlayer(front, WALK_SPEED_PLAYER);
+    // in front of the seat: face it a moment, then up onto it
+    walkDirRef.current = 'up';
+    setWalkDir('up');
+    setWalkFrame(0);
+    await sleep(200);
+    walkDirRef.current = null;
+    setWalkDir(null);
+    await playerJumpTo(seat, true);
     // seated: the sit frames (sprites.ts SIT_ANIM) play once, the last stays
     const s = { id: e.id, front };
     sittingRef.current = s;

@@ -3,6 +3,9 @@
 // colour comes from CSS, and share one 24x24 viewBox so they optically match
 // at any size.
 
+import { PixelIcon } from './ui/PixelIcon';
+import { COIN_SMALL, COIN_COLORS } from './ui/pixelIcons';
+
 type P = { className?: string; title?: string };
 
 const base = {
@@ -59,13 +62,9 @@ export function SaveIcon({ className }: P) {
   );
 }
 
+// the HUD's coin: the same gold clover coin as the UI's (ui/pixelIcons.ts)
 export function CoinIcon({ className }: P) {
-  return (
-    <svg {...base} className={className}>
-      <circle cx="12" cy="12" r="8.4" />
-      <path d="M12 7.4 13.18 10.38 16.37 10.58 13.9 12.62 14.7 15.72 12 14 9.3 15.72 10.1 12.62 7.63 10.58 10.82 10.38Z" />
-    </svg>
-  );
+  return <PixelIcon map={COIN_SMALL} colors={COIN_COLORS} px={1} className={className} />;
 }
 
 export function KeysIcon({ className }: P) {

@@ -294,4 +294,7 @@ export interface CraftLog {
   // debugging session.
   warnings?: string[];
   attempts?: CraftAttempt[];
+  // the /1 link's rescue after both plans failed: the plans with their broken
+  // shapes dropped, or the built-in template (spritePipeline.ts)
+  rescue?: 'salvaged' | 'template';
 }

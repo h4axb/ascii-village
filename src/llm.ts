@@ -25,6 +25,7 @@ import {
   densityOf,
   temperatureOf,
   planPrefsText,
+  applyColorPref,
   isKind,
   type Prefs,
   planAndRender,
@@ -48,7 +49,7 @@ import {
   type ItemFunction,
 } from './craft/functions';
 import { checkPolicy } from './craft/policy';
-import { fallbackNote } from './craft/colours';
+import { fallbackNote, fitToGame } from './craft/colours';
 import {
   REF_CRAFT_ON,
   hasRefBodies,
@@ -478,7 +479,7 @@ export async function craftItem(
       // `fit` field no longer gates anything: a universal token has no
       // category to mismatch against, so the only rejection left here is a
       // blocked prompt. `tokenHint` is still useful as a category guess.
-      // The preferences for the planner (interpretation, surprise) have to be
+      // The preferences for the planner (surprise) have to be
       // known before it runs; when some are saved for one KIND of thing, a
       // tiny call finds this request's kind first.
       let planPrefs: Prefs = {};
@@ -490,12 +491,23 @@ export async function craftItem(
       }
       const prefsText = [opts.prefs ? planPrefsText(planPrefs) : '', opts.clarify?.guidance ?? ''].filter(Boolean).join('\n\n');
       const temperature = opts.prefs ? temperatureOf(planPrefs) : undefined;
-      const plan = await planCraft(prompt, spec.category, chatJSON, {
-        model: MODELS.fast,
-        fallbackModel: MODELS.fastFallback,
-        prefsText,
-        temperature,
-      });
+      // the /1 link never ends without an item: a plan call that breaks
+      // (other than the AI being unreachable) goes on with no plan, and the
+      // pipeline's rescue draws it (spritePipeline.ts neverFail)
+      const neverFail = !!opts.noAlts;
+      let plan: Awaited<ReturnType<typeof planCraft>>;
+      try {
+        plan = await planCraft(prompt, spec.category, chatJSON, {
+          model: MODELS.fast,
+          fallbackModel: MODELS.fastFallback,
+          prefsText,
+          temperature,
+        });
+      } catch (err) {
+        if (!neverFail || err instanceof AiServiceError) throw err;
+        console.warn('[craft] plan call failed, rescuing:', err);
+        plan = { fit: true, sensitive: false, sizeAdjust: 'default', sizeClass: opts.clarify?.size ?? 'medium', name: '', width: 0, height: 0, parts: [], regions: [] };
+      }
       if (plan.sensitive) {
         // deliberately NO suggestions on blocked input
         return {
@@ -513,7 +525,6 @@ export async function craftItem(
       const postPrefs: Prefs = opts.prefs ? resolvePrefs(category) : {};
       const applied: Prefs = opts.prefs
         ? {
-            interpretation: planPrefs.interpretation,
             surprise: planPrefs.surprise,
             detail: postPrefs.detail,
             color: postPrefs.color,
@@ -528,11 +539,13 @@ export async function craftItem(
       // craftDescribe runs after category is known, same dependency as
       // before, just no longer racing a Stage-2 call that no longer exists.
       ui?.onStage?.('drawing');
-      const { sprite, log, error } = await planAndRender(prompt, category, plan, {
+      const { sprite, log, error, rescue } = await planAndRender(prompt, category, plan, {
         chat: chatJSON,
         model: MODELS.fast,
         fallbackModel: MODELS.fastFallback,
         retry: opts.retry,
+        neverFail,
+        colour: pickedHex(opts.clarify?.colour),
         ...(opts.prefs
           ? { multiplier: densityOf(postPrefs), color: postPrefs.color, prefsText, temperature }
           : {}),
@@ -609,7 +622,11 @@ export async function craftItem(
       item.textureModifier = textureModifierFor(spec.finish);
       const finish = opts.clarify?.finish ?? (opts.clarify?.mood ? MOOD_PRESETS[opts.clarify.mood].finish : undefined);
       if (finish) item.textureModifier = finish;
-      return opts.prefs ? { ok: true, item, kind: category, applied } : { ok: true, item };
+      // /1: drawn without a reference picture (none fits the words) or
+      // rescued: Mitchy says it's a first try
+      const untrained = neverFail && (rescue || !matchRefs(prompt).body) ? UNTRAINED_NOTE : undefined;
+      const out: CraftResult = opts.prefs ? { ok: true, item, kind: category, applied } : { ok: true, item };
+      return untrained ? { ...out, note: untrained } : out;
     } catch (err) {
       console.warn('[craft] pipeline error:', err);
       if (err instanceof AiServiceError) return { ok: false, reply: '', aiDown: aiDownOf(err) };
@@ -651,16 +668,26 @@ async function craftWithRefs(
 ): Promise<CraftResult | null> {
   // the clarify answer: its own hex ("Sky blue"), else its colour word
   const cc = opts.clarify?.colour?.trim().toLowerCase();
-  const pickedColour = cc ? (/^#[0-9a-f]{6}$/.test(cc) ? hexRgb(cc) : colourOf(cc.split(/\s+/).pop()!)) : null;
-  const shape = { surprise: opts.clarify?.surprise, colour: pickedColour };
+  const pickedColour = cc ? (/^#[0-9a-f]{6}$/.test(cc) ? fitToGame(hexRgb(cc)) : colourOf(cc.split(/\s+/).pop()!)) : null;
   const first = matchRefs(prompt);
+  // the /2 preferences for this kind of thing (the body's category): detail
+  // and colour in the bake, surprise in the variant pick and the model call
+  const kind = first.body ? gameCategoryOf(first.body) : null;
+  const prefs: Prefs = opts.prefs ? resolvePrefs(isKind(kind) ? kind : null) : {};
+  const surprise = opts.clarify?.surprise ?? (prefs.surprise === 1 ? true : prefs.surprise === -1 ? false : undefined);
+  const shape = { surprise, colour: pickedColour };
   let m: RefMatch & { details?: Parameters<typeof buildFromMatch>[0]['details']; mirror?: boolean } = isShip(first)
     ? shapeShip(first, prompt, shape)
     : shapeWateringCan(first, prompt, shape);
   // a watering can or a ship keeps what was picked here (variant, colours,
   // what's taken out, where the details go); the model only adds the details
-  const can = isWateringCan(m) || isShip(m) ? { body: m.body!, colours: m.colours, petals: m.petals, blank: m.blank, detailArea: m.detailArea } : null;
-  const where = m.detailArea ? `\nDraw the details the player asked for (${m.leftover.join(', ')}) as regions in the area "${m.detailArea}" of the body "${m.body!.id}", and keep that body.` : '';
+  const can = isWateringCan(m) || isShip(m) ? { body: m.body!, colours: m.colours, petals: m.petals, blank: m.blank, detailArea: m.detailArea, styleDetails: m.styleDetails } : null;
+  // where the details go: the picked area first; a feature that belongs
+  // elsewhere on the body (a ship's hull, its bow) may use those areas
+  const others = m.body?.areas.filter((a) => a.type === 'detail' && a.name !== m.detailArea).map((a) => `"${a.name}"`) ?? [];
+  const where = m.detailArea
+    ? `\nDraw the details the player asked for (${m.leftover.join(', ')}) as regions in the area "${m.detailArea}" of the body "${m.body!.id}"${others.length ? ` (or, for a feature that belongs elsewhere, in ${others.join(' / ')})` : ''}, and keep that body.`
+    : '';
   let text: { description: string; tags: string[]; fn: ItemFunction; name?: string } | null = null;
   let via: 'match' | 'model' = 'match';
   if (m.needsModel && llmEnabled) {
@@ -668,9 +695,9 @@ async function craftWithRefs(
       const raw = await chatJSON<Record<string, unknown>>(
         [
           { role: 'system', content: refPrompt() },
-          { role: 'user', content: `Library: ${refCatalogue(m)}\n\nThe player asked for: "${prompt}"${where}` },
+          { role: 'user', content: `Library: ${refCatalogue(m)}\n\nThe player asked for: "${prompt}"${where}${prefs.surprise ? `\n\n${planPrefsText(prefs)}` : ''}` },
         ],
-        { temperature: 0.5, maxTokens: 900, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
+        { temperature: prefs.surprise ? temperatureOf(prefs) - 0.2 : 0.5, maxTokens: 900, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
       );
       const c = parseRefChoice(raw);
       const chosen = c ? choiceToMatch(c, m) : null;
@@ -682,8 +709,9 @@ async function craftWithRefs(
       // a watering can keeps the variant and colours picked above; the
       // model only adds the details
       if (can) {
-        const details = can.detailArea ? (m.details ?? []).map((d) => ({ ...d, area: can.detailArea! })) : m.details;
-        m = { ...m, body: can.body, colours: { ...m.colours, ...can.colours }, petals: can.petals, blank: can.blank, detailArea: can.detailArea, details };
+        const own = new Set(can.body.areas.filter((a) => a.type === 'detail').map((a) => a.name));
+        const details = can.detailArea ? (m.details ?? []).map((d) => (own.has(d.area) ? d : { ...d, area: can.detailArea! })) : m.details;
+        m = { ...m, body: can.body, colours: { ...m.colours, ...can.colours }, petals: can.petals, blank: can.blank, detailArea: can.detailArea, details, styleDetails: can.styleDetails };
       }
       via = 'model';
       if (c?.description) text = { description: c.description, tags: c.tags ?? [], fn: c.fn!, name: c.name };
@@ -709,7 +737,8 @@ async function craftWithRefs(
   ui?.onStage?.('drawing');
   // the size: the answer, else a size word in the prompt
   const said = /\b(tiny|small|little|mini)\b/i.test(prompt) ? 'small' : /\b(big|large|huge|giant)\b/i.test(prompt) ? 'large' : /\bmedium\b/i.test(prompt) ? 'medium' : undefined;
-  const sp = await buildFromMatch(m, opts.clarify?.size ?? said);
+  const sp = await buildFromMatch(m, opts.clarify?.size ?? said, prefs.detail ?? 0);
+  if (prefs.color) sp.palette = applyColorPref(sp.palette, prefs.color);
   sp.lines.forEach((line, i) => ui?.onLine?.(line, i, 0));
   logRefCraft(prompt, via, m.body.id, m.leftover);
   const category = gameCategoryOf(m.body);
@@ -743,8 +772,18 @@ async function craftWithRefs(
   const finish = opts.clarify?.finish ?? (opts.clarify?.mood ? MOOD_PRESETS[opts.clarify.mood].finish : undefined);
   if (finish) item.textureModifier = finish;
   console.info('[craft] from references', { body: m.body.id, via, signs: sp.signs, swaps: m.swaps.map((x) => x.ref.id), decorations: m.decorations.map((x) => x.ref.id) });
-  const out: CraftResult = opts.prefs ? { ok: true, item, kind: category, applied: {} } : { ok: true, item };
+  const out: CraftResult = opts.prefs ? { ok: true, item, kind: category, applied: { detail: prefs.detail, color: prefs.color, surprise: prefs.surprise } } : { ok: true, item };
   return note ? { ...out, note } : out;
+}
+
+// what Mitchy says after an item drawn without a reference picture (/1)
+const UNTRAINED_NOTE = "I haven't crafted one of these before, so this is a first try. I still need more training for things like this.";
+// a picked colour ("#d65a4e") in the game's palette, as a hex for the shape
+// template; a colour word is left to the planner
+function pickedHex(c: string | undefined): string | undefined {
+  const h = c?.trim().toLowerCase();
+  if (!h || !/^#[0-9a-f]{6}$/.test(h)) return undefined;
+  return '#' + fitToGame(hexRgb(h)).map((v) => v.toString(16).padStart(2, '0')).join('');
 }
 
 const hexRgb = (h: string): [number, number, number] => {
@@ -810,12 +849,19 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> 
   if (!checkPolicy(prompt).allowed) return [];
   return preQuestions(prompt);
 }
-// (each with its own exact colour: no model call needed for these)
+// (each with its own exact colour: no model call needed for these): the
+// rainbow plus black and white, eased into the game's palette when used
 const COLOUR_OPTIONS: { label: string; word: string }[] = [
+  { label: 'Red', word: '#d65a4e' },
+  { label: 'Orange', word: '#e9954f' },
+  { label: 'Yellow', word: '#efcb5c' },
+  { label: 'Green', word: '#6cbf5a' },
   { label: 'Sky blue', word: '#7ec4ee' },
-  { label: 'Sunny yellow', word: '#ffd34e' },
-  { label: 'Rose pink', word: '#f39ac0' },
-  { label: 'Leaf green', word: '#6cbf5a' },
+  { label: 'Blue', word: '#4a74c9' },
+  { label: 'Purple', word: '#9a6cc9' },
+  { label: 'Pink', word: '#f39ac0' },
+  { label: 'Black', word: '#2b2b33' },
+  { label: 'White', word: '#f4f1e6' },
 ];
 export function preQuestions(prompt: string): ClarifyQuestion[] {
   const u = unknownsOf(prompt);

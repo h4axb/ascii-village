@@ -7,6 +7,7 @@
 // each phrase falls back to its base colour word ("baby blue" -> blue).
 // ---------------------------------------------------------------------------
 import { PALETTE } from './vocab';
+import { themeColor } from '../theme';
 
 // base colour words in English, German, French, Spanish, Italian, Dutch
 // (accents folded; Romance words by their stem, endings are stripped) -> a
@@ -157,3 +158,40 @@ export function fallbackNote(phrases: ColourPhrase[]): string | null {
   const joined = list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0];
   return `My colour helper didn't answer, so ${joined}.`;
 }
+
+// ---- the game's palette ----------------------------------------------------
+// A colour the AI chose (the colour call, the reference model's or the shape
+// planner's "#rrggbb") brought into the game's soft palette: theme.json's
+// colours mostly stay under about 0.65 HSV saturation and 0.9 brightness, so a neon
+// answer (#ff0000, #00ff88) is eased down to that range. The hue stays, and
+// greys / whites / blacks are left as they are.
+const SAT_KNEE = 0.45; // saturation eased above this ...
+const SAT_SOFT = 0.3; // ... by this much, so 1.0 lands at about 0.62
+const VAL_MAX = 0.86;
+const VAL_MIN = 0.18; // a coloured but nearly black answer still shows a hue
+export function fitToGame([r, g, b]: [number, number, number]): [number, number, number] {
+  const mx = Math.max(r, g, b) / 255;
+  const mn = Math.min(r, g, b) / 255;
+  const s = mx ? (mx - mn) / mx : 0;
+  if (s < 0.12) return [r, g, b];
+  let h = 0;
+  const d = mx - mn;
+  const [R, G, B] = [r / 255, g / 255, b / 255];
+  h = mx === R ? ((G - B) / d) % 6 : mx === G ? (B - R) / d + 2 : (R - G) / d + 4;
+  h = (h * 60 + 360) % 360;
+  const s2 = s > SAT_KNEE ? SAT_KNEE + (s - SAT_KNEE) * SAT_SOFT : s;
+  const v2 = Math.min(VAL_MAX, Math.max(VAL_MIN, mx));
+  const c = v2 * s2;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v2 - c;
+  const [r1, g1, b1] =
+    h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [Math.round((r1 + m) * 255), Math.round((g1 + m) * 255), Math.round((b1 + m) * 255)];
+}
+
+// what the game's own colours look like, for the colour prompts: soft pixel
+// art, never neon (the answers are eased into this range too, fitToGame)
+export const gameColourHint = () =>
+  `- The game is soft pixel art with muted, earthy colours, for example grass ${themeColor('grassTuft.base')}, sand ${themeColor('sand.glyph')}, ` +
+  `water ${themeColor('water.base')}, a flower petal ${themeColor('flower.orangePetal')}, wood ${themeColor('palm.trunk')}. ` +
+  'Pick colours that sit with these: never neon or fully saturated (no #ff0000, #00ff00, #ff00ff), a soft red is #c94a3c.';

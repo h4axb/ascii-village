@@ -8,16 +8,17 @@
 //                   world. Done in code: always applies.
 //   color           Pastel / Vivid — the finished palette's saturation and
 //                   lightness, adjusted in code. Always applies.
-//   interpretation  how much of the prompt's detail is taken over: Exact
-//                   (every feature named) / Essentials (the main subject and
-//                   its defining features). A planner instruction.
 //   surprise        Controlled (a concrete reading, nothing added) /
 //                   Surprise me (an abstract reading, plus details of the
 //                   planner's own on top). A planner instruction + its
 //                   temperature.
 //
-// The last two steer the language model, so they shape a craft but can't be
-// guaranteed for any single one.
+// Surprise steers the language model (and, for a craft from the reference
+// library, which variant is picked), so it shapes a craft but can't be
+// guaranteed for any single one. Detail and colour always apply, on both
+// paths (the shape planner and the reference library, refCraft.ts).
+// (An "interpretation" question existed before; saved answers for it are
+// simply ignored now.)
 //
 // Where an answer is remembered (the scope question): for the same KIND of
 // thing (the main element of the craft — see KINDS), for all crafts, or for
@@ -25,10 +26,10 @@
 // craft's kind, then all.
 // ---------------------------------------------------------------------------
 
-export type PrefKey = 'detail' | 'color' | 'interpretation' | 'surprise';
+export type PrefKey = 'detail' | 'color' | 'surprise';
 export type PrefValue = -1 | 0 | 1;
 export type Prefs = Partial<Record<PrefKey, PrefValue>>;
-export const PREF_KEYS: PrefKey[] = ['detail', 'color', 'interpretation', 'surprise'];
+export const PREF_KEYS: PrefKey[] = ['detail', 'color', 'surprise'];
 
 // The kind of thing a craft is, decided by the planner from its MAIN element
 // ("a dog with a witch hat" is a creature). Same six values as the game's
@@ -53,7 +54,6 @@ export type Scope = 'kind' | 'all' | 'session';
 export const PREF_INFO: Record<PrefKey, { title: string; labels: Record<PrefValue, string> }> = {
   detail: { title: 'Detail', labels: { [-1]: 'Fewer glyphs', 0: 'Normal detail', 1: 'Dense glyphs' } },
   color: { title: 'Colour', labels: { [-1]: 'Pastel colours', 0: 'Normal colours', 1: 'Vivid colours' } },
-  interpretation: { title: 'Interpretation', labels: { [-1]: 'Essentials only', 0: 'Normal reading', 1: 'Every detail' } },
   surprise: { title: 'Surprise', labels: { [-1]: 'Controlled', 0: 'Normal freedom', 1: 'Surprise me' } },
 };
 
@@ -164,19 +164,9 @@ export function temperatureOf(p: Prefs): number {
   return p.surprise === -1 ? 0.4 : p.surprise === 1 ? 0.95 : 0.7;
 }
 
-// interpretation + surprise → extra instructions for the planner
+// surprise → extra instructions for the planner
 export function planPrefsText(p: Prefs): string {
   const out: string[] = [];
-  if (p.interpretation === 1)
-    out.push(
-      'Represent EVERY feature the player named, even small ones — each gets its own region (use small ' +
-        'detail/accent regions for small features) rather than being merged away or dropped.',
-    );
-  if (p.interpretation === -1)
-    out.push(
-      'Keep only the essentials: the main subject and at most its 1-2 most defining features. Leave out ' +
-        'minor details the player mentioned, so the main shape reads clearly.',
-    );
   if (p.surprise === -1)
     out.push(
       'Read the request literally and concretely. Do NOT add any element, detail or decoration the player ' +
@@ -237,10 +227,11 @@ function adjustHex(hex: string, dir: -1 | 1): string {
   if (!m) return hex;
   const n = parseInt(m[1], 16);
   const [h, s, l] = rgbToHsl((n >> 16) & 255, (n >> 8) & 255, n & 255);
-  // pastel: less saturated, lifted toward light; vivid: more saturated,
-  // lightness pulled toward the middle where colour is strongest
-  const s2 = dir < 0 ? s * 0.5 : Math.min(1, s * 1.45 + 0.08);
-  const l2 = dir < 0 ? l + (0.86 - l) * 0.45 : l + (0.5 - l) * 0.25;
+  // pastel: lifted well toward light while keeping most of the hue's
+  // colour (a pastel blue, not a grey); vivid: more saturated, lightness
+  // pulled toward the middle where colour is strongest
+  const s2 = dir < 0 ? s * 0.9 : Math.min(1, s * 1.45 + 0.08);
+  const l2 = dir < 0 ? l + (0.86 - l) * 0.6 : l + (0.5 - l) * 0.25;
   const [r, g, b] = hslToRgb(h, s2, Math.max(0, Math.min(1, l2)));
   return '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
 }

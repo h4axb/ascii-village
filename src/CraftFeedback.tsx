@@ -6,10 +6,13 @@
 //                   item; "Not quite" opens up to 3 reason tags and an
 //                   optional one-sentence comment. Pure feedback: nothing
 //                   here changes the game (src/feedback/).
-//   TuneQuestions   one question at a time (detail, colour, interpretation,
-//                   surprise), then where to remember the answers, then a
+//   TuneQuestions   one question at a time (detail, colour, surprise), then where to remember the answers, then a
 //                   summary. These DO shape future crafts (craft/prefs.ts).
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { FitSprite, type SpriteLook } from './ui';
+import { HOUSE, HOUSE_COLORS, HOUSE_PALETTE, PALM, PALM_COLORS, PALM_PALETTE, PLAYER, PLAYER_COLORS, PLAYER_PALETTE } from './sprites';
+import { renderPlan } from './craft/spritePipeline';
+import type { CraftPlan, RegionSpec } from './craft/spriteConfig';
 import { FEEDBACK_REASONS, COMMENT_MAX, type FeedbackReason } from './feedback/schema';
 import {
   PREF_INFO,
@@ -132,25 +135,7 @@ type Glyph = [string, Tone][][];
 const G = (rows: (string | [string, Tone][])[]): Glyph =>
   rows.map((r) => (typeof r === 'string' ? [[r, 'ink'] as [string, Tone]] : r));
 
-const ICONS: Record<PrefKey | 'scope', Record<string, Glyph>> = {
-  // the same diamond drawn with fewer / more glyphs
-  detail: {
-    '-1': G(['   ', ' /\\ ', ' \\/ ', '   ']),
-    '0': G(['  /\\  ', ' /::\\ ', ' \\::/ ', '  \\/  ']),
-    '1': G(['   /\\   ', [['  /', 'ink'], ['§§', 'gold'], ['\\  ', 'ink']], [[' /', 'ink'], ['§@@§', 'gold'], ['\\ ', 'ink']], [[' \\', 'ink'], ['§@@§', 'gold'], ['/ ', 'ink']], [['  \\', 'ink'], ['§§', 'gold'], ['/  ', 'ink']], '   \\/   ']),
-  },
-  // a colour swatch, softer / normal / stronger
-  color: {
-    '-1': [[['¤¤¤', 'p1'], ['§§§', 'p2'], ['@@@', 'p3']], [['¤¤¤', 'p1'], ['§§§', 'p2'], ['@@@', 'p3']]],
-    '0': [[['¤¤¤', 'n1'], ['§§§', 'n2'], ['@@@', 'n3']], [['¤¤¤', 'n1'], ['§§§', 'n2'], ['@@@', 'n3']]],
-    '1': [[['¤¤¤', 'v1'], ['§§§', 'v2'], ['@@@', 'v3']], [['¤¤¤', 'v1'], ['§§§', 'v2'], ['@@@', 'v3']]],
-  },
-  // how much of your description makes it in: a note → a few / all marks
-  interpretation: {
-    '-1': G(['┌──┐     ', '│≡≡│ →  o', '└──┘     ']),
-    '0': G(['┌──┐   o ', '│≡≡│ → o~', '└──┘   o ']),
-    '1': [[['┌──┐  ', 'ink'], ['*', 'gold'], ['o', 'ink'], ['*', 'gold']], [['│≡≡│ → ', 'ink'], ['o~o', 'ink']], [['└──┘  ', 'ink'], ['*', 'gold'], ['o', 'ink'], ['*', 'gold']]],
-  },
+const ICONS: Record<'surprise' | 'scope', Record<string, Glyph>> = {
   // a box: shut / ajar / open with sparks
   surprise: {
     '-1': G(['        ', ' ______ ', '|______|', '|      |', '|______|']),
@@ -178,6 +163,60 @@ function GlyphIcon({ g }: { g: Glyph }) {
       ))}
     </pre>
   );
+}
+
+// ---- the detail and colour previews -----------------------------------------
+// Detail: three of the game's own drawings, from few glyphs to many — the
+// palm (fewer, bolder), the player (the usual density), the house (dense).
+const DETAIL_LOOKS: Record<string, SpriteLook> = {
+  '-1': { sprite: PALM, colors: PALM_COLORS, palette: PALM_PALETTE },
+  '0': { sprite: PLAYER, colors: PLAYER_COLORS, palette: PLAYER_PALETTE },
+  '1': { sprite: HOUSE, colors: HOUSE_COLORS, palette: HOUSE_PALETTE },
+};
+
+// Colour: a flower with blue petals, drawn by the crafting renderer itself
+// (craft/spritePipeline.ts renderPlan) with the colour preference applied the
+// same way a craft gets it — so Normal is the generator's own default
+// colouring, and Pastel / Vivid are exactly what those settings do.
+const R = (id: string, primitive: RegionSpec['primitive'], cx: number, cy: number, w: number, h: number, material: string, role: RegionSpec['role'] = 'body'): RegionSpec => ({
+  id,
+  primitive,
+  bounds: { cx, cy, width: w, height: h },
+  material,
+  role,
+  importance: 4,
+});
+const PETAL = '#5b8fd9'; // a blue as the generator gets it (eased into the game's palette like any)
+const PREVIEW_FLOWER: CraftPlan = {
+  fit: true,
+  sensitive: false,
+  sizeAdjust: 'default',
+  sizeClass: 'medium',
+  name: 'Blue flower',
+  width: 1,
+  height: 1.25,
+  parts: ['stem', 'petals', 'centre'],
+  regions: [
+    R('stem', 'line', 0.5, 0.8, 0.07, 0.4, 'leaf'),
+    R('leaf', 'ellipse', 0.66, 0.8, 0.26, 0.1, 'leaf', 'attachment'),
+    R('petal_top', 'ellipse', 0.5, 0.15, 0.3, 0.26, PETAL),
+    R('petal_left', 'ellipse', 0.24, 0.33, 0.34, 0.22, PETAL),
+    R('petal_right', 'ellipse', 0.76, 0.33, 0.34, 0.22, PETAL),
+    R('petal_bl', 'ellipse', 0.34, 0.53, 0.3, 0.24, PETAL),
+    R('petal_br', 'ellipse', 0.66, 0.53, 0.3, 0.24, PETAL),
+    R('centre', 'circle', 0.5, 0.36, 0.22, 0.22, '#efcb5c', 'detail'),
+  ],
+};
+
+function PrefPreview({ k, v }: { k: PrefKey | 'scope'; v: string }) {
+  const flower = useMemo(() => {
+    if (k !== 'color') return null;
+    const g = renderPlan('a flower with blue petals', PREVIEW_FLOWER, { color: Number(v) as PrefValue });
+    return { sprite: g.lines, colors: g.colors, palette: g.palette } as SpriteLook;
+  }, [k, v]);
+  if (k === 'detail') return <FitSprite className="fb-preview" look={DETAIL_LOOKS[v]} fill={0.92} maxScale={3} cells />;
+  if (flower) return <FitSprite className="fb-preview" look={flower} fill={0.92} maxScale={3} cells />;
+  return <GlyphIcon g={ICONS[k as 'surprise' | 'scope'][v]} />;
 }
 
 // ---- the questions --------------------------------------------------------
@@ -220,17 +259,6 @@ const PREF_QUESTIONS: Question<PrefKey, PrefValue>[] = [
     ],
   },
   {
-    key: 'interpretation',
-    eyebrow: 'Interpretation',
-    title: 'How much of your description should make it in?',
-    help: 'Whether I draw every detail you write, or focus on the main thing.',
-    options: [
-      { value: -1, name: 'Essentials', desc: 'The main thing, clearly', tip: 'Keeps only the main subject and its defining features, so its shape reads clearly.' },
-      { value: 0, name: 'Keep', desc: 'Current balance', tip: 'The usual balance.' },
-      { value: 1, name: 'Every detail', desc: 'All you wrote', tip: 'Tries to show every feature you name, even small ones.' },
-    ],
-  },
-  {
     key: 'surprise',
     eyebrow: 'Surprise',
     title: 'How much should I add on my own?',
@@ -263,15 +291,17 @@ export function TuneQuestions({
     eyebrow: 'Scope',
     title: 'Where should I remember these choices?',
     help: 'Only the questions you answered are remembered.',
+    // the kind option only when the craft's kind is known (else it would
+    // quietly save for all crafts)
     options: [
-      {
-        value: 'kind',
+      ...(kind ? [{
+        value: 'kind' as const,
         name: kind ? `All ${kindName}` : 'Similar crafts',
         desc: kind ? `Future ${kindName.toLowerCase()} you craft` : 'Crafts of the same kind',
         tip: kind
           ? `Used whenever a future craft is ${KIND_LABEL[kind].one === 'Object' ? 'an object' : `a ${KIND_LABEL[kind].one.toLowerCase()}`} — judged by its main element.`
           : 'Used for future crafts of the same kind.',
-      },
+      }] : []),
       { value: 'all', name: 'All crafts', desc: 'Every future craft', tip: 'Used for every future craft until you change them.' },
       { value: 'session', name: 'This session', desc: 'Until you close the game', tip: 'Used only until the game is closed or reloaded.' },
     ],
@@ -295,7 +325,7 @@ export function TuneQuestions({
           {keys.length === 0 && <div className="ds-muted">No questions answered, so nothing changes.</div>}
           {keys.map((k) => (
             <div key={k} className="fb-summary-item">
-              <GlyphIcon g={ICONS[k][String(answers[k])]} />
+              <PrefPreview k={k} v={String(answers[k])} />
               <div>
                 <b>{PREF_INFO[k].title}</b>
                 <span className="ds-muted">{PREF_INFO[k].labels[answers[k] as PrefValue]}</span>
@@ -317,7 +347,6 @@ export function TuneQuestions({
 
   const isScope = index === total - 1;
   const q = isScope ? scopeQ : PREF_QUESTIONS[index];
-  const icon = (v: string) => ICONS[isScope ? 'scope' : (q.key as PrefKey)][v];
   return (
     <div className="fb-tune">
       <div className="fb-progress">
@@ -359,7 +388,7 @@ export function TuneQuestions({
               }}
             >
               <span className="fb-tip">{o.tip}</span>
-              <GlyphIcon g={icon(String(o.value))} />
+              <PrefPreview k={isScope ? 'scope' : (q.key as PrefKey)} v={String(o.value)} />
               <span className="fb-answer-name">{o.name}</span>
               <span className="ds-muted fb-answer-desc">{o.desc}</span>
             </button>

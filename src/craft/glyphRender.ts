@@ -29,6 +29,7 @@
 import type { FaceMark, RasterRegion, RegionBounds, ShapePrimitive } from './spriteConfig';
 import { FEATURE_PRIMITIVES } from './spriteConfig';
 import { FEATURE_GLYPHS, MATERIALS, RAMP_GAMMA, RAMP_LIFT } from './materials';
+import { fitToGame } from './colours';
 
 export interface RenderedSprite {
   lines: string[];
@@ -97,7 +98,8 @@ function parseHex(hex: string): [number, number, number] {
 export function resolveMaterial(spec: string): [number, number, number] {
   const named = (MATERIALS as Record<string, [number, number, number]>)[spec];
   if (named) return named;
-  if (HEX_RE.test(spec)) return parseHex(spec);
+  // the planner's own hex, in the game's soft palette
+  if (HEX_RE.test(spec)) return fitToGame(parseHex(spec));
   return MATERIALS.stone; // never throws — same "clamp/default, don't crash" philosophy as functions.ts
 }
 

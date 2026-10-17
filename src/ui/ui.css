@@ -1199,7 +1199,18 @@
   gap: 10px;
 }
 .ds-rail-btn {
+  /* the pixel-art bookmarks (cart / coin), sized like the quest panel's
+     .qp-tab, a little dimmed until on or hovered */
+  width: 50px;
+  height: 56px;
   color: var(--ds-text-muted);
+}
+.ds-rail-btn svg {
+  opacity: 0.85;
+}
+.ds-rail-btn:hover svg,
+.ds-rail-btn.on svg {
+  opacity: 1;
 }
 .ds-rail-btn.on {
   color: var(--ds-text);
@@ -1483,6 +1494,16 @@
   opacity: 0.4;
   cursor: default;
 }
+/* a colour answer's own colour, as a dot before its name */
+.cl-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  vertical-align: 0;
+}
 .fb-comment {
   display: flex;
   flex-direction: column;
@@ -1636,16 +1657,19 @@
 .fb-glyph .t-ink { color: var(--ds-text); }
 .fb-glyph .t-soft { color: var(--ds-text-muted); }
 .fb-glyph .t-gold { color: var(--ds-coin); }
-/* the colour question's swatches: pastel / normal / vivid of one blue */
-.fb-glyph .t-p1 { color: #c9d6e6; }
-.fb-glyph .t-p2 { color: #b3c6dd; }
-.fb-glyph .t-p3 { color: #9fb8d6; }
-.fb-glyph .t-n1 { color: #8aa6c8; }
-.fb-glyph .t-n2 { color: #6d91ba; }
-.fb-glyph .t-n3 { color: #557ca9; }
-.fb-glyph .t-v1 { color: #4a9bf5; }
-.fb-glyph .t-v2 { color: #1f7fe8; }
-.fb-glyph .t-v3 { color: #0f64c4; }
+/* the detail and colour answers' pictures (CraftFeedback.tsx PrefPreview):
+   the game's palm / player / house, and the renderer's own blue flower */
+.fb-preview {
+  width: 120px;
+  height: 96px;
+  margin: 0 0 6px;
+  flex: none;
+}
+.fb-summary-item .fb-preview {
+  width: 64px;
+  height: 52px;
+  margin: 0;
+}
 .fb-summary {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1962,6 +1986,9 @@
 
 /* ---- the quest overlay under the clock (quest/QuestPanel.tsx) ------------ */
 .qp {
+  /* the card's width: the closed tabs slide back by exactly this, so they
+     end flush with the screen edge */
+  --qp-card-w: 370px;
   position: relative;
   display: flex;
   align-items: flex-start;
@@ -1971,7 +1998,7 @@
 }
 .qp-card {
   pointer-events: auto;
-  width: 370px;
+  width: var(--qp-card-w);
   min-height: 150px;
   box-sizing: border-box;
   padding: 20px 16px 20px 22px;
@@ -2000,7 +2027,7 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 10px;
-  transform: translateX(-290px);
+  transform: translateX(calc(-1 * var(--qp-card-w)));
   transition: transform 260ms ease;
 }
 .qp.open .qp-tabs {
@@ -2091,9 +2118,9 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  margin: -5px -6px 0 0;
+  width: 34px;
+  height: 34px;
+  margin: -8px -6px 0 0;
   border: 1px solid var(--ds-line);
   border-radius: var(--ds-radius-sm);
   background: transparent;
@@ -2251,13 +2278,11 @@
   }
 }
 @media (max-width: 700px) {
-  .qp-card {
-    width: 240px;
+  .qp {
+    --qp-card-w: 240px;
   }
-  .qp-tabs {
-    transform: translateX(-240px);
-  }
-  .qp-tab {
+  .qp-tab,
+  .ds-rail-btn {
     width: 46px;
     height: 50px;
   }
@@ -2607,4 +2632,10 @@
 }
 .recraft-row.away .recraft-btn {
   cursor: default;
+}
+
+/* the pixel coin in a line of text (prices, Buy for / Sell for) */
+.ds-coin-icon {
+  flex: none;
+  vertical-align: -3px;
 }

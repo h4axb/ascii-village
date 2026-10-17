@@ -2,6 +2,8 @@
 // round caps, drawn on a 24px grid and coloured by `currentColor`, so every
 // icon matches the 1px frame lines around it at any size.
 import type { ReactNode } from 'react';
+import { PixelIcon } from './PixelIcon';
+import { CART, CART_COLORS, COIN, COIN_SMALL, COIN_COLORS } from './pixelIcons';
 
 function Icon({ size = 22, children }: { size?: number; children: ReactNode }) {
   return (
@@ -35,12 +37,11 @@ export const IconClose = ({ size }: IconProps) => (
   </Icon>
 );
 
-// currency: a coin with an inner ring (filled, it's the one warm accent)
+// currency: the gold clover coin (pixel art, ./pixelIcons.ts). The 16 px
+// drawing at whole-pixel steps (16 up to 31 px), so it stays crisp in a line
+// of text.
 export const IconCoin = ({ size = 20 }: IconProps) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
-    <circle cx="12" cy="12" r="9" fill="var(--ds-coin)" />
-    <circle cx="12" cy="12" r="5.2" fill="none" stroke="var(--ds-coin-dark)" strokeWidth="1.6" />
-  </svg>
+  <PixelIcon map={COIN_SMALL} colors={COIN_COLORS} px={Math.max(1, Math.floor(size / 16))} className="ds-coin-icon" />
 );
 
 // "in inventory": a small tied pouch
@@ -109,20 +110,8 @@ export const IconGear = ({ size }: IconProps) => (
   </Icon>
 );
 
-// the shop's two modes, stacked under its back button: selling hands a coin
-// over (coin + arrow out), buying fills your bag (bag + plus)
-export const IconSell = ({ size }: IconProps) => (
-  <Icon size={size}>
-    <circle cx="10" cy="13" r="6" />
-    <path d="M10 10.5v5M8.5 12h3" />
-    <path d="M15 5h5v5M20 5l-6 6" />
-  </Icon>
-);
+// the shop's two modes, stacked under its back button, as pixel-art
+// bookmarks: selling earns coins (the big clover coin), buying fills the cart
+export const IconSell = () => <PixelIcon map={COIN} colors={COIN_COLORS} px={1} />;
 
-export const IconBuy = ({ size }: IconProps) => (
-  <Icon size={size}>
-    <path d="M5 9h14l-1.2 10.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8z" />
-    <path d="M9 9V7a3 3 0 0 1 6 0v2" />
-    <path d="M12 12.5v4M10 14.5h4" />
-  </Icon>
-);
+export const IconBuy = () => <PixelIcon map={CART} colors={CART_COLORS} px={2} />;

@@ -46,6 +46,7 @@ export function ClarifyPlan({
                 disabled={locked}
                 onClick={() => onPick(i, j)}
               >
+                {o.colour && /^#[0-9a-f]{6}$/i.test(o.colour) && <span className="cl-swatch" style={{ background: o.colour }} />}
                 {o.label}
               </button>
             ))}

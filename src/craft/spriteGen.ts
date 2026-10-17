@@ -20,6 +20,7 @@ import {
   type SpatialRelation,
 } from './spriteConfig';
 import { MATERIALS_HINT } from './materials';
+import { gameColourHint } from './colours';
 import { checkPolicy } from './policy';
 import { MOODS, MOOD_PRESETS, type Mood } from './moods';
 import type { TextureModifier } from './spec';
@@ -142,6 +143,8 @@ export function planPrompt(): string {
       'an aura, anything abstract), a literal "#rrggbb" hex that reads as the right colour instead. The ' +
       'named presets are surface/colour shortcuts, not a category system — most concepts will NOT match ' +
       'one, and that is expected; pick a hex.\n' +
+      gameColourHint() +
+      '\n' +
       '- "role": "body" or "attachment" for major anatomy/structure, "detail" or "accent" for small marks ' +
       '(seeds, sparkles, tiny features) that should NOT compete with major anatomy for space — these are ' +
       'tracked against a SEPARATE, more generous budget.\n' +

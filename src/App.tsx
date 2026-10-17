@@ -6856,12 +6856,12 @@ function Game() {
                   </div>
                 );
               })}
-              {/* fence pieces' and gates' contact shadows: pixel ovals
-                  like the player's, at their feet, all in one
+              {/* fence pieces', gates' and benches' contact shadows: pixel
+                  ovals like the player's, at their feet, all in one
                   layer (one opacity) so overlapping pieces stay even */}
               <div className="fence-shadows" style={{ '--fence-shadow': SHADOW_COLOR() } as React.CSSProperties}>
                 {ents
-                  .filter((e) => (e.kind === 'fence' || e.kind === 'gate') && !e.rotation)
+                  .filter((e) => (e.kind === 'fence' || e.kind === 'gate' || e.kind === 'bench') && !e.rotation)
                   .flatMap((e) => {
                     const k = e.scale ?? 1;
                     // built like the player's shadow (PlayerShadow): pixels
@@ -6875,7 +6875,22 @@ function Game() {
                     // so positions go in em, not ch (Sarasa Mono's ch is
                     // 0.5em: ch-based tops landed far from the pieces)
                     const top = half((e.y * TILE_LN + e.sprite.length * k) * GROUND_PER_LINE - 0.35);
-                    return fenceShadowRuns(e.sprite).flatMap(([c0, c1], i) => {
+                    const runs = fenceShadowRuns(e.sprite);
+                    if (e.kind === 'bench' && runs.length) {
+                      // a bench: one wider, deeper oval under the whole
+                      // seat, leg to leg, three pixels tall
+                      const a = e.x * TILE_CH + runs[0][0] * k, z = e.x * TILE_CH + runs[runs.length - 1][1] * k;
+                      const x0 = half(a - 0.5), x1 = half(z + 0.5);
+                      const t = top - 0.5;
+                      return [
+                        [0.5, 0],
+                        [0, 0.5],
+                        [0.5, 1],
+                      ].map(([inset, dy], i) => (
+                        <i key={`${e.id}-${i}`} style={{ left: `${x0 + inset}ch`, width: `${x1 - x0 - 2 * inset}ch`, top: `${(t + dy) / GROUND_PER_LINE}em` }} />
+                      ));
+                    }
+                    return runs.flatMap(([c0, c1], i) => {
                       // the feet plus half a pixel each side, at least two
                       // pixels wide, centred on them
                       const a = e.x * TILE_CH + c0 * k, z = e.x * TILE_CH + c1 * k;
@@ -8527,6 +8542,9 @@ function EntSprite({
         colors={p.colors}
         palette={p.palette}
         solid={!!p.solidCells}
+        // furniture: a lighter backing (the player's), so its painted colours
+        // don't sink into darkness
+        shade={kind === 'bench' ? PLAYER_SHADE : undefined}
         outline={kind === 'cat' ? undefined : null}
         charW={charW}
         lineH={lineH}

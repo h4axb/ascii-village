@@ -1,7 +1,8 @@
 // Where the player can sit on a piece of furniture (the bench): per asset,
 // one area as fractions of its drawn box. x0..x1 is where along it they can
-// sit, y1 is where their FEET go (the seat's front edge); y0, the seat's
-// back, only shows the area in the editor. Set in the world editor (E,
+// sit, y1 is where the sitter's bottom rests (the seat's front edge: the
+// shorts end there, the legs hang below); y0, the seat's back, only shows the
+// area in the editor. Set in the world editor (E,
 // Markers tab, "Seats"), saved to src/data/seats.json through
 // POST /__dev/save-seats.
 import data from './data/seats.json';

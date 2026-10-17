@@ -10,14 +10,15 @@
 #   src/data/sit.json   the game's frames (sprites.ts SIT_ANIM): decoded from
 #       that SVG like the walk frames, columns doubled, shirt/shorts masks
 #
-# Colours snap to the standing player's own palette (src/data/player.json) so
-# the seated player matches the standing one; a colour that player.json
-# already draws keeps its glyph there, any other one takes the brightness
-# ramp's. Background = the page's neutral white (the shirt and shoes are a
+# Colours come from the standing player's own palette (src/data/player.json)
+# part by part (hat, hair, skin, shirt, shorts, shoes: light to light), so
+# sitting down doesn't change the player's colours; a colour keeps the glyph
+# player.json draws it with. Background = the page's neutral white (the shirt and shoes are a
 # warm white, so they stay).
 #
 #   python3 -I scripts/sit-from-ref.py
 # ---------------------------------------------------------------------------
+import colorsys
 import json
 import os
 import re
@@ -90,7 +91,59 @@ def glyph_for(key):
     return RAMP[round(lum / 255 * (len(RAMP) - 1))]
 
 
-keys = [[key_for(c) if c else None for c in row] for row in cells]
+# Same tones as standing: each part of the figure (hat, hair, skin, shirt,
+# shorts, shoes) takes the standing sprite's own colours for that part,
+# light to light: the reference's cells of a part ranked by brightness get
+# the standing part's colours at the same rank, as often as standing uses
+# them. Parts standing doesn't have (the bag strap, the closed eyes) snap to
+# the nearest colour (key_for).
+
+
+def part(c):
+    r, g, b = (v / 255 for v in c)
+    hue, sat, val = colorsys.rgb_to_hsv(r, g, b)
+    hue *= 360
+    if sat < 0.12 and val > 0.8:
+        return 'white'
+    if sat < 0.18:
+        return 'grey'
+    if 190 < hue < 250:
+        return 'blue'
+    if val < 0.45:
+        return None
+    if (hue < 15 or hue > 340) and sat > 0.45:
+        return 'red'
+    if hue < 30 and sat < 0.45 and val > 0.85:
+        return 'skin'
+    if 15 <= hue < 60:
+        return 'tan'  # the hat, its light cream included
+    return None
+
+
+lum = lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+stand = defaultdict(list)  # part -> standing keys, one per standing cell
+for row in player['colors']:
+    for k in row:
+        if k != ' ' and part(pal_rgb[k]):
+            stand[part(pal_rgb[k])].append(k)
+for p in stand:
+    stand[p].sort(key=lambda k: lum(pal_rgb[k]))
+ref = defaultdict(list)  # part -> reference cells
+for j, row in enumerate(cells):
+    for i, c in enumerate(row):
+        if c and part(c) in stand:
+            ref[part(c)].append((j, i))
+keys = [[None] * NC for _ in range(NR)]
+for p, where in ref.items():
+    where.sort(key=lambda ji: lum(cells[ji[0]][ji[1]]))
+    for n, (j, i) in enumerate(where):
+        k = stand[p][min(len(stand[p]) - 1, (2 * n + 1) * len(stand[p]) // (2 * len(where)))]
+        keys[j][i] = k
+        sit_pal[k] = pal[k]
+for j, row in enumerate(cells):
+    for i, c in enumerate(row):
+        if c and keys[j][i] is None:
+            keys[j][i] = key_for(c)
 grid = [[(k, glyph_for(k)) if k else None for k in row] for row in keys]
 
 

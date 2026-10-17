@@ -3256,8 +3256,9 @@ function Game() {
     setWalkDir(null);
   }
   // ---- sitting on a bench ----
-  // Where the player sits on `e`: their feet on the seat's front edge (its
-  // marked area, src/seats.ts), as near along it as where they stand now
+  // Where the player sits on `e`: the bottom of their shorts on the seat's
+  // front edge (its marked area, src/seats.ts), the legs hanging below it,
+  // as near along it as where they stand now
   function seatSpot(e: Ent): Pt | null {
     const a = seatOf(e.asset ?? e.kind);
     if (!a) return null;
@@ -3268,11 +3269,16 @@ function Game() {
     // feet from the rig's top-left, in tiles
     const half = (PLAYER_SCALE * Math.max(...character.sprite.map((l) => l.length))) / 2 / TILE_CH;
     const feet = (PLAYER_SCALE * character.sprite.length) / TILE_LN;
+    // the sit frame is drawn as tall as the standing player: the part of it
+    // below the shorts (legs, shoes) hangs over the seat's edge
+    const frame = S.SIT_ANIM?.frames[S.SIT_ANIM.frames.length - 1];
+    const lastShorts = frame?.shortsMask ? frame.shortsMask.reduce((r, l, i) => (l.trim() ? i : r), -1) : -1;
+    const below = frame && lastShorts >= 0 ? (feet * (frame.sprite.length - lastShorts - 1)) / frame.sprite.length : 0;
     const lo = e.x + a.x0 * wT + half;
     const hi = e.x + a.x1 * wT - half;
     const pc = playerRef.current.x + half;
     const cx = lo <= hi ? Math.max(lo, Math.min(hi, pc)) : (lo + hi) / 2;
-    return { x: cx - half, y: e.y + a.y1 * hT - feet };
+    return { x: cx - half, y: e.y + a.y1 * hT - feet + below };
   }
   // Where the player stands in front of `e` to sit down (and lands when
   // getting up): the first row below the bench, under the seat spot, the

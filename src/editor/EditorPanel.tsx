@@ -1059,8 +1059,8 @@ function SeatsEditor() {
     <div className="wed-group">
       <div className="wed-group-name">Seats</div>
       <div className="wed-hint">
-        Where the player sits on a bench: drag the seat's area. Its bottom edge is where their feet go, its left and right ends how far
-        along they can sit.
+        Where the player sits on a bench: drag the seat's area. Its bottom edge is where they rest (their shorts end there, the legs
+        hang below), its left and right ends how far along they can sit.
       </div>
       <div className="wed-row">
         <select value={slug} onChange={(e) => setSlug(e.target.value)}>

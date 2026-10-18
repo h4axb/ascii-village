@@ -1425,6 +1425,18 @@ function Game() {
   // planetary menu around the player avatar (bottom-left HUD)
   const [orbitOpen, setOrbitOpen] = useState(false);
   const [handMenu, setHandMenu] = useState(false); // equip/unequip popup
+  // a press anywhere but the avatar, an orbit button or the hand popup
+  // folds the orbit back in (the press still does its own thing)
+  useEffect(() => {
+    if (!orbitOpen) return;
+    const onDown = (ev: PointerEvent) => {
+      if ((ev.target as Element | null)?.closest?.('.hud-avatar, .hud-orbit-btn, .hud-hand-menu')) return;
+      setOrbitOpen(false);
+      setHandMenu(false);
+    };
+    window.addEventListener('pointerdown', onDown, true);
+    return () => window.removeEventListener('pointerdown', onDown, true);
+  }, [orbitOpen]);
 
   // ---- stages 15-18: the "wake up, meet Mitchy" in-world cinematic ----
   // See src/introPartB.ts for every tunable and src/DialogueBox.tsx/

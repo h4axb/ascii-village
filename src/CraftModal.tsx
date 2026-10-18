@@ -188,6 +188,7 @@ export default function CraftModal({
   resume,
   money,
   onSpend,
+  onBugReport,
   onConsume,
   onClose,
   confirmClose,
@@ -209,6 +210,8 @@ export default function CraftModal({
   resume?: { name: string; chat: ChatLine[] };
   money: number;
   onSpend: (coins: number) => void; // negative = refund
+  // an object the game does not know yet was reported for a next patch
+  onBugReport?: () => void;
   onConsume: (equip: boolean, item: ShopItem) => void; // spend token, equip if asked — does NOT close
   onClose: () => void;
   confirmClose: boolean; // App raises this on Esc / outside-click
@@ -399,6 +402,7 @@ export default function CraftModal({
             setBusyLine(null);
             return finish({ ok: false, reply: res.retry });
           }
+          if (res.reported) onBugReport?.();
           const qs = res.questions;
           if (!qs.length) return draw(undefined, { questions: [], skipped: false, ms: Date.now() - t0, outcome: 'crafted' });
           setStage(null);

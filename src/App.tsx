@@ -631,17 +631,24 @@ const FRESH_SHOP: Modal = {
 
 type Bubble = { text: string; width: number } | null;
 
+// what the player sees when they find something the game can't do yet (an
+// object it doesn't know: reported for a next patch, CraftModal onBugReport)
+const BUG_REPORT = {
+  title: "You've discovered a new bug!",
+  sub: "Thanks for helping us improve the game! The issue has been reported, and we'll try to add it in the next patch.",
+};
+
 // A first-discovery toast (see discover in Game): floats in at the top
 // centre, holds 2 s, floats out, then hands over to the next one.
 const DISCOVERY_MS = 200 + 3000 + 300;
-function DiscoveryToast({ title, sub, onDone }: { title: string; sub: string; onDone(): void }) {
+function DiscoveryToast({ title, sub, onDone, kicker = 'FIRST DISCOVERY' }: { title: string; sub: string; onDone(): void; kicker?: string }) {
   useEffect(() => {
     const t = window.setTimeout(onDone, DISCOVERY_MS);
     return () => window.clearTimeout(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="discovery-toast" role="status" style={{ animationDuration: `${DISCOVERY_MS}ms` }}>
-      <div className="discovery-kicker">FIRST DISCOVERY</div>
+      <div className="discovery-kicker">{kicker}</div>
       <div className="discovery-title">{title}</div>
       <div className="discovery-sub">{sub}</div>
     </div>
@@ -1347,6 +1354,9 @@ function Game() {
   const [discoveries, setDiscoveries] = useState<string[]>(() => saved?.discoveries ?? []);
   const discoveriesRef = useRef(discoveries);
   const [discoveryQueue, setDiscoveryQueue] = useState<DiscoveryId[]>([]);
+  // a crafting "error" the player found (an object the game doesn't know
+  // yet, reported for a next patch): the same toast, as a bug report
+  const [bugReport, setBugReport] = useState(0);
   // ---- daily allowances (see time.ts daySeedOf) ----
   // Stored with the day they belong to; a stale day just reads as zero, so
   // nothing has to actively reset them — same idiom as removedIds/shaken.
@@ -7065,7 +7075,16 @@ function Game() {
       )}
 
       {/* a first discovery: top centre, one at a time */}
-      {discoveryQueue[0] && (
+      {bugReport > 0 && (
+        <DiscoveryToast
+          key={`bug-${bugReport}`}
+          kicker="BUG REPORT"
+          title={BUG_REPORT.title}
+          sub={BUG_REPORT.sub}
+          onDone={() => setBugReport(0)}
+        />
+      )}
+      {!bugReport && discoveryQueue[0] && (
         <DiscoveryToast
           key={discoveryQueue[0]}
           title={DISCOVERIES[discoveryQueue[0]].title}
@@ -7533,6 +7552,7 @@ function Game() {
               }}
               money={money}
               onSpend={(coins) => setMoney((mo) => mo - coins)}
+              onBugReport={() => setBugReport(Date.now())}
               resume={modal.recraft ? { name: modal.recraft.name, chat: modal.recraft.chat } : undefined}
               onConsume={(equip, item) => consumeCraft(modal.token.ownedId, item, equip, modal.recraft?.replaces)}
               onClose={closeCraft}

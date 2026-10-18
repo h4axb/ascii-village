@@ -950,7 +950,9 @@ export interface CraftClarify {
 // draw (named from the prompt, a yes/no).
 // `retry`: the main object isn't a word the game knows (and the model
 // couldn't read it): Mitchy asks for another object instead of questions
-export type ClarifyResult = { questions: ClarifyQuestion[]; retry?: undefined } | { retry: string; questions?: undefined };
+// `reported`: a word the game didn't know was reported for a next patch
+// (the workshop shows the bug-report toast)
+export type ClarifyResult = { questions: ClarifyQuestion[]; retry?: undefined; reported?: string } | { retry: string; questions?: undefined; reported?: string };
 export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
   // a blocked prompt is refused by craftItem right after, without questions
   if (!checkPolicy(prompt).allowed) return { questions: [] };
@@ -993,11 +995,12 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
       questions: [
         {
           topic: parts.main,
-          q: `I don't know a "${parts.main}" yet. It might be added in a next patch. Shall I surprise you, or do you want to try another object?`,
+          q: `I don't know a "${parts.main}" yet. Shall I surprise you, or do you want to try another object?`,
           options: [surprise(closestReading(prompt)?.theme ?? parts.theme), { label: 'Try another object', effect: 'Type another object.', tryAgain: true }],
           noDecide: true,
         },
       ],
+      reported: parts.main,
     };
   }
   const unknown = [...new Set(parts.unknown.filter((w) => w !== parts.main))].slice(0, 3);

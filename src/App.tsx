@@ -564,6 +564,7 @@ type Modal =
       csel: number;
       poor: boolean;
       limited?: boolean; // tried to buy a token after today's 3 are gone
+      sellOnly?: boolean; // opened from Mitchy's Sell Items: no Buy switch
     }
   // carry the whole token object (not just its id) so the modal survives the
   // token being consumed into an item during the success→folded flow
@@ -1200,7 +1201,9 @@ const CINEMATIC_START = (() => {
   if (Number.isFinite(t) && t > 0) return t;
   return SHOT_LIST.find((x) => x.id === q.get('shot'))?.at ?? 0;
 })();
-const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[0-4]\/?$/.test(PATH)
+// /1 and /2 (the study orders) play it like / does: once for a new save,
+// never again once it's done (quest steps autosave)
+const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[034]\/?$/.test(PATH)
   ? 'skip'
   : /^\/intro(\/[0-4])?\/?$/.test(PATH) || INTRO_CINEMATIC || INTRO_OLD
     ? 'force'
@@ -3898,7 +3901,11 @@ function Game() {
     setStorages(s.storages);
     setBag([...s.bag, token]);
     setRemoved(new Set(s.removedIds));
-    setShaken(new Set(s.shaken));
+    // palms stay as part 1 left them (bare stays bare), and the dates shaken
+    // off them go: `removed` is back at the snapshot, so a date picked up
+    // after it would otherwise lie on the ground again
+    setShaken((cur) => new Set([...s.shaken, ...cur]));
+    setDynamicEnts((es) => es.filter((e) => e.kind !== 'date'));
     setCrops(s.plantedCrops);
     setPlacedItems(s.placed ?? []);
     mitchyPosRef.current = s.mitchyPos ?? null;
@@ -3940,6 +3947,10 @@ function Game() {
       pond: () => fillAtPond(),
       plantSeed: () => plantBase('seed'),
       setPart: (part: QuestState['part']) => questRef.current && setQuest({ ...questRef.current, part, step: 0 }),
+      // (tests) jump to a step, run its hint, and what the hint did
+      setStep: (part: QuestState['part'], step: number) => questRef.current && setQuest({ ...questRef.current, part, step }),
+      hint: () => runHint(),
+      hintState: () => ({ pan, marks: hintMarks, card: hintCard?.pages[0] ?? null, toast }),
       equip: (ownedId: string) => {
         const o = bag.find((b) => b.ownedId === ownedId);
         if (o) equipOwned(o);
@@ -4670,11 +4681,18 @@ function Game() {
     if (t === 'house') return of(ents.find((e) => e.id === 'house'));
     if (t === 'mitchy') return of(ents.find((e) => e.id === 'cat'));
     if (t === 'pond') return of(nearestPond()?.e ?? ents.find(isPond));
-    if (t === 'garden') return of(ents.find((e) => e.kind === 'gardenbed'));
+    // the bed isn't in `ents` (the garden block draws it), so its spot comes
+    // from the plot itself
+    const bed = () => {
+      const r = plot.rect;
+      const cx = (r.x0 + r.x1 + 1) / 2;
+      return { id: 'garden', top: { x: cx, y: r.y0 }, c: { x: cx * TILE_CH, y: ((r.y0 + r.y1 + 1) / 2) * TILE_LN } };
+    };
+    if (t === 'garden') return bed();
     if (t === 'crop') {
       const c = crops.find((x) => x.id === quest?.seedCrop) ?? crops[0];
       const sl = c ? plot.slots[c.slot] : null;
-      if (!sl) return of(ents.find((e) => e.kind === 'gardenbed'));
+      if (!sl) return bed();
       return { id: `crop-${c!.slot}`, top: { x: sl.x + 0.5, y: sl.y }, c: { x: (sl.x + 0.5) * TILE_CH, y: (sl.y + 0.5) * TILE_LN } };
     }
     return of(nearestResources(1)[0]);
@@ -4704,7 +4722,7 @@ function Game() {
     if (!h.focus) return;
     const spot = hintSpot(h.focus);
     if (!spot) {
-      showToast('nothing like that nearby right now.');
+      showToast(h.focus === 'resource' ? 'nothing left to pick here. Try another island.' : 'nothing like that nearby right now.');
       return;
     }
     // lock, glide there, mark it, hold, glide back, unlock
@@ -5067,7 +5085,8 @@ function Game() {
     if (sel === 1) {
       setModal({ t: 'recraft' });
     } else if (sel === 2) {
-      setModal(FRESH_SHOP);
+      // Sell Items: straight to the sell side, without the Buy switch
+      setModal({ ...(FRESH_SHOP as Extract<Modal, { t: 'shop' }>), tab: 'sell', sellOnly: true });
     } else {
       // Talk opens the chat window (MitchyTalk.tsx); her world speech
       // bubble would only show blurred behind it
@@ -7470,6 +7489,7 @@ function Game() {
           {modal.t === 'shop' && (
             <ShopSheet
               tab={modal.tab}
+              sellOnly={!!modal.sellOnly}
               inv={inv}
               money={money}
               pick={modal.pick}
@@ -7915,8 +7935,10 @@ function ShopSheet({
   onSell,
   onClose,
   buy,
+  sellOnly = false,
 }: {
   tab: 'sell' | 'buy';
+  sellOnly?: boolean;
   inv: Record<ItemType, number>;
   money: number;
   pick: ItemType | null;
@@ -7939,7 +7961,7 @@ function ShopSheet({
   const price = item ? basePrice(item) : 0;
   const n = item ? Math.max(1, Math.min(amount, inv[item])) : 0;
 
-  const rail = (
+  const rail = sellOnly ? undefined : (
     <>
       {(['buy', 'sell'] as const).map((t) => (
         <button

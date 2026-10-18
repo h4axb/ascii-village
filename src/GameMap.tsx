@@ -45,6 +45,17 @@ const pickCell = (pxPerCell: number) =>
 // (ColoredSprite's solidCells, and the pond canvas).
 const SOLID_KINDS = new Set(['house', 'bridge', 'pond']);
 const SKIP_KINDS = new Set(['hotspot', 'blocker', 'cat', 'ghost']);
+// the kinds the game draws with a dark backing behind each glyph (App.tsx
+// solidCells): zoomed out, such a cell reads as its backing with a bit of
+// glyph colour, so the map mixes the two instead of using the bright glyph
+// colour (else palms and the like come out far brighter than in game)
+const BACKED_KINDS = new Set(['gardenbed', 'house', 'bridge', 'shop', 'palm', 'boulder', 'grasshalm', 'fence', 'gate', 'date', 'bench']);
+const GLYPH_SHARE = 0.4; // how much of a cell its glyph covers
+function backed(hex: string): string {
+  const a = parseInt(darken(hex, 0.55).slice(1), 16), b = parseInt(hex.slice(1), 16);
+  const m = (s: number) => Math.round(((a >> s) & 255) * (1 - GLYPH_SHARE) + ((b >> s) & 255) * GLYPH_SHARE);
+  return '#' + ((m(16) << 16) | (m(8) << 8) | m(0)).toString(16).padStart(6, '0');
+}
 
 const hexOf = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
@@ -134,7 +145,8 @@ function paintMap(c: HTMLCanvasElement, cw: number, font: string, ents: Ent[], s
         // covers little of it and the sprite looks faded, so the cell is
         // filled with its colour; big cells keep their glyph
         if (w < 5) {
-          ctx.fillStyle = hex ?? base;
+          const c = hex ?? rgbHex(base);
+          ctx.fillStyle = solid || BACKED_KINDS.has(e.kind) ? backed(c) : c;
           ctx.fillRect(x0, y0, w + 0.35, h + 0.35);
           continue;
         }

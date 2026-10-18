@@ -173,10 +173,18 @@ export function namedOf(prompt: string): { ref: RefDoc; phrase: string } | null 
       const f = fold(t).replace(/\s+/g, ' ').trim();
       // (a bare colour is no name: "golden" for the golden retriever)
       if (f.length < 3 || DOG_WORDS.includes(f) || (!f.includes(' ') && isColourWord(f))) continue;
-      // (the head word decides: "golden retriever" for "retriever", but not
-      // "dragon" for "dragon boat")
-      const head = (a: string, b: string) => a === b || a.endsWith(` ${b}`);
-      if (mainF && !head(mainF, f) && !head(f, mainF)) continue;
+      // a name that only describes another object doesn't count: right
+      // before it ("dragon boat") or in its details ("a ship with a dragon
+      // head"); a name after its own adjectives ("un lapin rose") does
+      // (French, Spanish, Italian put adjectives after the noun: "un lapin
+      // rose" is a pink bunny, no compound)
+      if (mainF && mainF !== f && !f.endsWith(` ${mainF}`)) {
+        if (` ${mainF} `.includes(` ${f} `)) continue; // inside the object's own name ("dragon boat")
+        if (!ADJ_AFTER.test(p) && !isColourWord(mainF) && (p.includes(` ${f} ${mainF} `) || p.includes(` ${f} ${mainF}s `))) continue;
+        const at = p.indexOf(` ${mainF} `);
+        const nameAt = Math.max(p.indexOf(` ${f} `), p.indexOf(` ${f}s `), p.indexOf(` ${f}es `));
+        if (at >= 0 && nameAt > at && DETAIL_SPLIT.test(p.slice(at, nameAt + 1))) continue;
+      }
       if (p.includes(` ${f} `) || p.includes(` ${f}s `) || p.includes(` ${f}es `)) if (!best || f.length > best.phrase.length) best = { ref: r, phrase: f };
     }
   if (best) return best;
@@ -200,6 +208,10 @@ export function colourPhrasesOf(prompt: string): ColourPhrase[] {
   return colourPhrases(ws).filter((p) => !ws.slice(p.start, p.end).every((w) => name.includes(w)));
 }
 
+// the words that start a detail phrase ("with a hat", "mit Hut")
+const DETAIL_SPLIT = /\s(with|and|on|of|having|that|which|who|mit|und|avec|et|con|met|en)\s/;
+// a prompt in a language whose adjectives follow the noun
+const ADJ_AFTER = /^ (un|une|le|la|les|el|los|las|il|lo|uno|una|mon|ma|mi) /;
 const MODAL_WORDS = new Set(['can', 'could', 'kann']);
 const VERB_BEFORE = new Set(['that', 'which', 'who', 'it', 'i', 'you', 'he', 'she', 'they', 'we', 'er', 'sie', 'es', 'der', 'die', 'das']);
 // `force`: match the words against this body (a ship chosen by its rules)

@@ -705,7 +705,12 @@ async function fallbackCraft(prompt: string, opts: CraftOpts, read: PromptRead |
     const r = await craftWithRefs(prompt.replace(/[\p{L}\p{N}'-]+/gu, (w) => (fallbackSubject(w).word === fixed ? fixed : w)), undefined, { ...opts, noModel: true }, read).catch(() => null);
     if (r) return r;
   }
-  const category: Category = subject.category ?? inferCategory(parseSpec(prompt).category);
+  // the category words decide when they know the object (a lamp is
+  // furniture, a sword a tool, a hat clothing); the themes only for the rest
+  // (a racoon, a llama: pets), since the theme lists also hold things found
+  // on ships or in gardens
+  const specCat = parseSpec(prompt).category;
+  const category: Category = specCat !== 'misc' ? inferCategory(specCat) : (subject.category ?? inferCategory(specCat));
   const word = subject.word ?? prompt.trim().split(/\s+/).pop() ?? '';
   const name = (word || 'Mystery Thing').slice(0, 18).replace(/^\w/, (c) => c.toUpperCase());
   const d = mockCraftDescribe(prompt, category);
@@ -873,7 +878,10 @@ async function craftWithRefs(
   const category = gameCategoryOf(m.body);
   const t = text ?? refDescription(m);
   // no model text: the words before "with", without a leading article
-  const head = prompt.trim().split(/\s+(?:with|and|that|which)\s+/i)[0].replace(/^(a|an|the|my)\s+/i, '');
+  const head = prompt
+    .trim()
+    .split(/\s+(?:with|and|that|which|mit|und|avec|et|qui|con|que|met|die|dat)\s+/i)[0]
+    .replace(/^(a|an|the|my|ein|eine|einen|einem|der|die|das|mein|meine|un|une|le|la|les|mon|ma|el|los|las|uno|una|il|lo|mi|een|het|de|mijn)\s+/i, '');
   const short = head.length <= 24 ? head : head.slice(0, 24).replace(/\s+\S*$/, '');
   const name = text?.name || short.replace(/^\w/, (ch) => ch.toUpperCase()) || m.body.title;
   const item = buildCraftedItem(category, name, prompt, { funcDesc: t.fn.narrative });

@@ -1201,6 +1201,9 @@ const CINEMATIC_START = (() => {
   if (Number.isFinite(t) && t > 0) return t;
   return SHOT_LIST.find((x) => x.id === q.get('shot'))?.at ?? 0;
 })();
+// The test links /1 and /2 (not the players' /intro/1, /intro/2) can skip
+// the intro, in the live game too
+const SKIP_INTRO_LINK = /^\/[12]\/?$/.test(PATH);
 // /1 and /2 (the study orders) play it like / does: once for a new save,
 // never again once it's done (quest steps autosave)
 const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[034]\/?$/.test(PATH)
@@ -7147,31 +7150,31 @@ function Game() {
           all, so its full-bleed 16:9 art never gets pillarboxed/cropped by
           bars sized for a different purpose. */}
       <Letterbox visible={letterboxVisible} open={letterboxOpen} />
-      {import.meta.env.DEV && !introDone && (
+      {(import.meta.env.DEV || SKIP_INTRO_LINK) && !introDone && (
         <button
           type="button"
           onClick={skipIntro}
           style={{
             position: 'fixed',
-            right: 10,
-            bottom: 10,
+            right: 14,
+            bottom: 14,
             // Topmost of the whole intro stack — above IntroA (10000),
             // Letterbox (10001) and .introb-dialogue-wrap (10005, both
             // styles.css/Letterbox.tsx) — it must stay clickable through
             // every stage, never covered by the letterbox bars it now also
             // renders during.
             zIndex: 10010,
-            font: '11px ui-monospace, monospace',
-            color: '#e4e6f0',
-            background: '#2a2a38',
-            border: '1px solid #3d3d4d',
-            borderRadius: 4,
-            padding: '5px 10px',
+            // the design system's option look (ui.css .ds-option)
+            font: '13px var(--game-font, ui-monospace, monospace)',
+            color: 'var(--ds-text, #deddb6)',
+            background: 'var(--ds-dialogue, rgba(28, 32, 20, 0.88))',
+            border: '1px solid var(--ds-line, rgba(222, 221, 182, 0.3))',
+            borderRadius: 'var(--ds-radius-sm, 7px)',
+            padding: '8px 16px',
             cursor: 'pointer',
-            opacity: 0.85,
           }}
         >
-          Skip Intro
+          Skip intro
         </button>
       )}
       {dialogue && (

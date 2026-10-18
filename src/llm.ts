@@ -29,7 +29,6 @@ import {
   isKind,
   type Prefs,
   planAndRender,
-  suggestAlternatives,
   analyzeCraft,
   SIZE_QUESTION,
   MOOD_PRESETS,
@@ -54,6 +53,8 @@ import { readPrompt, type PromptRead } from './craft/readPrompt';
 import { SVG_PROMPT, coverage, parseDrawing, rasterSvg } from './craft/svgDraw';
 import { LINK } from './link';
 import { closestWords, kindOf, promptParts, themeOfObject, type Theme } from './craft/lexicon';
+import { fallbackSubject, missingAssetNote } from './craft/fallbackCraft';
+import { renderPlan, templatePlan } from './craft/spritePipeline';
 
 // ---- the fallback's surprise and closest reading (clarifyPrompt) ----
 const THEMES: Theme[] = ['ships', 'watering', 'pets'];
@@ -492,7 +493,14 @@ export async function craftItem(prompt: string, ui?: CraftUiHooks, opts: CraftOp
   if (opts.clarify?.dropDetails?.length) prompt = withoutDetails(prompt, opts.clarify.dropDetails);
   const read = await readPrompt(prompt);
   if (read.fixes.length) console.info('[craft] read as', JSON.stringify(read.fixed), read.fixes);
-  const r = await craftFixed(read.fixed, ui, opts, read);
+  // crafting never fails: anything that breaks on the way crafts the
+  // fallback (blocked prompts are still refused inside)
+  let r: CraftResult;
+  try {
+    r = await craftFixed(read.fixed, ui, opts, read);
+  } catch (err) {
+    r = await fallbackCraft(read.fixed, opts, read, String(err));
+  }
   if (!r.ok) return r;
   r.item.tags = (r.item.tags ?? []).map((t) => (t.startsWith('prompt: ') ? `prompt: ${typed.trim()}` : t));
   return read.fixes.length ? { ...r, fixes: read.fixes } : r;
@@ -514,7 +522,10 @@ async function craftFixed(prompt: string, ui: CraftUiHooks | undefined, opts: Cr
   // (watering cans and dogs come from the library on every link:
   // src/data/refs/watering-can-* and pet-dog-*)
   if ((REF_CRAFT_ON || isAlwaysRef(matchRefs(prompt))) && hasRefBodies()) {
-    const r = await craftWithRefs(prompt, ui, opts, read);
+    const r = await craftWithRefs(prompt, ui, opts, read).catch((err) => {
+      console.warn('[craft] reference craft failed:', err);
+      return null;
+    });
     if (r) return r;
   }
 
@@ -545,10 +556,10 @@ async function craftFixed(prompt: string, ui: CraftUiHooks | undefined, opts: Cr
       }
       const prefsText = [opts.prefs ? planPrefsText(planPrefs) : '', opts.clarify?.guidance ?? ''].filter(Boolean).join('\n\n');
       const temperature = opts.prefs ? temperatureOf(planPrefs) : undefined;
-      // the /1 link never ends without an item: a plan call that breaks
-      // (other than the AI being unreachable) goes on with no plan, and the
-      // pipeline's rescue draws it (spritePipeline.ts neverFail)
-      const neverFail = !!opts.noAlts;
+      // no link ever ends without an item: a plan call that breaks (other
+      // than the AI being unreachable: the fallback below) goes on with no
+      // plan, and the pipeline's rescue draws it (spritePipeline.ts neverFail)
+      const neverFail = true;
       let plan: Awaited<ReturnType<typeof planCraft>>;
       try {
         plan = await planCraft(prompt, spec.category, chatJSON, {
@@ -558,7 +569,7 @@ async function craftFixed(prompt: string, ui: CraftUiHooks | undefined, opts: Cr
           temperature,
         });
       } catch (err) {
-        if (!neverFail || err instanceof AiServiceError) throw err;
+        if (err instanceof AiServiceError) throw err;
         console.warn('[craft] plan call failed, rescuing:', err);
         plan = { fit: true, sensitive: false, sizeAdjust: 'default', sizeClass: opts.clarify?.size ?? 'medium', name: '', width: 0, height: 0, parts: [], regions: [] };
       }
@@ -619,28 +630,10 @@ async function craftFixed(prompt: string, ui: CraftUiHooks | undefined, opts: Cr
       craftLog.push(log);
       console.info('[craft]', log);
 
-      if (!sprite && opts.noAlts) {
-        return {
-          ok: false,
-          reply: "Hmm, I couldn't get that one to come out right. Maybe change your idea a little and we try again?",
-          error: error ?? 'generation failed',
-        };
-      }
-      if (!sprite) {
-        // BENIGN failure (sensitive/mismatch were filtered above): let Mitchy
-        // offer three strategy-diverse alternatives as clickable options.
-        const s = await suggestAlternatives(prompt, category, error ?? 'generation failed', chatJSON, {
-          model: MODELS.fast,
-          fallbackModel: MODELS.fastFallback,
-        });
-        if (s) return { ok: false, reply: s.intro, suggestions: s.options };
-        return {
-          ok: false,
-          reply:
-            `oops... i tried a few times but couldn't get "${prompt}" right ` +
-            `(${error ?? 'generation failed'}). maybe describe it a bit differently?`,
-        };
-      }
+      // nothing drawn, or only the pipeline's stand-in shape: the never-fail
+      // fallback (its unified reading picks the shape; Mitchy says the asset
+      // is missing). A plan of the AI's own, rendered leniently, stays.
+      if (!sprite || rescue === 'template') return fallbackCraft(prompt, opts, read, error ?? 'only the template shape');
 
       const name =
         (sprite.name && sprite.name.trim()) ||
@@ -683,33 +676,58 @@ async function craftFixed(prompt: string, ui: CraftUiHooks | undefined, opts: Cr
       return untrained ? { ...out, note: untrained } : out;
     } catch (err) {
       console.warn('[craft] pipeline error:', err);
-      if (err instanceof AiServiceError) return { ok: false, reply: '', aiDown: aiDownOf(err) };
-      return {
-        ok: false,
-        reply: "oops... something went wrong on my workbench. give it another try in a moment?",
-      };
+      // the AI unreachable, or anything else breaking: the fallback
+      return fallbackCraft(prompt, opts, read, err instanceof AiServiceError ? `AI unreachable (${err.failure})` : String(err));
     }
   }
+  // no AI at all (no key): the fallback
+  return fallbackCraft(prompt, opts, read, 'offline');
+}
 
-  await delay(900);
-  // No cross-category rejection any more — one universal token crafts
-  // anything, so the category is simply inferred and the craft proceeds.
-  const offlineSpec = parseSpec(prompt);
-  const category = inferCategory(offlineSpec.category);
-  const name = prompt.trim().slice(0, 18).replace(/^\w/, (c) => c.toUpperCase()) || 'Mystery Thing';
-  // Offline mode still gets real (mock) description/tags/texture — parseSpec
-  // and textureModifierFor are pure local keyword-matching (no LLM needed at
-  // all), and craftDescribe degrades to its own mock text when !llmEnabled,
-  // so there's no reason to skip this path just because there's no API key.
-  const description = await craftDescribe(prompt, category);
-  const item = buildCraftedItem(category, name, prompt, {
-    funcDesc: description.fn.narrative,
-  });
-  item.fn = description.fn;
-  item.desc = description.description;
-  item.tags = [...description.tags, `prompt: ${prompt.trim()}`];
-  item.textureModifier = textureModifierFor(offlineSpec.finish);
-  return opts.prefs ? { ok: true, item, kind: category, applied: {} } : { ok: true, item };
+// The never-fail fallback, for every link and both designs: the library body
+// when one fits (no AI call: an outage still gives real pictures for known
+// things), else the built-in shape for what the unified word lists read the
+// prompt as (craft/fallbackCraft.ts) - and Mitchy says that asset is missing
+// and noted for a next patch (logged with the missing references).
+async function fallbackCraft(prompt: string, opts: CraftOpts, read: PromptRead | undefined, why: string): Promise<CraftResult> {
+  console.warn('[craft] fallback:', why);
+  if (hasRefBodies() && matchRefs(prompt).body) {
+    const r = await craftWithRefs(prompt, undefined, { ...opts, noModel: true }, read).catch((err) => {
+      console.warn('[craft] fallback: library failed:', err);
+      return null;
+    });
+    if (r) return r;
+  }
+  const subject = fallbackSubject(prompt);
+  const category: Category = subject.category ?? inferCategory(parseSpec(prompt).category);
+  const word = subject.word ?? prompt.trim().split(/\s+/).pop() ?? '';
+  const name = (word || 'Mystery Thing').slice(0, 18).replace(/^\w/, (c) => c.toUpperCase());
+  const d = mockCraftDescribe(prompt, category);
+  const item = buildCraftedItem(category, name, prompt, { funcDesc: d.fn.narrative });
+  try {
+    // the player's colour (the answer, else the first colour said) and size
+    const said = colourPhrasesOf(prompt)[0]?.base;
+    const rgb = said ? colourOf(said) : null;
+    const colour = pickedHex(opts.clarify?.colour) ?? (rgb ? '#' + rgb.map((v) => v.toString(16).padStart(2, '0')).join('') : undefined);
+    const size = opts.clarify?.size ?? read?.size ?? 'medium';
+    const sprite = renderPlan(prompt, templatePlan(category, name, colour, size));
+    item.sprite = sprite.lines;
+    if (sprite.palette && sprite.colors) {
+      item.palette = sprite.palette;
+      item.colors = sprite.colors;
+    }
+    if (sprite.resolutionScale) item.scale = sprite.resolutionScale;
+  } catch (err) {
+    // (the category's own sprite stays)
+    console.warn('[craft] fallback: shape failed:', err);
+  }
+  item.fn = d.fn;
+  item.desc = d.description;
+  item.tags = [...d.tags, `prompt: ${prompt.trim()}`];
+  item.textureModifier = textureModifierFor(parseSpec(prompt).finish);
+  logRefCraft(prompt, 'planner', null, word ? [word] : []);
+  const note = missingAssetNote(subject.word);
+  return opts.prefs ? { ok: true, item, kind: category, applied: {}, note } : { ok: true, item, note };
 }
 
 // /4: one smart-model call draws the item as an SVG; cleaned, drawn on a
@@ -765,7 +783,7 @@ async function craftDrawn(prompt: string, ui: CraftUiHooks | undefined, read: Pr
 async function craftWithRefs(
   prompt: string,
   ui: CraftUiHooks | undefined,
-  opts: { prefs?: boolean; clarify?: CraftClarify },
+  opts: { prefs?: boolean; clarify?: CraftClarify; noModel?: boolean },
   read?: PromptRead,
 ): Promise<CraftResult | null> {
   // the clarify answer: its own hex ("Sky blue"), else its colour word
@@ -792,7 +810,7 @@ async function craftWithRefs(
     : '';
   let text: { description: string; tags: string[]; fn: ItemFunction; name?: string } | null = null;
   let via: 'match' | 'model' = 'match';
-  if (m.needsModel && llmEnabled) {
+  if (m.needsModel && llmEnabled && !opts.noModel) {
     try {
       const raw = await chatJSON<Record<string, unknown>>(
         [
@@ -828,7 +846,7 @@ async function craftWithRefs(
   let note: string | undefined;
   const phrases = colourPhrasesOf(prompt);
   if (phrases.length) {
-    const exact = m.body ? await craftColours(prompt, m.body) : null;
+    const exact = m.body && !opts.noModel ? await craftColours(prompt, m.body) : null;
     if (exact) m = applyColours(m, exact);
     else note = fallbackNote(phrases) ?? undefined;
   }

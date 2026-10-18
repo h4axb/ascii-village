@@ -32,7 +32,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useMitchyLook } from './useMitchyLook';
 import * as S from './sprites';
-import { craftItem, mitchyChat, getMitchyLine, preflightCraft, clarifyPrompt, AiServiceError, aiDownOf } from './llm';
+import { craftItem, mitchyChat, getMitchyLine, preflightCraft, clarifyPrompt } from './llm';
 import type { AiDown, ClarifyQuestion, CraftClarify, CraftConcept, OwnedItem, ShopItem } from './llm';
 import { AiDownPopup, AI_RETRY_MS, noteAiDown, clearAiDown } from './AiDownPopup';
 import { clarifyGuidance } from './craft';
@@ -417,10 +417,10 @@ export default function CraftModal({
           push({ who: 'mitchy', kind: 'text', text: qs[0].q });
         }).catch((err: unknown) => {
           if (closed.current) return;
-          goOffline(
-            err instanceof AiServiceError ? aiDownOf(err) : { failure: 'server', status: null, detail: String(err) },
-            ask,
-          );
+          // no questions without the AI: crafting goes on (it never fails,
+          // llm.ts fallbackCraft)
+          console.warn('[craft] questions failed, crafting without them:', err);
+          draw(undefined, { questions: [], skipped: false, ms: Date.now() - t0, outcome: 'crafted' });
         });
       };
       ask();

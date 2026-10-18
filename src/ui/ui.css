@@ -2639,3 +2639,17 @@
   flex: none;
   vertical-align: -3px;
 }
+
+/* (/4) the AI's own drawing next to its glyph result */
+.cw3-drawing {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cw3-drawing img {
+  width: 128px;
+  height: 128px;
+  image-rendering: auto;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--ds-radius-sm);
+}

@@ -118,7 +118,8 @@ type Turn =
   | { who: 'mitchy'; kind: 'result'; item: ShopItem; prompt: string; status?: string; tag?: string; made?: string[] }
   | { who: 'mitchy'; kind: 'alts'; intro: string; options: string[] }
   | { who: 'mitchy'; kind: 'concepts'; concepts: [CraftConcept, CraftConcept]; surprise: string }
-  | { who: 'mitchy'; kind: 'plan' }; // (clarify) the plan panel, live from `clar`
+  | { who: 'mitchy'; kind: 'plan' } // (clarify) the plan panel, live from `clar`
+  | { who: 'mitchy'; kind: 'drawing'; src: string }; // (/4) the AI's own drawing, before it became glyphs
 
 // /1: how long a finished craft is shown on its own before the rating
 const RESULT_PAUSE_MS = 1500;
@@ -187,6 +188,7 @@ export default function CraftModal({
   resume,
   money,
   onSpend,
+  onBugReport,
   onConsume,
   onClose,
   confirmClose,
@@ -208,6 +210,8 @@ export default function CraftModal({
   resume?: { name: string; chat: ChatLine[] };
   money: number;
   onSpend: (coins: number) => void; // negative = refund
+  // an object the game does not know yet was reported for a next patch
+  onBugReport?: () => void;
   onConsume: (equip: boolean, item: ShopItem) => void; // spend token, equip if asked — does NOT close
   onClose: () => void;
   confirmClose: boolean; // App raises this on Esc / outside-click
@@ -389,10 +393,17 @@ export default function CraftModal({
         setStage('thinking');
         setBusyLine('Ooh, let me think about that for a second.');
         const t0 = Date.now();
-        void clarifyPrompt(craftPrompt).then((qs) => {
+        void clarifyPrompt(craftPrompt).then((res) => {
           if (closed.current) return;
           setAiDown(null);
           clearAiDown();
+          // an object the game doesn't know: Mitchy asks for another one
+          if (res.retry !== undefined) {
+            setBusyLine(null);
+            return finish({ ok: false, reply: res.retry });
+          }
+          if (res.reported) onBugReport?.();
+          const qs = res.questions;
           if (!qs.length) return draw(undefined, { questions: [], skipped: false, ms: Date.now() - t0, outcome: 'crafted' });
           setStage(null);
           setBusyLine(null);
@@ -424,6 +435,9 @@ export default function CraftModal({
         setPhase('success');
         if (rework) setAdjusted(true);
         if (how.surprise) push({ who: 'mitchy', kind: 'text', text: "Ta-da! Here's what I came up with." });
+        // a typo the prompt reading fixed (craft/readPrompt.ts): said once, softly
+        if (r.fixes?.length)
+          push({ who: 'mitchy', kind: 'text', text: `(I read ${r.fixes.slice(0, 3).map(([a, b]) => `"${a}" as ${b}`).join(', ')}.)` });
         const kind = feedback && isKind(r.kind) ? r.kind : null;
         const rated = feedback || clarify;
         push({
@@ -441,6 +455,7 @@ export default function CraftModal({
               ? { status: 'There it is. What do you think?' }
               : {}),
         });
+        if (r.refImage) push({ who: 'mitchy', kind: 'drawing', src: r.refImage });
         // a colour the helper couldn't mix exactly, or (/1) a first try without
         // a reference picture: Mitchy says so under the result
         if (r.note) push({ who: 'mitchy', kind: 'text', text: r.note });
@@ -490,10 +505,25 @@ export default function CraftModal({
     const c = clarRef.current;
     if (!c || c.locked || c.step >= c.questions.length) return;
     const q = c.questions[c.step];
-    push({ who: 'me', kind: 'text', text: pick === null ? YOU_DECIDE : q.options[pick].label });
+    const o = pick === null ? null : q.options[pick];
+    push({ who: 'me', kind: 'text', text: pick === null ? YOU_DECIDE : o!.label });
+    // "Try again" / "Try another object": back to typing, nothing crafted
+    if (o?.tryAgain) {
+      setClar(null);
+      setPhase('failed');
+      setInput(c.prompt.slice(0, PROMPT_MAX));
+      push({ who: 'mitchy', kind: 'text', text: 'No problem! Tell me another idea.' });
+      return;
+    }
     const picks = [...c.picks];
     picks[c.step] = pick;
     const step = c.step + 1;
+    // the only question (the closest reading, a surprise): craft right away
+    if (o?.final) {
+      clarRef.current = { ...c, picks, step };
+      commitClar(false);
+      return;
+    }
     if (step < c.questions.length) push({ who: 'mitchy', kind: 'text', text: c.questions[step].q });
     else {
       push({
@@ -524,6 +554,9 @@ export default function CraftModal({
       colour: chosen.find((o) => o.colour)?.colour,
       surprise: chosen.some((o) => o.surprise),
       dropDetails: chosen.flatMap((o) => o.drop ?? []),
+      replace: chosen.flatMap((o) => (o.replace ? [o.replace] : [])),
+      rewrite: chosen.find((o) => o.rewrite)?.rewrite,
+      themeSurprise: chosen.find((o) => o.surpriseTheme)?.surpriseTheme,
     };
     c.run(cl, clarLog(c, picks, skipped, 'crafted'));
   }
@@ -900,6 +933,16 @@ export default function CraftModal({
   } else {
     thread.forEach((t, i) => {
       if (t.kind === 'text') add(t.who, <Bubble key={i}>{t.text}</Bubble>);
+      else if (t.kind === 'drawing')
+        add(
+          t.who,
+          <Bubble key={i}>
+            <div className="cw3-drawing">
+              <span className="ds-muted">My drawing, before it became glyphs:</span>
+              <img src={t.src} alt="Mitchy's drawing" width={128} height={128} />
+            </div>
+          </Bubble>,
+        );
       else if (t.kind === 'alts') add('mitchy', <Bubble key={i}>{t.intro}</Bubble>);
       else if (t.kind === 'plan') {
         if (clar)

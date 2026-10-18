@@ -24,6 +24,7 @@ import { buildAtlas } from '../glyph/atlas';
 import { compose, decodeMask, type DetailRegion, type Recipe, type RefDoc } from '../glyph/refs';
 import { bakedToSprite } from '../glyph/sprite';
 import { MATERIALS } from './materials';
+import { applySurprise } from './surpriseLib';
 import { PALETTE } from './vocab';
 import { colourPhrases, fitToGame, gameColourHint, isColourWord, type ColourPhrase } from './colours';
 import { parseGameplayIntent, parseItemFunction, MODIFIER_PROMPT, NEUTRAL_MODIFIERS, type ItemFunction } from './functions';
@@ -84,6 +85,8 @@ const SYNONYMS: Record<string, string[]> = {
   boat: [
     'boat', 'ship', 'sloop', 'sailboat', 'raft', 'canoe', 'yacht', 'vessel', 'galleon', 'dinghy',
     'boot', 'schiff', 'segelschiff', 'piratenschiff', 'floss', 'bateau', 'navire', 'barco', 'barca', 'nave', 'schip', 'barque',
+    // the small boats (shapeShip picks one of the little wooden boats for these)
+    'rowboat', 'kayak', 'kanu', 'ruderboot', 'radeau', 'balsa', 'zattera', 'vlot',
   ],
   cart: ['cart', 'wagon', 'car', 'carriage', 'buggy'],
   'watering-can': ['watering', 'can', 'sprinkler'],
@@ -141,6 +144,9 @@ export interface RefMatch {
   // a known style's own features (a viking ship's dragon prow and shields,
   // SHIP_STYLES), drawn with whatever details the model adds
   styleDetails?: RefChoice['details'];
+  // the surprise (surpriseLib.ts): a decoration added to the picture,
+  // placed from the item's silhouette; `seed` keeps it stable per prompt
+  surprise?: { seed: string; only?: string };
 }
 
 const FUNCTION_WORDS = /\b(that|which|can|could|lets?|makes?|named|called|faster|fast|float|floats|fly|flies|shoots?|glows?|heals?)\b/;
@@ -185,9 +191,15 @@ export function colourPhrasesOf(prompt: string): ColourPhrase[] {
   return colourPhrases(ws).filter((p) => !ws.slice(p.start, p.end).every((w) => name.includes(w)));
 }
 
+const MODAL_WORDS = new Set(['can', 'could', 'kann']);
+const VERB_BEFORE = new Set(['that', 'which', 'who', 'it', 'i', 'you', 'he', 'she', 'they', 'we', 'er', 'sie', 'es', 'der', 'die', 'das']);
 // `force`: match the words against this body (a ship chosen by its rules)
 export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
-  const ws = words(prompt).map(sing);
+  // "can" after a pronoun or "that / which / who" is a verb ("a cat that
+  // can fly"), never the watering can
+  const ws = words(prompt)
+    .filter((w, i, all) => !(MODAL_WORDS.has(w) && VERB_BEFORE.has(all[i - 1] ?? '')))
+    .map(sing);
   const has = (w: string) => ws.includes(sing(w));
   const used = new Set<string>();
   // body: one asked for by name first (a dog breed, your dragon), else the
@@ -448,7 +460,8 @@ export function choiceToMatch(c: RefChoice, guess: RefMatch): (RefMatch & { deta
 // Three references, three variants (re-bakes of one count as the same):
 // the classic garden can, the golden can and the can with the flower on top.
 // Plain wishes alternate between classic and golden for shape diversity;
-// the flower can comes from "flower"/"blooming" or the surprise answer.
+// the flower can comes from "flower"/"blooming" (a surprise is a decoration
+// from surpriseLib.ts, on any variant).
 export type CanVariant = 'classic' | 'golden' | 'flower';
 const variantOf = (r: RefDoc): CanVariant => (r.id.includes('flower') ? 'flower' : r.id.includes('golden') ? 'golden' : 'classic');
 const CAN_FIXED = new Set(['flower', 'rose']); // keep their own colours when the can is recoloured
@@ -465,7 +478,7 @@ export function shapeWateringCan(m: RefMatch, prompt: string, opts: { surprise?:
   const ws = words(prompt).map(sing);
   const has = (...xs: string[]) => xs.some((x) => ws.includes(x));
   let v: CanVariant;
-  if (opts.surprise || has('flower', 'blooming', 'bloom', 'blossom')) v = 'flower';
+  if (has('flower', 'blooming', 'bloom', 'blossom')) v = 'flower';
   else if (has('gold', 'golden', 'brass', 'ornate', 'long', 'fancy')) v = 'golden';
   else if (has('classic', 'garden', 'simple', 'plain', 'old')) v = 'classic';
   else v = lastPlain = lastPlain === 'classic' ? 'golden' : 'classic';
@@ -494,7 +507,7 @@ export function shapeWateringCan(m: RefMatch, prompt: string, opts: { surprise?:
 //   a bow / figurehead decoration ...... the shark ship: the shark taken out
 //                                         (unless a shark is asked), the new one
 //                                         drawn where it was (bow_head)
-//   the surprise ........................ the turtle ship (a giant sea turtle)
+//   the surprise ........................ any ship plus a decoration (surpriseLib.ts)
 //   asked by name (pirate, shark, turtle, galleon) that one; a plain ship one
 //   of the pirate ship, galleon and shark ship. Small boats (raft, canoe…)
 //   keep the little wooden boats.
@@ -588,9 +601,7 @@ export function shapeShip(m: RefMatch, prompt: string, opts: { surprise?: boolea
   if (onBow && (extra.length || named === 'shark')) pick = 'shark';
   else if (onSail || (extra.length && named !== 'turtle' && named !== 'galleon' && named !== 'shark')) pick = 'pirate';
   else if (named) pick = named;
-  else if (opts.surprise) pick = 'turtle';
   else pick = (['pirate', 'galleon', 'shark'] as const)[Math.floor(Math.random() * 3)];
-  if (opts.surprise && pick !== 'turtle' && !named && !extra.length) pick = 'turtle';
   const body = ref(pick);
   if (!body) return m;
   const out = matchRefs(prompt, body);
@@ -717,6 +728,7 @@ const PET_SCREEN_W = { small: 3, medium: 4, large: 5.5 } as const;
 export const isAlwaysRef = (m: RefMatch) => m.body?.category === 'watering-can' || m.body?.category === 'pet' || m.body?.category === 'boat' || !!m.body?.names?.length;
 
 export interface RefSprite {
+  surpriseName?: string; // the surprise decoration that was added ("a little fish")
   lines: string[];
   colors: string[];
   palette: Record<string, string>;
@@ -745,20 +757,44 @@ export async function buildFromMatch(m: RefMatch & { details?: RefChoice['detail
     petals: m.petals,
     blank: m.blank,
   };
+  // the surprise: one extra of this item's category (craft/surpriseLib.ts),
+  // placed from its marks (a dog's head, a ship's sail, a can's lid)
+  let surpriseName: string | undefined;
+  if (m.surprise) {
+    const fit = body.category === 'boat' ? 'ships' : body.category === 'watering-can' ? 'watering' : body.category === 'pet' || body.gameCategory === 'pets' ? 'pets' : null;
+    const seed = m.surprise.seed;
+    recipe.after = (l, areaOf) => {
+      surpriseName = applySurprise(fit, l, areaOf, seed, m.surprise?.only) ?? undefined;
+    };
+  }
   const layer = compose(recipe);
   // watering cans, pets (the dogs), ships and named bodies are drawn finer:
   // 600-800 glyphs
   const can = body.category === 'watering-can' || body.category === 'pet' || body.category === 'boat' || !!body.names?.length;
   const band = size ?? (can ? 'medium' : body.sizeBand ?? 'small');
   // references carry real transparency: gaps are meant (no hole filling)
-  const b = bake(layer.img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs: Math.round((can ? CAN_SIGNS : SIGNS)[band] * DETAIL_SIGNS[detail]) }, getAtlas());
-  const g = bakedToSprite(b);
-  const w = Math.max(1, ...g.sprite.map((l) => l.length));
   // on screen by its game category: a pet follows at about half the
   // player's width, a vehicle has the ships' size, the rest the cans'
   const screenW =
     body.category === 'pet' || body.gameCategory === 'pets' ? PET_SCREEN_W : body.category === 'boat' || body.gameCategory === 'vehicle' ? SCREEN_W : can ? CAN_SCREEN_W : SCREEN_W;
-  return { lines: g.sprite, colors: g.colors, palette: g.palette, scale: screenW[band] / w, signs: b.signs, body };
+  const g = bakeImage(layer.img, Math.round((can ? CAN_SIGNS : SIGNS)[band] * DETAIL_SIGNS[detail]), screenW[band]);
+  return { ...g, body, surpriseName };
+}
+
+// A picture (a reference's composed layer, or the AI's drawing on /4,
+// svgDraw.ts) baked into the game's glyphs: `signs` glyphs, `screenW` ch
+// wide on screen. Real transparency: gaps are meant (no hole filling).
+export function bakeImage(img: Img, signs: number, screenW: number): Omit<RefSprite, 'body' | 'surpriseName'> {
+  const b = bake(img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs }, getAtlas());
+  const g = bakedToSprite(b);
+  const w = Math.max(1, ...g.sprite.map((l) => l.length));
+  return { lines: g.sprite, colors: g.colors, palette: g.palette, scale: screenW / w, signs: b.signs };
+}
+// the glyph counts and on-screen widths by category and size, for a drawn
+// picture (the same bands as the library's bodies)
+export function drawnBands(category: Category, size: 'small' | 'medium' | 'large' = 'medium') {
+  const screenW = category === 'pets' ? PET_SCREEN_W : category === 'vehicle' ? SCREEN_W : CAN_SCREEN_W;
+  return { signs: CAN_SIGNS[size], screenW: screenW[size] };
 }
 
 // what a crafted item gets when no model wrote its text
@@ -802,4 +838,21 @@ export function logRefCraft(prompt: string, via: 'match' | 'model' | 'planner', 
     sprite: { lines: [] },
     ref: { via, body: body ?? '', miss: miss.slice(0, 12) },
   });
+}
+
+// ---- the words the library knows (craft/lexicon.ts) ---------------------------------------
+// every body's title words, part names, tags and names, the size / filler
+// words and the ship words (named ships, styles, sail / bow words, dog words)
+export function libraryWords(): { known: Set<string>; filler: Set<string>; sizes: Set<string> } {
+  const known = new Set<string>();
+  const addAll = (s: string | undefined) => words(s ?? '').forEach((w) => known.add(w));
+  for (const r of REFS) {
+    addAll(r.title);
+    r.parts.forEach((p) => addAll(p.name.replace(/[_-]/g, ' ')));
+    (r.tags ?? []).forEach(addAll);
+    (r.names ?? []).forEach(addAll);
+  }
+  [...SIZE_WORDS, ...SAIL_WORDS, ...BOW_WORDS, ...SMALL_BOAT, ...DOG_WORDS, ...NAMED_SHIP.flatMap(([, l]) => l), ...SHIP_STYLES.flatMap((s) => s.words)].forEach((w) => known.add(w));
+  for (const [k, l] of Object.entries(SYNONYMS)) [k, ...l].forEach(addAll);
+  return { known, filler: new Set([...FILLER, ...STOP]), sizes: SIZE_WORDS };
 }

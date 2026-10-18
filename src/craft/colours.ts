@@ -12,7 +12,7 @@ import { themeColor } from '../theme';
 // base colour words in English, German, French, Spanish, Italian, Dutch
 // (accents folded; Romance words by their stem, endings are stripped) -> a
 // PALETTE key
-const BASE: Record<string, string> = {};
+export const BASE: Record<string, string> = {};
 const add = (key: string, ...ws: string[]) => ws.forEach((w) => (BASE[w] = key));
 for (const k of Object.keys(PALETTE)) BASE[k] = k;
 add('gray', 'grey', 'grau', 'gris', 'grigio', 'grigi', 'grij', 'grijs');
@@ -195,3 +195,62 @@ export const gameColourHint = () =>
   `- The game is soft pixel art with muted, earthy colours, for example grass ${themeColor('grassTuft.base')}, sand ${themeColor('sand.glyph')}, ` +
   `water ${themeColor('water.base')}, a flower petal ${themeColor('flower.orangePetal')}, wood ${themeColor('palm.trunk')}. ` +
   'Pick colours that sit with these: never neon or fully saturated (no #ff0000, #00ff00, #ff00ff), a soft red is #c94a3c.';
+
+// ---- typos in colour and size words (the local fallback of readPrompt.ts) --
+// A word that isn't a colour itself but is one or two letters off a common
+// colour or size word ("gree", "yelow", "smal", "purpel") is read as that word.
+// Short words and common English words that happen to sit close to a colour
+// ("queen", "crown", "glue", "cold") are never changed.
+const TYPO_TARGETS = [
+  'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'white', 'black', 'brown', 'grey', 'gray', 'gold', 'golden', 'silver',
+  'violet', 'turquoise', 'rainbow', 'small', 'large', 'little', 'medium', 'giant', 'tiny', 'huge', 'viking',
+];
+const TYPO_KEEP = new Set([
+  'queen', 'greet', 'greed', 'greek', 'grown', 'crown', 'drown', 'frown', 'brow', 'brows', 'glue', 'clue', 'true', 'blur', 'blues',
+  'prey', 'pick', 'ink', 'mink', 'link', 'sink', 'wink', 'pine', 'pint', 'cold', 'bold', 'hold', 'told', 'fold', 'mold', 'goal',
+  'gild', 'mall', 'smell', 'tall', 'ball', 'wall', 'call', 'fall', 'hall', 'small', 'barge', 'large', 'write', 'whine', 'while',
+  'whale', 'whit', 'block', 'slack', 'back', 'blank', 'clack', 'black', 'tine', 'tin', 'hug', 'hue', 'tide', 'range', 'grange',
+  'purse', 'people', 'giants', 'litter', 'kitten', 'mitten', 'brew', 'brain', 'grain', 'great', 'bike', 'king', 'grew', 'grow',
+  'blew', 'blow', 'glow', 'flow', 'slow', 'below', 'yell', 'mellow', 'fellow', 'hollow', 'willow', 'pinky', 'tidy', 'tins',
+]);
+// edit distance with swapped neighbours counting once ("gerrn" -> green)
+export function typoDistance(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)));
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  return d[a.length][b.length];
+}
+// the word a typo stands for, or null
+export function typoFix(w: string): string | null {
+  const lw = w.toLowerCase();
+  if (lw.length < 4 || TYPO_KEEP.has(lw) || TYPO_TARGETS.includes(lw) || token(lw).base || isModifier(lw)) return null;
+  const max = lw.length >= 6 ? 2 : 1;
+  let best: string | null = null;
+  let bestD = max + 1;
+  for (const t of TYPO_TARGETS) {
+    if (Math.abs(t.length - lw.length) > max) continue;
+    const dist = typoDistance(lw, t);
+    if (dist < bestD) {
+      best = t;
+      bestD = dist;
+    }
+  }
+  return best;
+}
+// the prompt with its colour / size typos fixed, and what was changed;
+// `known`: words the game knows are never "fixed" ("turtle" isn't a
+// "purple" typo)
+export function fixTypos(prompt: string, known?: (w: string) => boolean): { fixed: string; fixes: [string, string][] } {
+  const fixes: [string, string][] = [];
+  const fixed = prompt.replace(/[A-Za-zÀ-ÿ]+/g, (w) => {
+    const f = known?.(w) ? null : typoFix(w);
+    if (!f) return w;
+    fixes.push([w, f]);
+    return w[0] === w[0].toUpperCase() ? f[0].toUpperCase() + f.slice(1) : f;
+  });
+  return { fixed, fixes };
+}

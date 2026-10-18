@@ -564,6 +564,7 @@ type Modal =
       csel: number;
       poor: boolean;
       limited?: boolean; // tried to buy a token after today's 3 are gone
+      sellOnly?: boolean; // opened from Mitchy's Sell Items: no Buy switch
     }
   // carry the whole token object (not just its id) so the modal survives the
   // token being consumed into an item during the success→folded flow
@@ -631,17 +632,24 @@ const FRESH_SHOP: Modal = {
 
 type Bubble = { text: string; width: number } | null;
 
+// what the player sees when they find something the game can't do yet (an
+// object it doesn't know: reported for a next patch, CraftModal onBugReport)
+const BUG_REPORT = {
+  title: "You've discovered a new bug!",
+  sub: "Thanks for helping us improve the game! The issue has been reported, and we'll try to add it in the next patch.",
+};
+
 // A first-discovery toast (see discover in Game): floats in at the top
 // centre, holds 2 s, floats out, then hands over to the next one.
 const DISCOVERY_MS = 200 + 3000 + 300;
-function DiscoveryToast({ title, sub, onDone }: { title: string; sub: string; onDone(): void }) {
+function DiscoveryToast({ title, sub, onDone, kicker = 'FIRST DISCOVERY' }: { title: string; sub: string; onDone(): void; kicker?: string }) {
   useEffect(() => {
     const t = window.setTimeout(onDone, DISCOVERY_MS);
     return () => window.clearTimeout(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="discovery-toast" role="status" style={{ animationDuration: `${DISCOVERY_MS}ms` }}>
-      <div className="discovery-kicker">FIRST DISCOVERY</div>
+      <div className="discovery-kicker">{kicker}</div>
       <div className="discovery-title">{title}</div>
       <div className="discovery-sub">{sub}</div>
     </div>
@@ -1193,9 +1201,11 @@ const CINEMATIC_START = (() => {
   if (Number.isFinite(t) && t > 0) return t;
   return SHOT_LIST.find((x) => x.id === q.get('shot'))?.at ?? 0;
 })();
-const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[0-3]\/?$/.test(PATH)
+// /1 and /2 (the study orders) play it like / does: once for a new save,
+// never again once it's done (quest steps autosave)
+const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[034]\/?$/.test(PATH)
   ? 'skip'
-  : /^\/intro(\/[0-3])?\/?$/.test(PATH) || INTRO_CINEMATIC || INTRO_OLD
+  : /^\/intro(\/[0-4])?\/?$/.test(PATH) || INTRO_CINEMATIC || INTRO_OLD
     ? 'force'
     : 'default';
 
@@ -1347,6 +1357,9 @@ function Game() {
   const [discoveries, setDiscoveries] = useState<string[]>(() => saved?.discoveries ?? []);
   const discoveriesRef = useRef(discoveries);
   const [discoveryQueue, setDiscoveryQueue] = useState<DiscoveryId[]>([]);
+  // a crafting "error" the player found (an object the game doesn't know
+  // yet, reported for a next patch): the same toast, as a bug report
+  const [bugReport, setBugReport] = useState(0);
   // ---- daily allowances (see time.ts daySeedOf) ----
   // Stored with the day they belong to; a stale day just reads as zero, so
   // nothing has to actively reset them — same idiom as removedIds/shaken.
@@ -3888,7 +3901,11 @@ function Game() {
     setStorages(s.storages);
     setBag([...s.bag, token]);
     setRemoved(new Set(s.removedIds));
-    setShaken(new Set(s.shaken));
+    // palms stay as part 1 left them (bare stays bare), and the dates shaken
+    // off them go: `removed` is back at the snapshot, so a date picked up
+    // after it would otherwise lie on the ground again
+    setShaken((cur) => new Set([...s.shaken, ...cur]));
+    setDynamicEnts((es) => es.filter((e) => e.kind !== 'date'));
     setCrops(s.plantedCrops);
     setPlacedItems(s.placed ?? []);
     mitchyPosRef.current = s.mitchyPos ?? null;
@@ -3930,6 +3947,10 @@ function Game() {
       pond: () => fillAtPond(),
       plantSeed: () => plantBase('seed'),
       setPart: (part: QuestState['part']) => questRef.current && setQuest({ ...questRef.current, part, step: 0 }),
+      // (tests) jump to a step, run its hint, and what the hint did
+      setStep: (part: QuestState['part'], step: number) => questRef.current && setQuest({ ...questRef.current, part, step }),
+      hint: () => runHint(),
+      hintState: () => ({ pan, marks: hintMarks, card: hintCard?.pages[0] ?? null, toast }),
       equip: (ownedId: string) => {
         const o = bag.find((b) => b.ownedId === ownedId);
         if (o) equipOwned(o);
@@ -4660,11 +4681,18 @@ function Game() {
     if (t === 'house') return of(ents.find((e) => e.id === 'house'));
     if (t === 'mitchy') return of(ents.find((e) => e.id === 'cat'));
     if (t === 'pond') return of(nearestPond()?.e ?? ents.find(isPond));
-    if (t === 'garden') return of(ents.find((e) => e.kind === 'gardenbed'));
+    // the bed isn't in `ents` (the garden block draws it), so its spot comes
+    // from the plot itself
+    const bed = () => {
+      const r = plot.rect;
+      const cx = (r.x0 + r.x1 + 1) / 2;
+      return { id: 'garden', top: { x: cx, y: r.y0 }, c: { x: cx * TILE_CH, y: ((r.y0 + r.y1 + 1) / 2) * TILE_LN } };
+    };
+    if (t === 'garden') return bed();
     if (t === 'crop') {
       const c = crops.find((x) => x.id === quest?.seedCrop) ?? crops[0];
       const sl = c ? plot.slots[c.slot] : null;
-      if (!sl) return of(ents.find((e) => e.kind === 'gardenbed'));
+      if (!sl) return bed();
       return { id: `crop-${c!.slot}`, top: { x: sl.x + 0.5, y: sl.y }, c: { x: (sl.x + 0.5) * TILE_CH, y: (sl.y + 0.5) * TILE_LN } };
     }
     return of(nearestResources(1)[0]);
@@ -4694,7 +4722,7 @@ function Game() {
     if (!h.focus) return;
     const spot = hintSpot(h.focus);
     if (!spot) {
-      showToast('nothing like that nearby right now.');
+      showToast(h.focus === 'resource' ? 'nothing left to pick here. Try another island.' : 'nothing like that nearby right now.');
       return;
     }
     // lock, glide there, mark it, hold, glide back, unlock
@@ -5057,7 +5085,8 @@ function Game() {
     if (sel === 1) {
       setModal({ t: 'recraft' });
     } else if (sel === 2) {
-      setModal(FRESH_SHOP);
+      // Sell Items: straight to the sell side, without the Buy switch
+      setModal({ ...(FRESH_SHOP as Extract<Modal, { t: 'shop' }>), tab: 'sell', sellOnly: true });
     } else {
       // Talk opens the chat window (MitchyTalk.tsx); her world speech
       // bubble would only show blurred behind it
@@ -7065,7 +7094,16 @@ function Game() {
       )}
 
       {/* a first discovery: top centre, one at a time */}
-      {discoveryQueue[0] && (
+      {bugReport > 0 && (
+        <DiscoveryToast
+          key={`bug-${bugReport}`}
+          kicker="BUG REPORT"
+          title={BUG_REPORT.title}
+          sub={BUG_REPORT.sub}
+          onDone={() => setBugReport(0)}
+        />
+      )}
+      {!bugReport && discoveryQueue[0] && (
         <DiscoveryToast
           key={discoveryQueue[0]}
           title={DISCOVERIES[discoveryQueue[0]].title}
@@ -7451,6 +7489,7 @@ function Game() {
           {modal.t === 'shop' && (
             <ShopSheet
               tab={modal.tab}
+              sellOnly={!!modal.sellOnly}
               inv={inv}
               money={money}
               pick={modal.pick}
@@ -7533,6 +7572,7 @@ function Game() {
               }}
               money={money}
               onSpend={(coins) => setMoney((mo) => mo - coins)}
+              onBugReport={() => setBugReport(Date.now())}
               resume={modal.recraft ? { name: modal.recraft.name, chat: modal.recraft.chat } : undefined}
               onConsume={(equip, item) => consumeCraft(modal.token.ownedId, item, equip, modal.recraft?.replaces)}
               onClose={closeCraft}
@@ -7895,8 +7935,10 @@ function ShopSheet({
   onSell,
   onClose,
   buy,
+  sellOnly = false,
 }: {
   tab: 'sell' | 'buy';
+  sellOnly?: boolean;
   inv: Record<ItemType, number>;
   money: number;
   pick: ItemType | null;
@@ -7919,7 +7961,7 @@ function ShopSheet({
   const price = item ? basePrice(item) : 0;
   const n = item ? Math.max(1, Math.min(amount, inv[item])) : 0;
 
-  const rail = (
+  const rail = sellOnly ? undefined : (
     <>
       {(['buy', 'sell'] as const).map((t) => (
         <button

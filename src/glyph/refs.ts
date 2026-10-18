@@ -252,6 +252,10 @@ export interface Recipe {
   // recolour only a part's blossom-coloured pixels (its leaves and stems,
   // the greens, keep theirs): a flower's petals in a new colour
   petals?: { part: string; rgb: RGB }[];
+  // last touches on the composed picture, before it's mirrored and trimmed
+  // (the surprise, craft/surpriseLib.ts): `areaOf` gives a marked area's box
+  // in this picture's pixels
+  after?: (l: Layer, areaOf: (name: string) => { x: number; y: number; w: number; h: number } | null) => void;
 }
 
 // the hue (0-360) and saturation (0-1) of a pixel
@@ -389,13 +393,20 @@ export function compose(r: Recipe): Layer {
     if (!a) continue;
     paintDetail(l, areaBox(a, W0, H0, pad, pad), dt.regions, dt.free ? undefined : a.part, !!dt.free);
   }
+  if (r.after) {
+    const areaOf = (name: string) => {
+      const a = r.body.ref.areas.find((x) => x.name === name);
+      return a ? areaBox(a, W0, H0, pad, pad) : null;
+    };
+    r.after(l, areaOf);
+  }
   if (r.mirror) l = mirror(l);
   return trim(l);
 }
 
 // Take a part out: cleared, or painted over in `fill`'s most common colour
 // (each pixel keeps its own shading against the motif's mean) and joined to it
-function blankPart(l: Layer, name: string, fill?: string) {
+export function blankPart(l: Layer, name: string, fill?: string) {
   const d = l.img.data;
   if (!fill) {
     for (let i = 0; i < l.part.length; i++)

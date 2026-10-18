@@ -598,6 +598,11 @@ const PROMPT_WIDE_KINDS = new Set<EntityKind>(['cat', 'house', 'shop', 'hotspot'
 // these kinds: there it's beside the drawn shape this far down (of its height)
 const LABEL_BESIDE: Partial<Record<EntityKind, number>> = { palm: 0.78 };
 
+// The players' links /intro/1 and /intro/2 keep the camera at the closest
+// zoom, on the player: the mouse wheel does nothing there (cinematics and
+// hints still move it)
+const ZOOM_LOCKED = /^\/intro\/[12]\/?$/.test(window.location.pathname);
+
 // Settings > Controls: every key the game listens to (the handler is
 // handlerRef further down), in the order a new player needs them.
 const CONTROLS: [string, string[]][] = [
@@ -609,7 +614,7 @@ const CONTROLS: [string, string[]][] = [
   ['Inventory', ['I']],
   ['Map', ['M']],
   ['Back to the player', ['Space']],
-  ['Zoom', ['Mouse wheel']],
+  ...(ZOOM_LOCKED ? [] : [['Zoom', ['Mouse wheel']] as [string, string[]]]),
   ['Choose in menus', ['↑', '↓', 'Enter']],
   ['Back / close', ['Esc']],
   ['Download a save backup', ['Ctrl', 'S']],
@@ -4247,6 +4252,7 @@ function Game() {
         }
       }
       e.preventDefault();
+      if (ZOOM_LOCKED) return; // /intro/1, /intro/2: the camera stays put
       const el = fieldRef.current;
       const c = camRef.current;
       if (!el) return;

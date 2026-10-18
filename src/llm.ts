@@ -51,7 +51,29 @@ import {
 import { checkPolicy } from './craft/policy';
 import { fallbackNote, fitToGame } from './craft/colours';
 import { readPrompt, type PromptRead } from './craft/readPrompt';
-import { closestWords, isKnownWord, kindOf, promptParts } from './craft/lexicon';
+import { SVG_PROMPT, coverage, parseDrawing, rasterSvg } from './craft/svgDraw';
+import { LINK } from './link';
+import { closestReading, closestWords, kindOf, promptParts, type Theme } from './craft/lexicon';
+
+// ---- the fallback's surprise and closest reading (clarifyPrompt) ----
+const THEMES: Theme[] = ['ships', 'watering', 'pets'];
+// a few of each theme's library-made objects, for "Surprise me"
+const THEME_SURPRISES: Record<Theme, string[]> = {
+  ships: ['pirate ship', 'shark ship', 'galleon', 'turtle ship', 'viking ship', 'sailboat', 'rowboat'],
+  watering: ['watering can', 'golden watering can', 'watering can with a flower on top'],
+  pets: ['golden retriever', 'corgi', 'husky', 'pug', 'dachshund', 'shiba inu', 'beagle', 'border collie'],
+};
+// the prompt's understood colour and size words, kept for a new reading
+function keptWords(prompt: string): string[] {
+  return (prompt.toLowerCase().match(/[\p{L}-]+/gu) ?? []).filter((w) => {
+    const k = kindOf(w);
+    return k === 'colour' || k === 'size';
+  });
+}
+function themeSurprisePrompt(prompt: string, theme: Theme): string {
+  const list = THEME_SURPRISES[theme];
+  return [...keptWords(prompt), list[Math.floor(Math.random() * list.length)]].join(' ');
+}
 import {
   REF_CRAFT_ON,
   hasRefBodies,
@@ -64,6 +86,8 @@ import {
   refDescription,
   gameCategoryOf,
   logRefCraft,
+  bakeImage,
+  drawnBands,
   isWateringCan,
   isAlwaysRef,
   isShip,
@@ -457,6 +481,10 @@ export async function craftItem(prompt: string, ui?: CraftUiHooks, opts: CraftOp
   const policy = checkPolicy(prompt);
   if (!policy.allowed) return { ok: false, reply: policy.reason! };
   const typed = prompt;
+  // an unreadable prompt read as its closest known object, or a surprise of
+  // its theme (keeping the colours and sizes that were understood)
+  if (opts.clarify?.rewrite) prompt = opts.clarify.rewrite;
+  if (opts.clarify?.themeSurprise) prompt = themeSurprisePrompt(prompt, opts.clarify.themeSurprise);
   // the pre-clarification's answers about unknown words: the known word the
   // player picked, or the word left out — before the prompt is read
   for (const [from, to] of opts.clarify?.replace ?? []) prompt = prompt.replace(new RegExp(`\\b${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'), to);
@@ -486,6 +514,13 @@ async function craftFixed(prompt: string, ui: CraftUiHooks | undefined, opts: Cr
   // src/data/refs/watering-can-* and pet-dog-*)
   if ((REF_CRAFT_ON || isAlwaysRef(matchRefs(prompt))) && hasRefBodies()) {
     const r = await craftWithRefs(prompt, ui, opts, read);
+    if (r) return r;
+  }
+
+  // the test link /4: the AI draws it (craft/svgDraw.ts); a failed drawing
+  // falls through to the shape planner below
+  if (LINK === '4' && llmEnabled) {
+    const r = await craftDrawn(prompt, ui, read);
     if (r) return r;
   }
 
@@ -676,6 +711,53 @@ async function craftFixed(prompt: string, ui: CraftUiHooks | undefined, opts: Cr
   return opts.prefs ? { ok: true, item, kind: category, applied: {} } : { ok: true, item };
 }
 
+// /4: one smart-model call draws the item as an SVG; cleaned, drawn on a
+// canvas and baked into glyphs like a reference picture. null = no usable
+// drawing (the shape planner takes over).
+async function craftDrawn(prompt: string, ui: CraftUiHooks | undefined, read: PromptRead): Promise<CraftResult | null> {
+  const t0 = performance.now();
+  try {
+    ui?.onStage?.('drawing');
+    const raw = await chatJSON<Record<string, unknown>>(
+      [
+        { role: 'system', content: SVG_PROMPT },
+        { role: 'user', content: `The player asked for: "${prompt}"` },
+      ],
+      { temperature: 0.6, maxTokens: 4000, model: MODELS.smart, fallbackModel: MODELS.fast },
+    );
+    const d = parseDrawing(raw);
+    if (!d) {
+      console.warn('[craft] drawing: no usable SVG');
+      return null;
+    }
+    const img = await rasterSvg(d.svg);
+    if (coverage(img) < 0.03) {
+      console.warn('[craft] drawing: nearly empty');
+      return null;
+    }
+    const category: Category = (CATEGORIES as readonly string[]).includes(d.category) ? (d.category as Category) : inferCategory(parseSpec(prompt).category);
+    const band = drawnBands(category, read.size ?? undefined);
+    const g = bakeImage(img, band.signs, band.screenW);
+    // the drawing's colours in the game's palette, like any AI colour
+    const palette = Object.fromEntries(Object.entries(g.palette).map(([k, h]) => [k, '#' + fitToGame(hexRgb(h)).map((v) => v.toString(16).padStart(2, '0')).join('')]));
+    const description = await craftDescribe(prompt, category);
+    const name = d.name || prompt.trim().slice(0, 18).replace(/^\w/, (c) => c.toUpperCase()) || 'Mystery Thing';
+    const item = buildCraftedItem(category, name, prompt, { funcDesc: description.fn.narrative });
+    item.fn = description.fn;
+    item.sprite = g.lines;
+    item.colors = g.colors;
+    item.palette = palette;
+    item.scale = g.scale;
+    item.desc = d.description || description.description;
+    item.tags = [...description.tags, `prompt: ${prompt.trim()}`];
+    console.info('[craft] drawn by the AI', { ms: Math.round(performance.now() - t0), glyphs: g.signs, category });
+    return { ok: true, item, refImage: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(d.svg) };
+  } catch (err) {
+    console.warn('[craft] drawing failed:', err);
+    return null;
+  }
+}
+
 // A craft from the reference library: the matcher's recipe, or the model's
 // when the words need it (unknown details, a name, an invented function).
 // null = the library can't express it: the caller uses the shape planner.
@@ -857,6 +939,8 @@ export interface CraftClarify {
   surprise?: boolean; // "Yes, surprise me"
   dropDetails?: string[]; // detail phrases the player chose to leave out
   replace?: [string, string][]; // unknown words read as the known word the player picked
+  rewrite?: string; // the whole prompt read as this ("blue ship")
+  themeSurprise?: 'ships' | 'watering' | 'pets'; // a surprise of the theme instead
   finish?: TextureModifier;
   mood?: Mood;
 }
@@ -873,28 +957,64 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
   const read = await readPrompt(prompt);
   if (read.via === 'model') return { questions: preQuestions(read.fixed, read) };
   // read locally: the words the game doesn't know are asked about, as typed
-  const { main, others } = promptParts(prompt);
-  if (main && !isKnownWord(main)) {
-    logRefCraft(prompt, 'planner', null, [main]);
+  const parts = promptParts(prompt);
+  const surprise = (theme: Theme | null) => ({
+    label: 'Surprise me',
+    effect: 'A surprise from Mitchy.',
+    surpriseTheme: theme ?? THEMES[Math.floor(Math.random() * THEMES.length)],
+    surprise: true,
+    final: true,
+  });
+  // more than half of it unreadable: one question — the closest reading, a
+  // surprise, or try again
+  if (parts.content > 0 && parts.unknown.length / parts.content > 0.5) {
+    const near = closestReading(prompt);
+    const theme = near?.theme ?? parts.theme;
     return {
-      retry: `I don't know how to make a "${main}" yet. Could you try another object? I've noted it, so it can be added in a next patch.`,
+      questions: [
+        {
+          topic: 'Your idea',
+          q: near ? `I'm not sure what you mean. Did you mean "${near.text}"?` : "I'm not sure what you mean.",
+          options: [
+            ...(near ? [{ label: near.text, effect: `Craft ${near.text}.`, rewrite: near.text, final: true }] : []),
+            surprise(theme),
+            { label: 'Try again', effect: 'Type another idea.', tryAgain: true },
+          ],
+          noDecide: true,
+        },
+      ],
     };
   }
-  const unknown = [...new Set(others.filter((w) => !isKnownWord(w)))].slice(0, 3);
+  // only the main object unknown: a surprise or another object (and it's
+  // noted for a next patch)
+  if (parts.main && !parts.mainKnown) {
+    logRefCraft(prompt, 'planner', null, [parts.main]);
+    return {
+      questions: [
+        {
+          topic: parts.main,
+          q: `I don't know a "${parts.main}" yet. It might be added in a next patch. Shall I surprise you, or do you want to try another object?`,
+          options: [surprise(closestReading(prompt)?.theme ?? parts.theme), { label: 'Try another object', effect: 'Type another object.', tryAgain: true }],
+          noDecide: true,
+        },
+      ],
+    };
+  }
+  const unknown = [...new Set(parts.unknown.filter((w) => w !== parts.main))].slice(0, 3);
   const typoQs: ClarifyQuestion[] = unknown.map((w) => {
-    const near = closestWords(w, 2);
+    const [near] = closestWords(w, 1);
     return {
       topic: w,
-      q: `I don't know "${w}". Did you mean…`,
+      q: near ? `I don't know "${w}". Did you mean ${near}?` : `I don't know "${w}".`,
       options: [
-        ...near.map((n) => ({ label: n, effect: `Read "${w}" as ${n}.`, replace: [w, n] as [string, string] })),
+        ...(near ? [{ label: near, effect: `Read "${w}" as ${near}.`, replace: [w, near] as [string, string] }] : []),
         { label: 'Leave out this detail', effect: `Leave "${w}" out.`, drop: [w] },
       ],
       noDecide: true,
     };
   });
   // a typo that's a colour / size: its own question covers the colour / size one
-  const nearKinds = new Set(unknown.flatMap((w) => closestWords(w, 2).map(kindOf)));
+  const nearKinds = new Set(unknown.flatMap((w) => closestWords(w, 1).map(kindOf)));
   const rest = preQuestions(prompt, undefined, unknown, { colour: nearKinds.has('colour'), size: nearKinds.has('size') });
   // the typo questions right after size / colour, before the surprise
   const at = rest.findIndex((q) => q.topic === 'Surprise');

@@ -1193,9 +1193,9 @@ const CINEMATIC_START = (() => {
   if (Number.isFinite(t) && t > 0) return t;
   return SHOT_LIST.find((x) => x.id === q.get('shot'))?.at ?? 0;
 })();
-const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[0-3]\/?$/.test(PATH)
+const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[0-4]\/?$/.test(PATH)
   ? 'skip'
-  : /^\/intro(\/[0-3])?\/?$/.test(PATH) || INTRO_CINEMATIC || INTRO_OLD
+  : /^\/intro(\/[0-4])?\/?$/.test(PATH) || INTRO_CINEMATIC || INTRO_OLD
     ? 'force'
     : 'default';
 

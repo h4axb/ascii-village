@@ -118,7 +118,8 @@ type Turn =
   | { who: 'mitchy'; kind: 'result'; item: ShopItem; prompt: string; status?: string; tag?: string; made?: string[] }
   | { who: 'mitchy'; kind: 'alts'; intro: string; options: string[] }
   | { who: 'mitchy'; kind: 'concepts'; concepts: [CraftConcept, CraftConcept]; surprise: string }
-  | { who: 'mitchy'; kind: 'plan' }; // (clarify) the plan panel, live from `clar`
+  | { who: 'mitchy'; kind: 'plan' } // (clarify) the plan panel, live from `clar`
+  | { who: 'mitchy'; kind: 'drawing'; src: string }; // (/4) the AI's own drawing, before it became glyphs
 
 // /1: how long a finished craft is shown on its own before the rating
 const RESULT_PAUSE_MS = 1500;
@@ -450,6 +451,7 @@ export default function CraftModal({
               ? { status: 'There it is. What do you think?' }
               : {}),
         });
+        if (r.refImage) push({ who: 'mitchy', kind: 'drawing', src: r.refImage });
         // a colour the helper couldn't mix exactly, or (/1) a first try without
         // a reference picture: Mitchy says so under the result
         if (r.note) push({ who: 'mitchy', kind: 'text', text: r.note });
@@ -499,10 +501,25 @@ export default function CraftModal({
     const c = clarRef.current;
     if (!c || c.locked || c.step >= c.questions.length) return;
     const q = c.questions[c.step];
-    push({ who: 'me', kind: 'text', text: pick === null ? YOU_DECIDE : q.options[pick].label });
+    const o = pick === null ? null : q.options[pick];
+    push({ who: 'me', kind: 'text', text: pick === null ? YOU_DECIDE : o!.label });
+    // "Try again" / "Try another object": back to typing, nothing crafted
+    if (o?.tryAgain) {
+      setClar(null);
+      setPhase('failed');
+      setInput(c.prompt.slice(0, PROMPT_MAX));
+      push({ who: 'mitchy', kind: 'text', text: 'No problem! Tell me another idea.' });
+      return;
+    }
     const picks = [...c.picks];
     picks[c.step] = pick;
     const step = c.step + 1;
+    // the only question (the closest reading, a surprise): craft right away
+    if (o?.final) {
+      clarRef.current = { ...c, picks, step };
+      commitClar(false);
+      return;
+    }
     if (step < c.questions.length) push({ who: 'mitchy', kind: 'text', text: c.questions[step].q });
     else {
       push({
@@ -534,6 +551,8 @@ export default function CraftModal({
       surprise: chosen.some((o) => o.surprise),
       dropDetails: chosen.flatMap((o) => o.drop ?? []),
       replace: chosen.flatMap((o) => (o.replace ? [o.replace] : [])),
+      rewrite: chosen.find((o) => o.rewrite)?.rewrite,
+      themeSurprise: chosen.find((o) => o.surpriseTheme)?.surpriseTheme,
     };
     c.run(cl, clarLog(c, picks, skipped, 'crafted'));
   }
@@ -910,6 +929,16 @@ export default function CraftModal({
   } else {
     thread.forEach((t, i) => {
       if (t.kind === 'text') add(t.who, <Bubble key={i}>{t.text}</Bubble>);
+      else if (t.kind === 'drawing')
+        add(
+          t.who,
+          <Bubble key={i}>
+            <div className="cw3-drawing">
+              <span className="ds-muted">My drawing, before it became glyphs:</span>
+              <img src={t.src} alt="Mitchy's drawing" width={128} height={128} />
+            </div>
+          </Bubble>,
+        );
       else if (t.kind === 'alts') add('mitchy', <Bubble key={i}>{t.intro}</Bubble>);
       else if (t.kind === 'plan') {
         if (clar)

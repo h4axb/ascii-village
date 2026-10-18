@@ -185,9 +185,15 @@ export function colourPhrasesOf(prompt: string): ColourPhrase[] {
   return colourPhrases(ws).filter((p) => !ws.slice(p.start, p.end).every((w) => name.includes(w)));
 }
 
+const MODAL_WORDS = new Set(['can', 'could', 'kann']);
+const VERB_BEFORE = new Set(['that', 'which', 'who', 'it', 'i', 'you', 'he', 'she', 'they', 'we', 'er', 'sie', 'es', 'der', 'die', 'das']);
 // `force`: match the words against this body (a ship chosen by its rules)
 export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
-  const ws = words(prompt).map(sing);
+  // "can" after a pronoun or "that / which / who" is a verb ("a cat that
+  // can fly"), never the watering can
+  const ws = words(prompt)
+    .filter((w, i, all) => !(MODAL_WORDS.has(w) && VERB_BEFORE.has(all[i - 1] ?? '')))
+    .map(sing);
   const has = (w: string) => ws.includes(sing(w));
   const used = new Set<string>();
   // body: one asked for by name first (a dog breed, your dragon), else the
@@ -751,14 +757,28 @@ export async function buildFromMatch(m: RefMatch & { details?: RefChoice['detail
   const can = body.category === 'watering-can' || body.category === 'pet' || body.category === 'boat' || !!body.names?.length;
   const band = size ?? (can ? 'medium' : body.sizeBand ?? 'small');
   // references carry real transparency: gaps are meant (no hole filling)
-  const b = bake(layer.img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs: Math.round((can ? CAN_SIGNS : SIGNS)[band] * DETAIL_SIGNS[detail]) }, getAtlas());
-  const g = bakedToSprite(b);
-  const w = Math.max(1, ...g.sprite.map((l) => l.length));
   // on screen by its game category: a pet follows at about half the
   // player's width, a vehicle has the ships' size, the rest the cans'
   const screenW =
     body.category === 'pet' || body.gameCategory === 'pets' ? PET_SCREEN_W : body.category === 'boat' || body.gameCategory === 'vehicle' ? SCREEN_W : can ? CAN_SCREEN_W : SCREEN_W;
-  return { lines: g.sprite, colors: g.colors, palette: g.palette, scale: screenW[band] / w, signs: b.signs, body };
+  const g = bakeImage(layer.img, Math.round((can ? CAN_SIGNS : SIGNS)[band] * DETAIL_SIGNS[detail]), screenW[band]);
+  return { ...g, body };
+}
+
+// A picture (a reference's composed layer, or the AI's drawing on /4,
+// svgDraw.ts) baked into the game's glyphs: `signs` glyphs, `screenW` ch
+// wide on screen. Real transparency: gaps are meant (no hole filling).
+export function bakeImage(img: Img, signs: number, screenW: number): Omit<RefSprite, 'body'> {
+  const b = bake(img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs }, getAtlas());
+  const g = bakedToSprite(b);
+  const w = Math.max(1, ...g.sprite.map((l) => l.length));
+  return { lines: g.sprite, colors: g.colors, palette: g.palette, scale: screenW / w, signs: b.signs };
+}
+// the glyph counts and on-screen widths by category and size, for a drawn
+// picture (the same bands as the library's bodies)
+export function drawnBands(category: Category, size: 'small' | 'medium' | 'large' = 'medium') {
+  const screenW = category === 'pets' ? PET_SCREEN_W : category === 'vehicle' ? SCREEN_W : CAN_SCREEN_W;
+  return { signs: CAN_SIGNS[size], screenW: screenW[size] };
 }
 
 // what a crafted item gets when no model wrote its text

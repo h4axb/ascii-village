@@ -595,6 +595,10 @@ export interface ClarifyOption {
   surprise?: boolean; // add the surprise (a watering can: the flower on top)
   drop?: string[]; // leave these detail phrases out of the prompt
   replace?: [string, string]; // read this word as that one (an unknown word's closest known word)
+  rewrite?: string; // craft this prompt instead (the closest reading of an unreadable one)
+  surpriseTheme?: 'ships' | 'watering' | 'pets'; // craft a surprise of this theme instead
+  tryAgain?: boolean; // back to typing, nothing crafted
+  final?: boolean; // the only question: crafting starts right after it
 }
 export interface ClarifyQuestion {
   topic: string; // short name of the decision ("Focus"), shown in the plan panel

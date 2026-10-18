@@ -36,4 +36,4 @@ export function fallbackSubject(prompt: string): FallbackSubject {
 
 // what Mitchy says after a fallback craft
 export const missingAssetNote = (word: string | null) =>
-  `I don't have a pattern for ${word ? `"${word}"` : 'this'} yet, so this is my simple first try. I've noted it so it can be added in a next patch!`;
+  `I don't have a pattern for ${word ? `"${word}"` : 'this'} yet, so this is my simple first try. I've noted it so it can be improved in a next patch!`;

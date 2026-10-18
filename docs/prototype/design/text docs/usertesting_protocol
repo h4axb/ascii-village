@@ -1,45 +1,39 @@
-# dsad
+# Usertesting Ablaufsprotokoll
 
-# Survey
+Setup: 10 min.
+Playtest: 30 min. 
+Survey: 10 min. 
+Gespräch 10 min.
 
+# Ablauf
+After water vehicle craft quest part 1 is over
+When landing on shop island quest 2 begins
 
-# UEQ-S – Adjective Reference
-
-
-
+## Survey
+# Unterer Teil UEQ-S – Adjective Reference
 These definitions are for the researcher's internal reference during
 playtesting and analysis, not explanations to participants.
 
-## Pragmatic Quality
-Focus: Usability, clarity, and task efficiency.
 
-| Adjective pair | Meaning | Example in ASCIIA BAY |
+## Pragmatische Qualität
+Fokus: Benutzerfreundlichkeit, Verständlichkeit und Effizienz bei der Aufgabenerfüllung.
 
-+ Obstructive (aufdringlich) – Supportive
-Feedback interrupts progress unnecessarily vs. helps with crafting.
+| Adjektivpaar | Beispiel in ASCIIA BAY |
+|---|---|
+| **Behindernd – Unterstützend** | Das Feedback unterbricht unnötig den Spielfluss oder hilft beim Crafting. |
+| **Kompliziert – Einfach** | Spieler haben Schwierigkeiten mit der Bedienung oder können die Funktionen mühelos nutzen. |
+| **Ineffizient – Effizient** | Das Feedback erfordert Aufwand ohne erkennbaren Nutzen oder erleichtert das Crafting mit geringem Aufwand. |
+| **Verwirrend – Klar** | Spieler verstehen nicht, was ihre ausgewählten Präferenzen bewirken, oder erkennen deren Auswirkungen eindeutig. |
 
-+ Complicated – Easy 
-Players struggle with several controls vs. interact easily.
+## Hedonische Qualität
+Fokus: Stimulation, Originalität und Interesse.
 
-+ Inefficient – Efficient 
-Feedback takes effort without clear benefit vs. improves crafting efficiently. 
+| Adjektivpaar | Beispiel in ASCIIA BAY |
+|---|---|
+| **Langweilig – Spannend** | Das Feedback wirkt eintönig oder weckt Vorfreude auf das Crafting. |
+| **Uninteressant – Interessant** | Spieler ignorieren die Funktion oder möchten ihre Möglichkeiten erkunden. |
+| **Konventionell – Originell** | Die Interaktion wirkt wie eine gewöhnliche Bewertungsfunktion oder bietet einen ungewöhnlichen, kreativen Feedbackansatz. |
+| **Gewöhnlich – Innovativ** | Die Interaktion wirkt wie eine typische Benutzeroberfläche oder wie ein neuartiger, fortschrittlicher Ansatz für KI-basiertes Crafting. |
 
-+ Confusing – Clear 
-Players cannot tell what preferences do vs. understand their effects. 
-
-## Hedonic Quality
-Focus: Stimulation, originality, and interest.
-
-| Adjective pair | Meaning | Example in ASCIIA BAY |
-
-+ Boring – Exciting 
-Feedback feels tedious vs. creates excitement about crafting. |
-
-+ Not interesting – Interesting 
-Players ignore the feature vs. want to explore its possibilities.
-
-+ Conventional – Inventive 
-Familiar rating controls vs. an unusually creative feedback interaction. |
-
-+ Usual – Leading edge 
-Feels like a typical interface vs. a novel approach to AI crafting. |
+# Saving points
+Nach Abschluss jeder Quest, bei Übergang zur nächsten Variante, manuelles Saven

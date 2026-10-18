@@ -14,7 +14,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { darken } from './ColoredSprite';
 import { GROUND_W, GROUND_H, TILE_CH, TILE_LN, STRUCT_ENTS, grassKeepOut, footprint } from './world';
 import type { Ent } from './world';
-import { terrainField, GLYPHS, KIND_WATER } from './terrain';
+import { terrainField, GLYPHS, KIND_WATER, KIND_ROCK } from './terrain';
 import { IconClose } from './ui';
 import { themeColor } from './theme';
 import { WORLD_ASPECT } from './font';
@@ -124,20 +124,26 @@ function paintMap(c: HTMLCanvasElement, cw: number, font: string, ents: Ent[], s
     for (let r = 0; r < e.sprite.length; r++) {
       const line = e.sprite[r];
       const crow = e.colors?.[r] ?? '';
-      const y0 = Math.floor(oy + r * h);
-      const y1 = Math.floor(oy + (r + 1) * h);
+      const y0 = oy + r * h;
       for (let col = 0; col < line.length; col++) {
         const g = line[col];
         if (g === ' ') continue;
         const hex = e.palette?.[crow[col]];
-        const x0 = Math.floor(ox + col * w);
-        const x1 = Math.floor(ox + (col + 1) * w);
+        const x0 = ox + col * w;
+        // Zoomed out, a sprite cell is only a few pixels: a glyph that small
+        // covers little of it and the sprite looks faded, so the cell is
+        // filled with its colour; big cells keep their glyph
+        if (w < 5) {
+          ctx.fillStyle = hex ?? base;
+          ctx.fillRect(x0, y0, w + 0.35, h + 0.35);
+          continue;
+        }
         if (solid) {
           ctx.fillStyle = darken(hex ?? rgbHex(base), 0.55);
-          ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+          ctx.fillRect(x0, y0, w, h);
         }
         ctx.fillStyle = hex ?? base;
-        ctx.fillText(g, (x0 + x1) / 2, (y0 + y1) / 2);
+        ctx.fillText(g, x0 + w / 2, y0 + h / 2);
       }
     }
   }
@@ -148,6 +154,45 @@ function rgbHex(c: string): string {
   const m = c.match(/\d+/g);
   if (!c.startsWith('rgb') || !m) return c;
   return '#' + m.slice(0, 3).map((v) => (+v).toString(16).padStart(2, '0')).join('');
+}
+
+// The map's shot, in cells: the two biggest islands with a margin of sea
+// (land = not water, not rocks; islands = connected land)
+let HOME: { x: number; y: number; w: number; h: number } | null = null;
+function homeIslands() {
+  if (HOME) return HOME;
+  const f = terrainField();
+  const seen = new Uint8Array(GROUND_W * GROUND_H);
+  const land = (i: number) => f.kind[i] !== KIND_WATER && f.kind[i] !== KIND_ROCK;
+  const isles: { n: number; x0: number; y0: number; x1: number; y1: number }[] = [];
+  for (let i = 0; i < seen.length; i++) {
+    if (seen[i] || !land(i)) continue;
+    const b = { n: 0, x0: GROUND_W, y0: GROUND_H, x1: 0, y1: 0 };
+    const stack = [i];
+    seen[i] = 1;
+    while (stack.length) {
+      const j = stack.pop()!;
+      const x = j % GROUND_W, y = (j / GROUND_W) | 0;
+      b.n++;
+      b.x0 = Math.min(b.x0, x);
+      b.x1 = Math.max(b.x1, x);
+      b.y0 = Math.min(b.y0, y);
+      b.y1 = Math.max(b.y1, y);
+      for (const k of [j - 1, j + 1, j - GROUND_W, j + GROUND_W])
+        if (k >= 0 && k < seen.length && !seen[k] && land(k) && Math.abs((k % GROUND_W) - x) <= 1) {
+          seen[k] = 1;
+          stack.push(k);
+        }
+    }
+    isles.push(b);
+  }
+  isles.sort((a, b) => b.n - a.n);
+  const top = isles.slice(0, 2);
+  if (!top.length) return (HOME = { x: 0, y: 0, w: GROUND_W, h: GROUND_H });
+  const x0 = Math.min(...top.map((b) => b.x0)), x1 = Math.max(...top.map((b) => b.x1));
+  const y0 = Math.min(...top.map((b) => b.y0)), y1 = Math.max(...top.map((b) => b.y1));
+  const mx = (x1 - x0) * 0.1, my = (y1 - y0) * 0.1;
+  return (HOME = { x: x0 - mx, y: y0 - my, w: x1 - x0 + 2 * mx, h: y1 - y0 + 2 * my });
 }
 
 export default function GameMap({
@@ -178,13 +223,17 @@ export default function GameMap({
     return () => ro.disconnect();
   }, [open]);
 
-  // fully zoomed out: the whole world fits the viewport, centred
-  const pxPerCell = vp.w && vp.h ? Math.min(vp.w / GROUND_W, vp.h / (GROUND_H * WORLD_ASPECT)) : 0;
+  // the shot: the home islands (the two biggest), framed in the viewport
+  // with some sea around; the rest of the world fills what's left over
+  const shot = homeIslands();
+  const pxPerCell = vp.w && vp.h ? Math.min(vp.w / shot.w, vp.h / (shot.h * WORLD_ASPECT)) : 0;
   const pxPerLine = pxPerCell * WORLD_ASPECT;
   const mapW = GROUND_W * pxPerCell;
   const mapH = GROUND_H * pxPerLine;
-  const offX = (vp.w - mapW) / 2;
-  const offY = (vp.h - mapH) / 2;
+  // centred on the shot, but never past the world's edges (no empty strip)
+  const clampOff = (o: number, view: number, size: number) => (size <= view ? (view - size) / 2 : Math.min(0, Math.max(view - size, o)));
+  const offX = clampOff(vp.w / 2 - (shot.x + shot.w / 2) * pxPerCell, vp.w, mapW);
+  const offY = clampOff(vp.h / 2 - (shot.y + shot.h / 2) * pxPerLine, vp.h, mapH);
 
   // the player and Mitchy as entities of the picture, in their world look
   const people = characters
@@ -245,7 +294,7 @@ export default function GameMap({
         <div
           className="game-map-viewport"
           ref={vpRef}
-          style={{ background: sea ?? themeColor('water.mapBackdrop'), aspectRatio: `${GROUND_W} / ${GROUND_H * WORLD_ASPECT}` }}
+          style={{ background: sea ?? themeColor('water.mapBackdrop') }}
         >
           <canvas ref={canvasRef} className="game-map-canvas" style={{ left: offX, top: offY, width: mapW, height: mapH }} />
           {arrows.map(({ c, left, top }) => (

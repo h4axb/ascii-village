@@ -3653,15 +3653,21 @@ pre {
   height: 100%;
 }
 
-/* the whole world at once: the window takes the world's proportions
-   (aspect-ratio set inline), the panel hugs it */
+/* the map: a wide window whose picture fades out at the edges into the
+   panel's green */
 .game-map-panel.ds-panel:has(.game-map-viewport) {
-  width: fit-content;
+  width: min(1560px, 96vw);
 }
 .game-map-panel .game-map-viewport {
-  height: min(720px, 74vh);
-  width: auto;
-  max-width: 90vw;
+  height: min(760px, 74vh);
+  border: none;
+  background: transparent !important;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 9%, #000 91%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 11%, #000 89%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent 0, #000 9%, #000 91%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 11%, #000 89%, transparent 100%);
+  mask-composite: intersect;
 }
 /* the world picture, centred in the viewport (GameMap.tsx sizes it) */
 .game-map-viewport .game-map-canvas {

@@ -5,7 +5,15 @@ Playtest: 30 min.
 Survey: 10 min. 
 Gespräch 10 min.
 
-# Ablauf
+# Usertesting Ablauf
+Checkliste: Feedback DB leer. 
+1. Link schicken + Streamen, Uhr & Excel für Notizen machen bereit auf PC.
+2. Introduction kurz geben, User soll durchspielen, ich werde nur im Notfall eingreifen also nach 3 Versuchen wenn man nicht selbst weiterkommen fragen oder wenn ungeplante Situationen eintreten sollten.
+3. Playtest wird gespielt.
+4. Survey wird beantwortet (muss nicht streamen wenn sie nicht wollen und ehrliches Feedback)
+5. Interview - welche Fragen? Worauf sollte ich während Playtesting achten? Welche Beobachtungen tbd
+
+# Spielablauf
 After water vehicle craft quest part 1 is over
 When landing on shop island quest 2 begins
 
@@ -37,3 +45,48 @@ Fokus: Stimulation, Originalität und Interesse.
 
 # Saving points
 Nach Abschluss jeder Quest, bei Übergang zur nächsten Variante, manuelles Saven
+
+# Saving points detail
+
+Start
+
+The intro has finished and the first quest appears.
+The test session’s participant ID arrives from the server, right after that.
+
+Questline 1
+3. Walk around a little: every tile walked, until the step is done.
+4. Collect 3 resources: after each pick-up (1/3, 2/3) and when the third completes the step.
+5. Store something at home: when the item is put in storage.
+6. Talk to Mitchy: at the end of her hand-over scene, after the token is given.
+7. Craft a way across the water:
+
+when the crafted boat is placed on the water;
+when it’s put back in the inventory instead;
+when you board it;
+when you step off it.
+Arrival at the shop: after the arrival scene and Mitchy’s seed gift, as questline 2 starts. The checkpoint chip “saved” appears at the top.
+
+Questline 2
+9. Craft a watering tool: right after the craft.
+10. Fill it at the pond: on filling.
+11. Plant your seed: on planting.
+12. Water your plant: on watering it.
+13. Harvest your plant: on harvesting.
+14. Craft and equip a companion: when it’s equipped, either straight from the craft or from the inventory.
+15. Talk to Mitchy / “I’m done”: when you choose it. The questline-complete card shows, then the ratings start, with the checkpoint chip.
+
+Switching to the second design
+16. The transition screen: behind its “saving…” screen. This is the save the second part starts from.
+17. Begin the second part: when you start it, with the checkpoint chip.
+
+The replay (second design): the same moments as in questline 2, plus the boat moments from step 7. That covers crafting the boat (placing, boarding, stepping off), crafting the watering tool, filling, planting, watering, harvesting, the companion, and “I’m done”, which leads to the second ratings and their checkpoint.
+
+
+# Abschluss
+
+Was the session duration realistic?
+Did your observation sheet capture what you needed?
+Did the survey submission arrive correctly?
+Was AB/BA stored correctly?
+Did you unintentionally explain anything?
+Was there any genuine validity-threatening bug?

@@ -24,7 +24,7 @@ import { buildAtlas } from '../glyph/atlas';
 import { compose, decodeMask, type DetailRegion, type Recipe, type RefDoc } from '../glyph/refs';
 import { bakedToSprite } from '../glyph/sprite';
 import { MATERIALS } from './materials';
-import { drawSurprise, pickSurprise, placeSurprise } from './surpriseLib';
+import { applySurprise } from './surpriseLib';
 import { PALETTE } from './vocab';
 import { colourPhrases, fitToGame, gameColourHint, isColourWord, type ColourPhrase } from './colours';
 import { parseGameplayIntent, parseItemFunction, MODIFIER_PROMPT, NEUTRAL_MODIFIERS, type ItemFunction } from './functions';
@@ -146,7 +146,7 @@ export interface RefMatch {
   styleDetails?: RefChoice['details'];
   // the surprise (surpriseLib.ts): a decoration added to the picture,
   // placed from the item's silhouette; `seed` keeps it stable per prompt
-  surprise?: { seed: string };
+  surprise?: { seed: string; only?: string };
 }
 
 const FUNCTION_WORDS = /\b(that|which|can|could|lets?|makes?|named|called|faster|fast|float|floats|fly|flies|shoots?|glows?|heals?)\b/;
@@ -757,22 +757,17 @@ export async function buildFromMatch(m: RefMatch & { details?: RefChoice['detail
     petals: m.petals,
     blank: m.blank,
   };
-  let layer = compose(recipe);
-  // the surprise: one decoration from the universal library, fitted to this
-  // item (its kind decides which ones fit, its silhouette where it sits)
+  // the surprise: one extra of this item's category (craft/surpriseLib.ts),
+  // placed from its marks (a dog's head, a ship's sail, a can's lid)
   let surpriseName: string | undefined;
   if (m.surprise) {
     const fit = body.category === 'boat' ? 'ships' : body.category === 'watering-can' ? 'watering' : body.category === 'pet' || body.gameCategory === 'pets' ? 'pets' : null;
-    const deco = pickSurprise(fit, m.surprise.seed);
-    const at = placeSurprise(layer.img, deco, m.surprise.seed);
-    if (at) {
-      const drawn = drawSurprise(layer.img, deco, at);
-      const part = [...layer.part];
-      for (const i of drawn.pixels) part[i] = 'detail';
-      layer = { img: drawn.img, part };
-      surpriseName = deco.name;
-    }
+    const seed = m.surprise.seed;
+    recipe.after = (l, areaOf) => {
+      surpriseName = applySurprise(fit, l, areaOf, seed, m.surprise?.only) ?? undefined;
+    };
   }
+  const layer = compose(recipe);
   // watering cans, pets (the dogs), ships and named bodies are drawn finer:
   // 600-800 glyphs
   const can = body.category === 'watering-can' || body.category === 'pet' || body.category === 'boat' || !!body.names?.length;

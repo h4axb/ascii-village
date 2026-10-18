@@ -4722,7 +4722,7 @@ pre {
   position: fixed;
   top: 18px;
   left: 50%;
-  z-index: 3000;
+  z-index: 9980; /* over the map (9970) */
   transform: translateX(-50%);
   pointer-events: none;
   max-width: min(92vw, 440px);

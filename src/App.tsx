@@ -1243,13 +1243,17 @@ function Game() {
   // The link that was opened can override that (the Worker serves the game
   // for any path, see not_found_handling in wrangler.jsonc):
   //   /0      never plays the intro, straight onto the island
-  //   /intro  always plays it, even over a finished save (for testers)
+  //   /intro  plays it for a new save or one interrupted mid-intro, but
+  //           never again once it was watched to the end
   //   /       the default above
   const introPending =
     INTRO_AUTO_TRIGGER &&
     INTRO_LINK !== 'skip' &&
-    (INTRO_LINK === 'force' ||
-      (saved ? saved.introDone === false && !isPartC(saved.introStage) : true));
+    (INTRO_LINK === 'force'
+      ? !saved || saved.introDone === false
+      : saved
+        ? saved.introDone === false && !isPartC(saved.introStage)
+        : true);
   // Computed once, synchronously, at mount — every marker present, given
   // the above. Read again (fresh) inside the mount effect below, since a
   // DEV replay re-triggers it later in the session when this initial value
@@ -2683,9 +2687,9 @@ function Game() {
   // only once the full in-world sequence (Mitchy dialogue -> orientation ->
   // departure -> off-camera reposition -> letterbox close) has genuinely
   // finished, whether that happened naturally or via a late-stage Skip
-  // Intro fast-forward through the same runIntro() function. Runtime state
-  // only — it never calls writeSave/any persistence function; the save
-  // stays exclusively a Settings -> Save Game action.
+  // Intro fast-forward through the same runIntro() function. The effect on
+  // introDone below saves the moment it flips, so a reload after the intro
+  // never replays it (one before it does).
   function finishIntro() {
     if (sittingRef.current) void standUp(true); // a skip mid-intro
     setIntroDone(true);
@@ -4016,6 +4020,14 @@ function Game() {
   useEffect(() => {
     if (QUEST_ENABLED && introDone && !questRef.current) setQuest(freshQuest());
   }, [introDone]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the intro was watched to the end: saved right away (every link), so a
+  // reload never replays it; a reload before this point still does
+  const introDoneAtMountRef = useRef(introDone);
+  useEffect(() => {
+    if (!introDone || introDoneAtMountRef.current) return;
+    introDoneAtMountRef.current = true;
+    writeSave(snapRef.current());
+  }, [introDone]);
   // a user test shouldn't depend on remembering to save: every quest step
   // (and every first discovery) is written straight away
   useEffect(() => {

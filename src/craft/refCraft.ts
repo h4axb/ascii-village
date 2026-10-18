@@ -210,7 +210,9 @@ export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
     for (const w of words(dog.phrase)) used.add(sing(w));
     if (isDogRef(dog.ref)) for (const w of DOG_WORDS) used.add(w);
   }
-  for (const r of dog || force ? [] : REFS.filter((x) => x.role === 'body' && !isDogRef(x))) {
+  // (pets only come by their own names above: "pet", "kitten" or "creature"
+  // alone would otherwise pick whichever animal scores first)
+  for (const r of dog || force ? [] : REFS.filter((x) => x.role === 'body' && x.category !== 'pet')) {
     let s = 0;
     const nouns = [...(SYNONYMS[r.category] ?? []), ...r.category.split('-')];
     if (nouns.some(has)) s += 3;

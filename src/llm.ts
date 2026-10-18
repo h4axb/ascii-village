@@ -699,6 +699,12 @@ async function fallbackCraft(prompt: string, opts: CraftOpts, read: PromptRead |
     if (r) return r;
   }
   const subject = fallbackSubject(prompt);
+  // a typo fixed by the word lists ("a drgon" -> dragon) may name a library body
+  const fixed = subject.word;
+  if (fixed && hasRefBodies() && !prompt.toLowerCase().includes(fixed) && matchRefs(fixed).body) {
+    const r = await craftWithRefs(prompt.replace(/[\p{L}\p{N}'-]+/gu, (w) => (fallbackSubject(w).word === fixed ? fixed : w)), undefined, { ...opts, noModel: true }, read).catch(() => null);
+    if (r) return r;
+  }
   const category: Category = subject.category ?? inferCategory(parseSpec(prompt).category);
   const word = subject.word ?? prompt.trim().split(/\s+/).pop() ?? '';
   const name = (word || 'Mystery Thing').slice(0, 18).replace(/^\w/, (c) => c.toUpperCase());

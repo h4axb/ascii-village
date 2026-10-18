@@ -30,6 +30,7 @@ import { colourPhrases, fitToGame, gameColourHint, isColourWord, type ColourPhra
 import { parseGameplayIntent, parseItemFunction, MODIFIER_PROMPT, NEUTRAL_MODIFIERS, type ItemFunction } from './functions';
 import type { Category } from '../llm';
 import { LINK } from '../link';
+import { kindOf, promptParts } from './lexicon';
 import { newFeedbackId, playerId, sendFeedback, SESSION } from '../feedback/client';
 
 // Which links craft from the library (the quest test links /1 and /2 keep the
@@ -162,12 +163,20 @@ const DOG_WORDS = ['dog', 'dogs', 'puppy', 'pup', 'doggo', 'doggy', 'hund', 'hun
 const isDogRef = (r: RefDoc) => r.id.startsWith('pet-dog-');
 export function namedOf(prompt: string): { ref: RefDoc; phrase: string } | null {
   const p = ` ${fold(prompt).replace(/\s+/g, ' ')} `;
+  // a name only counts as the main object the prompt asks for: "a dragon
+  // boat" or "a ship with a dragon head" stay ships (craft/lexicon.ts)
+  const main = promptParts(prompt).main;
+  const mainF = main && kindOf(main) === 'object' ? fold(main).trim() : null;
   let best: { ref: RefDoc; phrase: string } | null = null;
   for (const r of REFS.filter((x) => x.role === 'body' && x.names?.length))
     for (const t of r.names!) {
       const f = fold(t).replace(/\s+/g, ' ').trim();
       // (a bare colour is no name: "golden" for the golden retriever)
       if (f.length < 3 || DOG_WORDS.includes(f) || (!f.includes(' ') && isColourWord(f))) continue;
+      // (the head word decides: "golden retriever" for "retriever", but not
+      // "dragon" for "dragon boat")
+      const head = (a: string, b: string) => a === b || a.endsWith(` ${b}`);
+      if (mainF && !head(mainF, f) && !head(f, mainF)) continue;
       if (p.includes(` ${f} `) || p.includes(` ${f}s `) || p.includes(` ${f}es `)) if (!best || f.length > best.phrase.length) best = { ref: r, phrase: f };
     }
   if (best) return best;

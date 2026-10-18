@@ -389,10 +389,16 @@ export default function CraftModal({
         setStage('thinking');
         setBusyLine('Ooh, let me think about that for a second.');
         const t0 = Date.now();
-        void clarifyPrompt(craftPrompt).then((qs) => {
+        void clarifyPrompt(craftPrompt).then((res) => {
           if (closed.current) return;
           setAiDown(null);
           clearAiDown();
+          // an object the game doesn't know: Mitchy asks for another one
+          if (res.retry !== undefined) {
+            setBusyLine(null);
+            return finish({ ok: false, reply: res.retry });
+          }
+          const qs = res.questions;
           if (!qs.length) return draw(undefined, { questions: [], skipped: false, ms: Date.now() - t0, outcome: 'crafted' });
           setStage(null);
           setBusyLine(null);
@@ -527,6 +533,7 @@ export default function CraftModal({
       colour: chosen.find((o) => o.colour)?.colour,
       surprise: chosen.some((o) => o.surprise),
       dropDetails: chosen.flatMap((o) => o.drop ?? []),
+      replace: chosen.flatMap((o) => (o.replace ? [o.replace] : [])),
     };
     c.run(cl, clarLog(c, picks, skipped, 'crafted'));
   }

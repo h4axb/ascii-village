@@ -594,6 +594,7 @@ export interface ClarifyOption {
   colour?: string; // a colour word the item is made in
   surprise?: boolean; // add the surprise (a watering can: the flower on top)
   drop?: string[]; // leave these detail phrases out of the prompt
+  replace?: [string, string]; // read this word as that one (an unknown word's closest known word)
 }
 export interface ClarifyQuestion {
   topic: string; // short name of the decision ("Focus"), shown in the plan panel

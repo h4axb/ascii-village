@@ -803,3 +803,20 @@ export function logRefCraft(prompt: string, via: 'match' | 'model' | 'planner', 
     ref: { via, body: body ?? '', miss: miss.slice(0, 12) },
   });
 }
+
+// ---- the words the library knows (craft/lexicon.ts) ---------------------------------------
+// every body's title words, part names, tags and names, the size / filler
+// words and the ship words (named ships, styles, sail / bow words, dog words)
+export function libraryWords(): { known: Set<string>; filler: Set<string>; sizes: Set<string> } {
+  const known = new Set<string>();
+  const addAll = (s: string | undefined) => words(s ?? '').forEach((w) => known.add(w));
+  for (const r of REFS) {
+    addAll(r.title);
+    r.parts.forEach((p) => addAll(p.name.replace(/[_-]/g, ' ')));
+    (r.tags ?? []).forEach(addAll);
+    (r.names ?? []).forEach(addAll);
+  }
+  [...SIZE_WORDS, ...SAIL_WORDS, ...BOW_WORDS, ...SMALL_BOAT, ...DOG_WORDS, ...NAMED_SHIP.flatMap(([, l]) => l), ...SHIP_STYLES.flatMap((s) => s.words)].forEach((w) => known.add(w));
+  for (const [k, l] of Object.entries(SYNONYMS)) [k, ...l].forEach(addAll);
+  return { known, filler: new Set([...FILLER, ...STOP]), sizes: SIZE_WORDS };
+}

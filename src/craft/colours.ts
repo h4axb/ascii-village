@@ -12,7 +12,7 @@ import { themeColor } from '../theme';
 // base colour words in English, German, French, Spanish, Italian, Dutch
 // (accents folded; Romance words by their stem, endings are stripped) -> a
 // PALETTE key
-const BASE: Record<string, string> = {};
+export const BASE: Record<string, string> = {};
 const add = (key: string, ...ws: string[]) => ws.forEach((w) => (BASE[w] = key));
 for (const k of Object.keys(PALETTE)) BASE[k] = k;
 add('gray', 'grey', 'grau', 'gris', 'grigio', 'grigi', 'grij', 'grijs');
@@ -214,7 +214,7 @@ const TYPO_KEEP = new Set([
   'blew', 'blow', 'glow', 'flow', 'slow', 'below', 'yell', 'mellow', 'fellow', 'hollow', 'willow', 'pinky', 'tidy', 'tins',
 ]);
 // edit distance with swapped neighbours counting once ("gerrn" -> green)
-function typoDistance(a: string, b: string): number {
+export function typoDistance(a: string, b: string): number {
   const d = Array.from({ length: a.length + 1 }, (_, i) => Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)));
   for (let i = 1; i <= a.length; i++)
     for (let j = 1; j <= b.length; j++) {

@@ -51,6 +51,7 @@ import {
 import { checkPolicy } from './craft/policy';
 import { fallbackNote, fitToGame } from './craft/colours';
 import { readPrompt, type PromptRead } from './craft/readPrompt';
+import { closestWords, isKnownWord, kindOf, promptParts } from './craft/lexicon';
 import {
   REF_CRAFT_ON,
   hasRefBodies,
@@ -455,11 +456,16 @@ type CraftOpts = { retry?: boolean; prefs?: boolean; clarify?: CraftClarify; noA
 export async function craftItem(prompt: string, ui?: CraftUiHooks, opts: CraftOpts = {}): Promise<CraftResult> {
   const policy = checkPolicy(prompt);
   if (!policy.allowed) return { ok: false, reply: policy.reason! };
+  const typed = prompt;
+  // the pre-clarification's answers about unknown words: the known word the
+  // player picked, or the word left out — before the prompt is read
+  for (const [from, to] of opts.clarify?.replace ?? []) prompt = prompt.replace(new RegExp(`\\b${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'), to);
+  if (opts.clarify?.dropDetails?.length) prompt = withoutDetails(prompt, opts.clarify.dropDetails);
   const read = await readPrompt(prompt);
   if (read.fixes.length) console.info('[craft] read as', JSON.stringify(read.fixed), read.fixes);
   const r = await craftFixed(read.fixed, ui, opts, read);
   if (!r.ok) return r;
-  r.item.tags = (r.item.tags ?? []).map((t) => (t.startsWith('prompt: ') ? `prompt: ${prompt.trim()}` : t));
+  r.item.tags = (r.item.tags ?? []).map((t) => (t.startsWith('prompt: ') ? `prompt: ${typed.trim()}` : t));
   return read.fixes.length ? { ...r, fixes: read.fixes } : r;
 }
 
@@ -850,6 +856,7 @@ export interface CraftClarify {
   colour?: string; // the colour picked ("Sky blue")
   surprise?: boolean; // "Yes, surprise me"
   dropDetails?: string[]; // detail phrases the player chose to leave out
+  replace?: [string, string][]; // unknown words read as the known word the player picked
   finish?: TextureModifier;
   mood?: Mood;
 }
@@ -857,11 +864,41 @@ export interface CraftClarify {
 // (craft/refCraft.ts unknownsOf, no model call): its size and colour when it
 // names none, whether to add a surprise, then the details no reference can
 // draw (named from the prompt, a yes/no).
-export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> {
+// `retry`: the main object isn't a word the game knows (and the model
+// couldn't read it): Mitchy asks for another object instead of questions
+export type ClarifyResult = { questions: ClarifyQuestion[]; retry?: undefined } | { retry: string; questions?: undefined };
+export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
   // a blocked prompt is refused by craftItem right after, without questions
-  if (!checkPolicy(prompt).allowed) return [];
+  if (!checkPolicy(prompt).allowed) return { questions: [] };
   const read = await readPrompt(prompt);
-  return preQuestions(read.fixed, read);
+  if (read.via === 'model') return { questions: preQuestions(read.fixed, read) };
+  // read locally: the words the game doesn't know are asked about, as typed
+  const { main, others } = promptParts(prompt);
+  if (main && !isKnownWord(main)) {
+    logRefCraft(prompt, 'planner', null, [main]);
+    return {
+      retry: `I don't know how to make a "${main}" yet. Could you try another object? I've noted it, so it can be added in a next patch.`,
+    };
+  }
+  const unknown = [...new Set(others.filter((w) => !isKnownWord(w)))].slice(0, 3);
+  const typoQs: ClarifyQuestion[] = unknown.map((w) => {
+    const near = closestWords(w, 2);
+    return {
+      topic: w,
+      q: `I don't know "${w}". Did you mean…`,
+      options: [
+        ...near.map((n) => ({ label: n, effect: `Read "${w}" as ${n}.`, replace: [w, n] as [string, string] })),
+        { label: 'Leave out this detail', effect: `Leave "${w}" out.`, drop: [w] },
+      ],
+      noDecide: true,
+    };
+  });
+  // a typo that's a colour / size: its own question covers the colour / size one
+  const nearKinds = new Set(unknown.flatMap((w) => closestWords(w, 2).map(kindOf)));
+  const rest = preQuestions(prompt, undefined, unknown, { colour: nearKinds.has('colour'), size: nearKinds.has('size') });
+  // the typo questions right after size / colour, before the surprise
+  const at = rest.findIndex((q) => q.topic === 'Surprise');
+  return { questions: at < 0 ? [...rest, ...typoQs] : [...rest.slice(0, at), ...typoQs, ...rest.slice(at)] };
 }
 // (each with its own exact colour: no model call needed for these): the
 // rainbow plus black and white, eased into the game's palette when used
@@ -880,10 +917,13 @@ const COLOUR_OPTIONS: { label: string; word: string }[] = [
 // `read`: the prompt's reading (craft/readPrompt.ts): a size or colour it
 // found counts as said, and with the model's reading only the details it
 // names can be "not among my patterns" (a typo never is)
-export function preQuestions(prompt: string, read?: PromptRead): ClarifyQuestion[] {
+// `asked`: unknown words already asked about (clarifyPrompt), so they are no
+// "not among my patterns" detail; `covered`: a colour / size they stand for
+export function preQuestions(prompt: string, read?: PromptRead, asked: string[] = [], covered: { colour?: boolean; size?: boolean } = {}): ClarifyQuestion[] {
   const u = unknownsOf(prompt);
-  if (read?.size) u.sizeNamed = true;
-  if (read?.colours.length) u.colourNamed = true;
+  if (read?.size || covered.size) u.sizeNamed = true;
+  if (read?.colours.length || covered.colour) u.colourNamed = true;
+  if (asked.length) u.details = u.details.filter((d) => !d.toLowerCase().split(/\s+/).some((w) => asked.includes(w)));
   if (read?.via === 'model') {
     const named = new Set([...read.details, read.style ?? ''].flatMap((d) => d.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []));
     u.details = u.details.filter((d) => d.toLowerCase().split(/\s+/).some((w) => named.has(w) || named.has(w.replace(/s$/, ''))));

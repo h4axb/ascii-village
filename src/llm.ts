@@ -60,7 +60,8 @@ const THEMES: Theme[] = ['ships', 'watering', 'pets'];
 // a few of each theme's library-made objects, for "Surprise me"
 const THEME_SURPRISES: Record<Theme, string[]> = {
   ships: ['pirate ship', 'shark ship', 'galleon', 'turtle ship', 'viking ship', 'sailboat', 'rowboat'],
-  watering: ['watering can', 'golden watering can', 'watering can with a flower on top'],
+  // (no colour words: the player's own colour is kept on top)
+  watering: ['watering can', 'classic watering can', 'watering can with a flower on top'],
   pets: ['golden retriever', 'corgi', 'husky', 'pug', 'dachshund', 'shiba inu', 'beagle', 'border collie'],
 };
 // the prompt's understood colour and size words, kept for a new reading

@@ -84,6 +84,8 @@ const SYNONYMS: Record<string, string[]> = {
   boat: [
     'boat', 'ship', 'sloop', 'sailboat', 'raft', 'canoe', 'yacht', 'vessel', 'galleon', 'dinghy',
     'boot', 'schiff', 'segelschiff', 'piratenschiff', 'floss', 'bateau', 'navire', 'barco', 'barca', 'nave', 'schip', 'barque',
+    // the small boats (shapeShip picks one of the little wooden boats for these)
+    'rowboat', 'kayak', 'kanu', 'ruderboot', 'radeau', 'balsa', 'zattera', 'vlot',
   ],
   cart: ['cart', 'wagon', 'car', 'carriage', 'buggy'],
   'watering-can': ['watering', 'can', 'sprinkler'],

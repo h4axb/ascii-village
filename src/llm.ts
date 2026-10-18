@@ -839,6 +839,9 @@ async function craftWithRefs(
   ui?.onStage?.('drawing');
   // the size: the answer, else a size word in the prompt
   const said = read?.size ?? (/\b(tiny|small|little|mini)\b/i.test(prompt) ? 'small' : /\b(big|large|huge|giant)\b/i.test(prompt) ? 'large' : /\bmedium\b/i.test(prompt) ? 'medium' : undefined);
+  // the surprise (design A's answer, design B's preference): a decoration
+  // from the universal library, fitted to the item (craft/surpriseLib.ts)
+  if (surprise) m.surprise = { seed: prompt.trim().toLowerCase() };
   const sp = await buildFromMatch(m, opts.clarify?.size ?? said, prefs.detail ?? 0);
   if (prefs.color) sp.palette = applyColorPref(sp.palette, prefs.color);
   sp.lines.forEach((line, i) => ui?.onLine?.(line, i, 0));
@@ -875,6 +878,11 @@ async function craftWithRefs(
   if (finish) item.textureModifier = finish;
   console.info('[craft] from references', { body: m.body.id, via, signs: sp.signs, swaps: m.swaps.map((x) => x.ref.id), decorations: m.decorations.map((x) => x.ref.id) });
   const out: CraftResult = opts.prefs ? { ok: true, item, kind: category, applied: { detail: prefs.detail, color: prefs.color, surprise: prefs.surprise } } : { ok: true, item };
+  // the surprise is named, so the player can spot it
+  if (sp.surpriseName) {
+    item.tags = [...(item.tags ?? []), `surprise: ${sp.surpriseName}`];
+    note = [note, `I added a little surprise: ${sp.surpriseName}.`].filter(Boolean).join(' ');
+  }
   return note ? { ...out, note } : out;
 }
 

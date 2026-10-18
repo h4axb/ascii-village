@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 import { chatJSON, llmEnabled, MODELS } from '../llmClient';
 import { fixTypos } from './colours';
+import { isKnownWord } from './lexicon';
 import type { SizeClass } from './spriteConfig';
 
 export interface PromptRead {
@@ -39,7 +40,7 @@ export function readPrompt(prompt: string): Promise<PromptRead> {
 }
 
 function local(prompt: string): PromptRead {
-  const { fixed, fixes } = fixTypos(prompt);
+  const { fixed, fixes } = fixTypos(prompt, isKnownWord);
   return { fixed, size: null, colours: [], details: [], style: null, fixes, via: 'local' };
 }
 
@@ -86,7 +87,7 @@ export function parseRead(raw: Record<string, unknown> | null | undefined, promp
   let fixed = str(raw.fixed, 200);
   const ow = words(prompt);
   const fw = words(fixed);
-  if (!fixed || fw.length > ow.length + 2 || fw.length < ow.length - 2 || fixed.length > prompt.length * 1.5 + 10) fixed = fixTypos(prompt).fixed;
+  if (!fixed || fw.length > ow.length + 2 || fw.length < ow.length - 2 || fixed.length > prompt.length * 1.5 + 10) fixed = fixTypos(prompt, isKnownWord).fixed;
   const sz = str(raw.size, 12).toLowerCase();
   const size: SizeClass | null = /^(small|tiny|little|mini)$/.test(sz) ? 'small' : /^(large|big|huge|giant)$/.test(sz) ? 'large' : sz === 'medium' ? 'medium' : null;
   const colours = (Array.isArray(raw.colours) ? raw.colours : [])

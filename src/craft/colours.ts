@@ -241,11 +241,13 @@ export function typoFix(w: string): string | null {
   }
   return best;
 }
-// the prompt with its colour / size typos fixed, and what was changed
-export function fixTypos(prompt: string): { fixed: string; fixes: [string, string][] } {
+// the prompt with its colour / size typos fixed, and what was changed;
+// `known`: words the game knows are never "fixed" ("turtle" isn't a
+// "purple" typo)
+export function fixTypos(prompt: string, known?: (w: string) => boolean): { fixed: string; fixes: [string, string][] } {
   const fixes: [string, string][] = [];
   const fixed = prompt.replace(/[A-Za-zÀ-ÿ]+/g, (w) => {
-    const f = typoFix(w);
+    const f = known?.(w) ? null : typoFix(w);
     if (!f) return w;
     fixes.push([w, f]);
     return w[0] === w[0].toUpperCase() ? f[0].toUpperCase() + f.slice(1) : f;

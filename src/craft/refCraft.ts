@@ -24,6 +24,7 @@ import { buildAtlas } from '../glyph/atlas';
 import { compose, decodeMask, type DetailRegion, type Recipe, type RefDoc } from '../glyph/refs';
 import { bakedToSprite } from '../glyph/sprite';
 import { MATERIALS } from './materials';
+import { drawSurprise, pickSurprise, placeSurprise } from './surpriseLib';
 import { PALETTE } from './vocab';
 import { colourPhrases, fitToGame, gameColourHint, isColourWord, type ColourPhrase } from './colours';
 import { parseGameplayIntent, parseItemFunction, MODIFIER_PROMPT, NEUTRAL_MODIFIERS, type ItemFunction } from './functions';
@@ -143,6 +144,9 @@ export interface RefMatch {
   // a known style's own features (a viking ship's dragon prow and shields,
   // SHIP_STYLES), drawn with whatever details the model adds
   styleDetails?: RefChoice['details'];
+  // the surprise (surpriseLib.ts): a decoration added to the picture,
+  // placed from the item's silhouette; `seed` keeps it stable per prompt
+  surprise?: { seed: string };
 }
 
 const FUNCTION_WORDS = /\b(that|which|can|could|lets?|makes?|named|called|faster|fast|float|floats|fly|flies|shoots?|glows?|heals?)\b/;
@@ -456,7 +460,8 @@ export function choiceToMatch(c: RefChoice, guess: RefMatch): (RefMatch & { deta
 // Three references, three variants (re-bakes of one count as the same):
 // the classic garden can, the golden can and the can with the flower on top.
 // Plain wishes alternate between classic and golden for shape diversity;
-// the flower can comes from "flower"/"blooming" or the surprise answer.
+// the flower can comes from "flower"/"blooming" (a surprise is a decoration
+// from surpriseLib.ts, on any variant).
 export type CanVariant = 'classic' | 'golden' | 'flower';
 const variantOf = (r: RefDoc): CanVariant => (r.id.includes('flower') ? 'flower' : r.id.includes('golden') ? 'golden' : 'classic');
 const CAN_FIXED = new Set(['flower', 'rose']); // keep their own colours when the can is recoloured
@@ -473,7 +478,7 @@ export function shapeWateringCan(m: RefMatch, prompt: string, opts: { surprise?:
   const ws = words(prompt).map(sing);
   const has = (...xs: string[]) => xs.some((x) => ws.includes(x));
   let v: CanVariant;
-  if (opts.surprise || has('flower', 'blooming', 'bloom', 'blossom')) v = 'flower';
+  if (has('flower', 'blooming', 'bloom', 'blossom')) v = 'flower';
   else if (has('gold', 'golden', 'brass', 'ornate', 'long', 'fancy')) v = 'golden';
   else if (has('classic', 'garden', 'simple', 'plain', 'old')) v = 'classic';
   else v = lastPlain = lastPlain === 'classic' ? 'golden' : 'classic';
@@ -502,7 +507,7 @@ export function shapeWateringCan(m: RefMatch, prompt: string, opts: { surprise?:
 //   a bow / figurehead decoration ...... the shark ship: the shark taken out
 //                                         (unless a shark is asked), the new one
 //                                         drawn where it was (bow_head)
-//   the surprise ........................ the turtle ship (a giant sea turtle)
+//   the surprise ........................ any ship plus a decoration (surpriseLib.ts)
 //   asked by name (pirate, shark, turtle, galleon) that one; a plain ship one
 //   of the pirate ship, galleon and shark ship. Small boats (raft, canoe…)
 //   keep the little wooden boats.
@@ -596,9 +601,7 @@ export function shapeShip(m: RefMatch, prompt: string, opts: { surprise?: boolea
   if (onBow && (extra.length || named === 'shark')) pick = 'shark';
   else if (onSail || (extra.length && named !== 'turtle' && named !== 'galleon' && named !== 'shark')) pick = 'pirate';
   else if (named) pick = named;
-  else if (opts.surprise) pick = 'turtle';
   else pick = (['pirate', 'galleon', 'shark'] as const)[Math.floor(Math.random() * 3)];
-  if (opts.surprise && pick !== 'turtle' && !named && !extra.length) pick = 'turtle';
   const body = ref(pick);
   if (!body) return m;
   const out = matchRefs(prompt, body);
@@ -725,6 +728,7 @@ const PET_SCREEN_W = { small: 3, medium: 4, large: 5.5 } as const;
 export const isAlwaysRef = (m: RefMatch) => m.body?.category === 'watering-can' || m.body?.category === 'pet' || m.body?.category === 'boat' || !!m.body?.names?.length;
 
 export interface RefSprite {
+  surpriseName?: string; // the surprise decoration that was added ("a little fish")
   lines: string[];
   colors: string[];
   palette: Record<string, string>;
@@ -753,7 +757,22 @@ export async function buildFromMatch(m: RefMatch & { details?: RefChoice['detail
     petals: m.petals,
     blank: m.blank,
   };
-  const layer = compose(recipe);
+  let layer = compose(recipe);
+  // the surprise: one decoration from the universal library, fitted to this
+  // item (its kind decides which ones fit, its silhouette where it sits)
+  let surpriseName: string | undefined;
+  if (m.surprise) {
+    const fit = body.category === 'boat' ? 'ships' : body.category === 'watering-can' ? 'watering' : body.category === 'pet' || body.gameCategory === 'pets' ? 'pets' : null;
+    const deco = pickSurprise(fit, m.surprise.seed);
+    const at = placeSurprise(layer.img, deco, m.surprise.seed);
+    if (at) {
+      const drawn = drawSurprise(layer.img, deco, at);
+      const part = [...layer.part];
+      for (const i of drawn.pixels) part[i] = 'detail';
+      layer = { img: drawn.img, part };
+      surpriseName = deco.name;
+    }
+  }
   // watering cans, pets (the dogs), ships and named bodies are drawn finer:
   // 600-800 glyphs
   const can = body.category === 'watering-can' || body.category === 'pet' || body.category === 'boat' || !!body.names?.length;
@@ -764,13 +783,13 @@ export async function buildFromMatch(m: RefMatch & { details?: RefChoice['detail
   const screenW =
     body.category === 'pet' || body.gameCategory === 'pets' ? PET_SCREEN_W : body.category === 'boat' || body.gameCategory === 'vehicle' ? SCREEN_W : can ? CAN_SCREEN_W : SCREEN_W;
   const g = bakeImage(layer.img, Math.round((can ? CAN_SIGNS : SIGNS)[band] * DETAIL_SIGNS[detail]), screenW[band]);
-  return { ...g, body };
+  return { ...g, body, surpriseName };
 }
 
 // A picture (a reference's composed layer, or the AI's drawing on /4,
 // svgDraw.ts) baked into the game's glyphs: `signs` glyphs, `screenW` ch
 // wide on screen. Real transparency: gaps are meant (no hole filling).
-export function bakeImage(img: Img, signs: number, screenW: number): Omit<RefSprite, 'body'> {
+export function bakeImage(img: Img, signs: number, screenW: number): Omit<RefSprite, 'body' | 'surpriseName'> {
   const b = bake(img, { ...DEFAULTS, bg: 'alpha', fillHoles: false, signs }, getAtlas());
   const g = bakedToSprite(b);
   const w = Math.max(1, ...g.sprite.map((l) => l.length));

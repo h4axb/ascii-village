@@ -49,11 +49,11 @@ import {
   type ItemFunction,
 } from './craft/functions';
 import { checkPolicy } from './craft/policy';
-import { fallbackNote, fitToGame } from './craft/colours';
+import { fallbackNote, fitToGame, typoDistance } from './craft/colours';
 import { readPrompt, type PromptRead } from './craft/readPrompt';
 import { SVG_PROMPT, coverage, parseDrawing, rasterSvg } from './craft/svgDraw';
 import { LINK } from './link';
-import { closestReading, closestWords, kindOf, promptParts, type Theme } from './craft/lexicon';
+import { closestWords, kindOf, promptParts, themeOfObject, type Theme } from './craft/lexicon';
 
 // ---- the fallback's surprise and closest reading (clarifyPrompt) ----
 const THEMES: Theme[] = ['ships', 'watering', 'pets'];
@@ -967,55 +967,57 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
     surprise: true,
     final: true,
   });
-  // more than half of it unreadable: one question — the closest reading, a
-  // surprise, or try again
-  if (parts.content > 0 && parts.unknown.length / parts.content > 0.5) {
-    const near = closestReading(prompt);
-    const theme = near?.theme ?? parts.theme;
-    return {
-      questions: [
-        {
-          topic: 'Your idea',
-          q: near ? `I'm not sure what you mean. Did you mean "${near.text}"?` : "I'm not sure what you mean.",
-          options: [
-            ...(near ? [{ label: near.text, effect: `Craft ${near.text}.`, rewrite: near.text, final: true }] : []),
-            surprise(theme),
-            { label: 'Try again', effect: 'Type another idea.', tryAgain: true },
-          ],
-          noDecide: true,
-        },
-      ],
-    };
-  }
-  // only the main object unknown: a surprise or another object (and it's
-  // noted for a next patch)
+  const tryAnother = { label: 'Try another object', effect: 'Type another object.', tryAgain: true };
+  // each unknown word gets its own question: its closest known word, or
+  // (a detail) leave it out
+  const near = (w: string, kinds?: Parameters<typeof closestWords>[2]) => {
+    const [c] = closestWords(w, 1, kinds);
+    return c && typoDistance(w.toLowerCase(), c) <= (w.length >= 7 ? 2 : 1) ? c : (kinds ? null : c);
+  };
+  const mainQs: ClarifyQuestion[] = [];
   if (parts.main && !parts.mainKnown) {
-    logRefCraft(prompt, 'planner', null, [parts.main]);
-    return {
-      questions: [
-        {
-          topic: parts.main,
-          q: `I don't know a "${parts.main}" yet. Shall I surprise you, or do you want to try another object?`,
-          options: [surprise(closestReading(prompt)?.theme ?? parts.theme), { label: 'Try another object', effect: 'Type another object.', tryAgain: true }],
-          noDecide: true,
-        },
-      ],
-      reported: parts.main,
-    };
+    const obj = near(parts.main, ['object']);
+    if (obj)
+      // a typo of an object it knows: that object, a surprise, or another one
+      mainQs.push({
+        topic: parts.main,
+        q: `I don't know "${parts.main}". Did you mean ${obj}?`,
+        options: [{ label: obj, effect: `Read "${parts.main}" as ${obj}.`, replace: [parts.main, obj] }, surprise(themeOfObject(obj) ?? parts.theme), tryAnother],
+        noDecide: true,
+      });
+    else {
+      // an object it doesn't know at all: reported for a next patch; a
+      // surprise or another object (nothing else to ask about)
+      logRefCraft(prompt, 'planner', null, [parts.main]);
+      return {
+        questions: [
+          {
+            topic: parts.main,
+            q: `I don't know a "${parts.main}" yet. Shall I surprise you, or do you want to try another object?`,
+            options: [surprise(parts.theme), tryAnother],
+            noDecide: true,
+          },
+        ],
+        reported: parts.main,
+      };
+    }
   }
-  const unknown = [...new Set(parts.unknown.filter((w) => w !== parts.main))].slice(0, 3);
-  const typoQs: ClarifyQuestion[] = unknown.map((w) => {
-    const [near] = closestWords(w, 1);
-    return {
-      topic: w,
-      q: near ? `I don't know "${w}". Did you mean ${near}?` : `I don't know "${w}".`,
-      options: [
-        ...(near ? [{ label: near, effect: `Read "${w}" as ${near}.`, replace: [w, near] as [string, string] }] : []),
-        { label: 'Leave out this detail', effect: `Leave "${w}" out.`, drop: [w] },
-      ],
-      noDecide: true,
-    };
-  });
+  const unknown = [...new Set(parts.unknown.filter((w) => w !== parts.main))];
+  const typoQs: ClarifyQuestion[] = [
+    ...mainQs,
+    ...unknown.map((w) => {
+      const c = near(w);
+      return {
+        topic: w,
+        q: c ? `I don't know "${w}". Did you mean ${c}?` : `I don't know "${w}".`,
+        options: [
+          ...(c ? [{ label: c, effect: `Read "${w}" as ${c}.`, replace: [w, c] as [string, string] }] : []),
+          { label: 'Leave out this detail', effect: `Leave "${w}" out.`, drop: [w] },
+        ],
+        noDecide: true,
+      };
+    }),
+  ];
   // a typo that's a colour / size: its own question covers the colour / size one
   const nearKinds = new Set(unknown.flatMap((w) => closestWords(w, 1).map(kindOf)));
   const rest = preQuestions(prompt, undefined, unknown, { colour: nearKinds.has('colour'), size: nearKinds.has('size') });

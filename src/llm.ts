@@ -50,6 +50,7 @@ import {
 } from './craft/functions';
 import { checkPolicy } from './craft/policy';
 import { fallbackNote, fitToGame } from './craft/colours';
+import { readPrompt, type PromptRead } from './craft/readPrompt';
 import {
   REF_CRAFT_ON,
   hasRefBodies,
@@ -342,7 +343,7 @@ export type CraftResult =
   // kind: what kind of thing it is (its main element) and applied: the
   // player's crafting preferences used for it — both only with opts.prefs
   // note: what Mitchy says after it (a colour that couldn't be mixed exactly)
-  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs; note?: string }
+  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs; note?: string; fixes?: [string, string][] }
   // `suggestions`: up to 3 alternative craft prompts (shown as clickable
   // buttons). Present only on BENIGN failures — never on category mismatches
   // or blocked (sensitive) input.
@@ -442,16 +443,27 @@ function inferCategory(specCategory: string, hint?: Category): Category {
 // the keyword-based mock below so the game still crafts.
 // `opts.retry: false` skips the automatic re-plan after a failed first plan
 // (the /1 test link); by default it runs as before.
-export async function craftItem(
-  prompt: string,
-  ui?: CraftUiHooks,
-  // prefs: apply the player's crafting preferences (craft/prefs.ts) — the
-  // /2 link; without it everything crafts exactly as before
-  // clarify: the player's answers from the pre-clarification step (the /1
-  // link) — planner guidance plus exact size / finish / mood overrides; with
-  // noAlts a failure offers no alternative ideas
-  opts: { retry?: boolean; prefs?: boolean; clarify?: CraftClarify; noAlts?: boolean } = {},
-): Promise<CraftResult> {
+// prefs: apply the player's crafting preferences (craft/prefs.ts) — the /2
+// link; without it everything crafts exactly as before
+// clarify: the player's answers from the pre-clarification step (the /1
+// link) — planner guidance plus exact size / finish / mood overrides; with
+// noAlts a failure offers no alternative ideas
+type CraftOpts = { retry?: boolean; prefs?: boolean; clarify?: CraftClarify; noAlts?: boolean };
+// The prompt is read first (craft/readPrompt.ts: its spelling fixed, its
+// size / colours / details as tags), and everything after crafts from the
+// fixed prompt; the item's "prompt:" tag keeps what the player typed.
+export async function craftItem(prompt: string, ui?: CraftUiHooks, opts: CraftOpts = {}): Promise<CraftResult> {
+  const policy = checkPolicy(prompt);
+  if (!policy.allowed) return { ok: false, reply: policy.reason! };
+  const read = await readPrompt(prompt);
+  if (read.fixes.length) console.info('[craft] read as', JSON.stringify(read.fixed), read.fixes);
+  const r = await craftFixed(read.fixed, ui, opts, read);
+  if (!r.ok) return r;
+  r.item.tags = (r.item.tags ?? []).map((t) => (t.startsWith('prompt: ') ? `prompt: ${prompt.trim()}` : t));
+  return read.fixes.length ? { ...r, fixes: read.fixes } : r;
+}
+
+async function craftFixed(prompt: string, ui: CraftUiHooks | undefined, opts: CraftOpts, read: PromptRead): Promise<CraftResult> {
   // Local content policy runs FIRST and on every path — before any network
   // call, and equally in offline/mock mode. The model-side `sensitive` check
   // below is fail-open by design (a failed request returns "not sensitive"),
@@ -467,7 +479,7 @@ export async function craftItem(
   // (watering cans and dogs come from the library on every link:
   // src/data/refs/watering-can-* and pet-dog-*)
   if ((REF_CRAFT_ON || isAlwaysRef(matchRefs(prompt))) && hasRefBodies()) {
-    const r = await craftWithRefs(prompt, ui, opts);
+    const r = await craftWithRefs(prompt, ui, opts, read);
     if (r) return r;
   }
 
@@ -665,6 +677,7 @@ async function craftWithRefs(
   prompt: string,
   ui: CraftUiHooks | undefined,
   opts: { prefs?: boolean; clarify?: CraftClarify },
+  read?: PromptRead,
 ): Promise<CraftResult | null> {
   // the clarify answer: its own hex ("Sky blue"), else its colour word
   const cc = opts.clarify?.colour?.trim().toLowerCase();
@@ -736,7 +749,7 @@ async function craftWithRefs(
   }
   ui?.onStage?.('drawing');
   // the size: the answer, else a size word in the prompt
-  const said = /\b(tiny|small|little|mini)\b/i.test(prompt) ? 'small' : /\b(big|large|huge|giant)\b/i.test(prompt) ? 'large' : /\bmedium\b/i.test(prompt) ? 'medium' : undefined;
+  const said = read?.size ?? (/\b(tiny|small|little|mini)\b/i.test(prompt) ? 'small' : /\b(big|large|huge|giant)\b/i.test(prompt) ? 'large' : /\bmedium\b/i.test(prompt) ? 'medium' : undefined);
   const sp = await buildFromMatch(m, opts.clarify?.size ?? said, prefs.detail ?? 0);
   if (prefs.color) sp.palette = applyColorPref(sp.palette, prefs.color);
   sp.lines.forEach((line, i) => ui?.onLine?.(line, i, 0));
@@ -847,7 +860,8 @@ export interface CraftClarify {
 export async function clarifyPrompt(prompt: string): Promise<ClarifyQuestion[]> {
   // a blocked prompt is refused by craftItem right after, without questions
   if (!checkPolicy(prompt).allowed) return [];
-  return preQuestions(prompt);
+  const read = await readPrompt(prompt);
+  return preQuestions(read.fixed, read);
 }
 // (each with its own exact colour: no model call needed for these): the
 // rainbow plus black and white, eased into the game's palette when used
@@ -863,8 +877,17 @@ const COLOUR_OPTIONS: { label: string; word: string }[] = [
   { label: 'Black', word: '#2b2b33' },
   { label: 'White', word: '#f4f1e6' },
 ];
-export function preQuestions(prompt: string): ClarifyQuestion[] {
+// `read`: the prompt's reading (craft/readPrompt.ts): a size or colour it
+// found counts as said, and with the model's reading only the details it
+// names can be "not among my patterns" (a typo never is)
+export function preQuestions(prompt: string, read?: PromptRead): ClarifyQuestion[] {
   const u = unknownsOf(prompt);
+  if (read?.size) u.sizeNamed = true;
+  if (read?.colours.length) u.colourNamed = true;
+  if (read?.via === 'model') {
+    const named = new Set([...read.details, read.style ?? ''].flatMap((d) => d.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []));
+    u.details = u.details.filter((d) => d.toLowerCase().split(/\s+/).some((w) => named.has(w) || named.has(w.replace(/s$/, ''))));
+  }
   const qs: ClarifyQuestion[] = [];
   if (!u.sizeNamed)
     qs.push({

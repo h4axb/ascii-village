@@ -424,6 +424,9 @@ export default function CraftModal({
         setPhase('success');
         if (rework) setAdjusted(true);
         if (how.surprise) push({ who: 'mitchy', kind: 'text', text: "Ta-da! Here's what I came up with." });
+        // a typo the prompt reading fixed (craft/readPrompt.ts): said once, softly
+        if (r.fixes?.length)
+          push({ who: 'mitchy', kind: 'text', text: `(I read ${r.fixes.slice(0, 3).map(([a, b]) => `"${a}" as ${b}`).join(', ')}.)` });
         const kind = feedback && isKind(r.kind) ? r.kind : null;
         const rated = feedback || clarify;
         push({

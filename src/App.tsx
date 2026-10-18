@@ -603,6 +603,11 @@ const LABEL_BESIDE: Partial<Record<EntityKind, number>> = { palm: 0.78 };
 // hints still move it)
 const ZOOM_LOCKED = /^\/intro\/[12]\/?$/.test(window.location.pathname);
 
+// O (options) opens Settings, like the profile menu's Settings, and closes it
+const SETTINGS_KEY = 'o';
+// a key typed into a text field is text, not a shortcut
+const typing = (ev: KeyboardEvent) => !!(ev.target as Element | null)?.closest?.('input, textarea, [contenteditable="true"]');
+
 // Settings > Controls: every key the game listens to (the handler is
 // handlerRef further down), in the order a new player needs them.
 const CONTROLS: [string, string[]][] = [
@@ -613,6 +618,7 @@ const CONTROLS: [string, string[]][] = [
   ['Pack the boat into the inventory (when near)', ['B']],
   ['Inventory', ['I']],
   ['Map', ['M']],
+  ['Settings', ['O']],
   ['Back to the player', ['Space']],
   ...(ZOOM_LOCKED ? [] : [['Zoom', ['Mouse wheel']] as [string, string[]]]),
   ['Choose in menus', ['↑', '↓', 'Enter']],
@@ -5682,6 +5688,8 @@ function Game() {
         k === 'i'
       ) {
         setModal(null);
+      } else if (modal.t === 'settings' && k === SETTINGS_KEY && !typing(ev)) {
+        setModal(null);
       }
       return;
     }
@@ -5693,6 +5701,9 @@ function Game() {
       // the boat in reach goes back into the bag
       if (boatPrompt?.kind === 'board' && !cinematic && !hintLockRef.current) questStowBoat(boatPrompt.id);
     } else if (k === 'i') setModal({ t: 'inventory' });
+    else if (k === SETTINGS_KEY) {
+      if (!ev.repeat && !typing(ev)) setModal({ t: 'settings' });
+    }
     else if (k === MAP_KEY) {
       if (!ev.repeat && !modal && !cineLockRef.current) setMapOpen(true);
     } else if (k === ' ') {

@@ -5953,6 +5953,8 @@ function Game() {
         solid: true,
         eyeRow: 14,
         ringColor: 'var(--ui-accent)',
+        // the map draws them as they stand in the world
+        body: { sprite: displaySprite, colors: displayColors, palette: displayPalette, scale: playerK, solid: true },
       },
       {
         id: 'cat',
@@ -5966,10 +5968,11 @@ function Game() {
         palette: S.MITCHY_PALETTE,
         solid: true,
         ringColor: 'var(--ui-petal-core)',
+        body: { sprite: catDef.sprite, colors: catDef.colors, palette: catDef.palette, scale: catDef.scale ?? 1 },
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mitchyRev: his look changed
-    [playerName, avatarSprite, avatarRecolored, catDef, mitchyRev],
+    [playerName, avatarSprite, avatarRecolored, catDef, mitchyRev, displaySprite, displayColors, displayPalette, playerK],
   );
 
   return (

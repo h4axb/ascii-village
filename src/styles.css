@@ -3653,30 +3653,28 @@ pre {
   height: 100%;
 }
 
-/* the illustrated map (mapArt.ts): the whole island fits, no panning */
-.game-map-viewport.art {
-  height: min(760px, 74vh);
-  border: none;
-  border-radius: 12px;
-  background: #f6ecd6;
+/* the whole world at once: the window takes the world's proportions
+   (aspect-ratio set inline), the panel hugs it */
+.game-map-panel.ds-panel:has(.game-map-viewport) {
+  width: fit-content;
 }
-.game-map-viewport.art .game-map-canvas {
+.game-map-panel .game-map-viewport {
+  height: min(720px, 74vh);
+  width: auto;
+  max-width: 90vw;
+}
+/* the world picture, centred in the viewport (GameMap.tsx sizes it) */
+.game-map-viewport .game-map-canvas {
   position: absolute;
-  left: 0;
-  top: 0;
 }
-/* the player and Mitchy standing on the map: feet at their spot, a bobbing
-   arrow with their name above */
-.map-char {
+/* a bobbing arrow with the name above the player and Mitchy */
+.map-pin {
   position: absolute;
   transform: translate(-50%, -100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   pointer-events: none;
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.6));
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
-.map-char svg {
+.map-pin svg {
   display: block;
 }
 .map-arrow {

@@ -43,6 +43,23 @@ Fokus: Stimulation, Originalität und Interesse.
 | **Konventionell – Originell** | Die Interaktion wirkt wie eine gewöhnliche Bewertungsfunktion oder bietet einen ungewöhnlichen, kreativen Feedbackansatz. |
 | **Gewöhnlich – Innovativ** | Die Interaktion wirkt wie eine typische Benutzeroberfläche oder wie ein neuartiger, fortschrittlicher Ansatz für KI-basiertes Crafting. |
 
+# /2/Feedback DB
+Misst folgende Dinge:
+- Player ID
+- 5 Fragen
+
+- Crafting Chatverlauf
+- Crafting Ergebnis
+- Daumen hoch/runter Feedback nach Craften
+- Recrafting
+- bei Post-Feedback was die Einstellung per Craft waren
+
+- Questabschlusszeit
+- Hinweis Counter
+- technischer Error
+
+
+
 # Saving points
 Nach Abschluss jeder Quest, bei Übergang zur nächsten Variante, manuelles Saven
 
@@ -90,3 +107,16 @@ Did the survey submission arrive correctly?
 Was AB/BA stored correctly?
 Did you unintentionally explain anything?
 Was there any genuine validity-threatening bug?
+
+# Fragen allgemein
+
+1. Wie kann ich den Projektlink des Usertestings außerhalb des Usertestings für Tespersonen unzugänglich machen? Unter anderem könnten die LLM Tokens weiter verbraucht werden.
+A: Jede Testperson bekommt einen individuellen Link (96-bit Keynummer) und hat ein 3 Stunden Limit. Anschließend sobald Tally Survey lädt, wird auf dem Server das Usertesting als beendet markiert. Für die LLM-Calls gibt es nun zwei Variablen, die Craft Kind und ID abfragen, um für die drei Arten wie die Crafting Tokens, Recraftings und Mitchy Talk Tokens die Anzahl sicherzustellen.
+
+1a. Was ist 96-bit Keynummer? 
+1b. Was sind HttpOnly Cookies? Frontend kann das nicht lesen, also kann auch nicht manipuliert werden.
+1c. What is a Cookie?
+1d. Timer kann nicht durch Reloading zurückgesetzt werden.
+2. Wie viele LLM Tokens stelle ich zur Verfügung? Genaue Anzahl oder plus Reserven?
+A: Genaue Anzahl anbieten: 3  Crafting Tokens (ein Token durch Mitchy, zwei Token durch Shop) und zusätzlich jeweils 3 Recrafting Möglichkeiten. Insgesamt 6 Crafting Token und 18 Recrafting LLM Calls.
+Falls es durch einen technischen Fehler unmöglich ist, das Usertesting weiter durchzuführen auf /admin Seite extra Tokens geben können. Warum nicht mehr? Damit Testpersonen nicht die Usertesting Zeit von 30 Minuten überschreiten und Ressourcenmanagement.

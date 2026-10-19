@@ -8581,12 +8581,53 @@ After: What was the main reason you preferred one crafting version over the othe
 
 [] Playtest twice AB/BA + count time
 
-### 19.10.26
+### BA Seminar - Recherche 7, 19.10.26
 
 10:00-11:30 Bachelorseminar
+- Quellverzeichnis führen auch für Assets & Texte 
+- Anregung anderen Workflow auszuprobieren, nur sich auf eine Sache zu konzentrieren, da ich aktuell sehr oft hin und her zwischen Aufgabenbereichen springe.
+- Recherche -> wichtig Quellen überprüfen!!! (HTW Lib wäre gute Quelle)
 
-- Bachelor writing proposal
-- send Antrag auf Titeländerung to fix grammar non-deterministisch -> nichtdeterministisch
+
+- Was für Gruppentermin vorbereiten?
+- Antrag auf Titeländerung to fix grammar non-deterministisch -> nichtdeterministisch
+
++ Reflektion zum Seminar
+Das Seminar hatte die zwei großen Schwerpunkte zu Zeitplanung & Recherche des Bachelorprojektes. Die meisten Sachen erwähnt zu der Zeitplanung sind schon in meinem Workflow integriert gewesen. Der relevantere Teil hat das Thema Recherche dargestellt, da nochmal ausgiebig über Quellenangaben gesprochen wurde. Ich muss auf jeden Fall anfangen eine Liste zu führen. Am besten eines für literarische Werke und eines für visuelle Assetherstellung. Einige Fragen, die sich für mich ergeben haben, waren:
+1. Muss ich die Assets überarbeiten, sodass diese copyright-gerecht sind?
+Viele meiner aktuellen Assets basieren auf einen KI-gestützen Development Prozess und Referenzen von Pinterest. Mein Fokus lag auf das Setting von einem Spiel (cozy isaland simulator) zu simulieren, wo das Feedback UX von einem LLM-gestützten Crafting Mechanik untersucht wird. Deswegen habe ich die Zeit statt in die UI Recherche in den Kontext von KI vorallem LLMs in unserer heutigen Gesellschaft gesetzt. Mein Gedanke war die UI nach dem Usertesting final zu gestalten, da besonders das UX im Vordergund stehen soll. Ebenso waren meine Anforderungen an den Prototypen: die UI soll einheitlich sein, klar zu lesen und kontextbezogen positioniert sein. Die visuelle Spielumgebung sollte genug gestaltet sein, um das UX Feedback nicht zu beeinträchtigen (Aesthetic-Usability-Effect).
+A: Das UI Design von dem Crafting auf jeden Fall. Restliche Assets müssen überprüft werden.
+2. Werden Leute auf das Projekt negativ gegenüber gestellt sein, da es einen sehr KI-gestützten Workflow umfasst? WIe stelle ich es vor?
+In dem Gruppentermin am kommenden Mittwoch werden wir wohl der Reihe nach unsere Projekte vorstellen. Die Themen wie Schwerpunkt, aktueller Stand und die nächsten Schritte umfassen.
+3. Anknüpfend an Frage 1 & 2 - Wie relevant ist AI credibility in der Zukunft?
+Das Thema Plagitariat existierte schon vor der Zeit mit KI und ich denke, es ist ein sehr kontroverses Thema, aber ist ownership so wichtig? Ich verneine nicht, dass für professionelles Publishing die Qualität visueller Gestaltungen ein sehr wichtiges Thema ist. Jedoch erscheint mir das die letzten 10% von einem Projekt. Es erscheint mir effizienter mit einem Konzept/einer Idee zu arbeiten wie einem KI Placeholder um eine Projektrichtung schnell zu visualisieren und nach der technischen Umsetzung den Feinschliff zu gestalten. Zu dem Zeitpunkt könnte sich auch eine neue visuelle Richtung entwickelt haben. Umso weniger sehe ich die Effizienz darin am Anfang bereits lange Zeit in menschengemachte Entwürfe zu investieren. Die kreative Richtung wird sowieso von einer Person einfließen. Außerdem auch die Ideen eines Menschen stammen eigentlich von Dingen, die woanders aufgeschnappt wurden. Trends kehren auch wieder, aber mit einer Neuinterpretation. Also ich erkenne nicht unbedingt den Unterschied, ob es toolstechnisch ein Mensch oder AI gestaltet hat. War der AI Output schlecht ist das der Fehler des kreativen Direktors.
+
+4. Woher kommt das, dass mir das Recht auf nach Ownership fehlt?
+A (3 & 4): Diese Frage muss aus vier verschiedenen Kategorien betrachtet werden:
+- Kreative Verantwortung
+- Ethische Verantwortung (Kulturreferenzen)
+- Urheberrechte
+- Gestalterischer Wert
+
+Mein Fokus liegt eher auf den gestalterischem Wert. Also der Wirksamkeit einer Methode. Trotzdem sind aktuelle Richtlinien für Urheberrechte streng reguliert, also muss ich mich dran halten.
+
+5. Warum fällt es mir schwer vor einer größeren Menschenmenge zu reden, wenn ich nicht gezwungen werde?
+A: Ich muss meine allgemeinen Sprachfertigkeiten verbessern für professionelle Kontexte, wo ich schnell, adressatengerecht und essentiell kommunizieren muss.
+
+Ursprung scheint die allgemeine Angst vor neuen Arbeitsabläufen zu sein mit denen ich nicht vertraut bin. Nur die Anzahl von wie oft ich mich in neue unterschiedliche Situationen bewege, wo ich gezwungen bin zu performen, vermindern nicht die Angst. Gegenenfalls wie Musical AG, Minijob, Messeleitung und Rhetorikkurs. Allerdings sobald ich mich an einen Ablauf gewöhne, vermindert sich der Druck.
+
+13:00-14:00 BA Seminar Reflektion
+
+14:00-15:00 Break
+15:00-16:00 Quellverzeichnis
+Recherche zu Copyright & Quellverzeichnis erstellen
+- Survey durchgehen final (5 Fragen + finales)
+15:00-18:00 Playtesting Links 1&2
+- alle Hinweise ausprobieren
+- Zeit messen
+- Craften mit Objekten außerhalb der Lib
+
+
 
 ### Prototype Freeze & Playtesting
 

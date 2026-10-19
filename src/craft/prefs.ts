@@ -26,6 +26,7 @@
 // craft's kind, then all.
 // ---------------------------------------------------------------------------
 
+import { storeKey } from '../quest/session';
 export type PrefKey = 'detail' | 'color' | 'surprise';
 export type PrefValue = -1 | 0 | 1;
 export type Prefs = Partial<Record<PrefKey, PrefValue>>;
@@ -58,7 +59,7 @@ export const PREF_INFO: Record<PrefKey, { title: string; labels: Record<PrefValu
 };
 
 // ---- storage ----
-const KEY = 'asciia-craft-prefs';
+const KEY = storeKey('asciia-craft-prefs', true); // a personal link keeps its own
 interface Stored {
   all: Prefs;
   byKind: Partial<Record<Kind, Prefs>>;

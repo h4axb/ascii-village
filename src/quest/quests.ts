@@ -30,25 +30,21 @@ export const QUEST_ENABLED = QUEST_ORDER !== null;
 // added for the run (quest/session.ts surveyUrl)
 export const FINAL_SURVEY_URL = 'https://tally.so/r/7R8900';
 
-// The consent step before a personal link's first start (App.tsx Consent).
-// Who participants write to about their data: fill in before the study.
-export const CONTACT = '[your name and e-mail]';
+// The AI & data notice before a personal link's first start (App.tsx
+// Consent): nothing is recorded before the player agrees.
 export const CONSENT = {
-  title: 'Before you start',
-  intro: 'This game is part of a study on how people craft things with an AI. While you play, the game records:',
-  recorded: [
-    'what you type when crafting, and your chat with Mitchy (the shopkeeper)',
-    'your ratings and answers in the game',
-    'how long each quest takes, which hints you use, and technical errors',
-    'your screen size and browser type',
+  title: 'AI & Data Notice',
+  intro: [
+    'During this usertest, the game uses AI-supported features to interpret your crafting inputs.',
+    'To evaluate the playtest, the following session data may be stored under a pseudonymous participant ID:',
   ],
+  recorded: ['crafting inputs and generated results', 'feedback and recrafting actions', 'quest and session times', 'help/hint usage', 'technical errors'],
   notes: [
-    'All of it is stored under a participant number only (like P012), never with your name or e-mail. The final survey gets the same number, so your answers there can be matched to your play.',
-    'What you type for crafting is sent to an AI service (Requesty, using Google Gemini) to make the item. Please don’t type personal information.',
-    'The data is used for this study only.',
-    `Taking part is voluntary. You can stop at any time without giving a reason. To have your data deleted, write to ${CONTACT}.`,
+    'The data will only be used for the evaluation of this Bachelor project. Results presented in the thesis will be anonymized or summarized so that individual participants cannot be identified.',
+    'No audio or video recordings will be made.',
+    'By checking the box below, you confirm that you have read this information and agree to participate in the playtest and to the described data collection.',
   ],
-  agree: 'I have read this and agree to take part.',
+  agree: 'I have read this information and agree to participate in the playtest and to the described data collection.',
   start: 'Agree and start',
   decline: 'Don’t take part',
   declined: 'No problem — nothing was recorded. You can close this tab now.',

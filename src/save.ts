@@ -9,9 +9,9 @@ import type { OwnedItem } from './llm';
 import type { PlantedCrop, Doors } from './farm';
 import type { PlacedItem } from './placement';
 import type { Outfit } from './outfit';
-import { linkKey, linkKeyFor, type Link } from './link';
+import { linkKeyFor, type Link } from './link';
 import { parseQuest, type QuestState } from './quest/state';
-import { parseTestSession, type TestSession } from './quest/session';
+import { parseTestSession, storeKey, type TestSession } from './quest/session';
 
 export interface SaveState {
   version: 1;
@@ -78,8 +78,9 @@ export interface SaveState {
   runClock?: { start: number; step: number; hints: number };
 }
 
-// one save per test link (see link.ts); /0 keeps this name
-const KEY = linkKey('ascii-village-save');
+// one save per test link (see link.ts), and one per personal link
+// (quest/session.ts storeKey); /0 keeps this name
+const KEY = storeKey('ascii-village-save');
 
 // The apple tree became a date palm, and the item id 'apple' became 'date'.
 // Saves written before that swap still hold 'apple' counts, and the item ids

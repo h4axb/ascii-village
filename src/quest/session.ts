@@ -11,7 +11,7 @@
 // the database is set up, the run gets a local id instead ("L-" + 5 letters)
 // so it still has one. Every feedback record is tagged with it
 // (feedback/client.ts), and the final survey opens with it in the URL.
-import { LINK, type Link } from '../link';
+import { LINK, linkKey, type Link } from '../link';
 import { ORDERS, QUEST_ORDER } from './quests';
 
 export type DesignOrder = 'AB' | 'BA';
@@ -137,6 +137,13 @@ function readKey(): { key: string | null; changed: boolean } {
 }
 const read = readKey();
 export const INVITE_KEY = read.key;
+
+// The browser storage name for something kept per run (the save, the craft
+// history, the post-reflection settings): a personal link keeps its own,
+// so it starts fresh even where the open test links were played before.
+// `global`: the name used off the personal links when it isn't per link.
+export const storeKey = (base: string, global = false) =>
+  INVITE_KEY ? `${linkKey(base)}-k${INVITE_KEY.slice(0, 12)}` : global ? base : linkKey(base);
 // a different personal link opened in this browser: a new participant
 export const INVITE_KEY_CHANGED = read.changed;
 

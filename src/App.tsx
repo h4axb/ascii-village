@@ -107,7 +107,6 @@ import {
   completeInviteRun,
   currentRun,
   INVITE_KEY,
-  INVITE_KEY_CHANGED,
   inviteDoneHere,
   inviteHeaders,
   linkOfOrder,
@@ -562,7 +561,9 @@ function storageList(
 type Modal =
   // equipPick: opened from the hand slot's "Equip" — non-equippable slots are
   // greyed out and a click equips instead of opening details.
-  | { t: 'inventory'; equipPick?: boolean }
+  // plantSlot: opened with [F] at the garden bed's free spot (plant mode);
+  // sel: what's picked there
+  | { t: 'inventory'; equipPick?: boolean; plantSlot?: number; sel?: string }
   // page: one of the sub-pages Settings opens (Controls, Crafting preferences)
   | { t: 'settings'; page?: 'controls' | 'prefs' }
   | { t: 'detail'; item: ItemType }
@@ -639,7 +640,6 @@ const CONTROLS: [string, string[]][] = [
   ['Inventory', ['I']],
   ['Map', ['M']],
   ['Settings', ['O']],
-  ['Back to the player', ['Space']],
   ...(ZOOM_LOCKED ? [] : [['Zoom', ['Mouse wheel']] as [string, string[]]]),
   ['Choose in menus', ['↑', '↓', 'Enter']],
   ['Back / close', ['Esc']],
@@ -690,9 +690,6 @@ function DiscoveryToast({ title, sub, onDone, kicker = 'FIRST DISCOVERY' }: { ti
 // crafting tokens the shop sells: per design on the quest links, else a day
 const SHOP_TOKENS = QUEST_ENABLED ? 2 : TOKENS_PER_DAY;
 
-// A different personal link opened in this browser: a new participant, so
-// the last one's save on this link goes (quest/session.ts)
-if (INVITE_KEY_CHANGED) deleteSave();
 
 // What a personal link shows instead of the game (quest/session.ts)
 const INVITE_TEXT: Record<Exclude<InviteState, 'ok' | 'consent'>, { title: string; text: string }> = {
@@ -722,7 +719,9 @@ function Consent({ onAgree, onDecline }: { onAgree: () => void; onDecline: () =>
     <div className="invite-block">
       <div className="ds-panel consent" role="dialog" aria-labelledby="consent-title">
         <h2 id="consent-title">{CONSENT.title}</h2>
-        <p>{CONSENT.intro}</p>
+        {CONSENT.intro.map((t) => (
+          <p key={t}>{t}</p>
+        ))}
         <ul>
           {CONSENT.recorded.map((t) => (
             <li key={t}>{t}</li>
@@ -4102,6 +4101,9 @@ function Game() {
       ghost: (x: number, y: number) => setPlacing((g) => (g ? { ...g, x, y } : g)),
       pond: () => fillAtPond(),
       plantSeed: () => plantBase('seed'),
+      // (tests) the garden bed's spots, and the free one [F] would plant into
+      slots: () => plot.slots,
+      bed: () => bedPrompt?.slot ?? null,
       setPart: (part: QuestState['part']) => questRef.current && setQuest({ ...questRef.current, part, step: 0 }),
       // (tests) jump to a step, run its hint, and what the hint did
       setStep: (part: QuestState['part'], step: number) => questRef.current && setQuest({ ...questRef.current, part, step }),
@@ -5057,6 +5059,10 @@ function Game() {
       else void questLand(boatPrompt.x, boatPrompt.y);
       return;
     }
+    if (!modal && bedPrompt) {
+      setModal({ t: 'inventory', plantSlot: bedPrompt.slot });
+      return;
+    }
     if (!modal && promptTarget) {
       setBubble(null);
       // a plant in reach with the watering tool in hand: water it
@@ -5236,6 +5242,26 @@ function Game() {
     // by the player (top-right of the head): a pond is wide, its own corner
     // is often off screen
     return { e: p.e, at: { right: (player.x + PLAYER_T.wT) * TILE_CH, top: player.y * TILE_LN } };
+  })();
+  // The garden bed's free spot in reach: [F] plant seed opens the inventory
+  // in plant mode (only plantable things, and their Plant button). It shows
+  // with or without a seed carried; planting happens only here, so nothing
+  // is planted far away and left to dry out.
+  const bedPrompt = (() => {
+    if (boatPrompt || pondPrompt || riding || modal || cinematic || mapOpen || editorOpen || placing || watering || hintLock || hintCard) return null;
+    const feetY = player.y + PLAYER_T.hT - 1;
+    let best: { slot: number; gap: number; dist: number } | null = null;
+    plot.slots.forEach((s, i) => {
+      if (crops.some((c) => c.slot === i)) return;
+      // the same reach as watering a planted one
+      const gap = Math.max(Math.max(0, s.x - (player.x + PLAYER_T.wT - 1), player.x - s.x), Math.max(0, s.y - feetY, player.y - s.y));
+      if (gap > 1) return;
+      const dist = Math.hypot(s.x + 0.5 - (player.x + PLAYER_T.wT / 2), s.y + 1 - (player.y + PLAYER_T.hT / 2));
+      if (!best || gap < best.gap || (gap === best.gap && dist < best.dist)) best = { slot: i, gap, dist };
+    });
+    const b = best as { slot: number; gap: number; dist: number } | null;
+    if (!b || (promptTarget && promptTarget.gap <= b.gap)) return null;
+    return { slot: b.slot, at: { right: (player.x + PLAYER_T.wT) * TILE_CH, top: player.y * TILE_LN } };
   })();
   // Mitchy's "!" bubble: while something with him is still open (the intro's
   // part C, bringing him the gathered things, reporting back) and the player
@@ -5617,7 +5643,6 @@ function Game() {
   // Options for an owned item's detail panel (shared by keyboard + click).
   function ownedOptList(owned: OwnedItem): { labels: string[]; pick: (i: number) => void } {
     const isEquipped = equipped?.ownedId === owned.ownedId;
-    const canPlant = owned.kind !== 'token' && (owned.category === 'plant' || owned.category === 'food');
     // Any owned item can be placed in the world, except tokens (same
     // exclusion "Plant in garden" already uses — a token isn't a real object).
     const canPlace = owned.kind !== 'token';
@@ -5627,7 +5652,6 @@ function Game() {
     const launchIt = canPlace && !!owned.equip?.float && !!questRef.current;
     if (owned.kind === 'token') labels.push('Use token');
     else if (owned.equip && !launchIt) labels.push(isEquipped ? 'Unequip' : 'Equip');
-    if (canPlant) labels.push('Plant in garden');
     if (launchIt) labels.push(QL.launch);
     else if (canPlace) labels.push('Place in world');
     return {
@@ -5648,9 +5672,9 @@ function Game() {
     return -1;
   }
 
-  function plantBase(it: ItemType) {
+  function plantBase(it: ItemType, at?: number) {
     if (inv[it] <= 0) return;
-    const slot = freeSlot();
+    const slot = at !== undefined && !crops.some((c) => c.slot === at) ? at : freeSlot();
     if (slot < 0) {
       setModal(null);
       showToast('the garden bed is full!');
@@ -5671,8 +5695,8 @@ function Game() {
     if (it === 'seed') questDone('plant', { seedCrop: crop.id });
   }
 
-  function plantOwned(o: OwnedItem) {
-    const slot = freeSlot();
+  function plantOwned(o: OwnedItem, at?: number) {
+    const slot = at !== undefined && !crops.some((c) => c.slot === at) ? at : freeSlot();
     if (slot < 0) {
       setModal(null);
       showToast('the garden bed is full!');
@@ -5830,6 +5854,18 @@ function Game() {
   function clearCrop(slot: number) {
     setCrops((cs) => cs.filter((x) => x.slot !== slot));
     setModal(null);
+    // the quest's own seed dried out: it comes back, and planting is the
+    // step again, so the quest can always be finished
+    const q = questRef.current;
+    const wasQuestSeed = !!q?.seedCrop && crops.find((c) => c.slot === slot)?.id === q.seedCrop;
+    const line = q ? questlineOf(q.part) : null;
+    const plantStep = line ? line.steps.findIndex((st) => st.id === 'plant') : -1;
+    if (q && wasQuestSeed && plantStep >= 0 && q.step > plantStep) {
+      setInv((v) => ({ ...v, seed: v.seed + 1 }));
+      setQuest({ ...q, step: plantStep, seedCrop: undefined });
+      showToast('plucked out the dried plant. here’s your seed back.');
+      return;
+    }
     showToast('plucked out the dried plant.');
   }
 
@@ -7331,6 +7367,12 @@ function Game() {
                   <span className="fpop-name">fill water</span>
                 </div>
               )}
+              {bedPrompt && (
+                <div className="fpop" style={{ left: `${bedPrompt.at.right}ch`, top: `${bedPrompt.at.top}em` }}>
+                  <kbd className="fpop-key">F</kbd>
+                  <span className="fpop-name">plant seed</span>
+                </div>
+              )}
 
               {/* the boat's keys (see boatPrompt) */}
               {boatPrompt && (
@@ -7568,11 +7610,21 @@ function Game() {
               money={money}
               equippedId={equipped?.ownedId ?? null}
               equipPick={modal.t === 'inventory' && !!modal.equipPick}
-              selected={modal.t === 'detail' ? modal.item : modal.t === 'detailOwned' ? modal.ownedId : null}
-              onSelectBase={(it) => setModal({ t: 'detail', item: it })}
-              onSelectOwned={(o) => setModal({ t: 'detailOwned', ownedId: o.ownedId, sel: 0 })}
+              plantPick={plantSlotOf(modal) !== null}
+              selected={
+                modal.t === 'detail' ? modal.item : modal.t === 'detailOwned' ? modal.ownedId : modal.t === 'inventory' ? (modal.sel ?? null) : null
+              }
+              onSelectBase={(it) =>
+                setModal((m) => (plantSlotOf(m) !== null ? { ...(m as Extract<Modal, { t: 'inventory' }>), sel: it } : { t: 'detail', item: it }))
+              }
+              onSelectOwned={(o) =>
+                setModal((m) =>
+                  plantSlotOf(m) !== null ? { ...(m as Extract<Modal, { t: 'inventory' }>), sel: o.ownedId } : { t: 'detailOwned', ownedId: o.ownedId, sel: 0 },
+                )
+              }
               onEquipPick={equipOwned}
-              onPlantBase={plantBase}
+              onPlantBase={(it) => plantBase(it, plantSlotOf(modal) ?? undefined)}
+              onPlantOwned={(o) => plantOwned(o, plantSlotOf(modal) ?? undefined)}
               ownedOptList={ownedOptList}
               onBack={escClose}
               onClose={() => setModal(null)}
@@ -8407,12 +8459,20 @@ const coinValue = (n: number) => (
   </>
 );
 
+// the garden bed spot an inventory opened in plant mode plants into
+const plantSlotOf = (m: Modal | null): number | null => (m && m.t === 'inventory' && m.plantSlot !== undefined ? m.plantSlot : null);
+
+// a crafted thing that can go in the garden bed (a plant or food)
+const canPlantOwned = (o: OwnedItem) => o.kind !== 'token' && (o.category === 'plant' || o.category === 'food');
+
 function InventorySheet({
   inv,
   bag,
   money,
   equippedId,
   equipPick,
+  plantPick = false,
+  onPlantOwned,
   selected,
   onSelectBase,
   onSelectOwned,
@@ -8428,6 +8488,9 @@ function InventorySheet({
   money: number;
   equippedId: string | null;
   equipPick: boolean;
+  // opened with [F] at the garden bed: only what can be planted, and its Plant
+  plantPick?: boolean;
+  onPlantOwned?: (o: OwnedItem) => void;
   selected: string | null;
   onSelectBase: (it: ItemType) => void;
   onSelectOwned: (o: OwnedItem) => void;
@@ -8445,7 +8508,7 @@ function InventorySheet({
       look: baseLook(it),
       count: inv[it],
       label: ITEM_INFO[it].name,
-      disabled: equipPick, // raw materials can't be held
+      disabled: equipPick || (plantPick && !PLANTABLE_BASE.includes(it)), // raw materials can't be held
     })),
     ...bag.map((o) => ({
       key: o.ownedId,
@@ -8453,11 +8516,11 @@ function InventorySheet({
       tag: o.kind === 'token' ? 'TOKEN' : equippedId === o.ownedId ? 'EQ' : undefined,
       label: o.name,
       // payment takes resources only; equip-pick only what can be held
-      disabled: !!pay || (equipPick && (o.kind === 'token' || !o.equip || !!o.equip.float)),
+      disabled: !!pay || (equipPick && (o.kind === 'token' || !o.equip || !!o.equip.float)) || (plantPick && !canPlantOwned(o)),
     })),
   ];
   // Nothing picked yet: show the first item, like the reference does.
-  const shown = selected ?? (equipPick ? null : (slots[0]?.key ?? null));
+  const shown = selected ?? (equipPick ? null : plantPick ? (slots.find((x) => !x.disabled)?.key ?? null) : (slots[0]?.key ?? null));
   const base = bases.find((b) => b === shown) ?? null;
   const owned = base || pay ? null : (bag.find((o) => o.ownedId === shown) ?? null);
   const fact = useFunFact(base);
@@ -8538,16 +8601,22 @@ function InventorySheet({
         actions={
           pay
             ? payActions
-            : PLANTABLE_BASE.includes(base)
-              ? [{ icon: <IconSprout />, label: 'Plant in garden', onClick: () => onPlantBase(base) }]
+            : plantPick && PLANTABLE_BASE.includes(base)
+              ? [{ icon: <IconSprout />, label: base === 'seed' ? 'Plant seed' : 'Plant', onClick: () => onPlantBase(base), variant: 'go' }]
               : []
         }
       >
         {!pay?.help && (pay ? <p>{ITEM_INFO[base].desc}</p> : <BaseItemText item={base} fact={fact} />)}
       </DetailPanel>
     );
+  } else if (plantPick && !owned && !base) {
+    detail = <DetailPanel empty="Nothing to plant. Seeds and plants you carry can go in the bed." />;
   } else if (owned) {
-    const { labels, pick } = ownedOptList(owned);
+    const { labels, pick } = plantPick
+      ? canPlantOwned(owned)
+        ? { labels: ['Plant in garden'], pick: () => onPlantOwned?.(owned) }
+        : { labels: [] as string[], pick: () => {} }
+      : ownedOptList(owned);
     const iconFor = (l: string) =>
       l === 'Plant in garden' ? <IconSprout /> : l === 'Place in world' ? <IconMap /> : l === 'Use token' ? <IconSpark /> : <IconHand />;
     const nameFor = (l: string) => (l === 'Equip' ? 'Equip to hand' : l === 'Unequip' ? 'Put away' : l);
@@ -8606,11 +8675,11 @@ function InventorySheet({
 
   return (
     <Sheet
-      label={pay ? 'Trade with Mitchy' : equipPick ? 'Equip what?' : 'Inventory'}
+      label={pay ? 'Trade with Mitchy' : equipPick ? 'Equip what?' : plantPick ? 'Plant what?' : 'Inventory'}
       onBack={onBack}
       onClose={onClose}
       money={money}
-      footer={equipPick ? 'pick something to hold · [Esc] cancel' : undefined}
+      footer={equipPick ? 'pick something to hold · [Esc] cancel' : plantPick ? 'pick what to plant here · [Esc] cancel' : undefined}
     >
       <Split>
         <SlotGrid

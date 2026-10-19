@@ -7,13 +7,12 @@
 //   - a speaker label that changes mid-conversation ('???' -> 'Mitchy')
 //   - inline {KEY:xxx} / {SETTINGS_CONTROLS} highlight tokens (see
 //     introPartB.ts's DIALOGUE_HIGHLIGHT_LABELS) rendered as yellow spans
-//   - a "next" arrow at the bottom centre of the box (click it, anywhere on
-//     the box, or press Enter/Space) when there are no choices; the line
-//     also moves on by itself after AUTO_NEXT_MS
+//   - a "next" arrow at the bottom centre of the box when there are no
+//     choices: clicking it is the only way to the next line
 //   - a two-option choice prompt (reusing OptList's up/down + enter pattern)
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import { AUTO_ADVANCE_MS, AUTO_NEXT_MS, DIALOGUE_HIGHLIGHT_LABELS } from './introPartB';
+import { AUTO_ADVANCE_MS, DIALOGUE_HIGHLIGHT_LABELS } from './introPartB';
 import { Dialogue } from './ui';
 
 // The ▼ lives in the design system now; re-exported for IntroNarration.
@@ -85,23 +84,13 @@ export default function DialogueBox({
           e.preventDefault();
           onChoice(sel);
         }
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        onAdvance();
       }
+      // a plain line moves on only by clicking its ▼ (no key, no timer), so
+      // nobody skips Mitchy's words by accident
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [locked, hasChoices, line, sel, onAdvance, onChoice]);
-
-  // Normal play: a plain line (no choices) moves on by itself after
-  // AUTO_NEXT_MS unless the player advanced it first. Re-armed per line.
-  useEffect(() => {
-    if (locked || hasChoices) return;
-    const t = window.setTimeout(onAdvance, AUTO_NEXT_MS);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locked, hasChoices, line]);
 
   // Locked/test mode: no click or keyboard, just a timer. Re-armed every
   // time `line` changes (a fresh dialogue beat), same as the sel-reset

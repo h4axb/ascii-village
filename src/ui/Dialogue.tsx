@@ -42,16 +42,15 @@ export function Dialogue({
   sel?: number;
   onSel?: (i: number) => void;
   onPick?: (i: number) => void;
-  onNext?: () => void; // shows ▼ and makes the box clickable
+  onNext?: () => void; // shows ▼, the one way to the next line
   className?: string;
 }) {
   const hasOptions = !!options && options.length > 0;
   return (
     <div className={'ds-dialogue-wrap' + (className ? ' ' + className : '')}>
-      <div
-        className={'ds-dialogue' + (onNext ? ' clickable' : '')}
-        onClick={onNext && !hasOptions ? onNext : undefined}
-      >
+      {/* only the ▼ moves on (a click on the box itself doesn't, so a line
+          is never skipped by accident) */}
+      <div className="ds-dialogue">
         <div className="ds-dialogue-name">{speaker}</div>
         <span className="ds-bracket tl" />
         <span className="ds-bracket tr" />

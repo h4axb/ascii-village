@@ -470,6 +470,7 @@ export default function CraftModal({
           clarify: log ?? null,
           fallback: r.fallback ?? null, // drawn offline (llm.ts fallbackCraft), and why
           unknown: r.unknown ?? null, // (design B) words not known yet: crafted freely / left out
+          base: r.base ?? null, // (design B) a kind of animal built from a library one
           sprite: { lines: r.item.sprite, ...(r.item.palette && r.item.colors ? { palette: r.item.palette, colors: r.item.colors } : {}) },
         });
         setPhase('success');
@@ -501,6 +502,8 @@ export default function CraftModal({
         // a reference picture: Mitchy says so under the result
         if (r.note) push({ who: 'mitchy', kind: 'text', text: r.note });
         // (design B) the words Mitchy didn't know yet, with the result
+        if (feedback && r.base)
+          push({ who: 'mitchy', kind: 'text', text: `I don't have a ${r.base.asked} pattern yet, so I built yours from my ${r.base.used}.` });
         if (feedback && r.unknown) {
           const q = (ws: string[]) => ws.map((w) => `"${w}"`).join(', ');
           if (r.unknown.crafted.length)

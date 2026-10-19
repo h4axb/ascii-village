@@ -377,7 +377,7 @@ export type CraftResult =
   // fallback: drawn by fallbackCraft (the AI couldn't), and why
   // unknown: (design B) the words the generator didn't know yet — drawn
   // freely anyway, or left out by the player's setting
-  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs; note?: string; fixes?: [string, string][]; fallback?: Fallback; unknown?: { crafted: string[]; skipped: string[] } }
+  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs; note?: string; fixes?: [string, string][]; fallback?: Fallback; unknown?: { crafted: string[]; skipped: string[] }; base?: { asked: string; used: string } }
   // `suggestions`: up to 3 alternative craft prompts (shown as clickable
   // buttons). Present only on BENIGN failures — never on category mismatches
   // or blocked (sensitive) input.
@@ -504,12 +504,17 @@ export async function craftItem(prompt: string, ui?: CraftUiHooks, opts: CraftOp
   // freely, or left out when the player's setting says so; Mitchy names
   // them with the result
   let unknown: { crafted: string[]; skipped: string[] } | undefined;
+  // (design B) a kind of animal built from a library one ("a bird" from the
+  // parrot): Mitchy says so with the result
+  let base: { asked: string; used: string } | undefined;
   if (opts.prefs) {
+    const cb = matchRefs(read.fixed).classBase;
+    if (cb) base = { asked: cb.asked, used: cb.ref.title.replace(/^pixel\s+/i, '').toLowerCase() };
     const parts = promptParts(read.fixed);
     // not in the word lists, or a detail the library body can't draw
     const u = undrawable(read.fixed);
     const words = [...new Set([...parts.unknown, ...(u.body ? u.details : [])].filter((w) => w !== parts.main))];
-    const mainUnknown = parts.main && !parts.mainKnown ? [parts.main] : [];
+    const mainUnknown = parts.main && !parts.mainKnown && !base ? [parts.main] : [];
     if (words.length || mainUnknown.length) {
       const guess = fallbackSubject(read.fixed).category;
       const skipped = resolvePrefs(isKind(guess) ? guess : null).unknown === -1 ? words : [];
@@ -527,6 +532,7 @@ export async function craftItem(prompt: string, ui?: CraftUiHooks, opts: CraftOp
   }
   if (!r.ok) return r;
   if (unknown) r = { ...r, unknown };
+  if (base && r.item) r = { ...r, base };
   r.item.tags = (r.item.tags ?? []).map((t) => (t.startsWith('prompt: ') ? `prompt: ${typed.trim()}` : t));
   return read.fixes.length ? { ...r, fixes: read.fixes } : r;
 }
@@ -1042,6 +1048,19 @@ function unknownWordQuestion(w: string, closest?: string | null): ClarifyQuestio
     noDecide: true,
   };
 }
+// A kind of animal with no picture of its own ("a bird"): built from a
+// library animal of that kind (the parrot; craft/refCraft.ts CLASS_WORDS)
+function classQuestion(text: string): ClarifyQuestion | null {
+  const cb = matchRefs(text).classBase;
+  if (!cb) return null;
+  const used = cb.ref.title.replace(/^pixel\s+/i, '').toLowerCase();
+  return {
+    topic: cb.asked,
+    q: `I don't have a pattern for a ${cb.asked} yet. I can craft it anyway from my ${used}, but it may turn out different than you imagine. Or do you want to try another object?`,
+    options: [{ label: 'Craft it anyway', effect: `Mitchy builds your ${cb.asked} from the ${used} pattern.` }, tryAnother],
+    noDecide: true,
+  };
+}
 // A detail the library has no picture for (it knows the word): drawn freely,
 // or left out
 function patternQuestion(d: string): ClarifyQuestion {
@@ -1111,8 +1130,10 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
   if (read?.via !== 'model') return localClarify(prompt);
   const p = promptParts(read.fixed);
   const unknown = [...new Set(p.unknown.filter((w) => w !== p.main))];
-  const mainQ: ClarifyQuestion[] =
-    p.main && !p.mainKnown
+  const classQ = classQuestion(read.fixed);
+  const mainQ: ClarifyQuestion[] = classQ
+    ? [classQ]
+    : p.main && !p.mainKnown
       ? [
           {
             topic: p.main,
@@ -1141,8 +1162,9 @@ export function localClarify(prompt: string): ClarifyResult {
     const [c] = closestWords(w, 1, kinds);
     return c && typoDistance(w.toLowerCase(), c) <= (w.length >= 7 ? 2 : 1) ? c : (kinds ? null : c);
   };
-  const mainQs: ClarifyQuestion[] = [];
-  if (parts.main && !parts.mainKnown) {
+  const classQ = classQuestion(prompt);
+  const mainQs: ClarifyQuestion[] = classQ ? [classQ] : [];
+  if (!classQ && parts.main && !parts.mainKnown) {
     const obj = near(parts.main, ['object']);
     if (obj)
       // a typo of an object it knows: that object, crafted anyway, a surprise, or another one

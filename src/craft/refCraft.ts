@@ -148,6 +148,9 @@ export interface RefMatch {
   // the surprise (surpriseLib.ts): a decoration added to the picture,
   // placed from the item's silhouette; `seed` keeps it stable per prompt
   surprise?: { seed: string; only?: string };
+  // a kind of animal with no picture of its own ("a bird", "a toucan"),
+  // built from a library animal of that kind (the parrot; CLASS_WORDS)
+  classBase?: { asked: string; ref: RefDoc };
 }
 
 const FUNCTION_WORDS = /\b(that|which|can|could|lets?|makes?|named|called|faster|fast|float|floats|fly|flies|shoots?|glows?|heals?)\b/;
@@ -159,9 +162,36 @@ const FUNCTION_WORDS = /\b(that|which|can|could|lets?|makes?|named|called|faster
 // shepherd" beats "shepherd") picks that body, before any category scoring.
 // A dog word without a breed picks a dog at random; no dog word, no dog (a
 // cat stays a cat).
-const DOG_WORDS = ['dog', 'dogs', 'puppy', 'pup', 'doggo', 'doggy', 'hund', 'hundchen', 'welpe', 'chien', 'chiot', 'perro', 'perrito', 'cachorro', 'cane', 'cucciolo', 'hond', 'hondje', 'pies', 'kopek'];
+const DOG_WORDS = ['dog', 'dogs', 'puppy', 'puppies', 'pup', 'pups', 'pupper', 'doggo', 'doggy', 'doggie', 'doggies', 'hound', 'hunde', 'chiens', 'perros', 'hund', 'hundchen', 'welpe', 'chien', 'chiot', 'perro', 'perrito', 'cachorro', 'cane', 'cucciolo', 'hond', 'hondje', 'pies', 'kopek'];
 const isDogRef = (r: RefDoc) => r.id.startsWith('pet-dog-');
-export function namedOf(prompt: string): { ref: RefDoc; phrase: string } | null {
+// Kinds of animal: the word for the kind and its species. A main object of
+// one ("a bird", "a toucan") with no picture of its own is built from a
+// library animal of that kind: a body whose names hit one of the species
+// (the parrot). Add a kind here when the library gets one.
+const CLASS_WORDS: { kind: string[]; members: string[] }[] = [
+  {
+    kind: ['bird', 'birdie', 'birdy', 'vogel', 'vögelchen', 'oiseau', 'pájaro', 'pajaro', 'uccello', 'pajarito', 'uccellino'],
+    members: [
+      'parrot', 'macaw', 'toucan', 'parakeet', 'budgie', 'budgerigar', 'cockatoo', 'cockatiel', 'lovebird', 'owl', 'eagle', 'hawk',
+      'falcon', 'crow', 'raven', 'sparrow', 'robin', 'finch', 'canary', 'pigeon', 'dove', 'duck', 'duckling', 'goose', 'swan',
+      'chicken', 'chick', 'hen', 'rooster', 'penguin', 'flamingo', 'peacock', 'hummingbird', 'kingfisher', 'seagull', 'gull',
+      'pelican', 'stork', 'heron', 'woodpecker', 'magpie', 'jay', 'bluebird', 'blackbird', 'tukan', 'papagei', 'eule', 'ente',
+    ],
+  },
+];
+function classBaseOf(prompt: string): { asked: string; ref: RefDoc } | null {
+  const main = promptParts(prompt).main;
+  if (!main) return null;
+  const mw = words(main).map(sing);
+  for (const c of CLASS_WORDS) {
+    const asked = mw.find((w) => c.kind.includes(w) || c.members.includes(w));
+    if (!asked) continue;
+    const refs = REFS.filter((r) => r.role === 'body' && (r.names ?? []).some((n) => words(n).some((w) => c.members.includes(sing(w)) || c.kind.includes(sing(w)))));
+    if (refs.length) return { asked, ref: refs[Math.floor(Math.random() * refs.length)] };
+  }
+  return null;
+}
+export function namedOf(prompt: string): { ref: RefDoc; phrase: string; base?: string } | null {
   const p = ` ${fold(prompt).replace(/\s+/g, ' ')} `;
   // a name only counts as the main object the prompt asks for: "a dragon
   // boat" or "a ship with a dragon head" stay ships (craft/lexicon.ts)
@@ -179,9 +209,11 @@ export function namedOf(prompt: string): { ref: RefDoc; phrase: string } | null 
       // (French, Spanish, Italian put adjectives after the noun: "un lapin
       // rose" is a pink bunny, no compound)
       if (mainF && mainF !== f && !f.endsWith(` ${mainF}`)) {
-        if (` ${mainF} `.includes(` ${f} `)) continue; // inside the object's own name ("dragon boat")
-        // (a name before its own kind word counts: "pomeranian dog")
-        const ownKind = DOG_WORDS.includes(mainF) || (SYNONYMS[r.category] ?? []).includes(mainF);
+        // (a name before its own kind word counts: "pomeranian dog", and
+        // inside the main phrase too: "corgi puppy")
+        const kindWord = mainF.split(' ').pop()!;
+        const ownKind = DOG_WORDS.includes(kindWord) || (SYNONYMS[r.category] ?? []).includes(kindWord);
+        if (!ownKind && ` ${mainF} `.includes(` ${f} `)) continue; // inside the object's own name ("dragon boat")
         if (!ownKind && !ADJ_AFTER.test(p) && !isColourWord(mainF) && (p.includes(` ${f} ${mainF} `) || p.includes(` ${f} ${mainF}s `))) continue;
         const at = p.indexOf(` ${mainF} `);
         const nameAt = Math.max(p.indexOf(` ${f} `), p.indexOf(` ${f}s `), p.indexOf(` ${f}es `));
@@ -198,6 +230,9 @@ export function namedOf(prompt: string): { ref: RefDoc; phrase: string } | null 
     const dogs = looks.length ? looks : all;
     if (dogs.length) return { ref: dogs[Math.floor(Math.random() * dogs.length)], phrase: '' };
   }
+  // a kind of animal without its own picture: one of that kind
+  const cb = classBaseOf(prompt);
+  if (cb) return { ref: cb.ref, phrase: '', base: cb.asked };
   return null;
 }
 export const dogOf = namedOf;
@@ -231,6 +266,9 @@ export function mainFitsBody(b: RefDoc, prompt: string): boolean {
   const own = [...(SYNONYMS[b.category] ?? []), ...b.category.split('-'), ...(b.names ?? [])];
   const vocab = new Set([...own, ...(b.category === 'boat' ? [] : [...b.tags, b.title])].flatMap((n) => words(n)).map(sing));
   if (mainWords.some((w) => vocab.has(w))) return true;
+  // a kind of animal on a library animal of that kind ("a toucan" on the parrot)
+  const inClass = (c: (typeof CLASS_WORDS)[number], w: string) => c.kind.includes(w) || c.members.includes(w);
+  if (CLASS_WORDS.some((c) => mainWords.some((w) => inClass(c, w)) && (b.names ?? []).some((n) => words(n).some((w) => inClass(c, sing(w)))))) return true;
   return b.category === 'boat' && themeOfObject(main) === 'ships';
 }
 
@@ -248,7 +286,8 @@ export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
   let body: RefDoc | null = force ?? dog?.ref ?? null, score = force ? 10 : dog ? 10 : 0;
   if (dog) {
     for (const w of words(dog.phrase)) used.add(sing(w));
-    if (isDogRef(dog.ref)) for (const w of DOG_WORDS) used.add(w);
+    if (isDogRef(dog.ref)) for (const w of DOG_WORDS) used.add(w).add(sing(w));
+    if (dog.base) used.add(dog.base);
   }
   // (pets only come by their own names above: "pet", "kitten" or "creature"
   // alone would otherwise pick whichever animal scores first)
@@ -267,6 +306,7 @@ export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
   // the turtle ship) never turns a bucket into a ship
   if (body && !dog && !force && !mainFitsBody(body, prompt)) body = null;
   const res: RefMatch = { body: score >= 3 ? body : null, score, colours: {}, swaps: [], decorations: [], leftover: [], needsModel: false };
+  if (dog?.base && res.body === dog.ref) res.classBase = { asked: dog.base, ref: dog.ref };
   if (!res.body) {
     res.needsModel = true;
     return res;
@@ -648,13 +688,18 @@ export function shapeShip(m: RefMatch, prompt: string, opts: { surprise?: boolea
   const extra = probe.leftover.filter((w) => !SAIL_WORDS.includes(w) && !BOW_WORDS.includes(w) && !NAMED_SHIP.some(([, l]) => l.includes(w)));
   const onSail = has(SAIL_WORDS);
   const onBow = has(BOW_WORDS);
-  let pick: keyof typeof SHIP_IDS;
-  if (onBow && (extra.length || named === 'shark')) pick = 'shark';
-  else if (onSail || (extra.length && named !== 'turtle' && named !== 'galleon' && named !== 'shark')) pick = 'pirate';
-  else if (named) pick = named;
-  else pick = (['pirate', 'galleon', 'shark'] as const)[Math.floor(Math.random() * 3)];
-  const body = ref(pick);
+  // a plain ship (or one with a sail or details asked) is any of our boats
+  // but the ones with their own look (turtle, shark, the viking longship's
+  // style); a sail asked: one with a sail
+  const pool = REFS.filter((r) => r.role === 'body' && r.category === 'boat' && !['boat-turtle-ship', 'boat-shark-ship', 'boat-viking-longship'].includes(r.id));
+  const sailed = pool.filter((r) => r.parts.some((p) => p.name === 'sail'));
+  const anyOf = (l: RefDoc[]) => l[Math.floor(Math.random() * l.length)] ?? null;
+  let body: RefDoc | null;
+  if (onBow && (extra.length || named === 'shark')) body = ref('shark');
+  else if (named) body = ref(named);
+  else body = anyOf(onSail ? sailed : pool) ?? ref('pirate');
   if (!body) return m;
+  const pick = (Object.entries(SHIP_IDS).find(([, id]) => id === body!.id)?.[0] ?? null) as keyof typeof SHIP_IDS | null;
   const out = matchRefs(prompt, body);
   // the place words aren't details ("head" stays: "a dragon head")
   for (const w of [...SAIL_WORDS, ...BOW_WORDS].filter((x) => x !== 'head' && x !== 'kopf')) out.leftover = out.leftover.filter((x) => x !== w);

@@ -730,6 +730,7 @@ interface Invite {
   crafts_used: number;
   bonus_tokens: number;
   talk_used: number;
+  consented?: number | null;
   expiresAt: number | null;
   recrafts: Record<string, number>;
   itemExtras: Record<string, number>;
@@ -746,6 +747,14 @@ const mins = (ms: number) =>
       ? `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s`
       : `${Math.round(ms / 1000)} s`;
 const clock = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+const when = (t: number) => new Date(t).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+// when a run ended: the survey opened, or its time ran out (null: still on)
+function endOf(i: Invite): { at: number; how: 'finished' | 'expired' } | null {
+  if (i.completed) return { at: i.completed, how: 'finished' };
+  if (i.started && i.expiresAt && Date.now() > i.expiresAt) return { at: i.expiresAt, how: 'expired' };
+  return null;
+}
 
 function inviteStatus(i: Invite): string {
   if (i.completed) return 'finished';
@@ -773,8 +782,11 @@ function StepTimes({ events }: { events: RunEvent[] }) {
 // one participant's whole run, in order
 function ParticipantRun({ id, events, feedback, invite }: { id: string; events: RunEvent[]; feedback: FeedbackRecord[]; invite: Invite | null }) {
   const list = [...events].sort((a, b) => a.at - b.at);
-  const first = list[0]?.at ?? invite?.started ?? null;
-  const last = list[list.length - 1]?.at ?? null;
+  const first = invite?.started ?? list[0]?.at ?? null;
+  const end = invite ? endOf(invite) : null;
+  const surveyAt = list.find((e) => e.data.what === 'survey')?.at ?? null;
+  const last = end?.at ?? surveyAt ?? list[list.length - 1]?.at ?? null;
+  const running = invite ? !end : !surveyAt;
   const crafts = list.filter((e) => e.type === 'craft');
   const hints = list.filter((e) => e.type === 'hint').length;
   const errors = list.filter((e) => e.type === 'error');
@@ -785,8 +797,18 @@ function ParticipantRun({ id, events, feedback, invite }: { id: string; events: 
     <section className="fbd-run">
       <section className="fbd-tiles">
         <Tile label="Participant (Tally test_id)" value={id} sub={[order && `order ${order}`, invite?.link ?? list[0]?.link, invite?.note].filter(Boolean).join(' · ')} />
-        <Tile label="Status" value={invite ? inviteStatus(invite) : list.some((e) => e.data.what === 'survey') ? 'finished' : '–'} sub={first ? `started ${new Date(first).toLocaleString()}` : undefined} />
-        <Tile label="Total time" value={first && last ? mins(last - first) : '–'} sub={steps.length ? `avg step ${mins(steps.reduce((a, e) => a + (Number(e.data.ms) || 0), 0) / steps.length)}` : undefined} />
+        <Tile
+          label="Start · end"
+          value={invite ? inviteStatus(invite) : surveyAt ? 'finished' : list.length ? 'playing' : '–'}
+          sub={[
+            first ? `start ${when(first)}` : '',
+            running ? 'end: still running' : last ? `end ${when(last)}${end?.how === 'expired' ? ' (expired)' : ''}` : '',
+            invite?.consented ? `consent ${when(invite.consented)}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        />
+        <Tile label={running ? 'Time so far' : 'Total time'} value={first && last ? mins((running ? Date.now() : last) - first) : '–'} sub={steps.length ? `avg step ${mins(steps.reduce((a, e) => a + (Number(e.data.ms) || 0), 0) / steps.length)}` : undefined} />
         <Tile label="Crafts / reworks" value={`${crafts.filter((c) => !c.data.recraftOf).length} / ${crafts.reduce((a, c) => a + (Number(c.data.reworks) || 0), 0)}`} sub={invite ? `budget ${invite.crafts_used} of ${invite.crafts_allowed} crafts` : undefined} />
         <Tile label="Hints · errors" value={`${hints} · ${errors.length}`} />
       </section>
@@ -1015,6 +1037,8 @@ function Participants({ pass, invites, events, reload }: { pass: string; invites
                 <th>Participant</th>
                 <th>Link · note</th>
                 <th>Status</th>
+                <th>Start</th>
+                <th>End</th>
                 <th>Time left</th>
                 <th>Crafts</th>
                 <th>Reworks</th>
@@ -1040,6 +1064,23 @@ function Participants({ pass, invites, events, reload }: { pass: string; invites
                       </div>
                     </td>
                     <td>{st}</td>
+                    <td className="fbd-muted">
+                      {i.started ? when(i.started) : '–'}
+                      {i.consented && <div>consent {when(i.consented)}</div>}
+                    </td>
+                    <td className="fbd-muted">
+                      {(() => {
+                        const e = endOf(i);
+                        if (!e || !i.started) return '–';
+                        return (
+                          <>
+                            {e.how === 'expired' ? 'expired ' : ''}
+                            {when(e.at)}
+                            <div>({mins(e.at - i.started)})</div>
+                          </>
+                        );
+                      })()}
+                    </td>
                     <td className="fbd-muted">{st === 'playing' && left !== null ? mins(Math.max(0, left)) : '–'}</td>
                     <td>
                       {i.crafts_used} of {i.crafts_allowed}

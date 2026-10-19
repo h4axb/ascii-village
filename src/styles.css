@@ -5055,3 +5055,32 @@ pre {
   color: var(--ds-text-soft);
   line-height: 1.5;
 }
+/* the consent step before a personal link's first start (App.tsx Consent) */
+.invite-block .ds-panel.consent {
+  max-width: min(560px, 92vw);
+  max-height: 88vh;
+  overflow: auto;
+}
+.invite-block .consent p,
+.invite-block .consent li {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+.invite-block .consent ul {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  color: var(--ds-text-soft);
+}
+.consent-check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 14px 0;
+  color: var(--ds-text);
+  cursor: pointer;
+}
+.consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}

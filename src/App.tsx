@@ -194,7 +194,7 @@ import { CraftPrefsSettings } from './CraftFeedback';
 import { LINK } from './link';
 import { loadHistory, ago, type CraftRecord, type ChatLine } from './craftHistory';
 import { MitchyTalk, hasBirthDate, forgetBirthDate } from './MitchyTalk';
-import { QUEST_ENABLED, GATHER_TARGET, EXPLORE_TILES, SEED_CHOICES, type SeedKind, type HintTarget, LINES as QL, FINAL_SURVEY_URL, QUESTLINE_1, DISCOVERIES, objectiveById, type StepId, type DiscoveryId } from './quest/quests';
+import { QUEST_ENABLED, GATHER_TARGET, EXPLORE_TILES, SEED_CHOICES, type SeedKind, type HintTarget, LINES as QL, FINAL_SURVEY_URL, CONSENT, QUESTLINE_1, DISCOVERIES, objectiveById, type StepId, type DiscoveryId } from './quest/quests';
 import { boatReachable, boatRoute, seaRoute, pathLength, pointAt, smoothBoatPath, type Pt } from './quest/route';
 import { QuestPanel, type QuestView } from './quest/QuestPanel';
 import { HintSparkles } from './HintSparkles';
@@ -695,14 +695,14 @@ const SHOP_TOKENS = QUEST_ENABLED ? 2 : TOKENS_PER_DAY;
 if (INVITE_KEY_CHANGED) deleteSave();
 
 // What a personal link shows instead of the game (quest/session.ts)
-const INVITE_TEXT: Record<Exclude<InviteState, 'ok'>, { title: string; text: string }> = {
+const INVITE_TEXT: Record<Exclude<InviteState, 'ok' | 'consent'>, { title: string; text: string }> = {
   finished: { title: 'Thank you!', text: 'You have already completed this test. You can close this tab now.' },
   expired: { title: 'This link has expired', text: 'The time for this test has run out. Please contact the person who sent you the link.' },
   'other-device': { title: 'Already opened elsewhere', text: 'This link was opened on another device or browser. Please continue there, or contact the person who sent you the link.' },
   unknown: { title: 'Link not found', text: 'Please use the personal link you received.' },
   'no-key': { title: 'Personal link needed', text: 'Please use the personal link you received.' },
 };
-function InviteBlocked({ state }: { state: Exclude<InviteState, 'ok'> }) {
+function InviteBlocked({ state }: { state: Exclude<InviteState, 'ok' | 'consent'> }) {
   const t = INVITE_TEXT[state];
   return (
     <div className="invite-block">
@@ -714,8 +714,44 @@ function InviteBlocked({ state }: { state: Exclude<InviteState, 'ok'> }) {
   );
 }
 
+// A personal link's first start: what is recorded, and the participant's
+// consent (quests.ts CONSENT). Nothing is sent before they agree.
+function Consent({ onAgree, onDecline }: { onAgree: () => void; onDecline: () => void }) {
+  const [ok, setOk] = useState(false);
+  return (
+    <div className="invite-block">
+      <div className="ds-panel consent" role="dialog" aria-labelledby="consent-title">
+        <h2 id="consent-title">{CONSENT.title}</h2>
+        <p>{CONSENT.intro}</p>
+        <ul>
+          {CONSENT.recorded.map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ul>
+        {CONSENT.notes.map((t) => (
+          <p key={t}>{t}</p>
+        ))}
+        <label className="consent-check">
+          <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} /> {CONSENT.agree}
+        </label>
+        <div className="consent-actions">
+          <button className="ds-action go" disabled={!ok} onClick={onAgree}>
+            <span>{CONSENT.start}</span>
+          </button>
+          <button className="ds-action" onClick={onDecline}>
+            <span>{CONSENT.decline}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [started, setStarted] = useState(false);
+  // a personal link that never started asks for consent on Start
+  const [fresh, setFresh] = useState(false);
+  const [consent, setConsent] = useState<'ask' | 'declined' | null>(null);
   // a personal link: checked before anything else shows
   const [invite, setInvite] = useState<InviteState | 'checking'>(PERSONAL_LINK ? 'checking' : 'ok');
   useEffect(() => {
@@ -726,6 +762,7 @@ export default function App() {
       .then((r) => r.json())
       .then((d: { state?: string }) => {
         const st = d.state;
+        setFresh(st === 'not-started');
         setInvite(st === 'finished' || st === 'expired' || st === 'other-device' || st === 'unknown' ? st : 'ok');
       })
       .catch(() => setInvite('ok')); // offline: play (crafting goes offline too)
@@ -737,12 +774,15 @@ export default function App() {
   // Start fades the landing to black (0.5 s), then the game (and the intro
   // cinematic, which opens on black) takes over: no hard cut
   const [leaving, setLeaving] = useState(false);
-  const leave = async () => {
+  const leave = async (agreed = false) => {
     if (leaving) return;
     if (PERSONAL_LINK) {
+      if (fresh && !agreed) return setConsent('ask');
       // Start / Continue starts (or resumes) the run on the server
-      const st = await startInviteRun();
+      const st = await startInviteRun(agreed);
+      if (st === 'consent') return setConsent('ask');
       if (st !== 'ok') return setInvite(st);
+      setConsent(null);
       const r = currentRun();
       // the key belongs to the other design order's link
       if (r && r.link !== window.location.pathname.replace(/\/$/, '')) {
@@ -753,11 +793,20 @@ export default function App() {
     setLeaving(true);
     window.setTimeout(() => setStarted(true), LANDING_FADE_MS);
   };
-  if (invite !== 'ok' && invite !== 'checking') return <InviteBlocked state={invite} />;
+  if (invite !== 'ok' && invite !== 'checking' && invite !== 'consent') return <InviteBlocked state={invite} />;
+  if (consent === 'declined')
+    return (
+      <div className="invite-block">
+        <div className="ds-panel" role="status">
+          <p>{CONSENT.declined}</p>
+        </div>
+      </div>
+    );
+  if (consent === 'ask') return <Consent onAgree={() => void leave(true)} onDecline={() => setConsent('declined')} />;
   if (started) return <Game />;
   return (
     <>
-      <Landing onStart={leave} />
+      <Landing onStart={() => void leave()} />
       <div className="landing-fade" style={{ opacity: leaving ? 1 : 0, transition: `opacity ${LANDING_FADE_MS}ms ease` }} />
     </>
   );

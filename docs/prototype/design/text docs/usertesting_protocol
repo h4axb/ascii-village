@@ -6,24 +6,85 @@ Survey: 10 min.
 Gespräch 10 min.
 
 # Usertesting Ablauf
-Checkliste: Feedback DB leer. 
-1. Link schicken + Streamen, Uhr & Excel für Notizen machen bereit auf PC.
-2. Introduction kurz geben, User soll durchspielen, ich werde nur im Notfall eingreifen also nach 3 Versuchen wenn man nicht selbst weiterkommen fragen oder wenn ungeplante Situationen eintreten sollten.
-3. Playtest wird gespielt.
-4. Survey wird beantwortet (muss nicht streamen wenn sie nicht wollen und ehrliches Feedback)
-5. Interview - welche Fragen? Worauf sollte ich während Playtesting achten? Welche Beobachtungen tbd
+!!! Checkliste: Vor Testperson 1 Dummy Feedback in DB leer machen. 
+Intro an Testpersonen: Das Projekt ist ein cozy island simulator, welche die Besonderheit hat, dass man mit Prompts Sachen craften kann. Ich möchte die Nutzerführung davon mit zwei Varianten testen, die beide im Veraluf ausprobieren wirst. 
+Man hat insgesamt so 20-30 Minuten Zeit und am Ende füllt man dann noch einen kleinen Feedbackformular aus. Habs versucht so kurz wie möglich zu halten also sollte 3-5 Minuten im Schnitt dauern. Dann folgt noch kurz ein Follow-Up Gespräch und das wars.
+Wichtig ist, ich werde während des Test versuchen mich soweit es geht zurückzuhalten außer bei technischer Notwendigkeit. Also auch bei Fragen oder Bugs nicht panisch werden und erstmal versuchen selbst mit den gegebenen Sachen durchzukommen. 
+Gleich sobald das Spiel startet kommt eine Mitteilung, da Daten gespeichert werden aus dieser Session. Also grundsätzlich ist das Feedback pseudonymisiert und nur für mich und ich werde es anonymisiert für mein Bachelor statistisch auswerten und erwähnen. Kann man sich nochmal durchlesen und dann Haken ankreuzen und starten. Ansonsten in einer Excel Tabelle werde ich die Notizen nochmal vermerken, die ich mir heute mache. Desweiteren werden auch keine Audio-oder Videoaufzeichnungen vorgenommen.
 
-# Spielablauf
-After water vehicle craft quest part 1 is over
-When landing on shop island quest 2 begins
+1. Link mit Keynummer schicken + Testperson streamt, wenn das online abläuft. 
+Uhr & Excel für Notizen machen bereit auf PC.
+Browser: Chrome
+Gerät: Laptop oder PC
+2. Introduction kurz geben wie oben genannt.
+3. Usertest wird durchgeführt. Ich mache mir Notizen in Playtest_Tracker Excel (https://docs.google.com/spreadsheets/d/1Zm6MOGSOskef5RgK9p7KMVQ03fe6g9xvYCYUWOTc66I/edit?gid=59013658#gid=59013658)
+4. Survey wird beantwortet (muss nicht streamen wenn sie nicht wollen, ehrliches Feedback)
+5. Nachgespräch
+6. Rohdaten als JSON abspeichern nach jeder Session
 
-## Survey
-# Unterer Teil UEQ-S – Adjective Reference
+# Notizenschwerpunkte während Usertesting
+1. Eingriff meinerseits Ja/Nein:
+-> Hat es das Feedback für A/B beeinflusst?
+2. Notable quote:
+3. Extremitäten (wo hats besonders lange gebraucht, Crafting Anomalitäten etc.)
+4. Besondere Reaktionen: Verwirrung, Freude etc.
+5. Session usable: Yes / Review needed
+
+# Nachgespräch Follow-Up Questions
+1. Generell welche Variante wurde präferiert und warum? Beispiel?
+2. Wenn Besonderheit, warum wurde Reaktion xy gezeigt?
+3. Hattest du besonders einen Moment, wo du das Gefühl hattest oder nicht hattest Kontrolle über das Ergebnis zu haben?
+4. Was denkst du wie hat das Spiel dein Feedback/Input verarbeitet?
+
+
+# Abbruchssituationen
+1. Zeitüberschreitung von 40 Minuten.
+2. Technischer Fehler was Forsetzen des Spiels unmöglich macht.
+3. Testpersonen brechen ab.
+
+# Reflektion nach Usertesting
+Was the session duration realistic?
+Did your observation sheet capture what you needed?
+Did the survey submission arrive correctly?
+Was AB/BA stored correctly?
+Did you unintentionally explain anything?
+Was there any genuine validity-threatening bug?
+
+
+
+# Questunterteilungen
+Gesamtes Spiel ist erstmal unterteilt in zwei Feedback Design Varianten A & B.
+Dann hat jede Variante 2 Questlinien. Diese sind unterteilt in verschiedene kleine Quests.
+Questlinie 1
+1. Herumlaufen
+2. 3 Ressourcen sammeln
+3. Zuhause was ablegen
+4. Zu Mitchy gehen.
+5. Mitchy gibt Token und man soll ein Wassertransportobjekt bauen.
+Questlinie 2
+1. Auf Shop Island gelandet und Seed bekommen. Bewässerungstool bauen.
+2. Mit Wasser befüllen.
+3. Samen einpflanzen.
+4. Gießen.
+5. Ernten.
+6. Pet craften. 
+7. Zu Mitchy.
+
+
+
+# Feedbackkategorien
+1. I (don't) like it + Tags - wie hat die Qualität der Crafting Mechanik gefallen? Was genau hat mir (nicht) gefallen
+2.  5 Fragen - Feedback um direkten Eindruck festzuhalten von einer Variante
+3.  Tally Survey (Direct comparative choices + Likerts Scale + UEQ-S pragmatische & hedonische Eindrücke) - Feedback für statistische Auswertung
+- Variante A oder B?
+- Einzelne Features bewerten von 1-7 (wie hat dir das Feedback vor dem Crafting gefallen)
+- Pragmatische & hedonische Gesamteindrücke
+
+## UEQ-S Kategorien
 These definitions are for the researcher's internal reference during
 playtesting and analysis, not explanations to participants.
 
-
-## Pragmatische Qualität
++ Pragmatische Qualität
 Fokus: Benutzerfreundlichkeit, Verständlichkeit und Effizienz bei der Aufgabenerfüllung.
 
 | Adjektivpaar | Beispiel in ASCIIA BAY |
@@ -33,7 +94,7 @@ Fokus: Benutzerfreundlichkeit, Verständlichkeit und Effizienz bei der Aufgabene
 | **Ineffizient – Effizient** | Das Feedback erfordert Aufwand ohne erkennbaren Nutzen oder erleichtert das Crafting mit geringem Aufwand. |
 | **Verwirrend – Klar** | Spieler verstehen nicht, was ihre ausgewählten Präferenzen bewirken, oder erkennen deren Auswirkungen eindeutig. |
 
-## Hedonische Qualität
++ Hedonische Qualität
 Fokus: Stimulation, Originalität und Interesse.
 
 | Adjektivpaar | Beispiel in ASCIIA BAY |
@@ -43,7 +104,8 @@ Fokus: Stimulation, Originalität und Interesse.
 | **Konventionell – Originell** | Die Interaktion wirkt wie eine gewöhnliche Bewertungsfunktion oder bietet einen ungewöhnlichen, kreativen Feedbackansatz. |
 | **Gewöhnlich – Innovativ** | Die Interaktion wirkt wie eine typische Benutzeroberfläche oder wie ein neuartiger, fortschrittlicher Ansatz für KI-basiertes Crafting. |
 
-# /2/Feedback DB
+# Welche Personeninfos & welches Feedback wird wo gespeichert
+1. /2/Feedback DB
 Misst folgende Dinge:
 - Player ID
 - 5 Fragen
@@ -55,9 +117,16 @@ Misst folgende Dinge:
 - bei Post-Feedback was die Einstellung per Craft waren
 
 - Questabschlusszeit
+- Start-und Endzeit
 - Hinweis Counter
 - technischer Error
 
+2. Playtest_Tracker Excel
+- Personen ID & Name
+- Individueller Testlink jeweiliger Person
+- Testgruppe: Game Designer, Hobbyspieler, Gelegenheitspieler
+- Testversion AB oder BA
+- Notizen während des Usertestings & Nachgespräch
 
 
 # Saving points
@@ -99,24 +168,40 @@ Switching to the second design
 The replay (second design): the same moments as in questline 2, plus the boat moments from step 7. That covers crafting the boat (placing, boarding, stepping off), crafting the watering tool, filling, planting, watering, harvesting, the companion, and “I’m done”, which leads to the second ratings and their checkpoint.
 
 
-# Abschluss
 
-Was the session duration realistic?
-Did your observation sheet capture what you needed?
-Did the survey submission arrive correctly?
-Was AB/BA stored correctly?
-Did you unintentionally explain anything?
-Was there any genuine validity-threatening bug?
 
 # Fragen allgemein
 
 1. Wie kann ich den Projektlink des Usertestings außerhalb des Usertestings für Tespersonen unzugänglich machen? Unter anderem könnten die LLM Tokens weiter verbraucht werden.
 A: Jede Testperson bekommt einen individuellen Link (96-bit Keynummer) und hat ein 3 Stunden Limit. Anschließend sobald Tally Survey lädt, wird auf dem Server das Usertesting als beendet markiert. Für die LLM-Calls gibt es nun zwei Variablen, die Craft Kind und ID abfragen, um für die drei Arten wie die Crafting Tokens, Recraftings und Mitchy Talk Tokens die Anzahl sicherzustellen.
 
-1a. Was ist 96-bit Keynummer? 
+Funktionen die ich als Admin machen kann, sind:
+- Mehr Tokens geben
+- Mehr Zeit verlängern
+- Erlauben in neuem Tab zu öffnen (aber muss JSON Save mitnehmen)
+
+1a. Was ist 96-bit Keynummer? 2⁹⁶ Möglichkeiten für eine Keyschlüsselnummer
 1b. Was sind HttpOnly Cookies? Frontend kann das nicht lesen, also kann auch nicht manipuliert werden.
-1c. What is a Cookie?
-1d. Timer kann nicht durch Reloading zurückgesetzt werden.
+1c. What is a Cookie? A note your web remembers.
+
 2. Wie viele LLM Tokens stelle ich zur Verfügung? Genaue Anzahl oder plus Reserven?
-A: Genaue Anzahl anbieten: 3  Crafting Tokens (ein Token durch Mitchy, zwei Token durch Shop) und zusätzlich jeweils 3 Recrafting Möglichkeiten. Insgesamt 6 Crafting Token und 18 Recrafting LLM Calls.
-Falls es durch einen technischen Fehler unmöglich ist, das Usertesting weiter durchzuführen auf /admin Seite extra Tokens geben können. Warum nicht mehr? Damit Testpersonen nicht die Usertesting Zeit von 30 Minuten überschreiten und Ressourcenmanagement.
+A: Genaue Anzahl anbieten.
+
+Pro Condition:
+- 3 reguläre Craft-Vorgänge
+- bis zu 3 Recrafts pro Craft
+
+Gesamter Test mit A+B:
+- 6 reguläre Craft-Calls
+- maximal 18 Recraft-Calls
+- 40 Mitchy Talk Calls
+- maximal 64 entsprechende LLM-Calls
+
+Zusätzliche Calls nur bei dokumentiertem technischen Verlust.
+Falls es durch einen technischen Fehler unmöglich ist, das Usertesting weiter durchzuführen auf /admin Seite extra Tokens geben können. Warum nicht mehr Crafting Tokens? Damit Testpersonen nicht die Usertesting Zeit von 30 Minuten überschreiten und Ressourcenmanagement.
+
+3. Muss ich das Tracking von /2/Feedback mit Testpersonen teilen?
+A: Ja, das muss DSGVO konform sein. Also am Anfang des Spiels eine Mitteilung mit Checkbox einblenden und vorab kurz mündlich erklären.
+
+4. Rohdaten wie für lange aufbewahren?
+A: Ein Jahr. Damit ich nach Bachelor noch das Feedback habe.

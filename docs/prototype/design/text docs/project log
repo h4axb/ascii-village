@@ -8617,20 +8617,148 @@ A: Ich muss meine allgemeinen Sprachfertigkeiten verbessern für professionelle 
 Ursprung scheint die allgemeine Angst vor neuen Arbeitsabläufen zu sein mit denen ich nicht vertraut bin. Nur die Anzahl von wie oft ich mich in neue unterschiedliche Situationen bewege, wo ich gezwungen bin zu performen, vermindern nicht die Angst. Gegenenfalls wie Musical AG, Minijob, Messeleitung und Rhetorikkurs. Allerdings sobald ich mich an einen Ablauf gewöhne, vermindert sich der Druck.
 
 13:00-14:00 BA Seminar Reflektion
-
 14:00-15:00 Break
-15:00-16:00 Quellverzeichnis
-Recherche zu Copyright & Quellverzeichnis erstellen
-- Survey durchgehen final (5 Fragen + finales)
-15:00-18:00 Playtesting Links 1&2
-- alle Hinweise ausprobieren
-- Zeit messen
-- Craften mit Objekten außerhalb der Lib
+15:00-19:00 Usertesting Protokoll finalisiert (/docs/text docs/usertesting_protocol)
+19:00-22:00 Playtesting Links 1&2
+
+### Finale Playtest-Checkliste
+- **Test-Setup komplett simulieren**
+- Excel Tabelle, Timer, Adminseite
+
+- **Testdurchlauf von Usertesting**
+-Usertesting Protokoll komplett durchgehen
+
+- **Zugang & Session**
+  - individueller Testlink funktioniert
+  - falscher/alter Link wird blockiert
+  - richtiger AB/BA-Order wird geladen
+  - gleicher Browser nach Refresh funktioniert weiter
+  - anderer Browser wird wie geplant blockiert
+  - Session läuft nicht länger als vorgesehen
+  - nach Abschluss / Tally-Start wird Session als completed markiert
+  - erneutes Öffnen danach zeigt „already completed“
+
+- **Consent / Datenschutz**
+  - Hinweis erscheint direkt zu Beginn
+  - gespeicherte Daten werden verständlich genannt
+  - Checkbox ist Pflicht
+  - ohne Zustimmung kein Start
+  - keine Audio-/Videoaufnahme wird behauptet oder durchgeführt
+
+- **Questflow**
+  - Intro endet korrekt
+  - Quest 1 startet
+  - Ressourcen sammeln funktioniert
+  - Storage funktioniert
+  - Mitchy-Handover funktioniert
+  - Wasserfahrzeug-Craft funktioniert
+  - Shop-Island-Übergang funktioniert
+  - Seed wird korrekt vergeben
+  - Watering Tool → Fill → Plant → Water → Harvest → Pet → Mitchy funktioniert
+  - zweite Variante startet vollständig und korrekt
+  - alle Ratings erscheinen am Ende jeder Condition
+
+- **Design A**
+  - Pre-clarification erscheint zum richtigen Zeitpunkt
+  - Fragen passen zum Prompt
+  - Skip / „You decide“ funktioniert
+  - unbekannter Begriff funktioniert
+  - Typo funktioniert
+  - Surprise funktioniert
+  - Plan-Summary zeigt richtige Auswahl
+  - Craft startet mit übernommenen Antworten
+  - keine B-Preferences beeinflussen A
+
+- **Design B**
+  - Craft startet direkt
+  - Result Feedback erscheint
+  - Like / Not quite funktioniert
+  - Tags funktionieren
+  - optionaler Kommentar funktioniert
+  - Preference-Tuning funktioniert
+  - Scope „this session / this kind / all crafts“ funktioniert
+  - gespeicherte Preferences beeinflussen nur das, was sie beeinflussen sollen
+  - Transition zu A entfernt/isoliert B-State korrekt
+
+- **LLM / Fallback**
+  - normale API-Anfrage funktioniert
+  - wenn möglich einmal bewusst Fallback testen
+  - `fallback_used` wird gespeichert
+  - fehlgeschlagener Call zerstört nicht den Questflow
+  - technischer Fehler verbraucht nicht dauerhaft einen benötigten Token
+  - Admin kann bei Bedarf Token nachgeben
+
+- **Token-/Call-Limits**
+  - pro Condition genau richtige Anzahl regulärer Crafts verfügbar
+  - Recraft-Limit stimmt
+  - Mitchy-Talk-Limit stimmt
+  - Server blockiert Calls über Budget
+  - nach Session-Ende keine weiteren Calls möglich
+
+- **Save / Recovery**
+  - Refresh während Quest funktioniert
+  - Refresh nach Craft funktioniert
+  - Refresh zwischen A/B funktioniert
+  - Browser-Crash-Simulation: neu öffnen → letzter Checkpoint
+  - Ratings gehen durch Reload nicht verloren
+  - keine Condition wird versehentlich übersprungen oder doppelt gewertet
+
+- **Feedback DB**
+  - Participant ID korrekt
+  - order = AB / BA korrekt
+  - condition = A / B eindeutig
+  - 5 Ratings getrennt pro Condition
+  - Crafting Chat gespeichert
+  - Crafting Ergebnis gespeichert
+  - Like/Dislike + Tags gespeichert
+  - Recrafts gespeichert
+  - B Preferences gespeichert
+  - Questzeiten plausibel
+  - Start-/Endzeit plausibel
+  - Hint Counter korrekt
+  - Errors korrekt
+  - fallback_used korrekt
+
+- **Survey / Tally**
+  - nach Condition 2 öffnet richtige Survey
+  - richtige Participant ID übertragen
+  - richtige Order übertragen
+  - alle Pflichtfelder funktionieren
+  - UEQ-S vollständig
+  - Freitext funktioniert
+  - Submission kommt tatsächlich an
+  - Export zeigt korrekte Hidden Fields
+
+- **Moderator-Setup**
+  - Playtest_Tracker offen
+  - Participant ID + Order vorab eingetragen
+  - Uhr/Timer bereit
+  - Testlink kopiert
+  - Survey erreichbar
+  - Meeting-Link funktioniert
+  - Screen Sharing getestet
+  - Chrome + PC/Laptop bestätigt
+  - feste Moderator-Sätze griffbereit
+
+- **Abbruch-/Interventionsfälle einmal gedanklich durchgehen**
+  - UI-Frage → nicht erklären
+  - Quest vergessen → neutral wiederholen
+  - technischer Bug → minimal helfen
+  - API fallback → nichts sagen, nur notieren
+  - Crash → reload
+  - >40 min → Session ggf. beenden / incomplete markieren
+  - Teilnehmer möchte abbrechen → sofort stoppen
+
+Am Ende von **AB-Dummy** und **BA-Dummy** würde ich jeweils noch prüfen:
+
+> Ist alles in DB + Tally + JSON so angekommen, wie ich es später auswerten will?
+
+
 
 
 
 ### Prototype Freeze & Playtesting
-
+Recherche zu Copyright & Quellverzeichnis erstellen
 User Test Build v1.0
 
 [x] mail für usertesting: ~~timo, huy, angie, sascha, sam, lucie, joanne~~ 
@@ -8647,10 +8775,10 @@ User Test Build v1.0
 
 [] Titeländerung
 [] playtest x2 AB
-[] implement BA
+[x] implement BA
 [] playtest x2 BA
 [] what to expect from usertesting + observation sheet
-[] game polish: crafting generator, intro, map, item icon, quest ui
+[x] game polish: crafting generator, intro, map, item icon, quest ui
 
 
 

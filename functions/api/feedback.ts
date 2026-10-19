@@ -15,7 +15,7 @@
 // id in wrangler.jsonc, create the table (worker/feedback.sql), set the
 // secret. Until then both routes answer 503 and the game keeps feedback in
 // the browser's outbox (src/feedback/client.ts) to resend later.
-import { cleanTag, normalizeFeedback } from '../../src/feedback/schema';
+import { cleanTag, conditionOf, designOf, normalizeFeedback } from '../../src/feedback/schema';
 
 // Minimal slice of Cloudflare's D1 API — avoids pulling in
 // @cloudflare/workers-types for these few calls.
@@ -65,6 +65,84 @@ export function tagsByVote(records: { tags?: unknown; vote?: unknown }[]) {
   };
 }
 
+// The user test's analysis columns (src/feedback/schema.ts designOf,
+// conditionOf): participant, run_order (AB/BA), condition (1/2), design
+// (A/B), fallback_used (0/1), fallback_reason. Filled by the server from each
+// record on insert; a table made before them gets them added, and rows
+// already stored are filled from their JSON (here and in events.ts).
+export const SQL_DESIGN = (j: string) => `CASE json_extract(${j},'$.cond') WHEN 'pre' THEN 'A' WHEN 'post' THEN 'B' END`;
+export const SQL_CONDITION = (j: string, order: string) =>
+  `CASE WHEN ${order} = 'AB' THEN (CASE json_extract(${j},'$.cond') WHEN 'pre' THEN 1 WHEN 'post' THEN 2 END) ` +
+  `WHEN ${order} = 'BA' THEN (CASE json_extract(${j},'$.cond') WHEN 'post' THEN 1 WHEN 'pre' THEN 2 END) END`;
+export async function addColumns(db: D1Database, table: string, cols: [string, string][]): Promise<boolean> {
+  const { results } = await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
+  const have = new Set(results.map((c) => c.name));
+  let added = false;
+  for (const [name, type] of cols) {
+    if (have.has(name)) continue;
+    await db.prepare(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`).run();
+    added = true;
+  }
+  return added;
+}
+let columnsReady: Promise<void> | null = null;
+function ensureColumns(db: D1Database) {
+  columnsReady ??= (async () => {
+    await addColumns(db, 'feedback', [
+      ['participant', 'TEXT'],
+      ['run_order', 'TEXT'],
+      ['condition', 'INTEGER'],
+      ['design', 'TEXT'],
+      ['fallback_used', 'INTEGER'],
+      ['fallback_reason', 'TEXT'],
+    ]);
+    // rows stored before the columns: filled once from their JSON
+    await db
+      .prepare(
+        `UPDATE feedback SET participant = json_extract(data,'$.participant'), run_order = json_extract(data,'$.order'), ` +
+          `design = ${SQL_DESIGN('data')}, condition = ${SQL_CONDITION('data', "json_extract(data,'$.order')")}, ` +
+          `fallback_used = CASE WHEN json_extract(data,'$.fallback') IS NOT NULL THEN 1 ELSE 0 END, ` +
+          `fallback_reason = json_extract(data,'$.fallback.why') WHERE fallback_used IS NULL`,
+      )
+      .run();
+    // ratings made before results carried their fallback flag: a fallback the
+    // run log noted for the same participant and prompt within a minute
+    const { results: hasEvents } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events'").all<{ name: string }>();
+    await db.prepare('CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, at INTEGER NOT NULL)').run();
+    const { results: done } = await db.prepare("SELECT name FROM migrations WHERE name = 'feedback-fallback-from-events'").all<{ name: string }>();
+    if (hasEvents.length && !done.length) {
+      {
+        await db
+          .prepare(
+            `UPDATE feedback SET fallback_used = 1, fallback_reason = (SELECT json_extract(e.data,'$.data.why') FROM events e ` +
+              `WHERE e.participant = feedback.participant AND e.type = 'error' AND json_extract(e.data,'$.data.kind') = 'fallback-craft' ` +
+              `AND json_extract(e.data,'$.data.prompt') = substr(json_extract(feedback.data,'$.prompt'), 1, 200) AND abs(e.at - feedback.at) < 60000 LIMIT 1) ` +
+              `WHERE fallback_used = 0 AND json_extract(data,'$.fallback') IS NULL AND EXISTS (SELECT 1 FROM events e ` +
+              `WHERE e.participant = feedback.participant AND e.type = 'error' AND json_extract(e.data,'$.data.kind') = 'fallback-craft' ` +
+              `AND json_extract(e.data,'$.data.prompt') = substr(json_extract(feedback.data,'$.prompt'), 1, 200) AND abs(e.at - feedback.at) < 60000)`,
+          )
+          .run();
+        // records stored without the design (crafts from the reference
+        // library): the design the run log shows for that moment
+        await db
+          .prepare(
+            `UPDATE feedback SET design = CASE (SELECT json_extract(e.data,'$.cond') FROM events e WHERE e.participant = feedback.participant AND json_extract(e.data,'$.cond') IS NOT NULL AND e.at <= feedback.at + 5000 ORDER BY e.at DESC LIMIT 1) WHEN 'pre' THEN 'A' WHEN 'post' THEN 'B' END, ` +
+              `condition = CASE WHEN run_order = 'AB' THEN (CASE (SELECT json_extract(e.data,'$.cond') FROM events e WHERE e.participant = feedback.participant AND json_extract(e.data,'$.cond') IS NOT NULL AND e.at <= feedback.at + 5000 ORDER BY e.at DESC LIMIT 1) WHEN 'pre' THEN 1 WHEN 'post' THEN 2 END) ` +
+              `WHEN run_order = 'BA' THEN (CASE (SELECT json_extract(e.data,'$.cond') FROM events e WHERE e.participant = feedback.participant AND json_extract(e.data,'$.cond') IS NOT NULL AND e.at <= feedback.at + 5000 ORDER BY e.at DESC LIMIT 1) WHEN 'post' THEN 1 WHEN 'pre' THEN 2 END) END ` +
+              `WHERE design IS NULL AND participant IS NOT NULL`,
+          )
+          .run();
+        // once only: later ratings carry their own flag
+        await db.prepare("INSERT OR IGNORE INTO migrations (name, at) VALUES ('feedback-fallback-from-events', ?1)").bind(Date.now()).run();
+      }
+    }
+  })().catch((e) => {
+    columnsReady = null;
+    throw e;
+  });
+  return columnsReady;
+}
+
 const json = (status: number, data: unknown) =>
   new Response(JSON.stringify(data), {
     status,
@@ -88,6 +166,7 @@ function sameToken(a: string, b: string): boolean {
 export async function handleFeedback(request: Request, env: FeedbackEnv): Promise<Response> {
   const db = env.FEEDBACK_DB ?? env.asciia_feedback;
   if (!db) return json(503, { error: 'feedback storage is not set up (no FEEDBACK_DB binding in wrangler.jsonc)' });
+  await ensureColumns(db);
 
   if (request.method === 'GET' && new URL(request.url).pathname === '/api/feedback/tags') {
     const { results } = await db
@@ -123,11 +202,28 @@ export async function handleFeedback(request: Request, env: FeedbackEnv): Promis
     // An update (tuning answers added later) only from the same player.
     await db
       .prepare(
-        'INSERT INTO feedback (id, at, player, link, kind, vote, data) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ' +
-          'ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, vote = excluded.vote, data = excluded.data ' +
+        'INSERT INTO feedback (id, at, player, link, kind, vote, data, participant, run_order, condition, design, fallback_used, fallback_reason) ' +
+          'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13) ' +
+          'ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, vote = excluded.vote, data = excluded.data, participant = excluded.participant, ' +
+          'run_order = excluded.run_order, condition = excluded.condition, design = excluded.design, ' +
+          'fallback_used = excluded.fallback_used, fallback_reason = excluded.fallback_reason ' +
           'WHERE feedback.player = excluded.player',
       )
-      .bind(rec.id, rec.at, rec.player, rec.link, rec.kind, rec.vote ?? 'none', JSON.stringify(rec))
+      .bind(
+        rec.id,
+        rec.at,
+        rec.player,
+        rec.link,
+        rec.kind,
+        rec.vote ?? 'none',
+        JSON.stringify(rec),
+        rec.participant ?? null,
+        rec.order ?? null,
+        conditionOf(rec.order, rec.cond),
+        designOf(rec.cond),
+        rec.fallback ? 1 : 0,
+        rec.fallback?.why ?? null,
+      )
       .run();
     return json(200, { ok: true });
   }

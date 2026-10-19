@@ -61,13 +61,15 @@ export interface Invite {
   bonus_tokens: number;
   expires_extra: number;
   talk_used: number;
+  consented: number | null; // when the participant agreed to the study (the first start)
+  run_order: string | null; // AB or BA, from the link
 }
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS invites (key TEXT PRIMARY KEY, link TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL,
     started INTEGER, device TEXT, completed INTEGER, participant_id TEXT, crafts_allowed INTEGER NOT NULL DEFAULT ${CRAFTS},
     crafts_used INTEGER NOT NULL DEFAULT 0, bonus_tokens INTEGER NOT NULL DEFAULT 0, expires_extra INTEGER NOT NULL DEFAULT 0,
-    talk_used INTEGER NOT NULL DEFAULT 0)`,
+    talk_used INTEGER NOT NULL DEFAULT 0, consented INTEGER, run_order TEXT)`,
   'CREATE TABLE IF NOT EXISTS craft_ids (key TEXT NOT NULL, id TEXT NOT NULL, kind TEXT NOT NULL, item TEXT, calls INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (key, id))',
   'CREATE TABLE IF NOT EXISTS item_extras (key TEXT NOT NULL, item TEXT NOT NULL, extra INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (key, item))',
   'CREATE TABLE IF NOT EXISTS llm_open (day TEXT PRIMARY KEY, n INTEGER NOT NULL)',
@@ -81,6 +83,14 @@ export async function ensureSchema(db: D1Database) {
   if (!ready) {
     ready = (async () => {
       for (const s of SCHEMA) await db.prepare(s).run();
+      // a database made before the consent step: add its column
+      const { results } = await db.prepare('PRAGMA table_info(invites)').all<{ name: string }>();
+      if (!results.some((c) => c.name === 'consented')) await db.prepare('ALTER TABLE invites ADD COLUMN consented INTEGER').run();
+      // the design order the link runs (AB: /intro/1, BA: /intro/2)
+      if (!results.some((c) => c.name === 'run_order')) {
+        await db.prepare('ALTER TABLE invites ADD COLUMN run_order TEXT').run();
+        await db.prepare("UPDATE invites SET run_order = CASE WHEN link LIKE '%/2' THEN 'BA' ELSE 'AB' END").run();
+      }
     })().catch((e) => {
       ready = null;
       throw e;
@@ -223,12 +233,14 @@ export async function handleSession(request: Request, env: SessionEnv): Promise<
     const inv = await invite(db, keyOf(request, body));
     const st = runState(inv, request);
     if (st === 'not-started' && inv) {
+      // the first start needs the participant's consent (App.tsx Consent)
+      if (body.consent !== true) return json(428, { error: 'consent' });
       // the first start: this browser owns the run from now on
       const device = newKey();
       const pid = await nextParticipant(db, inv.link);
       const now = Date.now();
       await db
-        .prepare('UPDATE invites SET started = ?1, device = ?2, participant_id = ?3 WHERE key = ?4 AND started IS NULL')
+        .prepare('UPDATE invites SET started = ?1, device = ?2, participant_id = ?3, consented = ?1 WHERE key = ?4 AND started IS NULL')
         .bind(now, device, pid, inv.key)
         .run();
       const fresh = (await invite(db, inv.key))!;
@@ -365,7 +377,10 @@ export async function handleAdmin(request: Request, env: SessionEnv): Promise<Re
     const keys: string[] = [];
     for (let i = 0; i < n; i++) {
       const key = newKey();
-      await db.prepare('INSERT INTO invites (key, link, note, created) VALUES (?1, ?2, ?3, ?4)').bind(key, link, note, Date.now()).run();
+      await db
+        .prepare('INSERT INTO invites (key, link, note, created, run_order) VALUES (?1, ?2, ?3, ?4, ?5)')
+        .bind(key, link, note, Date.now(), orderOfLink(link))
+        .run();
       keys.push(key);
     }
     return json(200, { keys, link });

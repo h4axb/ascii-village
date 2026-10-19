@@ -23,7 +23,7 @@
 import { RATING_QUESTIONS } from '../quest/quests';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FitSprite } from '../ui';
-import { FEEDBACK_REASONS, POSITIVE_REASONS, type FeedbackRecord } from './schema';
+import { conditionOf, designOf, FEEDBACK_REASONS, POSITIVE_REASONS, type FeedbackRecord } from './schema';
 import { topTags } from '../../functions/api/feedback';
 import { KIND_LABEL, PREF_INFO, PREF_KEYS, isKind } from '../craft/prefs';
 import type { RunEvent } from '../quest/runlog';
@@ -218,6 +218,18 @@ export default function Dashboard() {
                 .sort((a, b) => b[1].length - a[1].length)
                 .map(([st, es]) => ({ label: st, value: es.length, text: `${es.length} (${new Set(es.map((e) => e.participant)).size} players)` }))}
               note={`${evs.filter((e) => e.type === 'hint').length} hints in all`}
+            />
+          </Card>
+          <Card title="Crafts drawn offline, per design">
+            <Bars
+              rows={(['A', 'B'] as const).map((dz) => {
+                const rs = evs
+                  .filter((e) => e.type === 'craft' && designOf(e.cond) === dz)
+                  .flatMap((e) => ((e.data.results as { ok?: boolean; fallback?: unknown }[] | undefined) ?? []).filter((r) => r.ok !== false));
+                const off = rs.filter((r) => r.fallback).length;
+                return { label: `Design ${dz}`, value: pct(off, rs.length), max: 100, text: `${off} of ${rs.length} (${pct(off, rs.length)}%)` };
+              })}
+              note="Results the AI couldn't make, drawn by the offline fallback instead"
             />
           </Card>
           <Card title="Technical errors">
@@ -500,6 +512,7 @@ function RatingsTable({ data }: { data: FeedbackRecord[] }) {
           <tr>
             <th>Craft</th>
             <th>Prompt</th>
+            <th>Design · cond. · order</th>
             <th>Kind</th>
             <th>Vote</th>
             <th>Reasons · comment</th>
@@ -519,6 +532,11 @@ function RatingsTable({ data }: { data: FeedbackRecord[] }) {
                 <b>{r.name}</b>
                 <div className="fbd-muted">{r.prompt}</div>
                 {r.adjusted && <div className="fbd-muted">(adjusted)</div>}
+                {r.fallback && <div className="fbd-error-text">drawn offline: {r.fallback.why}</div>}
+              </td>
+              <td className="fbd-muted">
+                {designOf(r.cond) ?? '–'} · {conditionOf(r.order, r.cond) ?? '–'} · {r.order ?? '–'}
+                {r.participant && <div>{r.participant}</div>}
               </td>
               <td>{kindName(r.kind)}</td>
               <td>{r.vote === 'up' ? '▲ like' : '▼ not quite'}</td>
@@ -665,7 +683,7 @@ function toCsv(rows: FeedbackRecord[]): string {
     'at', 'link', 'player', 'name', 'prompt', 'kind', 'adjusted', 'vote', 'reasons', 'positive', 'tags', 'comment',
     ...PREF_KEYS.map((k) => `applied_${k}`), ...PREF_KEYS.map((k) => `answer_${k}`), 'scope',
     'clarify_questions', 'clarify_answers', 'clarify_skipped', 'clarify_outcome', 'clarify_ms', 'clarify_error', 'cond', 'rating',
-    'participant', 'order',
+    'participant', 'order', 'run_order', 'condition', 'design', 'fallback_used', 'fallback_reason',
   ];
   const cell = (v: unknown) => {
     const s = v === undefined || v === null ? '' : String(v);
@@ -698,6 +716,11 @@ function toCsv(rows: FeedbackRecord[]): string {
       r.rating ? JSON.stringify(r.rating) : '',
       r.participant,
       r.order,
+      r.order,
+      conditionOf(r.order, r.cond),
+      designOf(r.cond),
+      r.fallback ? 1 : 0,
+      r.fallback?.why,
     ]
       .map(cell)
       .join(','),
@@ -730,6 +753,7 @@ interface Invite {
   crafts_used: number;
   bonus_tokens: number;
   talk_used: number;
+  consented?: number | null;
   expiresAt: number | null;
   recrafts: Record<string, number>;
   itemExtras: Record<string, number>;
@@ -746,6 +770,14 @@ const mins = (ms: number) =>
       ? `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s`
       : `${Math.round(ms / 1000)} s`;
 const clock = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+const when = (t: number) => new Date(t).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+// when a run ended: the survey opened, or its time ran out (null: still on)
+function endOf(i: Invite): { at: number; how: 'finished' | 'expired' } | null {
+  if (i.completed) return { at: i.completed, how: 'finished' };
+  if (i.started && i.expiresAt && Date.now() > i.expiresAt) return { at: i.expiresAt, how: 'expired' };
+  return null;
+}
 
 function inviteStatus(i: Invite): string {
   if (i.completed) return 'finished';
@@ -773,8 +805,11 @@ function StepTimes({ events }: { events: RunEvent[] }) {
 // one participant's whole run, in order
 function ParticipantRun({ id, events, feedback, invite }: { id: string; events: RunEvent[]; feedback: FeedbackRecord[]; invite: Invite | null }) {
   const list = [...events].sort((a, b) => a.at - b.at);
-  const first = list[0]?.at ?? invite?.started ?? null;
-  const last = list[list.length - 1]?.at ?? null;
+  const first = invite?.started ?? list[0]?.at ?? null;
+  const end = invite ? endOf(invite) : null;
+  const surveyAt = list.find((e) => e.data.what === 'survey')?.at ?? null;
+  const last = end?.at ?? surveyAt ?? list[list.length - 1]?.at ?? null;
+  const running = invite ? !end : !surveyAt;
   const crafts = list.filter((e) => e.type === 'craft');
   const hints = list.filter((e) => e.type === 'hint').length;
   const errors = list.filter((e) => e.type === 'error');
@@ -785,8 +820,18 @@ function ParticipantRun({ id, events, feedback, invite }: { id: string; events: 
     <section className="fbd-run">
       <section className="fbd-tiles">
         <Tile label="Participant (Tally test_id)" value={id} sub={[order && `order ${order}`, invite?.link ?? list[0]?.link, invite?.note].filter(Boolean).join(' · ')} />
-        <Tile label="Status" value={invite ? inviteStatus(invite) : list.some((e) => e.data.what === 'survey') ? 'finished' : '–'} sub={first ? `started ${new Date(first).toLocaleString()}` : undefined} />
-        <Tile label="Total time" value={first && last ? mins(last - first) : '–'} sub={steps.length ? `avg step ${mins(steps.reduce((a, e) => a + (Number(e.data.ms) || 0), 0) / steps.length)}` : undefined} />
+        <Tile
+          label="Start · end"
+          value={invite ? inviteStatus(invite) : surveyAt ? 'finished' : list.length ? 'playing' : '–'}
+          sub={[
+            first ? `start ${when(first)}` : '',
+            running ? 'end: still running' : last ? `end ${when(last)}${end?.how === 'expired' ? ' (expired)' : ''}` : '',
+            invite?.consented ? `consent ${when(invite.consented)}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        />
+        <Tile label={running ? 'Time so far' : 'Total time'} value={first && last ? mins((running ? Date.now() : last) - first) : '–'} sub={steps.length ? `avg step ${mins(steps.reduce((a, e) => a + (Number(e.data.ms) || 0), 0) / steps.length)}` : undefined} />
         <Tile label="Crafts / reworks" value={`${crafts.filter((c) => !c.data.recraftOf).length} / ${crafts.reduce((a, c) => a + (Number(c.data.reworks) || 0), 0)}`} sub={invite ? `budget ${invite.crafts_used} of ${invite.crafts_allowed} crafts` : undefined} />
         <Tile label="Hints · errors" value={`${hints} · ${errors.length}`} />
       </section>
@@ -854,19 +899,20 @@ function EventBody({ e }: { e: RunEvent }) {
         </span>
       );
     case 'craft':
-      return <CraftLog d={d} />;
+      return <CraftLog d={d} cond={conditionOf(e.order, e.cond)} />;
   }
 }
 
 // one crafting panel: results with their settings, the conversation, ratings
-function CraftLog({ d }: { d: Record<string, any> }) { // eslint-disable-line @typescript-eslint/no-explicit-any
+function CraftLog({ d, cond }: { d: Record<string, any>; cond: 1 | 2 | null }) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const [open, setOpen] = useState(false);
   const results: Record<string, any>[] = d.results ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
   const ratings: Record<string, any>[] = d.ratings ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
   return (
     <div className="fbd-craft">
       <div>
-        <b>{d.recraftOf ? `Recraft of ${d.recraftOf}` : 'Craft'}</b> · design {d.design === 'pre' ? 'A (pre-clarification)' : d.design === 'post' ? 'B (post-reflection)' : d.design} ·{' '}
+        <b>{d.recraftOf ? `Recraft of ${d.recraftOf}` : 'Craft'}</b> · design {d.design === 'pre' ? 'A (pre-clarification)' : d.design === 'post' ? 'B (post-reflection)' : d.design}
+        {cond && ` · condition ${cond}`} ·{' '}
         {d.outcome === 'crafted' ? 'kept' : 'left without keeping'} · {mins(d.ms)}
         {d.reworksOf > 1 && ` · reworks ${d.reworks} of ${d.reworksOf}`}
       </div>
@@ -884,6 +930,11 @@ function CraftLog({ d }: { d: Record<string, any> }) { // eslint-disable-line @t
               {prefText(r.applied) && <div className="fbd-muted">settings: {prefText(r.applied)}</div>}
               {r.clarify?.questions?.length > 0 && (
                 <div className="fbd-muted">answers: {r.clarify.questions.map((q: { topic: string; pick: string | null }) => `${q.topic}=${q.pick ?? 'You decide'}`).join(', ')}</div>
+              )}
+              {r.fallback && (
+                <div className="fbd-error-text">
+                  drawn offline ({r.fallback.via === 'library' ? 'library picture' : 'built-in shape'}): {r.fallback.why}
+                </div>
               )}
               {r.note && <div className="fbd-muted">{r.note}</div>}
             </div>
@@ -921,12 +972,21 @@ function eventsCsv(events: RunEvent[]): string {
     const s = v === undefined || v === null ? '' : typeof v === 'string' ? v : JSON.stringify(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const cols = ['at', 'participant', 'order', 'link', 'cond', 'part', 'step', 'type', 'data'];
+  const cols = ['at', 'participant', 'run_order', 'condition', 'design', 'fallback_used', 'link', 'cond', 'part', 'step', 'type', 'data'];
+  const fallbackUsed = (e: RunEvent) =>
+    (e.type === 'error' && e.data.kind === 'fallback-craft') ||
+    (e.type === 'craft' && ((e.data.results as { fallback?: unknown }[] | undefined) ?? []).some((r) => !!r?.fallback))
+      ? 1
+      : 0;
   return [
     cols.join(','),
     ...[...events]
       .sort((a, b) => a.at - b.at)
-      .map((e) => [new Date(e.at).toISOString(), e.participant, e.order, e.link, e.cond, e.part, e.step, e.type, e.data].map(cell).join(',')),
+      .map((e) =>
+        [new Date(e.at).toISOString(), e.participant, e.order, conditionOf(e.order, e.cond), designOf(e.cond), fallbackUsed(e), e.link, e.cond, e.part, e.step, e.type, e.data]
+          .map(cell)
+          .join(','),
+      ),
   ].join('\n');
 }
 
@@ -1015,6 +1075,8 @@ function Participants({ pass, invites, events, reload }: { pass: string; invites
                 <th>Participant</th>
                 <th>Link · note</th>
                 <th>Status</th>
+                <th>Start</th>
+                <th>End</th>
                 <th>Time left</th>
                 <th>Crafts</th>
                 <th>Reworks</th>
@@ -1040,6 +1102,23 @@ function Participants({ pass, invites, events, reload }: { pass: string; invites
                       </div>
                     </td>
                     <td>{st}</td>
+                    <td className="fbd-muted">
+                      {i.started ? when(i.started) : '–'}
+                      {i.consented && <div>consent {when(i.consented)}</div>}
+                    </td>
+                    <td className="fbd-muted">
+                      {(() => {
+                        const e = endOf(i);
+                        if (!e || !i.started) return '–';
+                        return (
+                          <>
+                            {e.how === 'expired' ? 'expired ' : ''}
+                            {when(e.at)}
+                            <div>({mins(e.at - i.started)})</div>
+                          </>
+                        );
+                      })()}
+                    </td>
                     <td className="fbd-muted">{st === 'playing' && left !== null ? mins(Math.max(0, left)) : '–'}</td>
                     <td>
                       {i.crafts_used} of {i.crafts_allowed}

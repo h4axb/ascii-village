@@ -79,6 +79,15 @@ export const setCurrentTestSession = (s: TestSession | null) => {
 };
 export const currentTestSession = () => current;
 
+// Where in the test the player is: the active crafting design (cond), the
+// quest part and step (App keeps it current, quest/runlog.ts)
+export type RunWhere = { cond?: 'pre' | 'post'; part?: string; step?: string };
+let where: RunWhere = {};
+export const setCurrentWhere = (w: RunWhere) => {
+  where = w;
+};
+export const currentWhere = () => where;
+
 // The final survey's link with the session in it:
 // <url>?order=AB&test_id=P001 (keeps whatever query the url already has)
 export function surveyUrl(base: string, s: TestSession | null): string {
@@ -161,13 +170,14 @@ export interface RunInfo {
 export const RECRAFTS_PER_ITEM = 3;
 let run: RunInfo | null = null;
 export const currentRun = () => run;
-export type InviteState = 'ok' | 'unknown' | 'finished' | 'expired' | 'other-device' | 'no-key';
+export type InviteState = 'ok' | 'unknown' | 'finished' | 'expired' | 'other-device' | 'no-key' | 'consent';
 
 const keyHeader = (): Record<string, string> => (INVITE_KEY ? { 'X-Test-Key': INVITE_KEY } : {});
 
 // Start (or resume) the run. Offline or no server: 'ok' (the game still
-// plays, crafting offline).
-export async function startInviteRun(): Promise<InviteState> {
+// plays, crafting offline). The first start needs `consent` (App.tsx
+// Consent); without it the server answers 'consent'.
+export async function startInviteRun(consent = false): Promise<InviteState> {
   if (!PERSONAL_LINK) return 'ok';
   if (!INVITE_KEY) return 'no-key';
   if (inviteDoneHere()) return 'finished';
@@ -175,9 +185,10 @@ export async function startInviteRun(): Promise<InviteState> {
     const res = await fetch('/api/session/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...keyHeader() },
-      body: JSON.stringify({ key: INVITE_KEY }),
+      body: JSON.stringify({ key: INVITE_KEY, consent }),
     });
     const d = (await res.json().catch(() => ({}))) as Partial<RunInfo> & { error?: string };
+    if (res.status === 428) return 'consent';
     if (res.ok && d.participantId) {
       run = d as RunInfo;
       return 'ok';

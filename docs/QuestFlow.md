@@ -105,3 +105,18 @@ All in `src/quest/quests.ts`:
 - **Feedback records:** every craft and rating record carries `participant` and `order`, and both are in the dashboard's CSV.
 - **Survey:** **Open final survey** opens `FINAL_SURVEY_URL` with `?order=AB&test_id=P001` added (`surveyUrl` in `src/quest/session.ts`).
 
+
+## Data columns for the analysis
+
+Every rating (`feedback` table) and every run-log event (`events` table) carries these as their own columns, filled by the server from the record (`src/feedback/schema.ts` `designOf`, `conditionOf`). Rows stored before the columns existed were filled from their JSON on the first request.
+
+| Column | Values | Meaning |
+|---|---|---|
+| `participant` | `P001`, … | the participant id; Tally's `test_id` |
+| `run_order` | `AB`, `BA` | the order of the run: `/1`, `/intro/1` = AB; `/2`, `/intro/2` = BA |
+| `design` | `A`, `B` | the crafting panel in use: A = pre-clarification (`cond` `pre`), B = post-reflection (`cond` `post`) |
+| `condition` | `1`, `2` | where that design sits in the run: AB → A is 1, B is 2; BA → B is 1, A is 2 |
+| `fallback_used` | `0`, `1` | 1 = the result was drawn by the offline fallback (`llm.ts` `fallbackCraft`), not by the AI |
+| `fallback_reason` | text | why (ratings only; events keep it in their data): the AI unreachable, a budget used up, only the template shape |
+
+The `invites` table also has `run_order`. Both dashboard CSVs export the same columns.

@@ -30,6 +30,30 @@ export const QUEST_ENABLED = QUEST_ORDER !== null;
 // added for the run (quest/session.ts surveyUrl)
 export const FINAL_SURVEY_URL = 'https://tally.so/r/7R8900';
 
+// The consent step before a personal link's first start (App.tsx Consent).
+// Who participants write to about their data: fill in before the study.
+export const CONTACT = '[your name and e-mail]';
+export const CONSENT = {
+  title: 'Before you start',
+  intro: 'This game is part of a study on how people craft things with an AI. While you play, the game records:',
+  recorded: [
+    'what you type when crafting, and your chat with Mitchy (the shopkeeper)',
+    'your ratings and answers in the game',
+    'how long each quest takes, which hints you use, and technical errors',
+    'your screen size and browser type',
+  ],
+  notes: [
+    'All of it is stored under a participant number only (like P012), never with your name or e-mail. The final survey gets the same number, so your answers there can be matched to your play.',
+    'What you type for crafting is sent to an AI service (Requesty, using Google Gemini) to make the item. Please don’t type personal information.',
+    'The data is used for this study only.',
+    `Taking part is voluntary. You can stop at any time without giving a reason. To have your data deleted, write to ${CONTACT}.`,
+  ],
+  agree: 'I have read this and agree to take part.',
+  start: 'Agree and start',
+  decline: 'Don’t take part',
+  declined: 'No problem — nothing was recorded. You can close this tab now.',
+};
+
 export type StepId =
   | 'explore'
   | 'gather'

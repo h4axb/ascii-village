@@ -18,3 +18,6 @@ project settings
 # TypeScript incremental build cache (tsc -b)
 *.tsbuildinfo
 .participants-dev.json
+
+# the local stand-in for Cloudflare D1 under pnpm dev / vite preview (vite.config.ts)
+.dev-d1.sqlite

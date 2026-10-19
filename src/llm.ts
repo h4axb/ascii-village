@@ -174,7 +174,9 @@ export const CATEGORIES = ['plant', 'pets', 'clothing', 'vehicle', 'food', 'uten
 export type Category = (typeof CATEGORIES)[number];
 
 // An item instance the player owns (bought or crafted).
-export type OwnedItem = ShopItem & { ownedId: string };
+// chain: the token that first crafted it (kept through reworks), recrafts:
+// how many reworks it has had (the personal links allow 3 per item)
+export type OwnedItem = ShopItem & { ownedId: string; chain?: string; recrafts?: number };
 
 export interface ShopItem {
   id: string;
@@ -690,6 +692,8 @@ async function craftFixed(prompt: string, ui: CraftUiHooks | undefined, opts: Cr
 // prompt as (craft/fallbackCraft.ts) - and Mitchy says that asset is missing
 // and noted for a next patch (logged with the missing references).
 async function fallbackCraft(prompt: string, opts: CraftOpts, read: PromptRead | undefined, why: string): Promise<CraftResult> {
+  // the user test's run log notes every fallback craft (quest/runlog.ts)
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('asciia-fallback', { detail: { prompt: prompt.slice(0, 200), why: why.slice(0, 200) } }));
   console.warn('[craft] fallback:', why);
   if (hasRefBodies() && matchRefs(prompt).body) {
     const r = await craftWithRefs(prompt, undefined, { ...opts, noModel: true }, read).catch((err) => {

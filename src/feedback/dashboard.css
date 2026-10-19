@@ -316,3 +316,95 @@
   color: var(--ds-text);
   max-width: 280px;
 }
+
+/* ---- the run log: one participant's timeline (ParticipantRun) ---- */
+.fbd-run {
+  margin-bottom: 18px;
+}
+.fbd-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fbd-ev {
+  display: grid;
+  grid-template-columns: 76px minmax(90px, 160px) 1fr;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ds-line-soft);
+}
+.fbd-ev-time,
+.fbd-ev-where {
+  color: var(--ds-text-muted);
+  font-size: 12px;
+}
+.fbd-ev.step .fbd-ev-body b {
+  color: var(--ds-go);
+}
+.fbd-ev.error {
+  background: rgba(230, 103, 103, 0.06);
+}
+.fbd-error-text {
+  color: #f0b0a0;
+}
+.fbd-craft-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 8px 0;
+}
+.fbd-craft-result {
+  display: flex;
+  gap: 10px;
+  max-width: 420px;
+}
+.fbd .fbd-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ds-text-soft);
+  text-decoration: underline;
+}
+.fbd-chat {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ds-line-soft);
+  border-radius: var(--ds-radius-sm);
+  max-height: 340px;
+  overflow: auto;
+}
+.fbd-chat-line {
+  margin: 3px 0;
+}
+.fbd-chat-line.me b {
+  color: var(--ds-name);
+}
+@media (max-width: 640px) {
+  .fbd-ev {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+/* ---- the Participants tab ---- */
+.fbd-admin .fbd-card {
+  margin-bottom: 14px;
+}
+.fbd-made {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+.fbd-made code {
+  word-break: break-all;
+}
+.fbd-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fbd-help button,
+.fbd-help select {
+  padding: 3px 8px;
+  font-size: 12px;
+}

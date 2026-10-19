@@ -1,11 +1,13 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, type Connect, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { docHash } from './src/editor/docHash';
-import { normalizeFeedback, type FeedbackRecord } from './src/feedback/schema';
-import { tagsByVote } from './functions/api/feedback';
-import { orderOfLink, participantIdOf } from './functions/api/participant';
+import { handleFeedback, type FeedbackEnv } from './functions/api/feedback';
+import { handleParticipant } from './functions/api/participant';
+import { gateLlm, handleAdmin, handleSession, type SessionEnv } from './functions/api/session';
+import { handleEvents } from './functions/api/events';
+import { onRequestPost } from './functions/api/chat/completions';
 
 // Dev-only save endpoint for the in-game world editor (src/editor/, press E).
 // The editor never writes on its own: Ctrl+S / Save POSTs everything it edits
@@ -226,102 +228,98 @@ const groundSavePlugin = () =>
     return !!d && typeof d.cells === 'string' && Array.isArray(d.stones);
   });
 
-// Dev-only stand-in for the Worker's /api/feedback (functions/api/feedback.ts),
-// so crafting panel 2's feedback and the /2/feedback dashboard work under
-// `pnpm dev` without Cloudflare: records go to .feedback-dev.json (not
-// committed). The dashboard password here is FEEDBACK_ADMIN_TOKEN from the
-// environment, or "dev" when that isn't set.
-function feedbackDevStorePlugin(): Plugin {
-  const file = path.resolve(__dirname, '.feedback-dev.json');
-  const load = async (): Promise<FeedbackRecord[]> => {
-    try {
-      return JSON.parse(await readFile(file, 'utf-8'));
-    } catch {
-      return [];
-    }
-  };
-  return {
-    name: 'feedback-dev-store',
-    configureServer(server) {
-      server.middlewares.use('/api/feedback', (req, res, next) => {
-        const reply = (status: number, data: unknown) => {
-          res.statusCode = status;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify(data));
+// The Worker's /api routes under `pnpm dev` and `vite preview`, running the
+// real handlers (functions/api/*) against a local SQLite file standing in for
+// Cloudflare D1 (.dev-d1.sqlite, not committed): crafting feedback, the
+// participant ids, personal invite links and their AI budgets, the run log
+// and the dashboard's Participants tab. The dashboard password here is
+// FEEDBACK_ADMIN_TOKEN from the environment, or "dev". Under `vite preview`
+// (a production build) the LLM proxy runs too, with the key from
+// LLM_API_KEY / VITE_LLM_API_KEY and LLM_BASE_URL from the environment.
+function workerApiDevPlugin(): Plugin {
+  type Env = SessionEnv & FeedbackEnv & Record<string, unknown>;
+  let env: Env | null = null;
+  async function getEnv(): Promise<Env> {
+    if (env) return env;
+    const { DatabaseSync } = (await import('node:sqlite' as string)) as {
+      DatabaseSync: new (file: string) => { exec(sql: string): void; prepare(sql: string): { run(...v: unknown[]): unknown; all(...v: unknown[]): unknown[] } };
+    };
+    const sqlite = new DatabaseSync(path.resolve(__dirname, '.dev-d1.sqlite'));
+    sqlite.exec(await readFile(path.resolve(__dirname, 'worker/feedback.sql'), 'utf-8'));
+    // the D1 calls the handlers use: prepare().bind().run()/all()
+    const db = {
+      prepare(sql: string) {
+        let vals: unknown[] = [];
+        const st = {
+          bind(...v: unknown[]) {
+            vals = v.map((x) => (x === undefined ? null : x));
+            return st;
+          },
+          async run() {
+            return sqlite.prepare(sql).run(...vals);
+          },
+          async all<T>() {
+            return { results: sqlite.prepare(sql).all(...vals) as T[] };
+          },
         };
-        // public: the tags /1 players wrote (functions/api/feedback.ts topTags)
-        if (req.method === 'GET' && (req.url ?? '').startsWith('/tags')) {
-          load().then((rows) => reply(200, tagsByVote(rows.filter((r) => r.link === '/1' || r.link === '/intro/1'))));
-          return;
-        }
-        if (req.method === 'GET') {
-          const token = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
-          if (token !== (process.env.FEEDBACK_ADMIN_TOKEN || 'dev')) return reply(401, { error: 'wrong password' });
-          load().then((rows) => reply(200, [...rows].sort((a, b) => b.at - a.at)));
-          return;
-        }
-        if (req.method !== 'POST') return next();
-        let body = '';
-        req.on('data', (c) => (body += c));
-        req.on('end', async () => {
-          let parsed: unknown;
-          try {
-            parsed = JSON.parse(body);
-          } catch {
-            return reply(400, { error: 'invalid JSON' });
-          }
-          const rec = normalizeFeedback(parsed);
-          if (typeof rec === 'string') return reply(400, { error: rec });
-          const rows = (await load()).filter((r) => r.id !== rec.id);
-          rows.push(rec);
-          await writeFile(file, JSON.stringify(rows, null, 1));
-          reply(200, { ok: true });
-        });
-      });
-    },
+        return st;
+      },
+    };
+    const e = process.env;
+    env = {
+      FEEDBACK_DB: db as never,
+      FEEDBACK_ADMIN_TOKEN: e.FEEDBACK_ADMIN_TOKEN || 'dev',
+      LLM_API_KEY: e.LLM_API_KEY || e.VITE_LLM_API_KEY,
+      LLM_BASE_URL: e.LLM_BASE_URL,
+      LLM_ALLOWED_MODELS: e.LLM_ALLOWED_MODELS,
+      LLM_OPEN_DAILY_LIMIT: e.LLM_OPEN_DAILY_LIMIT,
+    };
+    return env;
+  }
+  const route = (p: string) =>
+    p === '/api/feedback' || p === '/api/feedback/tags' || p === '/api/participant' || p === '/api/events' || p === '/api/chat/completions' || p.startsWith('/api/session/') || p.startsWith('/api/admin/');
+  const handler: Connect.NextHandleFunction = (req, res, next) => {
+    const url = new URL(req.originalUrl ?? req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+    if (!route(url.pathname)) return next();
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => chunks.push(c));
+    req.on('end', async () => {
+      try {
+        const headers = new Headers();
+        for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') headers.set(k, v);
+        const body = req.method === 'GET' || req.method === 'HEAD' ? undefined : Buffer.concat(chunks);
+        const request = new Request(url, { method: req.method, headers, body });
+        const e = await getEnv();
+        const p = url.pathname;
+        let out: Response;
+        if (p === '/api/chat/completions') out = (await gateLlm(request, e)) ?? (await onRequestPost({ request, env: e as never }));
+        else if (p.startsWith('/api/feedback')) out = await handleFeedback(request, e);
+        else if (p === '/api/participant') out = await handleParticipant(request, e);
+        else if (p === '/api/events') out = await handleEvents(request, e);
+        else if (p.startsWith('/api/session/')) out = await handleSession(request, e);
+        else out = await handleAdmin(request, e);
+        res.statusCode = out.status;
+        out.headers.forEach((v, k) => res.setHeader(k, v));
+        res.end(Buffer.from(await out.arrayBuffer()));
+      } catch (err) {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+    });
   };
-}
-
-// Dev-only stand-in for the Worker's /api/participant (functions/api/
-// participant.ts): the user test's participant ids under `pnpm dev`, counted
-// in .participants-dev.json (not committed).
-function participantDevPlugin(): Plugin {
-  const file = path.resolve(__dirname, '.participants-dev.json');
   return {
-    name: 'participant-dev',
+    name: 'worker-api-dev',
     configureServer(server) {
-      server.middlewares.use('/api/participant', (req, res, next) => {
-        if (req.method !== 'POST') return next();
-        let body = '';
-        req.on('data', (c) => (body += c));
-        req.on('end', async () => {
-          let link = '/1';
-          try {
-            const b = JSON.parse(body) as { link?: string };
-            if (typeof b.link === 'string') link = b.link;
-          } catch {
-            // the /1 order
-          }
-          let rows: { n: number; at: number; link: string; order: string }[] = [];
-          try {
-            rows = JSON.parse(await readFile(file, 'utf-8'));
-          } catch {
-            rows = [];
-          }
-          const order = orderOfLink(link);
-          const n = rows.length + 1;
-          rows.push({ n, at: Date.now(), link, order });
-          await writeFile(file, JSON.stringify(rows, null, 1));
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ participantId: participantIdOf(n), order }));
-        });
-      });
+      server.middlewares.use(handler);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(handler);
     },
   };
 }
 
 export default defineConfig({
-  plugins: [react(), worldEditorSavePlugin(), startTitleUploadPlugin(), introNarrationSavePlugin(), themeSavePlugin(), groundSavePlugin(), shipSeatsSavePlugin(), seatsSavePlugin(), feedbackDevStorePlugin(), participantDevPlugin()],
+  plugins: [react(), worldEditorSavePlugin(), startTitleUploadPlugin(), introNarrationSavePlugin(), themeSavePlugin(), groundSavePlugin(), shipSeatsSavePlugin(), seatsSavePlugin(), workerApiDevPlugin()],
   server: {
     // Pinned so a dev server never silently drifts onto a different port
     // (Vite's default is to auto-increment on conflict) — localStorage is

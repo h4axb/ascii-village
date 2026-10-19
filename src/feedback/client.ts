@@ -91,7 +91,11 @@ export async function sendFeedback(rec: FeedbackRecord): Promise<void> {
   if (await post(rec)) {
     writeOutbox(queued);
     void flush();
-  } else writeOutbox([...queued, rec]);
+  } else {
+    writeOutbox([...queued, rec]);
+    // the run log notes it (quest/runlog.ts); it goes out later
+    window.dispatchEvent(new CustomEvent('asciia-feedback-queued', { detail: rec.id }));
+  }
 }
 
 // resend whatever is waiting, once per page load

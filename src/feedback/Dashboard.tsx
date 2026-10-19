@@ -8,6 +8,12 @@
 //           remembered
 //   table   every rating (the charts' table view), comments first; export
 //           as CSV or JSON for a spreadsheet
+//   run log (GET /api/events, quest/runlog.ts) time per quest step, hints
+//           per step, technical errors; with one participant picked, their
+//           whole run: steps, hints, every craft with its conversation,
+//           settings and reworks, errors
+//   Participants tab: make personal invite links and help a player live
+//           (an extra token or rework, more time, another device)
 // Loaded on demand from main.tsx, so the game never downloads it.
 //
 // Colours (validated with the dataviz skill's validator on this dark
@@ -20,6 +26,7 @@ import { FitSprite } from '../ui';
 import { FEEDBACK_REASONS, POSITIVE_REASONS, type FeedbackRecord } from './schema';
 import { topTags } from '../../functions/api/feedback';
 import { KIND_LABEL, PREF_INFO, PREF_KEYS, isKind } from '../craft/prefs';
+import type { RunEvent } from '../quest/runlog';
 import './dashboard.css';
 
 const PASS_KEY = 'asciia-feedback-pass';
@@ -48,6 +55,10 @@ export default function Dashboard() {
   const [range, setRange] = useState<Range>('30');
   const [kind, setKind] = useState('all');
   const [link, setLink] = useState('all');
+  const [who, setWho] = useState('all'); // one participant, or everyone
+  const [tab, setTab] = useState<'feedback' | 'participants'>('feedback');
+  const [events, setEvents] = useState<RunEvent[]>([]);
+  const [invites, setInvites] = useState<Invite[]>([]);
   const [tip, setTip] = useState<Tip>(null);
   showTip = setTip;
 
@@ -69,6 +80,12 @@ export default function Dashboard() {
         sessionStorage.setItem(PASS_KEY, p);
         setPass(p);
         setRows(body as FeedbackRecord[]);
+        // the run log and the invite links (empty when not set up yet)
+        const auth = { headers: { Authorization: `Bearer ${p}` } };
+        const ev = await fetch('/api/events', auth).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+        const inv = await fetch('/api/admin/invites', auth).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+        setEvents(Array.isArray(ev) ? ev : []);
+        setInvites(Array.isArray(inv) ? inv : []);
       }
     } catch (e) {
       setError(`Couldn't reach the server: ${String(e)}`);
@@ -81,10 +98,29 @@ export default function Dashboard() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const links = useMemo(() => [...new Set((rows ?? []).map((r) => r.link))].sort(), [rows]);
+  const people = useMemo(
+    () =>
+      [
+        ...new Set([
+          ...(rows ?? []).map((r) => r.participant ?? ''),
+          ...events.map((e) => e.participant),
+          ...invites.map((i) => i.participant_id ?? ''),
+        ]),
+      ]
+        .filter(Boolean)
+        .sort(),
+    [rows, events, invites],
+  );
   let data = useMemo(() => {
     const since = range === 'all' ? 0 : Date.now() - Number(range) * DAY;
-    return (rows ?? []).filter((r) => r.at >= since && (kind === 'all' || r.kind === kind) && (link === 'all' || r.link === link));
-  }, [rows, range, kind, link]);
+    return (rows ?? []).filter(
+      (r) => r.at >= since && (kind === 'all' || r.kind === kind) && (link === 'all' || r.link === link) && (who === 'all' || r.participant === who),
+    );
+  }, [rows, range, kind, link, who]);
+  const evs = useMemo(() => {
+    const since = range === 'all' ? 0 : Date.now() - Number(range) * DAY;
+    return events.filter((e) => e.at >= since && (link === 'all' || e.link === link) && (who === 'all' || e.participant === who));
+  }, [events, range, link, who]);
 
   if (!rows) {
     return (
@@ -117,7 +153,19 @@ export default function Dashboard() {
     <div className="fbd">
       <header className="fbd-head">
         <h1>Crafting feedback</h1>
-        <div className="fbd-filters">
+        <Seg value={tab} onChange={setTab} options={[['feedback', 'Evaluation'], ['participants', 'Participants']]} />
+        <div className="fbd-filters" style={tab !== 'feedback' ? { display: 'none' } : undefined}>
+          <label>
+            Participant{' '}
+            <select value={who} onChange={(e) => setWho(e.target.value)}>
+              <option value="all">All participants</option>
+              {people.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
           <Seg value={range} onChange={setRange} options={[['7', '7 days'], ['30', '30 days'], ['all', 'All time']]} />
           <label>
             Kind{' '}
@@ -147,9 +195,41 @@ export default function Dashboard() {
           </button>
           <button onClick={() => download('feedback.csv', toCsv(all), 'text/csv')}>CSV</button>
           <button onClick={() => download('feedback.json', JSON.stringify(all, null, 1), 'application/json')}>JSON</button>
+          <button onClick={() => download('run-log.csv', eventsCsv(evs), 'text/csv')}>Run log CSV</button>
         </div>
       </header>
       {error && <p className="fbd-error">{error}</p>}
+
+      {tab === 'participants' ? (
+        <Participants pass={pass} invites={invites} events={events} reload={() => void load(pass)} />
+      ) : (
+        <>
+      {who !== 'all' && (
+        <ParticipantRun id={who} events={evs} feedback={all} invite={invites.find((i) => i.participant_id === who) ?? null} />
+      )}
+      {who === 'all' && evs.length > 0 && (
+        <section className="fbd-grid">
+          <Card title="Time per quest step (median)">
+            <StepTimes events={evs} />
+          </Card>
+          <Card title="Hints per quest step">
+            <Bars
+              rows={Object.entries(group(evs.filter((e) => e.type === 'hint'), (e) => String(e.data.step ?? e.step ?? '?')))
+                .sort((a, b) => b[1].length - a[1].length)
+                .map(([st, es]) => ({ label: st, value: es.length, text: `${es.length} (${new Set(es.map((e) => e.participant)).size} players)` }))}
+              note={`${evs.filter((e) => e.type === 'hint').length} hints in all`}
+            />
+          </Card>
+          <Card title="Technical errors">
+            <Bars
+              rows={Object.entries(group(evs.filter((e) => e.type === 'error'), errorKind))
+                .sort((a, b) => b[1].length - a[1].length)
+                .map(([k, es]) => ({ label: k, value: es.length, text: `${es.length} (${new Set(es.map((e) => e.participant)).size} players)` }))}
+              note="AI unreachable, crafts drawn offline, feedback not sent, page errors"
+            />
+          </Card>
+        </section>
+      )}
 
       <section className="fbd-tiles">
         <Tile label="Ratings" value={data.length} />
@@ -238,6 +318,8 @@ export default function Dashboard() {
           <Card title="Ratings (comments first)" wide>
             <RatingsTable data={data} />
           </Card>
+        </>
+      )}
         </>
       )}
       {tip && (
@@ -630,4 +712,379 @@ function download(name: string, text: string, type: string) {
   a.download = name;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ---- the run log (quest/runlog.ts) ----
+
+// one personal invite link (functions/api/session.ts, GET /api/admin/invites)
+interface Invite {
+  key: string;
+  link: string;
+  note: string;
+  created: number;
+  started: number | null;
+  device: string | null;
+  completed: number | null;
+  participant_id: string | null;
+  crafts_allowed: number;
+  crafts_used: number;
+  bonus_tokens: number;
+  talk_used: number;
+  expiresAt: number | null;
+  recrafts: Record<string, number>;
+  itemExtras: Record<string, number>;
+}
+
+const errorKind = (e: RunEvent) => {
+  const k = String(e.data.kind ?? 'other');
+  return k === 'ai' ? `AI ${String(e.data.failure ?? '')}`.trim() : k === 'fallback-craft' ? 'Crafted offline' : k === 'feedback-unsent' ? 'Feedback not sent' : `Page error (${k})`;
+};
+const mins = (ms: number) =>
+  ms >= 3600000
+    ? `${Math.floor(ms / 3600000)} h ${Math.floor((ms % 3600000) / 60000)} min`
+    : ms >= 60000
+      ? `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s`
+      : `${Math.round(ms / 1000)} s`;
+const clock = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+function inviteStatus(i: Invite): string {
+  if (i.completed) return 'finished';
+  if (!i.started) return 'not opened';
+  if (i.expiresAt && Date.now() > i.expiresAt) return 'expired';
+  return 'playing';
+}
+
+// median time per quest step, over everyone in the filter
+function StepTimes({ events }: { events: RunEvent[] }) {
+  const steps = events.filter((e) => e.type === 'step');
+  if (!steps.length) return <p className="fbd-muted">No finished quest steps yet.</p>;
+  const by = group(steps, (e) => `${e.data.part ?? ''} · ${e.data.step ?? '?'}`);
+  return (
+    <Bars
+      rows={Object.entries(by).map(([k, es]) => {
+        const m = median(es.map((e) => Number(e.data.ms) || 0));
+        return { label: k, value: m, text: `${mins(m)} (${es.length})` };
+      })}
+      note="Per step: the median, and how many players finished it"
+    />
+  );
+}
+
+// one participant's whole run, in order
+function ParticipantRun({ id, events, feedback, invite }: { id: string; events: RunEvent[]; feedback: FeedbackRecord[]; invite: Invite | null }) {
+  const list = [...events].sort((a, b) => a.at - b.at);
+  const first = list[0]?.at ?? invite?.started ?? null;
+  const last = list[list.length - 1]?.at ?? null;
+  const crafts = list.filter((e) => e.type === 'craft');
+  const hints = list.filter((e) => e.type === 'hint').length;
+  const errors = list.filter((e) => e.type === 'error');
+  const steps = list.filter((e) => e.type === 'step');
+  const ratings = feedback.filter((r) => r.participant === id && r.rating);
+  const order = list[0]?.order ?? feedback.find((r) => r.participant === id)?.order ?? '';
+  return (
+    <section className="fbd-run">
+      <section className="fbd-tiles">
+        <Tile label="Participant (Tally test_id)" value={id} sub={[order && `order ${order}`, invite?.link ?? list[0]?.link, invite?.note].filter(Boolean).join(' · ')} />
+        <Tile label="Status" value={invite ? inviteStatus(invite) : list.some((e) => e.data.what === 'survey') ? 'finished' : '–'} sub={first ? `started ${new Date(first).toLocaleString()}` : undefined} />
+        <Tile label="Total time" value={first && last ? mins(last - first) : '–'} sub={steps.length ? `avg step ${mins(steps.reduce((a, e) => a + (Number(e.data.ms) || 0), 0) / steps.length)}` : undefined} />
+        <Tile label="Crafts / reworks" value={`${crafts.filter((c) => !c.data.recraftOf).length} / ${crafts.reduce((a, c) => a + (Number(c.data.reworks) || 0), 0)}`} sub={invite ? `budget ${invite.crafts_used} of ${invite.crafts_allowed} crafts` : undefined} />
+        <Tile label="Hints · errors" value={`${hints} · ${errors.length}`} />
+      </section>
+      {ratings.length > 0 && (
+        <Card title="Rating questions" wide>
+          <RatingCompare data={ratings} />
+        </Card>
+      )}
+      <Card title="Timeline" wide>
+        {list.length === 0 ? (
+          <p className="fbd-muted">No run log for {id} in this range.</p>
+        ) : (
+          <ol className="fbd-timeline">
+            {list.map((e) => (
+              <li key={`${e.id}-${e.at}`} className={`fbd-ev ${e.type}`}>
+                <span className="fbd-ev-time">{clock(e.at)}</span>
+                <span className="fbd-ev-where">{[e.cond && (e.cond === 'pre' ? 'A' : 'B'), e.part, e.step].filter(Boolean).join(' · ')}</span>
+                <div className="fbd-ev-body">
+                  <EventBody e={e} />
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
+    </section>
+  );
+}
+
+const PREF_WORD: Record<string, Record<string, string>> = {
+  detail: { '-1': 'fewer glyphs', '0': 'normal detail', '1': 'more glyphs' },
+  color: { '-1': 'pastel', '0': 'normal colour', '1': 'vivid' },
+  surprise: { '-1': 'controlled', '0': 'keep', '1': 'surprise me' },
+};
+const prefText = (p: unknown) =>
+  p && typeof p === 'object'
+    ? Object.entries(p as Record<string, number>)
+        .map(([k, v]) => PREF_WORD[k]?.[String(v)] ?? `${k} ${v}`)
+        .join(', ')
+    : '';
+
+function EventBody({ e }: { e: RunEvent }) {
+  const d = e.data as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  switch (e.type) {
+    case 'step':
+      return (
+        <span>
+          <b>Finished “{d.step}”</b> in {mins(d.ms)} · {d.hints} hint{d.hints === 1 ? '' : 's'} · {mins(d.sinceStart)} into the run
+        </span>
+      );
+    case 'hint':
+      return <span>Hint on “{d.step}” ({d.shows})</span>;
+    case 'session':
+      return (
+        <span>
+          {d.what === 'start' ? 'Run started' : d.what === 'resume' ? 'Run resumed (reload)' : d.what === 'survey' ? 'Opened the final survey' : d.what === 'extra-token' ? `Got ${d.count} extra token(s)` : d.what === 'budget-refused' ? `AI budget refused: ${d.detail}` : String(d.what)}
+          {d.screen && <span className="fbd-muted"> · {d.screen}</span>}
+        </span>
+      );
+    case 'error':
+      return (
+        <span className="fbd-error-text">
+          {errorKind(e)}: {String(d.detail ?? d.why ?? d.message ?? d.id ?? '')}
+          {d.prompt && <span className="fbd-muted"> · “{d.prompt}”</span>}
+        </span>
+      );
+    case 'craft':
+      return <CraftLog d={d} />;
+  }
+}
+
+// one crafting panel: results with their settings, the conversation, ratings
+function CraftLog({ d }: { d: Record<string, any> }) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [open, setOpen] = useState(false);
+  const results: Record<string, any>[] = d.results ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const ratings: Record<string, any>[] = d.ratings ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  return (
+    <div className="fbd-craft">
+      <div>
+        <b>{d.recraftOf ? `Recraft of ${d.recraftOf}` : 'Craft'}</b> · design {d.design === 'pre' ? 'A (pre-clarification)' : d.design === 'post' ? 'B (post-reflection)' : d.design} ·{' '}
+        {d.outcome === 'crafted' ? 'kept' : 'left without keeping'} · {mins(d.ms)}
+        {d.reworksOf > 1 && ` · reworks ${d.reworks} of ${d.reworksOf}`}
+      </div>
+      <div className="fbd-craft-results">
+        {results.map((r, i) => (
+          <div key={i} className="fbd-craft-result">
+            {r.sprite?.lines?.length > 0 && (
+              <span className="fbd-thumb">
+                <FitSprite look={{ sprite: r.sprite.lines, colors: r.sprite.colors, palette: r.sprite.palette }} fill={0.85} maxScale={1.4} />
+              </span>
+            )}
+            <div>
+              <b>{r.ok === false ? 'Failed' : r.name}</b> {r.rework && <span className="fbd-muted">(rework)</span>}
+              <div className="fbd-muted">“{r.prompt}”</div>
+              {prefText(r.applied) && <div className="fbd-muted">settings: {prefText(r.applied)}</div>}
+              {r.clarify?.questions?.length > 0 && (
+                <div className="fbd-muted">answers: {r.clarify.questions.map((q: { topic: string; pick: string | null }) => `${q.topic}=${q.pick ?? 'You decide'}`).join(', ')}</div>
+              )}
+              {r.note && <div className="fbd-muted">{r.note}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+      {ratings.map((r, i) => (
+        <div key={i} className="fbd-muted">
+          rated “{r.name}”: {r.vote === 'up' ? '▲ like' : r.vote === 'down' ? '▼ not quite' : '–'}
+          {[...(r.reasons ?? []), ...(r.positive ?? []), ...(r.tags ?? [])].length > 0 && ` · ${[...(r.reasons ?? []), ...(r.positive ?? []), ...(r.tags ?? [])].join(', ')}`}
+          {r.comment && ` · “${r.comment}”`}
+          {r.answers && ` · tuned: ${prefText(r.answers)}${r.scope ? ` (${r.scope})` : ''}`}
+        </div>
+      ))}
+      <button className="fbd-link" onClick={() => setOpen((o) => !o)}>
+        {open ? 'Hide the conversation' : `Show the conversation (${(d.thread ?? []).length} lines)`}
+      </button>
+      {open && (
+        <div className="fbd-chat">
+          {(d.thread ?? []).map((t: Record<string, any>, i: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+            <div key={i} className={`fbd-chat-line ${t.who}`}>
+              <b>{t.who === 'me' ? 'Player' : 'Mitchy'}:</b>{' '}
+              {t.result ? <i>[result: {t.result}]</i> : t.concepts ? <i>[ideas: {t.concepts.join(' / ')}]</i> : t.text}
+              {t.options && <span className="fbd-muted"> [{t.options.join(' / ')}]</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function eventsCsv(events: RunEvent[]): string {
+  const cell = (v: unknown) => {
+    const s = v === undefined || v === null ? '' : typeof v === 'string' ? v : JSON.stringify(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const cols = ['at', 'participant', 'order', 'link', 'cond', 'part', 'step', 'type', 'data'];
+  return [
+    cols.join(','),
+    ...[...events]
+      .sort((a, b) => a.at - b.at)
+      .map((e) => [new Date(e.at).toISOString(), e.participant, e.order, e.link, e.cond, e.part, e.step, e.type, e.data].map(cell).join(',')),
+  ].join('\n');
+}
+
+// ---- the Participants tab: personal links, and live help ----
+function Participants({ pass, invites, events, reload }: { pass: string; invites: Invite[]; events: RunEvent[]; reload: () => void }) {
+  const [count, setCount] = useState(1);
+  const [link, setLink] = useState('/intro/1');
+  const [note, setNote] = useState('');
+  const [made, setMade] = useState<string[]>([]);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const iv = window.setInterval(() => tick((n) => n + 1), 1000); // the countdowns
+    const re = window.setInterval(reload, 30000);
+    return () => {
+      window.clearInterval(iv);
+      window.clearInterval(re);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const linkOf = (i: { key: string; link: string }) => `${window.location.origin}${i.link}?k=${i.key}`;
+  async function post(path: string, body: Record<string, unknown>) {
+    setMsg(null);
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${pass}` },
+      body: JSON.stringify(body),
+    }).catch(() => null);
+    if (!res?.ok) {
+      setMsg(`That didn't work (${res?.status ?? 'offline'}).`);
+      return null;
+    }
+    const d = await res.json().catch(() => ({}));
+    reload();
+    return d;
+  }
+  async function create() {
+    const d = (await post('/api/admin/invites', { count, link, note })) as { keys?: string[]; link?: string } | null;
+    if (d?.keys) setMade(d.keys.map((k) => linkOf({ key: k, link: d.link ?? link })));
+  }
+  // the items a player crafted (their chain ids), for "+1 rework"
+  const itemsOf = (pid: string | null) => {
+    const out = new Map<string, string>();
+    for (const e of events) {
+      if (e.participant !== pid || e.type !== 'craft') continue;
+      const rs = (e.data.results as { name?: string }[] | undefined) ?? [];
+      const r = rs[rs.length - 1];
+      if (r?.name && typeof e.data.chain === 'string') out.set(e.data.chain, r.name);
+    }
+    return out;
+  };
+  const copy = (t: string) => void navigator.clipboard?.writeText(t);
+  return (
+    <section className="fbd-admin">
+      <Card title="Create personal links" wide>
+        <div className="fbd-filters">
+          <label>
+            How many <input type="number" min={1} max={100} value={count} onChange={(e) => setCount(Number(e.target.value) || 1)} style={{ width: 64 }} />
+          </label>
+          <Seg value={link} onChange={setLink} options={[['/intro/1', '/intro/1 (A then B)'], ['/intro/2', '/intro/2 (B then A)']]} />
+          <label>
+            Note <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="optional, e.g. a name" maxLength={80} />
+          </label>
+          <button onClick={() => void create()}>Create</button>
+        </div>
+        {made.length > 0 && (
+          <div className="fbd-made">
+            {made.map((l) => (
+              <div key={l}>
+                <code>{l}</code> <button onClick={() => copy(l)}>Copy</button>
+              </div>
+            ))}
+            {made.length > 1 && <button onClick={() => copy(made.join('\n'))}>Copy all</button>}
+          </div>
+        )}
+        <p className="fbd-muted fbd-note">
+          Each link works for one person, in the first browser that opens it, for 3 hours from the first start, and closes when they open the final survey.
+          Budget per person: 6 crafts (3 per design), 3 reworks per crafted item.
+        </p>
+      </Card>
+      {msg && <p className="fbd-error">{msg}</p>}
+      <Card title={`Links (${invites.length})`} wide>
+        <div className="fbd-table-wrap">
+          <table className="fbd-table">
+            <thead>
+              <tr>
+                <th>Participant</th>
+                <th>Link · note</th>
+                <th>Status</th>
+                <th>Time left</th>
+                <th>Crafts</th>
+                <th>Reworks</th>
+                <th>Help</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invites.map((i) => {
+                const st = inviteStatus(i);
+                const left = i.expiresAt ? i.expiresAt - Date.now() : null;
+                const items = itemsOf(i.participant_id);
+                return (
+                  <tr key={i.key}>
+                    <td>
+                      <b>{i.participant_id ?? '–'}</b>
+                    </td>
+                    <td>
+                      {i.link} {i.note && <span className="fbd-muted">· {i.note}</span>}
+                      <div>
+                        <button className="fbd-link" onClick={() => copy(linkOf(i))}>
+                          copy link
+                        </button>
+                      </div>
+                    </td>
+                    <td>{st}</td>
+                    <td className="fbd-muted">{st === 'playing' && left !== null ? mins(Math.max(0, left)) : '–'}</td>
+                    <td>
+                      {i.crafts_used} of {i.crafts_allowed}
+                      {i.bonus_tokens > 0 && <span className="fbd-muted"> (+{i.bonus_tokens})</span>}
+                    </td>
+                    <td className="fbd-muted">
+                      {Object.entries(i.recrafts).length
+                        ? Object.entries(i.recrafts)
+                            .map(([item, n]) => `${items.get(item) ?? item.slice(-6)} ${n}/${3 + (i.itemExtras[item] ?? 0)}`)
+                            .join(', ')
+                        : '–'}
+                    </td>
+                    <td className="fbd-help">
+                      <button disabled={!i.started || !!i.completed} onClick={() => void post('/api/admin/token', { key: i.key })} title="Puts a crafting token in their inventory within 20 s">
+                        +1 token
+                      </button>
+                      {items.size > 0 && (
+                        <select
+                          value=""
+                          onChange={(e) => e.target.value && void post('/api/admin/recraft', { key: i.key, item: e.target.value })}
+                          title="One more rework for an item"
+                        >
+                          <option value="">+1 rework…</option>
+                          {[...items].map(([chain, name]) => (
+                            <option key={chain} value={chain}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <button disabled={!i.started || !!i.completed} onClick={() => void post('/api/admin/extend', { key: i.key })}>
+                        +1 hour
+                      </button>
+                      <button disabled={!i.device} onClick={() => void post('/api/admin/reset-device', { key: i.key })} title="The next browser that opens the link takes it over">
+                        Other device
+                      </button>
+                      {i.completed && <button onClick={() => void post('/api/admin/reopen', { key: i.key })}>Reopen</button>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </section>
+  );
 }

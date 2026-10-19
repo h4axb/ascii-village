@@ -102,7 +102,27 @@ import { assetOf } from './assets';
 import { eyesOf } from './playerEyes';
 import { SPEECH_BUBBLE, SPEECH_BUBBLE_COLORS, SPEECH_BUBBLE_PALETTE } from './speechBubble';
 import { onThemeChange, themeRevision, pondLook, themeSwatch } from './theme';
-import { linkOfOrder, requestTestSession, setCurrentTestSession, surveyUrl, type TestSession } from './quest/session';
+import { flushRunLog, logEvent, setRunWhere, watchErrors } from './quest/runlog';
+import {
+  completeInviteRun,
+  currentRun,
+  INVITE_KEY,
+  INVITE_KEY_CHANGED,
+  inviteDoneHere,
+  inviteHeaders,
+  linkOfOrder,
+  RECRAFTS_PER_ITEM,
+  recraftsLeft,
+  setCraftContext,
+  refreshRun,
+  PERSONAL_LINK,
+  requestTestSession,
+  setCurrentTestSession,
+  startInviteRun,
+  surveyUrl,
+  type InviteState,
+  type TestSession,
+} from './quest/session';
 import { groundBare } from './ground';
 import { Sheet, Split, SlotGrid, DetailPanel, Panel, ChoicePanel, PanelCloseContext, Row, Stepper, FitSprite, IconGear, IconCoin, IconBag, IconHand, IconSprout, IconMap, IconSpark, IconSell, IconBuy, IconBack, type Slot, type Action } from './ui';
 import { useIntroNarrationTool } from './devIntroNarration';
@@ -667,8 +687,49 @@ function DiscoveryToast({ title, sub, onDone, kicker = 'FIRST DISCOVERY' }: { ti
   );
 }
 
+// crafting tokens the shop sells: per design on the quest links, else a day
+const SHOP_TOKENS = QUEST_ENABLED ? 2 : TOKENS_PER_DAY;
+
+// A different personal link opened in this browser: a new participant, so
+// the last one's save on this link goes (quest/session.ts)
+if (INVITE_KEY_CHANGED) deleteSave();
+
+// What a personal link shows instead of the game (quest/session.ts)
+const INVITE_TEXT: Record<Exclude<InviteState, 'ok'>, { title: string; text: string }> = {
+  finished: { title: 'Thank you!', text: 'You have already completed this test. You can close this tab now.' },
+  expired: { title: 'This link has expired', text: 'The time for this test has run out. Please contact the person who sent you the link.' },
+  'other-device': { title: 'Already opened elsewhere', text: 'This link was opened on another device or browser. Please continue there, or contact the person who sent you the link.' },
+  unknown: { title: 'Link not found', text: 'Please use the personal link you received.' },
+  'no-key': { title: 'Personal link needed', text: 'Please use the personal link you received.' },
+};
+function InviteBlocked({ state }: { state: Exclude<InviteState, 'ok'> }) {
+  const t = INVITE_TEXT[state];
+  return (
+    <div className="invite-block">
+      <div className="ds-panel" role="alert">
+        <h2>{t.title}</h2>
+        <p>{t.text}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [started, setStarted] = useState(false);
+  // a personal link: checked before anything else shows
+  const [invite, setInvite] = useState<InviteState | 'checking'>(PERSONAL_LINK ? 'checking' : 'ok');
+  useEffect(() => {
+    if (!PERSONAL_LINK) return;
+    if (!INVITE_KEY) return setInvite('no-key');
+    if (inviteDoneHere()) return setInvite('finished');
+    fetch('/api/session/check', { headers: inviteHeaders() })
+      .then((r) => r.json())
+      .then((d: { state?: string }) => {
+        const st = d.state;
+        setInvite(st === 'finished' || st === 'expired' || st === 'other-device' || st === 'unknown' ? st : 'ok');
+      })
+      .catch(() => setInvite('ok')); // offline: play (crafting goes offline too)
+  }, []);
   // crafting feedback waiting from an earlier visit goes out now
   useEffect(() => {
     if (CRAFT_FEEDBACK || CRAFT_CLARIFY || QUEST_ENABLED) flushFeedbackOutbox();
@@ -676,11 +737,23 @@ export default function App() {
   // Start fades the landing to black (0.5 s), then the game (and the intro
   // cinematic, which opens on black) takes over: no hard cut
   const [leaving, setLeaving] = useState(false);
-  const leave = () => {
+  const leave = async () => {
     if (leaving) return;
+    if (PERSONAL_LINK) {
+      // Start / Continue starts (or resumes) the run on the server
+      const st = await startInviteRun();
+      if (st !== 'ok') return setInvite(st);
+      const r = currentRun();
+      // the key belongs to the other design order's link
+      if (r && r.link !== window.location.pathname.replace(/\/$/, '')) {
+        window.location.replace(`${r.link}?k=${encodeURIComponent(INVITE_KEY ?? '')}`);
+        return;
+      }
+    }
     setLeaving(true);
     window.setTimeout(() => setStarted(true), LANDING_FADE_MS);
   };
+  if (invite !== 'ok' && invite !== 'checking') return <InviteBlocked state={invite} />;
   if (started) return <Game />;
   return (
     <>
@@ -1570,9 +1643,9 @@ function Game() {
   // Today's remaining allowances. Reading through daySeedOf is what makes a
   // stored counter from a previous day self-invalidate.
   const today = daySeedOf(wt);
-  // the quest links: at most TOKENS_PER_DAY (3) tokens from the shop in all
-  // (reset for the second crafting design); otherwise 3 a day
-  const tokensLeftToday = TOKENS_PER_DAY - (QUEST_ENABLED || tokenBuys.day === today ? tokenBuys.n : 0);
+  // the quest links: 2 tokens from the shop per crafting design (Mitchy gives
+  // the first one; the three crafts each design needs); otherwise 3 a day
+  const tokensLeftToday = SHOP_TOKENS - (QUEST_ENABLED || tokenBuys.day === today ? tokenBuys.n : 0);
   const coinsGrantedToday = coinGrants.day === today ? coinGrants.total : 0;
 
   // ---- the world clock (worldTime) ticks once per second ----
@@ -1826,6 +1899,8 @@ function Game() {
     mitchyPos: mitchyPos ?? undefined,
     quest: quest ?? undefined,
     testSession: testSession ?? undefined,
+    bonusGiven: bonusGiven || undefined,
+    runClock: runClockRef.current ?? undefined,
   });
 
   // Shared by both explicit save actions below — just the "Saving…" HUD
@@ -1877,6 +1952,8 @@ function Game() {
 
   // the shop's token (its look follows the worldTime hour)
   const hourSeed = hourSeedOf(wt);
+  const hourSeedRef = useRef(hourSeed);
+  hourSeedRef.current = hourSeed;
 
   function showToast(text: string) {
     window.clearTimeout(toastTimer.current);
@@ -4039,6 +4116,59 @@ function Game() {
     (window as unknown as { __qt?: () => unknown }).__qt = () => questTestRef.current;
   }, []);
 
+  // Extra crafting tokens granted on the dashboard (an emergency during an
+  // online session): asked for every 20 s, each one lands in the bag
+  const [bonusGiven, setBonusGiven] = useState(saved?.bonusGiven ?? 0);
+  const bonusGivenRef = useRef(bonusGiven);
+  useEffect(() => {
+    if (!INVITE_KEY || !QUEST_ENABLED) return;
+    const tick = async () => {
+      const r = await refreshRun();
+      const extra = (r?.bonusTokens ?? 0) - bonusGivenRef.current;
+      if (!r || extra <= 0) return;
+      bonusGivenRef.current = r.bonusTokens;
+      setBonusGiven(r.bonusTokens);
+      const tokens = Array.from({ length: extra }, (_, i): OwnedItem => ({ ...universalToken(hourSeedRef.current), ownedId: `own-${Date.now()}-bonus${i}` }));
+      setBag((b) => [...b, ...tokens]);
+      logEvent('session', { what: 'extra-token', count: extra });
+      showToast(extra > 1 ? `Mitchy slipped you ${extra} extra crafting tokens.` : 'Mitchy slipped you an extra crafting token.');
+    };
+    void tick();
+    const iv = window.setInterval(() => void tick(), 20000);
+    return () => window.clearInterval(iv);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (bonusGiven) writeSave(snapRef.current());
+  }, [bonusGiven]);
+
+  // ---- the run log (quest/runlog.ts): where the player is, each finished
+  // step with its time and hints, session moments ----
+  // the run's clock survives reloads in the save
+  const runClockRef = useRef(saved?.runClock ?? null);
+  useEffect(() => {
+    if (!QUEST_ENABLED) return;
+    watchErrors();
+    void flushRunLog();
+  }, []);
+  const stepKey = quest ? `${quest.part}:${quest.step}` : '';
+  const prevStepRef = useRef<{ key: string; id: string | null; part: string } | null>(null);
+  useEffect(() => {
+    if (!QUEST_ENABLED || !quest) return;
+    const obj = objectiveOf(quest);
+    setRunWhere({ cond: condOf(quest.part) ?? undefined, part: quest.part, step: obj?.id });
+    const now = Date.now();
+    const clock = (runClockRef.current ??= { start: now, step: now, hints: 0 });
+    const prev = prevStepRef.current;
+    prevStepRef.current = { key: stepKey, id: obj?.id ?? null, part: quest.part };
+    // the first look after a load: the step goes on, nothing finished
+    if (!prev || prev.key === stepKey) return;
+    if (prev.id) {
+      logEvent('step', { step: prev.id, part: prev.part, ms: now - clock.step, sinceStart: now - clock.start, hints: clock.hints });
+    }
+    clock.step = now;
+    clock.hints = 0;
+  }, [stepKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // the quest starts as soon as the intro has finished
   useEffect(() => {
     if (QUEST_ENABLED && introDone && !questRef.current) setQuest(freshQuest());
@@ -4095,8 +4225,20 @@ function Game() {
     sessionAskedRef.current = true;
     void requestTestSession().then((s) => setTestSession(s));
   }, [quest, testSession]);
+  const sessionLoggedRef = useRef(false);
   useEffect(() => {
     setCurrentTestSession(testSession);
+    if (QUEST_ENABLED && testSession && !sessionLoggedRef.current) {
+      sessionLoggedRef.current = true;
+      const r = currentRun();
+      logEvent('session', {
+        what: sessionAskedRef.current ? 'start' : 'resume',
+        personal: !!INVITE_KEY,
+        ...(r ? { expiresAt: r.expiresAt, crafts: r.crafts } : {}),
+        screen: `${window.innerWidth}x${window.innerHeight}`,
+        agent: navigator.userAgent.slice(0, 160),
+      });
+    }
     if (QUEST_ENABLED && testSession && questRef.current) writeSave(snapRef.current());
   }, [testSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -4749,6 +4891,8 @@ function Game() {
     const obj = objectiveOf(questRef.current);
     if (!obj || hintLockRef.current || hintCardRef.current || cinematic || modal) return;
     const h = obj.hint;
+    if (runClockRef.current) runClockRef.current.hints++;
+    logEvent('hint', { step: obj.id, shows: h.card ? 'card' : h.focus ? `focus:${h.focus}` : h.blink ? 'blink' : 'none' });
     if (h.card) {
       setHintCard({ pages: h.card.pages, i: 0 });
       return;
@@ -5137,6 +5281,10 @@ function Game() {
 
   // ---- Mitchy's Recraft: pay 12, back into that item's chat ----
   function startRecraft(item: OwnedItem, rec: CraftRecord | null) {
+    if (reworksLeft(item) <= 0) {
+      setModal({ t: 'recraft', line: `the ${item.name} has had all its reworks, sorry! it stays as it is.` });
+      return;
+    }
     if (money < RECRAFT_PRICE) {
       setModal({ t: 'recraft', line: `hmm, a recraft costs ${RECRAFT_PRICE} coins. u don’t have enough yet.` });
       return;
@@ -5147,6 +5295,44 @@ function Game() {
     const chat: ChatLine[] = rec?.chat ?? (rec ? [{ who: 'me', text: rec.prompt }] : []);
     setModal({ t: 'craft', token, recraft: { replaces: item.ownedId, name: item.name, chat } });
   }
+  // Reworks of one crafted item (the in-panel Adjust and Mitchy's Recraft
+  // together): 3 on the quest links, plus any granted on the dashboard
+  const chainOf = (item: OwnedItem) => item.chain ?? item.ownedId;
+  function reworksOf(chain: string): number {
+    if (!QUEST_ENABLED) return 1;
+    return RECRAFTS_PER_ITEM + (currentRun()?.itemExtras[chain] ?? 0);
+  }
+  function reworksLeft(item: OwnedItem): number {
+    const chain = chainOf(item);
+    return Math.min(reworksOf(chain) - (item.recrafts ?? 0), recraftsLeft(chain, item.recrafts ?? 0));
+  }
+  // the open crafting panel's item chain and reworks so far; also which
+  // craft its AI calls count against (quest/session.ts setCraftContext)
+  const craftModalToken = modal?.t === 'craft' ? modal.token.ownedId : null;
+  const craftPanel = useMemo(() => {
+    const m = modal;
+    if (!m || m.t !== 'craft') return null;
+    if (m.recraft) {
+      const old = bag.find((b) => b.ownedId === m.recraft!.replaces);
+      return { chain: old ? chainOf(old) : m.recraft.replaces, used: (old?.recrafts ?? 0) + 1 }; // this recraft is one
+    }
+    return { chain: m.token.ownedId, used: 0 };
+  }, [craftModalToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  const craftPanelRef = useRef(craftPanel);
+  craftPanelRef.current = craftPanel;
+  useEffect(() => {
+    const p = craftPanel;
+    if (!p) setCraftContext(null);
+    else if (p.used) setCraftContext({ id: `rc:${p.chain}:${p.used}`, kind: 'recraft', item: p.chain });
+    else setCraftContext({ id: `tok:${p.chain}`, kind: 'craft' });
+  }, [craftPanel]);
+  function onRework(n: number) {
+    const p = craftPanelRef.current;
+    if (!p) return;
+    p.used = n;
+    setCraftContext({ id: `rc:${p.chain}:${n}`, kind: 'recraft', item: p.chain });
+  }
+
   function closeCraft() {
     const m = modalRef.current;
     if (m?.t === 'craft' && m.recraft && !recraftDoneRef.current) {
@@ -5208,7 +5394,12 @@ function Game() {
   // setModal(null), so the modal survives.)
   function consumeCraft(tokenId: string, crafted: ShopItem, equip: boolean, replaces?: string) {
     const item = questCraftFit(crafted);
-    const owned: OwnedItem = { ...item, ownedId: `own-${Date.now()}` };
+    const panel = craftPanelRef.current;
+    const owned: OwnedItem = {
+      ...item,
+      ownedId: `own-${Date.now()}`,
+      ...(panel ? { chain: panel.chain, recrafts: panel.used } : {}),
+    };
     questCrafted(owned, equip);
     // a recraft: the new item takes the old one's place
     if (replaces) {
@@ -7260,6 +7451,9 @@ function Game() {
                     if (FINAL_SURVEY_URL) window.open(surveyUrl(FINAL_SURVEY_URL, testSession), '_blank', 'noopener');
                     else console.warn('[quest] FINAL_SURVEY_URL is not set (src/quest/quests.ts)');
                     setQuest({ ...questRef.current!, part: 'end' });
+                    // a personal link is done for good: no second run
+                    logEvent('session', { what: 'survey', totalMs: runClockRef.current ? Date.now() - runClockRef.current.start : null });
+                    void completeInviteRun();
                   }}
                 >
                   <span>Open final survey</span>
@@ -7556,8 +7750,8 @@ function Game() {
                 picked: modal.confirm,
                 line: modal.limited
                   ? QUEST_ENABLED
-                    ? `that's all ${TOKENS_PER_DAY} tokens, sorry!`
-                    : `that's all ${TOKENS_PER_DAY} tokens for today. come back tomorrow!`
+                    ? `that's all ${SHOP_TOKENS} tokens, sorry!`
+                    : `that's all ${SHOP_TOKENS} tokens for today. come back tomorrow!`
                   : modal.poor
                     ? 'hmm, u don’t have enough coins for that one yet.'
                     : modal.line,
@@ -7621,6 +7815,11 @@ function Game() {
               onSpend={(coins) => setMoney((mo) => mo - coins)}
               onBugReport={() => setBugReport(Date.now())}
               resume={modal.recraft ? { name: modal.recraft.name, chat: modal.recraft.chat } : undefined}
+              reworks={
+                QUEST_ENABLED && craftPanelRef.current
+                  ? { used: craftPanelRef.current.used, of: reworksOf(craftPanelRef.current.chain), chain: craftPanelRef.current.chain, onRework }
+                  : undefined
+              }
               onConsume={(equip, item) => consumeCraft(modal.token.ownedId, item, equip, modal.recraft?.replaces)}
               onClose={closeCraft}
               confirmClose={!!modal.confirmClose}

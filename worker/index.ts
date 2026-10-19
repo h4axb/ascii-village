@@ -5,6 +5,8 @@
 import { onRequestPost } from '../functions/api/chat/completions';
 import { handleFeedback, type FeedbackEnv } from '../functions/api/feedback';
 import { handleParticipant } from '../functions/api/participant';
+import { gateLlm, handleAdmin, handleSession } from '../functions/api/session';
+import { handleEvents } from '../functions/api/events';
 
 interface Env extends FeedbackEnv {
   ASSETS: { fetch: (request: Request) => Promise<Response> };
@@ -14,6 +16,7 @@ interface Env extends FeedbackEnv {
   LLM_ALLOWED_MODELS?: string;
   LLM_MAX_TOKENS?: string;
   ALLOWED_ORIGINS?: string;
+  LLM_OPEN_DAILY_LIMIT?: string;
 }
 
 export default {
@@ -23,12 +26,19 @@ export default {
       if (request.method !== 'POST') {
         return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
       }
+      // the personal links' AI budgets (functions/api/session.ts)
+      const refused = await gateLlm(request, env);
+      if (refused) return refused;
       return onRequestPost({ request, env });
     }
     // crafting feedback (crafting panel 2) — see functions/api/feedback.ts
     if (pathname === '/api/feedback' || pathname === '/api/feedback/tags') return handleFeedback(request, env);
     // the user test's participant ids — see functions/api/participant.ts
     if (pathname === '/api/participant') return handleParticipant(request, env);
+    // personal invite links, the run log, the dashboard's Participants tab
+    if (pathname.startsWith('/api/session/')) return handleSession(request, env);
+    if (pathname === '/api/events') return handleEvents(request, env);
+    if (pathname.startsWith('/api/admin/')) return handleAdmin(request, env);
     return env.ASSETS.fetch(request);
   },
 };

@@ -90,7 +90,7 @@ All in `src/quest/quests.ts`:
 - A new run asks the server for the next participant ID: `P001`, `P002`, … counted across every device.
 - A new run is a new player on `/1`, `/2`, `/intro/1` or `/intro/2`, or **New Game**.
 - The server is `POST /api/participant` (`functions/api/participant.ts`, same D1 database as the feedback). Its table creates itself on first use.
-- Under `pnpm dev`, a stand-in counts in `.participants-dev.json`.
+- Under `pnpm dev` and `vite preview`, the real handlers run against a local SQLite file, `.dev-d1.sqlite` (vite.config.ts).
 
 **Keeping it**
 - The run keeps `{participantId, order}` in its save (`testSession`), so a reload keeps the same ID.

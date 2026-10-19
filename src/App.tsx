@@ -4265,6 +4265,8 @@ function Game() {
     if (modal?.t === 'settings') discover('settings');
     if ((modal?.t === 'settings' && modal.page === 'controls') || (questOpen && questView === 'controls')) discover('controls');
     if (modal?.t === 'houseMenu') discover('home');
+    // the companion hint's "!" on the shop goes once the shop is open
+    if (modal?.t === 'shop') setHintMarks((m) => (m.includes('shop') ? m.filter((x) => x !== 'shop') : m));
     if (mapOpen) discover('map');
   }, [modal, mapOpen, questOpen, questView]); // eslint-disable-line react-hooks/exhaustive-deps
   // A run gets its participant id when its quests start (a new player, or
@@ -4890,6 +4892,7 @@ function Game() {
       const e = ents.find((x) => x.id === ref.id);
       if (e?.id === 'house') t = 'house';
       else if (e?.id === 'cat') t = 'mitchy';
+      else if (e?.kind === 'shop') t = 'shop';
       else if (e && isPond(e)) t = 'pond';
       else if (e?.kind === 'gardenbed') t = 'garden';
       else if (e && RESOURCE_KINDS.has(e.kind)) t = 'resource';
@@ -4912,6 +4915,7 @@ function Game() {
     };
     if (t === 'house') return of(ents.find((e) => e.id === 'house'));
     if (t === 'mitchy') return of(ents.find((e) => e.id === 'cat'));
+    if (t === 'shop') return of(ents.find((e) => e.kind === 'shop'));
     if (t === 'pond') return of(nearestPond()?.e ?? ents.find(isPond));
     // the bed isn't in `ents` (the garden block draws it), so its spot comes
     // from the plot itself

@@ -298,4 +298,5 @@ export const STOPWORDS = new Set([
   'kind', 'sort', 'type', 'really', 'very', 'so', 'just', 'please', 'want', 'give', 'me',
   'craft', 'make', 'create', 'build', 'it', 'is', 'has', 'having', 'looks', 'like', 'to',
   'for', 'in', 'on', 'from', 'thing', 'stuff', 'called', 'named', 'named-as',
+  'but', 'instead', 'also', 'rather', // a rework's join ("…, but with a hat")
 ]);

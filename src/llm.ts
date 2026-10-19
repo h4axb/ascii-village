@@ -506,7 +506,9 @@ export async function craftItem(prompt: string, ui?: CraftUiHooks, opts: CraftOp
   let unknown: { crafted: string[]; skipped: string[] } | undefined;
   if (opts.prefs) {
     const parts = promptParts(read.fixed);
-    const words = [...new Set(parts.unknown.filter((w) => w !== parts.main))];
+    // not in the word lists, or a detail the library body can't draw
+    const u = undrawable(read.fixed);
+    const words = [...new Set([...parts.unknown, ...(u.body ? u.details : [])].filter((w) => w !== parts.main))];
     const mainUnknown = parts.main && !parts.mainKnown ? [parts.main] : [];
     if (words.length || mainUnknown.length) {
       const guess = fallbackSubject(read.fixed).category;
@@ -1027,6 +1029,7 @@ export type ClarifyResult = { questions: ClarifyQuestion[]; retry?: undefined; r
 // the result is unpredictable) or skip it; read offline, also its closest
 // known word when it looks like a typo
 const craftAnyway = (w: string) => ({ label: 'Craft it anyway', effect: `Mitchy draws "${w}" freely — the result is unpredictable.` });
+const tryAnother = { label: 'Try another object', effect: 'Type another object.', tryAgain: true };
 function unknownWordQuestion(w: string, closest?: string | null): ClarifyQuestion {
   return {
     topic: w,
@@ -1039,33 +1042,92 @@ function unknownWordQuestion(w: string, closest?: string | null): ClarifyQuestio
     noDecide: true,
   };
 }
+// A detail the library has no picture for (it knows the word): drawn freely,
+// or left out
+function patternQuestion(d: string): ClarifyQuestion {
+  return {
+    topic: d,
+    q: `I don't have a pattern for "${d}" yet. I can craft it anyway, but how it turns out is unpredictable. Or shall I skip that detail?`,
+    options: [craftAnyway(d), { label: 'Skip this detail', effect: `Leave "${d}" out.`, drop: [d] }],
+    noDecide: true,
+  };
+}
+
+// The words of a prompt the library can't draw (design A asks about each,
+// design B's "leave unknown words out" skips them): on a library body, the
+// details it can't place; without one (the shape planner draws it all), the
+// main object and the other things to draw (not colours, sizes, materials)
+export function undrawable(text: string): { body: boolean; main: string | null; details: string[] } {
+  const m = matchRefs(text);
+  const p = promptParts(text);
+  if (m.body && (REF_CRAFT_ON || isAlwaysRef(m))) return { body: true, main: p.main, details: unknownsOf(text).details };
+  const drawn = new Set(['object', 'part', 'detail']);
+  return { body: false, main: p.main, details: [...new Set(p.others.filter((w) => w !== p.main && drawn.has(kindOf(w) ?? '')))] };
+}
+
+// The per-word questions: every word the game doesn't know, every detail the
+// library can't draw, and (no library picture) the main object itself.
+// `unknown`: the words not in the word lists (main excluded); `closest`: a
+// typo's closest known word (read locally).
+function wordQuestions(text: string, unknown: string[], closest?: (w: string) => string | null): ClarifyQuestion[] {
+  const p = promptParts(text);
+  const u = undrawable(text);
+  const isUnknown = (d: string) => d.toLowerCase().split(/\s+/).some((w) => unknown.includes(w));
+  const mainQ: ClarifyQuestion[] =
+    !u.body && p.main && p.mainKnown
+      ? [
+          {
+            topic: p.main,
+            q: `I don't have a pattern for a ${p.main} yet. I can craft it anyway, but how it turns out is unpredictable. Or do you want to try another object?`,
+            options: [craftAnyway(p.main), tryAnother],
+            noDecide: true,
+          },
+        ]
+      : [];
+  return [
+    ...mainQ,
+    ...unknown.map((w) => unknownWordQuestion(w, closest?.(w))),
+    ...u.details.filter((d) => !isUnknown(d) && d !== p.main).map(patternQuestion),
+  ];
+}
+// the per-word questions go after size / colour, before the surprise
+const withWordQs = (rest: ClarifyQuestion[], words: ClarifyQuestion[]) => {
+  const at = rest.findIndex((q) => q.topic === 'Surprise');
+  return at < 0 ? [...rest, ...words] : [...rest.slice(0, at), ...words, ...rest.slice(at)];
+};
+
+// Design A's questions before a craft. Read by the AI when it can (typos
+// fixed), else locally; either way every word the library can't draw is
+// asked about, so nothing is crafted or skipped without asking.
 export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
   // a blocked prompt is refused by craftItem right after, without questions
   if (!checkPolicy(prompt).allowed) return { questions: [] };
-  const read = await readPrompt(prompt);
-  if (read.via === 'model') {
-    // the AI read it (typos fixed): every word the game still doesn't know
-    // is asked about — craft it anyway (drawn freely, unpredictable) or skip
-    const p = promptParts(read.fixed);
-    const unknown = [...new Set(p.unknown.filter((w) => w !== p.main))];
-    const qs = preQuestions(read.fixed, read, unknown);
-    const mainQ: ClarifyQuestion[] =
-      p.main && !p.mainKnown
-        ? [
-            {
-              topic: p.main,
-              q: `I don't know a "${p.main}" yet. I can try to craft it anyway, but how it turns out is unpredictable. Or do you want to try another object?`,
-              options: [craftAnyway(p.main), { label: 'Try another object', effect: 'Type another object.', tryAgain: true }],
-              noDecide: true,
-            },
-          ]
-        : [];
-    const wordQs = unknown.map((w) => unknownWordQuestion(w));
-    const at = qs.findIndex((q) => q.topic === 'Surprise');
-    const asked = [...mainQ, ...wordQs];
-    return { questions: at < 0 ? [...qs, ...asked] : [...qs.slice(0, at), ...asked, ...qs.slice(at)] };
+  let read: PromptRead | null = null;
+  try {
+    read = await readPrompt(prompt);
+  } catch (err) {
+    console.warn('[craft] reading failed, asking from the word lists:', err);
   }
-  // read locally: the words the game doesn't know are asked about, as typed
+  if (read?.via !== 'model') return localClarify(prompt);
+  const p = promptParts(read.fixed);
+  const unknown = [...new Set(p.unknown.filter((w) => w !== p.main))];
+  const mainQ: ClarifyQuestion[] =
+    p.main && !p.mainKnown
+      ? [
+          {
+            topic: p.main,
+            q: `I don't know a "${p.main}" yet. I can try to craft it anyway, but how it turns out is unpredictable. Or do you want to try another object?`,
+            options: [craftAnyway(p.main), tryAnother],
+            noDecide: true,
+          },
+        ]
+      : [];
+  return { questions: withWordQs(preQuestions(read.fixed, read, [], { noDetail: true }), [...mainQ, ...wordQuestions(read.fixed, unknown)]) };
+}
+
+// The questions read from the word lists alone (no AI): also what is asked
+// when the AI reading fails
+export function localClarify(prompt: string): ClarifyResult {
   const parts = promptParts(prompt);
   const surprise = (theme: Theme | null) => ({
     label: 'Surprise me',
@@ -1074,9 +1136,7 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
     surprise: true,
     final: true,
   });
-  const tryAnother = { label: 'Try another object', effect: 'Type another object.', tryAgain: true };
-  // each unknown word gets its own question: its closest known word, or
-  // (a detail) leave it out
+  // a typo's closest known word
   const near = (w: string, kinds?: Parameters<typeof closestWords>[2]) => {
     const [c] = closestWords(w, 1, kinds);
     return c && typoDistance(w.toLowerCase(), c) <= (w.length >= 7 ? 2 : 1) ? c : (kinds ? null : c);
@@ -1085,7 +1145,7 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
   if (parts.main && !parts.mainKnown) {
     const obj = near(parts.main, ['object']);
     if (obj)
-      // a typo of an object it knows: that object, a surprise, or another one
+      // a typo of an object it knows: that object, crafted anyway, a surprise, or another one
       mainQs.push({
         topic: parts.main,
         q: `I don't know "${parts.main}". Did you mean ${obj}?`,
@@ -1093,8 +1153,7 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
         noDecide: true,
       });
     else {
-      // an object it doesn't know at all: reported for a next patch; a
-      // surprise or another object (nothing else to ask about)
+      // an object it doesn't know at all: reported for a next patch
       logRefCraft(prompt, 'planner', null, [parts.main]);
       return {
         questions: [
@@ -1110,16 +1169,10 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
     }
   }
   const unknown = [...new Set(parts.unknown.filter((w) => w !== parts.main))];
-  const typoQs: ClarifyQuestion[] = [
-    ...mainQs,
-    ...unknown.map((w) => unknownWordQuestion(w, near(w))),
-  ];
   // a typo that's a colour / size: its own question covers the colour / size one
   const nearKinds = new Set(unknown.flatMap((w) => closestWords(w, 1).map(kindOf)));
-  const rest = preQuestions(prompt, undefined, unknown, { colour: nearKinds.has('colour'), size: nearKinds.has('size') });
-  // the typo questions right after size / colour, before the surprise
-  const at = rest.findIndex((q) => q.topic === 'Surprise');
-  return { questions: at < 0 ? [...rest, ...typoQs] : [...rest.slice(0, at), ...typoQs, ...rest.slice(at)] };
+  const rest = preQuestions(prompt, undefined, unknown, { colour: nearKinds.has('colour'), size: nearKinds.has('size'), noDetail: true });
+  return { questions: withWordQs(rest, [...mainQs, ...wordQuestions(prompt, unknown, (w) => near(w))]) };
 }
 // (each with its own exact colour: no model call needed for these): the
 // rainbow plus black and white, eased into the game's palette when used
@@ -1140,7 +1193,7 @@ const COLOUR_OPTIONS: { label: string; word: string }[] = [
 // names can be "not among my patterns" (a typo never is)
 // `asked`: unknown words already asked about (clarifyPrompt), so they are no
 // "not among my patterns" detail; `covered`: a colour / size they stand for
-export function preQuestions(prompt: string, read?: PromptRead, asked: string[] = [], covered: { colour?: boolean; size?: boolean } = {}): ClarifyQuestion[] {
+export function preQuestions(prompt: string, read?: PromptRead, asked: string[] = [], covered: { colour?: boolean; size?: boolean; noDetail?: boolean } = {}): ClarifyQuestion[] {
   const u = unknownsOf(prompt);
   if (read?.size || covered.size) u.sizeNamed = true;
   if (read?.colours.length || covered.colour) u.colourNamed = true;
@@ -1170,7 +1223,7 @@ export function preQuestions(prompt: string, read?: PromptRead, asked: string[] 
       { label: 'Keep it classic', effect: 'Keep it classic, no extras.', surprise: false },
     ],
   });
-  if (u.refBody && u.details.length) {
+  if (!covered.noDetail && u.refBody && u.details.length) {
     const many = u.details.length > 1;
     const names = u.details.map((d) => `the ${d}`);
     const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];

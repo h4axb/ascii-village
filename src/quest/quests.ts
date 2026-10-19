@@ -70,7 +70,7 @@ export type StepId =
 // the step is done; `sparkles` twinkle around the nearest resources; `blink`
 // flashes the Controls bookmark; `card` is a picture hint in a modal - its
 // pages describe the picture in [brackets] until the art is drawn.
-export type HintTarget = 'resource' | 'house' | 'mitchy' | 'pond' | 'garden' | 'crop';
+export type HintTarget = 'resource' | 'house' | 'mitchy' | 'shop' | 'pond' | 'garden' | 'crop';
 export interface Hint {
   focus?: HintTarget;
   bubble?: boolean;
@@ -216,7 +216,7 @@ export const QUESTLINE_2: Questline = {
       icon: '🐾',
       task: 'Craft and equip a companion',
       sub: 'Bring a little companion into your new life.',
-      hint: { focus: 'mitchy', bubble: true },
+      hint: { focus: 'shop', bubble: true }, // the token for it is bought in the shop
     },
     {
       id: 'report',
@@ -288,7 +288,7 @@ export const REPLAY: Questline = {
       icon: '🐾',
       task: 'Craft and equip a companion',
       sub: 'Bring another little companion into your world.',
-      hint: { focus: 'mitchy' },
+      hint: { focus: 'shop', bubble: true },
     },
     {
       id: 'report',

@@ -32,7 +32,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useMitchyLook } from './useMitchyLook';
 import * as S from './sprites';
-import { craftItem, mitchyChat, getMitchyLine, preflightCraft, clarifyPrompt } from './llm';
+import { craftItem, mitchyChat, getMitchyLine, preflightCraft, clarifyPrompt, localClarify, type ClarifyResult } from './llm';
 import type { AiDown, ClarifyQuestion, CraftClarify, CraftConcept, OwnedItem, ShopItem } from './llm';
 import { AiDownPopup, AI_RETRY_MS, noteAiDown, clearAiDown } from './AiDownPopup';
 import { clarifyGuidance } from './craft';
@@ -360,8 +360,8 @@ export default function CraftModal({
     setBusyLine(null);
     partialLevel.current = -1;
     reworking.current = !!rework;
-    // (clarify) a new idea gets Mitchy's questions first (not a rework)
-    const asking = clarify && !rework && !how.direct;
+    // (clarify) every craft gets Mitchy's questions first, reworks too
+    const asking = clarify && !how.direct;
     const building = () => getMitchyLine('a "hold on, building your thing right now" busy').then(setBusyLine);
     if (!asking) void building();
 
@@ -415,7 +415,7 @@ export default function CraftModal({
         setStage('thinking');
         setBusyLine('Ooh, let me think about that for a second.');
         const t0 = Date.now();
-        void clarifyPrompt(craftPrompt).then((res) => {
+        const got = (res: ClarifyResult) => {
           if (closed.current) return;
           setAiDown(null);
           clearAiDown();
@@ -425,7 +425,10 @@ export default function CraftModal({
             return finish({ ok: false, reply: res.retry });
           }
           if (res.reported) onBugReport?.();
-          const qs = res.questions;
+          // a rework asks only about its change (and the surprise): the
+          // first craft already asked about the rest
+          const changed = (q: ClarifyQuestion) => q.topic === 'Surprise' || new RegExp(`\\b${q.topic.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text);
+          const qs = rework ? res.questions.filter(changed) : res.questions;
           if (!qs.length) return draw(undefined, { questions: [], skipped: false, ms: Date.now() - t0, outcome: 'crafted' });
           setStage(null);
           setBusyLine(null);
@@ -437,12 +440,12 @@ export default function CraftModal({
             text: `Ooh, before I start I have ${qs.length === 1 ? 'one quick question' : qs.length === 2 ? 'two quick questions' : 'a few quick questions'} so it turns out the way you imagine.`,
           });
           push({ who: 'mitchy', kind: 'text', text: qs[0].q });
-        }).catch((err: unknown) => {
+        };
+        void clarifyPrompt(craftPrompt).then(got).catch((err: unknown) => {
           if (closed.current) return;
-          // no questions without the AI: crafting goes on (it never fails,
-          // llm.ts fallbackCraft)
-          console.warn('[craft] questions failed, crafting without them:', err);
-          draw(undefined, { questions: [], skipped: false, ms: Date.now() - t0, outcome: 'crafted' });
+          // never craft without asking: the local questions instead
+          console.warn('[craft] questions failed, asking the local ones:', err);
+          got(localClarify(craftPrompt));
         });
       };
       ask();
@@ -504,13 +507,13 @@ export default function CraftModal({
             push({
               who: 'mitchy',
               kind: 'text',
-              text: `I don't know ${q(r.unknown.crafted)} yet, so I drew ${r.unknown.crafted.length > 1 ? 'them' : 'it'} freely. It may look a bit unexpected.`,
+              text: `I don't have a pattern for ${q(r.unknown.crafted)} yet, so I drew ${r.unknown.crafted.length > 1 ? 'them' : 'it'} freely. It may look a bit unexpected.`,
             });
           if (r.unknown.skipped.length)
             push({
               who: 'mitchy',
               kind: 'text',
-              text: `I left out ${q(r.unknown.skipped)}: I don't know ${r.unknown.skipped.length > 1 ? 'those words' : 'that word'} yet (your setting: leave unknown words out).`,
+              text: `I left out ${q(r.unknown.skipped)}: I don't have a pattern for ${r.unknown.skipped.length > 1 ? 'them' : 'it'} yet (your setting: leave unknown words out).`,
             });
         }
         setPopup({ item: r.item, prompt: craftPrompt });

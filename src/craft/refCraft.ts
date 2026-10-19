@@ -180,7 +180,9 @@ export function namedOf(prompt: string): { ref: RefDoc; phrase: string } | null 
       // rose" is a pink bunny, no compound)
       if (mainF && mainF !== f && !f.endsWith(` ${mainF}`)) {
         if (` ${mainF} `.includes(` ${f} `)) continue; // inside the object's own name ("dragon boat")
-        if (!ADJ_AFTER.test(p) && !isColourWord(mainF) && (p.includes(` ${f} ${mainF} `) || p.includes(` ${f} ${mainF}s `))) continue;
+        // (a name before its own kind word counts: "pomeranian dog")
+        const ownKind = DOG_WORDS.includes(mainF) || (SYNONYMS[r.category] ?? []).includes(mainF);
+        if (!ownKind && !ADJ_AFTER.test(p) && !isColourWord(mainF) && (p.includes(` ${f} ${mainF} `) || p.includes(` ${f} ${mainF}s `))) continue;
         const at = p.indexOf(` ${mainF} `);
         const nameAt = Math.max(p.indexOf(` ${f} `), p.indexOf(` ${f}s `), p.indexOf(` ${f}es `));
         if (at >= 0 && nameAt > at && DETAIL_SPLIT.test(p.slice(at, nameAt + 1))) continue;
@@ -380,7 +382,13 @@ export function unknownsOf(prompt: string): PromptUnknowns {
 // the prompt without the given detail phrases (the player left them out)
 export function withoutDetails(prompt: string, details: string[]): string {
   let p = ` ${prompt} `;
-  for (const d of details) p = p.replace(new RegExp(`\\s(?:an?|the|some)?\\s*${d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'), ' ');
+  for (const d of details) {
+    const w = d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // the whole detail phrase ("with a blue ribbon"), else the word itself
+    const phrase = new RegExp(`\\s(?:with|and|mit|und|avec|et|con|met)\\s+(?:(?:an?|the|some|\\d+|two|three)\\s+)?(?:[\\w-]+\\s+){0,2}${w}\\b`, 'i');
+    const next = p.replace(phrase, ' ');
+    p = next !== p ? next : p.replace(new RegExp(`\\s(?:an?|the|some)?\\s*${w}\\b`, 'i'), ' ');
+  }
   return p.replace(/\s+/g, ' ').trim();
 }
 

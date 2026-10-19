@@ -5034,3 +5034,24 @@ pre {
   z-index: 10000;
   cursor: pointer;
 }
+
+/* a personal link that can't play (App.tsx InviteBlocked): already done,
+   expired, opened elsewhere, or no key */
+.invite-block {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: #11140c;
+}
+.invite-block h2 {
+  margin: 0 0 10px;
+  color: var(--ds-name);
+  font-size: 18px;
+}
+.invite-block p {
+  margin: 0;
+  color: var(--ds-text-soft);
+  line-height: 1.5;
+}

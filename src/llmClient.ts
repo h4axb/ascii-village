@@ -27,6 +27,8 @@
 //                           the public bundle.
 // VITE_LLM_DISABLED=1 at build time ships a build with the mock/offline
 // behavior instead (no proxy calls at all).
+import { aiHeaders } from './quest/session';
+
 const API_KEY = import.meta.env.DEV ? (import.meta.env.VITE_LLM_API_KEY?.trim() ?? '') : '';
 const BASE_URL = import.meta.env.DEV
   ? (import.meta.env.VITE_LLM_BASE_URL?.trim() || 'https://router.requesty.ai/v1').replace(/\/$/, '')
@@ -108,6 +110,17 @@ export class AiServiceError extends Error {
   ) {
     super(`AI service ${failure}${status ? ` (HTTP ${status})` : ''}: ${detail}`);
     this.name = 'AiServiceError';
+    // the user test's run log notes it (quest/runlog.ts)
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('asciia-ai-error', { detail: { failure, status, detail: detail.slice(0, 200) } }));
+  }
+}
+// The server refused the call because the personal link's AI budget is
+// spent. A plain Error to the crafting code (it falls back quietly).
+export class AiBudgetError extends Error {
+  constructor(readonly detail: string) {
+    super(`AI budget: ${detail}`);
+    this.name = 'AiBudgetError';
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('asciia-ai-budget', { detail }));
   }
 }
 function failureOf(status: number): AiFailure {
@@ -130,6 +143,7 @@ async function chatOnce(messages: ChatMessage[], opts: ChatOptions, model: strin
         headers: {
           'Content-Type': 'application/json',
           ...authHeader(),
+          ...aiHeaders(),
         },
         signal: controller.signal,
         body: JSON.stringify({
@@ -159,7 +173,12 @@ async function chatOnce(messages: ChatMessage[], opts: ChatOptions, model: strin
         if (typeof j.error === 'string') detail = j.error;
         else if (j.error && typeof (j.error as { message?: unknown }).message === 'string')
           detail = (j.error as { message: string }).message;
-      } catch {
+        // a personal link's budget is used up (functions/api/session.ts):
+        // not an outage, so no "AI unavailable" popup — the craft just
+        // goes on offline
+        if ((j as { budget?: unknown }).budget) throw new AiBudgetError(detail);
+      } catch (e) {
+        if (e instanceof AiBudgetError) throw e;
         // not JSON: keep the raw text
       }
       throw new AiServiceError(failureOf(res.status), res.status, detail);
@@ -225,6 +244,7 @@ async function* chatStreamOnce(
       headers: {
         'Content-Type': 'application/json',
         ...authHeader(),
+        ...aiHeaders(),
       },
       signal: controller.signal,
       body: JSON.stringify({

@@ -18,6 +18,7 @@ export type DesignOrder = 'AB' | 'BA';
 export interface TestSession {
   participantId: string;
   order: DesignOrder;
+  key?: string; // the personal invite link's key (below), when the run has one
 }
 
 // The link that runs a design order: an uploaded save keeps playing in the
@@ -43,6 +44,8 @@ function localId(): string {
 
 // A fresh session for a new run
 export async function requestTestSession(): Promise<TestSession> {
+  // a personal link: the run the server started for its key
+  if (INVITE_KEY && run?.participantId) return { participantId: run.participantId, order: run.order, key: INVITE_KEY };
   const order = LINK_ORDER ?? 'AB';
   try {
     const res = await fetch('/api/participant', {
@@ -65,7 +68,7 @@ export async function requestTestSession(): Promise<TestSession> {
 export function parseTestSession(v: unknown): TestSession | undefined {
   const s = v as Partial<TestSession> | undefined;
   if (!s || typeof s.participantId !== 'string' || (s.order !== 'AB' && s.order !== 'BA')) return undefined;
-  return { participantId: s.participantId, order: s.order };
+  return { participantId: s.participantId, order: s.order, ...(typeof s.key === 'string' ? { key: s.key } : {}) };
 }
 
 // The session of the run being played right now (App keeps it current):
@@ -89,4 +92,158 @@ export function surveyUrl(base: string, s: TestSession | null): string {
   } catch {
     return base;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Personal invite links (functions/api/session.ts): participants get
+// /intro/1?k=<key> or /intro/2?k=<key>. The key is read once, kept in this
+// browser, and taken out of the address bar. The server binds it to this
+// browser, runs it for 3 hours from the first start, closes it when the
+// survey opens, and holds its AI budgets: 6 crafts, 3 recrafts per crafted
+// item, a few other calls. The open test links (/0-/4) have no key.
+// ---------------------------------------------------------------------------
+export const PERSONAL_LINK = /^\/intro\/[12]\/?$/.test(window.location.pathname);
+const KEY_STORE = `asciia-invite-key-${LINK}`;
+const DONE_STORE = 'asciia-invite-done';
+
+function readKey(): { key: string | null; changed: boolean } {
+  if (!PERSONAL_LINK) return { key: null, changed: false };
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(KEY_STORE);
+  } catch {
+    // no storage: the URL's key only
+  }
+  const fromUrl = new URLSearchParams(window.location.search).get('k')?.trim() || null;
+  if (fromUrl) {
+    try {
+      localStorage.setItem(KEY_STORE, fromUrl);
+    } catch {
+      // kept for this page load only
+    }
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+  const key = fromUrl ?? stored;
+  return { key, changed: !!fromUrl && !!stored && fromUrl !== stored };
+}
+const read = readKey();
+export const INVITE_KEY = read.key;
+// a different personal link opened in this browser: a new participant
+export const INVITE_KEY_CHANGED = read.changed;
+
+export const markInviteDone = () => {
+  try {
+    if (INVITE_KEY) localStorage.setItem(DONE_STORE, `${localStorage.getItem(DONE_STORE) ?? ''} ${INVITE_KEY}`);
+  } catch {
+    // the server knows anyway
+  }
+};
+export const inviteDoneHere = () => {
+  try {
+    return !!INVITE_KEY && (localStorage.getItem(DONE_STORE) ?? '').split(' ').includes(INVITE_KEY);
+  } catch {
+    return false;
+  }
+};
+
+export interface RunInfo {
+  participantId: string | null;
+  order: DesignOrder;
+  link: string;
+  expiresAt: number;
+  crafts: { allowed: number; used: number };
+  recraftsPerItem: number;
+  itemExtras: Record<string, number>; // extra recrafts granted per item chain
+  recraftsUsed: Record<string, number>;
+  bonusTokens: number; // extra crafting tokens granted on the dashboard
+}
+// reworks per crafted item on the quest links (the server's own limit too)
+export const RECRAFTS_PER_ITEM = 3;
+let run: RunInfo | null = null;
+export const currentRun = () => run;
+export type InviteState = 'ok' | 'unknown' | 'finished' | 'expired' | 'other-device' | 'no-key';
+
+const keyHeader = (): Record<string, string> => (INVITE_KEY ? { 'X-Test-Key': INVITE_KEY } : {});
+
+// Start (or resume) the run. Offline or no server: 'ok' (the game still
+// plays, crafting offline).
+export async function startInviteRun(): Promise<InviteState> {
+  if (!PERSONAL_LINK) return 'ok';
+  if (!INVITE_KEY) return 'no-key';
+  if (inviteDoneHere()) return 'finished';
+  try {
+    const res = await fetch('/api/session/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...keyHeader() },
+      body: JSON.stringify({ key: INVITE_KEY }),
+    });
+    const d = (await res.json().catch(() => ({}))) as Partial<RunInfo> & { error?: string };
+    if (res.ok && d.participantId) {
+      run = d as RunInfo;
+      return 'ok';
+    }
+    if (d.error === 'finished') markInviteDone();
+    if (d.error === 'unknown' || d.error === 'finished' || d.error === 'expired' || d.error === 'other-device') return d.error;
+    return 'ok';
+  } catch {
+    return 'ok';
+  }
+}
+
+// The run's budgets and granted extras, fresh from the server
+export async function refreshRun(): Promise<RunInfo | null> {
+  if (!INVITE_KEY || !run) return run;
+  try {
+    const res = await fetch('/api/session/status', { headers: keyHeader() });
+    if (res.ok) run = (await res.json()) as RunInfo;
+  } catch {
+    // keep the last one
+  }
+  return run;
+}
+
+// The survey opened: the key is done for good
+export async function completeInviteRun(): Promise<void> {
+  if (!INVITE_KEY) return;
+  markInviteDone();
+  try {
+    await fetch('/api/session/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...keyHeader() },
+      body: JSON.stringify({ key: INVITE_KEY }),
+      keepalive: true,
+    });
+  } catch {
+    // the local mark stays; the key also expires on its own
+  }
+}
+
+// Which craft an AI call belongs to (set while a crafting panel is open):
+// the server counts one craft per token and one recraft per try on an item
+export interface CraftContext {
+  id: string;
+  kind: 'craft' | 'recraft';
+  item?: string; // the crafted item's chain id (a recraft)
+}
+let craftCtx: CraftContext | null = null;
+export const setCraftContext = (c: CraftContext | null) => {
+  craftCtx = c;
+};
+// the headers every AI call sends
+export function aiHeaders(): Record<string, string> {
+  if (!INVITE_KEY) return {};
+  return {
+    ...keyHeader(),
+    ...(craftCtx
+      ? { 'X-Craft-Id': craftCtx.id, 'X-Craft-Kind': craftCtx.kind, ...(craftCtx.item ? { 'X-Craft-Item': craftCtx.item } : {}) }
+      : {}),
+  };
+}
+export const inviteHeaders = keyHeader;
+
+// recrafts left on an item chain (Infinity off the personal links)
+export function recraftsLeft(chain: string, doneOnChain: number): number {
+  if (!INVITE_KEY || !run) return Infinity;
+  const allowed = run.recraftsPerItem + (run.itemExtras[chain] ?? 0);
+  return Math.max(0, allowed - Math.max(doneOnChain, run.recraftsUsed[chain] ?? 0));
 }

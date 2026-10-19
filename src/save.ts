@@ -71,6 +71,11 @@ export interface SaveState {
   // The user test's participant id and design order for this run
   // (quest/session.ts); a new run (New Game) gets a new one
   testSession?: TestSession;
+  // extra crafting tokens from the dashboard already put in the bag
+  bonusGiven?: number;
+  // the run log's clock (quest/runlog.ts): run start, current step's start,
+  // hints used on it
+  runClock?: { start: number; step: number; hints: number };
 }
 
 // one save per test link (see link.ts); /0 keeps this name

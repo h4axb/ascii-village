@@ -47,6 +47,7 @@ import {
   type FeedbackReason,
   type PositiveReason,
 } from './feedback/schema';
+import { logEvent } from './quest/runlog';
 import { loadSharedTags, newFeedbackId, playerId, sendFeedback, SESSION, type SharedTags } from './feedback/client';
 import { appendHistory, ago, loadHistory, type CraftRecord, type ChatLine } from './craftHistory';
 import { MITCHY_NAME } from './introPartB';
@@ -121,6 +122,15 @@ type Turn =
   | { who: 'mitchy'; kind: 'plan' } // (clarify) the plan panel, live from `clar`
   | { who: 'mitchy'; kind: 'drawing'; src: string }; // (/4) the AI's own drawing, before it became glyphs
 
+// one line of the conversation, for the run log
+function turnLog(t: Turn): Record<string, unknown> | null {
+  if (t.kind === 'text') return { who: t.who, text: t.text };
+  if (t.kind === 'result') return { who: 'mitchy', result: t.item.name, prompt: t.prompt };
+  if (t.kind === 'alts') return { who: 'mitchy', text: t.intro, options: t.options };
+  if (t.kind === 'concepts') return { who: 'mitchy', concepts: t.concepts.map((c) => c.name), surprise: t.surprise };
+  return null;
+}
+
 // /1: how long a finished craft is shown on its own before the rating
 const RESULT_PAUSE_MS = 1500;
 const CONCEPT_LETTERS = ['A', 'B'] as const;
@@ -186,6 +196,7 @@ export default function CraftModal({
   cond,
   launch,
   resume,
+  reworks,
   money,
   onSpend,
   onBugReport,
@@ -208,6 +219,10 @@ export default function CraftModal({
   // a recraft (Mitchy's Recraft, already paid): that item's old chat comes
   // back and she waits for the new prompt
   resume?: { name: string; chat: ChatLine[] };
+  // reworks of this item (the in-panel "Adjust" and Mitchy's Recraft
+  // together): how many it has had and how many it may have; onRework runs
+  // when one starts. Without it: one adjustment, as on the open links.
+  reworks?: { used: number; of: number; chain?: string; onRework?: (n: number) => void };
   money: number;
   onSpend: (coins: number) => void; // negative = refund
   // an object the game does not know yet was reported for a next patch
@@ -230,7 +245,9 @@ export default function CraftModal({
           {
             who: 'mitchy',
             kind: 'text',
-            text: `Let's rework your ${resume.name}! Tell me the new prompt and I'll craft it again.`,
+            text:
+              `Let's rework your ${resume.name}! Tell me the new prompt and I'll craft it again.` +
+              (reworks ? ` (Rework ${reworks.used} of ${reworks.of})` : ''),
           },
         ]
       : [
@@ -256,7 +273,10 @@ export default function CraftModal({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [viewRec, setViewRec] = useState<CraftRecord | null>(null); // a past craft's chat in place of the current one
   const [adjusting, setAdjusting] = useState(false); // typing what to change
-  const [adjusted, setAdjusted] = useState(false); // the one rework is used
+  // reworks used on this item; all used: no more "Adjust"
+  const reworksUsed = useRef(reworks?.used ?? 0);
+  const reworksOf = reworks?.of ?? 1;
+  const [adjusted, setAdjusted] = useState(reworksUsed.current >= reworksOf);
   const [optSel, setOptSel] = useState(0);
   const [fb, setFb] = useState<Fb | null>(null);
   // /1: the finished craft stands alone for a moment before the rating
@@ -432,8 +452,22 @@ export default function CraftModal({
       setStage(null);
       setPartial([]);
       if (r.ok) {
+        logResults.current.push({
+          at: Date.now(),
+          ok: true,
+          prompt: craftPrompt,
+          name: r.item.name,
+          kind: r.kind ?? r.item.category ?? null,
+          rework: !!rework,
+          applied: r.applied ?? null,
+          note: r.note ?? null,
+          fixes: r.fixes ?? null,
+          clarify: log ?? null,
+          sprite: { lines: r.item.sprite, ...(r.item.palette && r.item.colors ? { palette: r.item.palette, colors: r.item.colors } : {}) },
+        });
         setPhase('success');
-        if (rework) setAdjusted(true);
+        if (rework && reworksUsed.current >= reworksOf && reworksOf > 1)
+          push({ who: 'mitchy', kind: 'text', text: 'That was the last rework for this one.' });
         if (how.surprise) push({ who: 'mitchy', kind: 'text', text: "Ta-da! Here's what I came up with." });
         // a typo the prompt reading fixed (craft/readPrompt.ts): said once, softly
         if (r.fixes?.length)
@@ -576,6 +610,7 @@ export default function CraftModal({
   // a clarification that never got rated (the craft failed, or the player
   // left before crafting) — still worth a record
   function sendClarifyOnly(prompt: string, log: ClarifyLog) {
+    logClarify.current.push(log);
     void sendFeedback({
       v: 1,
       id: newFeedbackId(),
@@ -629,6 +664,9 @@ export default function CraftModal({
     if (popup) {
       if (!adjusting || money < ADJUST_PRICE) return; // awaiting a choice
       const rework = popup;
+      reworksUsed.current += 1;
+      reworks?.onRework?.(reworksUsed.current);
+      setAdjusted(reworksUsed.current >= reworksOf);
       flushFb(); // the rating of the old design is final now
       setFb(null);
       onSpend(ADJUST_PRICE);
@@ -698,9 +736,49 @@ export default function CraftModal({
     };
   }
   const sentFb = useRef('');
+
+  // ---- the user test's run log (quest/runlog.ts): this panel, as one event
+  // updated as it goes — the whole conversation, every result with the
+  // settings it was crafted with, the ratings, reworks, how it ended ----
+  const logId = useRef(newFeedbackId());
+  const openedAt = useRef(Date.now());
+  const logResults = useRef<Record<string, unknown>[]>([]);
+  const logRatings = useRef(new Map<string, Record<string, unknown>>());
+  const logClarify = useRef<ClarifyLog[]>([]);
+  const outcome = useRef<'left' | 'crafted'>('left');
+  const threadRef = useRef(thread);
+  threadRef.current = thread;
+  function logPanel() {
+    logEvent(
+      'craft',
+      {
+        design: cond ?? (clarify ? 'pre' : feedback ? 'post' : 'plain'),
+        recraftOf: resume?.name ?? null,
+        chain: reworks?.chain ?? null, // the crafted item's id across its reworks
+        reworks: reworksUsed.current,
+        reworksOf,
+        ms: Date.now() - openedAt.current,
+        outcome: outcome.current,
+        thread: threadRef.current.map(turnLog).filter(Boolean),
+        results: logResults.current,
+        ratings: [...logRatings.current.values()],
+        clarifyUnrated: logClarify.current,
+      },
+      logId.current,
+    );
+  }
+  useEffect(() => {
+    const t = window.setTimeout(logPanel, 1500);
+    return () => window.clearTimeout(t);
+  }, [thread]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => logPanel(), []); // eslint-disable-line react-hooks/exhaustive-deps
   function flushFb(f: Fb | null = fbRef.current) {
     if (!f || !f.vote) return;
     const rec = fbRecord(f);
+    {
+      const { sprite: _s, player: _p, session: _x, v: _v, ...rating } = rec;
+      logRatings.current.set(f.id, rating);
+    }
     const key = JSON.stringify(rec);
     if (key === sentFb.current) return;
     sentFb.current = key;
@@ -726,6 +804,7 @@ export default function CraftModal({
     if (!res) return;
     const { item } = res;
     lastResult.current = null;
+    outcome.current = 'crafted';
     if (clarify) finishRating(); // (already done; stores any late change)
     else flushFb();
     onConsume(equip, item); // spend the token; App does NOT close the panel
@@ -759,7 +838,11 @@ export default function CraftModal({
     if (!popup || adjusted || money < ADJUST_PRICE) return;
     if (clarify) finishRating();
     setAdjusting(true);
-    push({ who: 'mitchy', kind: 'text', text: 'Sure! What should I change? Tell me in a few words.' });
+    push({
+      who: 'mitchy',
+      kind: 'text',
+      text: 'Sure! What should I change? Tell me in a few words.' + (reworksOf > 1 ? ` (Rework ${reworksUsed.current + 1} of ${reworksOf})` : ''),
+    });
     setTimeout(() => inputRef.current?.focus(), 0);
   }
   function cancelAdjust() {

@@ -139,9 +139,33 @@ works), logged in with `npx wrangler login` if asked:
    enter the password.
 
 What it stores, and what it never stores, is in `docs/CraftFeedback.md`.
-Under `pnpm dev` none of this is needed: ratings go to `.feedback-dev.json`
-(not committed) and the dashboard password there is `dev` (or the
-`FEEDBACK_ADMIN_TOKEN` environment variable, if set).
+Under `pnpm dev` (and `vite preview`) none of this is needed: the same
+handlers run against a local SQLite file, `.dev-d1.sqlite` (not committed),
+and the dashboard password there is `dev` (or the `FEEDBACK_ADMIN_TOKEN`
+environment variable, if set).
+
+## Personal links for the user test (`/intro/1?k=…`, `/intro/2?k=…`)
+
+Nothing to set up beyond the feedback database above: the tables create
+themselves. On `/2/feedback` → **Participants**, create one link per person
+and send it to them.
+
+- A link works in the first browser that opens it, for 3 hours from the first
+  start (a reload continues the run), and closes for good when the player
+  opens the final survey. A second visit shows "already completed".
+- AI budget per link (checked by the Worker, `functions/api/session.ts`):
+  6 crafts (3 per design: Mitchy's gift token + 2 from the shop), 3 reworks
+  per crafted item, 40 other calls (Mitchy's lines). Past it, crafting goes
+  on offline, without an error popup.
+- Live help on the same tab: **+1 token** (lands in the player's inventory
+  within 20 s), **+1 rework** for an item, **+1 hour**, **Other device** (the
+  next browser that opens the link takes it over), **Reopen**.
+- The open test links (`/0`–`/4`) need no key; their AI calls share a daily
+  limit, `LLM_OPEN_DAILY_LIMIT` (default 300).
+- The run log (`/api/events`, `src/quest/runlog.ts`): every craft with its
+  whole conversation and settings, hints, time per quest step and technical
+  errors, per participant — the dashboard's **Participant** filter shows one
+  person's whole run.
 
 ## What the proxy enforces
 

@@ -466,6 +466,7 @@ export default function CraftModal({
           fixes: r.fixes ?? null,
           clarify: log ?? null,
           fallback: r.fallback ?? null, // drawn offline (llm.ts fallbackCraft), and why
+          unknown: r.unknown ?? null, // (design B) words not known yet: crafted freely / left out
           sprite: { lines: r.item.sprite, ...(r.item.palette && r.item.colors ? { palette: r.item.palette, colors: r.item.colors } : {}) },
         });
         setPhase('success');
@@ -496,6 +497,22 @@ export default function CraftModal({
         // a colour the helper couldn't mix exactly, or (/1) a first try without
         // a reference picture: Mitchy says so under the result
         if (r.note) push({ who: 'mitchy', kind: 'text', text: r.note });
+        // (design B) the words Mitchy didn't know yet, with the result
+        if (feedback && r.unknown) {
+          const q = (ws: string[]) => ws.map((w) => `"${w}"`).join(', ');
+          if (r.unknown.crafted.length)
+            push({
+              who: 'mitchy',
+              kind: 'text',
+              text: `I don't know ${q(r.unknown.crafted)} yet, so I drew ${r.unknown.crafted.length > 1 ? 'them' : 'it'} freely. It may look a bit unexpected.`,
+            });
+          if (r.unknown.skipped.length)
+            push({
+              who: 'mitchy',
+              kind: 'text',
+              text: `I left out ${q(r.unknown.skipped)}: I don't know ${r.unknown.skipped.length > 1 ? 'those words' : 'that word'} yet (your setting: leave unknown words out).`,
+            });
+        }
         setPopup({ item: r.item, prompt: craftPrompt });
         lastResult.current = { item: r.item, prompt: craftPrompt };
         if (rated)

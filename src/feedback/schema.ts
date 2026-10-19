@@ -44,7 +44,7 @@ export interface ClarifyLog {
 }
 const PROMPT_MAX = 120;
 
-type P = Partial<Record<'detail' | 'color' | 'interpretation' | 'surprise', -1 | 0 | 1>>;
+type P = Partial<Record<'detail' | 'color' | 'interpretation' | 'surprise' | 'unknown', -1 | 0 | 1>>;
 
 export interface FeedbackRecord {
   v: 1;
@@ -144,7 +144,7 @@ function clarifyLog(v: unknown): ClarifyLog | null {
 function prefs(v: unknown): P {
   const out: P = {};
   if (!v || typeof v !== 'object') return out;
-  for (const k of ['detail', 'color', 'interpretation', 'surprise'] as const) {
+  for (const k of ['detail', 'color', 'interpretation', 'surprise', 'unknown'] as const) {
     const x = (v as Record<string, unknown>)[k];
     if (x === -1 || x === 0 || x === 1) out[k] = x;
   }

@@ -8,6 +8,10 @@
 //                   world. Done in code: always applies.
 //   color           Pastel / Vivid — the finished palette's saturation and
 //                   lightness, adjusted in code. Always applies.
+//   unknown         a word the generator doesn't know yet: craft it anyway
+//                   (the AI draws it freely, unpredictable; the default) or
+//                   leave it out of the prompt. Done in code (llm.ts
+//                   craftItem), before anything is drawn.
 //   surprise        Controlled (a concrete reading, nothing added) /
 //                   Surprise me (an abstract reading, plus details of the
 //                   planner's own on top). A planner instruction + its
@@ -27,10 +31,13 @@
 // ---------------------------------------------------------------------------
 
 import { storeKey } from '../quest/session';
-export type PrefKey = 'detail' | 'color' | 'surprise';
+export type PrefKey = 'detail' | 'color' | 'surprise' | 'unknown';
 export type PrefValue = -1 | 0 | 1;
 export type Prefs = Partial<Record<PrefKey, PrefValue>>;
-export const PREF_KEYS: PrefKey[] = ['detail', 'color', 'surprise'];
+export const PREF_KEYS: PrefKey[] = ['detail', 'color', 'surprise', 'unknown'];
+// the values a setting offers (unknown words: two choices, crafting them is
+// what happens without a setting)
+export const PREF_VALUES: Record<PrefKey, PrefValue[]> = { detail: [-1, 0, 1], color: [-1, 0, 1], surprise: [-1, 0, 1], unknown: [-1, 1] };
 
 // The kind of thing a craft is, decided by the planner from its MAIN element
 // ("a dog with a witch hat" is a creature). Same six values as the game's
@@ -56,6 +63,8 @@ export const PREF_INFO: Record<PrefKey, { title: string; labels: Record<PrefValu
   detail: { title: 'Detail', labels: { [-1]: 'Fewer glyphs', 0: 'Normal detail', 1: 'Dense glyphs' } },
   color: { title: 'Colour', labels: { [-1]: 'Pastel colours', 0: 'Normal colours', 1: 'Vivid colours' } },
   surprise: { title: 'Surprise', labels: { [-1]: 'Controlled', 0: 'Normal freedom', 1: 'Surprise me' } },
+  // words the generator doesn't know yet: drawn freely (unpredictable) or left out
+  unknown: { title: 'Unknown words', labels: { [-1]: 'Leave them out', 0: 'Craft them anyway', 1: 'Craft them anyway' } },
 };
 
 // ---- storage ----

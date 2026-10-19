@@ -375,7 +375,9 @@ export type CraftResult =
   // player's crafting preferences used for it — both only with opts.prefs
   // note: what Mitchy says after it (a colour that couldn't be mixed exactly)
   // fallback: drawn by fallbackCraft (the AI couldn't), and why
-  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs; note?: string; fixes?: [string, string][]; fallback?: Fallback }
+  // unknown: (design B) the words the generator didn't know yet — drawn
+  // freely anyway, or left out by the player's setting
+  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs; note?: string; fixes?: [string, string][]; fallback?: Fallback; unknown?: { crafted: string[]; skipped: string[] } }
   // `suggestions`: up to 3 alternative craft prompts (shown as clickable
   // buttons). Present only on BENIGN failures — never on category mismatches
   // or blocked (sensitive) input.
@@ -496,8 +498,23 @@ export async function craftItem(prompt: string, ui?: CraftUiHooks, opts: CraftOp
   // player picked, or the word left out — before the prompt is read
   for (const [from, to] of opts.clarify?.replace ?? []) prompt = prompt.replace(new RegExp(`\\b${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'), to);
   if (opts.clarify?.dropDetails?.length) prompt = withoutDetails(prompt, opts.clarify.dropDetails);
-  const read = await readPrompt(prompt);
+  let read = await readPrompt(prompt);
   if (read.fixes.length) console.info('[craft] read as', JSON.stringify(read.fixed), read.fixes);
+  // (design B, no questions) words the generator doesn't know yet: drawn
+  // freely, or left out when the player's setting says so; Mitchy names
+  // them with the result
+  let unknown: { crafted: string[]; skipped: string[] } | undefined;
+  if (opts.prefs) {
+    const parts = promptParts(read.fixed);
+    const words = [...new Set(parts.unknown.filter((w) => w !== parts.main))];
+    const mainUnknown = parts.main && !parts.mainKnown ? [parts.main] : [];
+    if (words.length || mainUnknown.length) {
+      const guess = fallbackSubject(read.fixed).category;
+      const skipped = resolvePrefs(isKind(guess) ? guess : null).unknown === -1 ? words : [];
+      if (skipped.length) read = { ...read, fixed: withoutDetails(read.fixed, skipped) };
+      unknown = { crafted: [...mainUnknown, ...words.filter((w) => !skipped.includes(w))], skipped };
+    }
+  }
   // crafting never fails: anything that breaks on the way crafts the
   // fallback (blocked prompts are still refused inside)
   let r: CraftResult;
@@ -507,6 +524,7 @@ export async function craftItem(prompt: string, ui?: CraftUiHooks, opts: CraftOp
     r = await fallbackCraft(read.fixed, opts, read, String(err));
   }
   if (!r.ok) return r;
+  if (unknown) r = { ...r, unknown };
   r.item.tags = (r.item.tags ?? []).map((t) => (t.startsWith('prompt: ') ? `prompt: ${typed.trim()}` : t));
   return read.fixes.length ? { ...r, fixes: read.fixes } : r;
 }

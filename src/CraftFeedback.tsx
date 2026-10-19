@@ -17,6 +17,7 @@ import { FEEDBACK_REASONS, COMMENT_MAX, type FeedbackReason } from './feedback/s
 import {
   PREF_INFO,
   PREF_KEYS,
+  PREF_VALUES,
   KIND_LABEL,
   KINDS,
   loadPrefs,
@@ -135,7 +136,12 @@ type Glyph = [string, Tone][][];
 const G = (rows: (string | [string, Tone][])[]): Glyph =>
   rows.map((r) => (typeof r === 'string' ? [[r, 'ink'] as [string, Tone]] : r));
 
-const ICONS: Record<'surprise' | 'scope', Record<string, Glyph>> = {
+const ICONS: Record<'surprise' | 'scope' | 'unknown', Record<string, Glyph>> = {
+  // a word Mitchy doesn't know: crossed out / drawn with sparks
+  unknown: {
+    '-1': G(['        ', ' ?word? ', ' ------ ', '        ']),
+    '1': [G(['        '])[0], G([' ?word? '])[0], [[' ', 'ink'], ['*', 'gold'], [' ', 'ink'], ['~~~~', 'ink'], [' ', 'ink'], ['*', 'gold']], G(['        '])[0]],
+  },
   // a box: shut / ajar / open with sparks
   surprise: {
     '-1': G(['        ', ' ______ ', '|______|', '|      |', '|______|']),
@@ -216,7 +222,7 @@ function PrefPreview({ k, v }: { k: PrefKey | 'scope'; v: string }) {
   }, [k, v]);
   if (k === 'detail') return <FitSprite className="fb-preview" look={DETAIL_LOOKS[v]} fill={0.92} maxScale={3} cells />;
   if (flower) return <FitSprite className="fb-preview" look={flower} fill={0.92} maxScale={3} cells />;
-  return <GlyphIcon g={ICONS[k as 'surprise' | 'scope'][v]} />;
+  return <GlyphIcon g={ICONS[k as 'surprise' | 'scope' | 'unknown'][v]} />;
 }
 
 // ---- the questions --------------------------------------------------------
@@ -267,6 +273,16 @@ const PREF_QUESTIONS: Question<PrefKey, PrefValue>[] = [
       { value: -1, name: 'Controlled', desc: 'Only what I asked for', tip: 'A concrete reading of your words; nothing added.' },
       { value: 0, name: 'Keep', desc: 'Current balance', tip: 'The usual amount of my own ideas.' },
       { value: 1, name: 'Surprise me', desc: 'Add unexpected ideas', tip: 'A freer, more abstract reading of your words, with a few details of my own on top.' },
+    ],
+  },
+  {
+    key: 'unknown',
+    eyebrow: 'Unknown words',
+    title: 'When I don’t know a word yet…',
+    help: 'Some words aren’t in my patterns yet. I can draw them freely anyway (how they turn out is unpredictable), or leave them out.',
+    options: [
+      { value: -1, name: 'Leave them out', desc: 'Skip words I don’t know', tip: 'Words I don’t know yet are left out of the craft; I tell you which.' },
+      { value: 1, name: 'Craft them anyway', desc: 'Draw them freely', tip: 'Words I don’t know yet are drawn freely; the result is unpredictable.' },
     ],
   },
 ];
@@ -454,7 +470,7 @@ export function CraftPrefsSettings() {
                 }}
               >
                 <option value="">—</option>
-                {([-1, 0, 1] as const).map((v) => (
+                {PREF_VALUES[k].map((v) => (
                   <option key={v} value={v}>
                     {PREF_INFO[k].labels[v]}
                   </option>

@@ -7,6 +7,7 @@
 // interface either way.
 
 import { llmEnabled, chat, chatJSON, MODELS, AiServiceError, type AiFailure } from './llmClient';
+import type { Fallback } from './feedback/schema';
 import type { DailySaju } from './saju';
 // Build-time-generated static data (produced offline by scripts/build-*.mjs).
 // The shop samples from these; if they're empty, it falls back to ITEM_POOL.
@@ -372,7 +373,8 @@ export type CraftResult =
   // kind: what kind of thing it is (its main element) and applied: the
   // player's crafting preferences used for it — both only with opts.prefs
   // note: what Mitchy says after it (a colour that couldn't be mixed exactly)
-  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs; note?: string; fixes?: [string, string][] }
+  // fallback: drawn by fallbackCraft (the AI couldn't), and why
+  | { ok: true; item: ShopItem; refImage?: string; kind?: Category; applied?: Prefs; note?: string; fixes?: [string, string][]; fallback?: Fallback }
   // `suggestions`: up to 3 alternative craft prompts (shown as clickable
   // buttons). Present only on BENIGN failures — never on category mismatches
   // or blocked (sensitive) input.
@@ -700,14 +702,14 @@ async function fallbackCraft(prompt: string, opts: CraftOpts, read: PromptRead |
       console.warn('[craft] fallback: library failed:', err);
       return null;
     });
-    if (r) return r;
+    if (r) return r.ok ? { ...r, fallback: { why, via: 'library' } } : r;
   }
   const subject = fallbackSubject(prompt);
   // a typo fixed by the word lists ("a drgon" -> dragon) may name a library body
   const fixed = subject.word;
   if (fixed && hasRefBodies() && !prompt.toLowerCase().includes(fixed) && matchRefs(fixed).body) {
     const r = await craftWithRefs(prompt.replace(/[\p{L}\p{N}'-]+/gu, (w) => (fallbackSubject(w).word === fixed ? fixed : w)), undefined, { ...opts, noModel: true }, read).catch(() => null);
-    if (r) return r;
+    if (r) return r.ok ? { ...r, fallback: { why, via: 'library' } } : r;
   }
   // the category words decide when they know the object (a lamp is
   // furniture, a sword a tool, a hat clothing); the themes only for the rest
@@ -742,7 +744,8 @@ async function fallbackCraft(prompt: string, opts: CraftOpts, read: PromptRead |
   item.textureModifier = textureModifierFor(parseSpec(prompt).finish);
   logRefCraft(prompt, 'planner', null, word ? [word] : []);
   const note = missingAssetNote(subject.word);
-  return opts.prefs ? { ok: true, item, kind: category, applied: {}, note } : { ok: true, item, note };
+  const fallback: Fallback = { why, via: 'template' };
+  return opts.prefs ? { ok: true, item, kind: category, applied: {}, note, fallback } : { ok: true, item, note, fallback };
 }
 
 // /4: one smart-model call draws the item as an SVG; cleaned, drawn on a

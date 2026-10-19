@@ -9,6 +9,8 @@
 //   GET  /api/events  — every event, newest first, for the /2/feedback
 //                       dashboard (dashboard password).
 import { dbOf, ensureSchema, isAdmin, json, sameOrigin, type D1Database, type SessionEnv } from './session';
+import { addColumns, SQL_CONDITION, SQL_DESIGN } from './feedback';
+import { conditionOf, designOf } from '../../src/feedback/schema';
 
 export const EVENT_TYPES = ['craft', 'hint', 'step', 'error', 'session'] as const;
 export type RunEventType = (typeof EVENT_TYPES)[number];
@@ -21,6 +23,26 @@ function ensureEvents(db: D1Database) {
     .prepare('CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, at INTEGER NOT NULL, participant TEXT NOT NULL, link TEXT, type TEXT NOT NULL, data TEXT NOT NULL)')
     .run()
     .then(() => db.prepare('CREATE INDEX IF NOT EXISTS events_participant ON events (participant, at)').run())
+    // the analysis columns (src/feedback/schema.ts): run_order (AB/BA),
+    // condition (1/2), design (A/B), fallback_used (0/1)
+    .then(() => addColumns(db, 'events', [['run_order', 'TEXT'], ['condition', 'INTEGER'], ['design', 'TEXT'], ['fallback_used', 'INTEGER']]))
+    .then(() =>
+      // events stored before the columns: filled once from their JSON. A
+      // craft logged before results carried their fallback flag counts as a
+      // fallback when the game noted one for the same prompt within a minute.
+      db
+        .prepare(
+          `UPDATE events SET run_order = json_extract(data,'$.order'), design = ${SQL_DESIGN('data')}, ` +
+            `condition = ${SQL_CONDITION('data', "json_extract(data,'$.order')")}, fallback_used = CASE ` +
+            `WHEN type = 'error' AND json_extract(data,'$.data.kind') = 'fallback-craft' THEN 1 ` +
+            `WHEN type = 'craft' AND EXISTS (SELECT 1 FROM json_each(json_extract(events.data,'$.data.results')) r WHERE json_extract(r.value,'$.fallback') IS NOT NULL) THEN 1 ` +
+            `WHEN type = 'craft' AND EXISTS (SELECT 1 FROM json_each(json_extract(events.data,'$.data.results')) r, events e2 ` +
+            `WHERE e2.participant = events.participant AND e2.type = 'error' AND json_extract(e2.data,'$.data.kind') = 'fallback-craft' ` +
+            `AND json_extract(e2.data,'$.data.prompt') = substr(json_extract(r.value,'$.prompt'), 1, 200) ` +
+            `AND abs(e2.at - json_extract(r.value,'$.at')) < 60000) THEN 1 ELSE 0 END WHERE fallback_used IS NULL`,
+        )
+        .run(),
+    )
     .catch((e) => {
       ready = null;
       throw e;
@@ -71,12 +93,19 @@ export async function handleEvents(request: Request, env: SessionEnv): Promise<R
     if (!results.length || results[0].participant_id !== participant) return json(403, { error: 'not this run' });
   }
   const link = typeof ev.link === 'string' ? ev.link.slice(0, 20) : null;
+  // the analysis columns, worked out here from the event itself
+  const order = ev.order === 'AB' || ev.order === 'BA' ? ev.order : null;
+  const d = (ev.data ?? {}) as Record<string, unknown>;
+  const fallback =
+    (type === 'error' && d.kind === 'fallback-craft') ||
+    (type === 'craft' && Array.isArray(d.results) && d.results.some((r) => !!(r as { fallback?: unknown } | null)?.fallback));
   await db
     .prepare(
-      'INSERT INTO events (id, at, participant, link, type, data) VALUES (?1, ?2, ?3, ?4, ?5, ?6) ' +
-        'ON CONFLICT(id) DO UPDATE SET at = excluded.at, data = excluded.data WHERE events.participant = excluded.participant',
+      'INSERT INTO events (id, at, participant, link, type, data, run_order, condition, design, fallback_used) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) ' +
+        'ON CONFLICT(id) DO UPDATE SET at = excluded.at, data = excluded.data, run_order = excluded.run_order, condition = excluded.condition, ' +
+        'design = excluded.design, fallback_used = excluded.fallback_used WHERE events.participant = excluded.participant',
     )
-    .bind(id, at, participant, link, type, raw)
+    .bind(id, at, participant, link, type, raw, order, conditionOf(order, ev.cond), designOf(ev.cond), fallback ? 1 : 0)
     .run();
   return json(200, { ok: true });
 }

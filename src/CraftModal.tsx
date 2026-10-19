@@ -44,6 +44,7 @@ import {
   FEEDBACK_REASONS,
   POSITIVE_REASONS,
   type ClarifyLog,
+  type Fallback,
   type FeedbackReason,
   type PositiveReason,
 } from './feedback/schema';
@@ -85,6 +86,7 @@ interface Fb {
   result: Result;
   kind: Kind | null;
   applied: Prefs;
+  fallback?: Fallback; // drawn offline, not by the AI
   adjusted: boolean;
   vote: 'up' | 'down' | null;
   reasons: FeedbackReason[];
@@ -463,6 +465,7 @@ export default function CraftModal({
           note: r.note ?? null,
           fixes: r.fixes ?? null,
           clarify: log ?? null,
+          fallback: r.fallback ?? null, // drawn offline (llm.ts fallbackCraft), and why
           sprite: { lines: r.item.sprite, ...(r.item.palette && r.item.colors ? { palette: r.item.palette, colors: r.item.colors } : {}) },
         });
         setPhase('success');
@@ -502,6 +505,7 @@ export default function CraftModal({
             result: { item: r.item, prompt: craftPrompt },
             kind,
             applied: r.applied ?? {},
+            fallback: r.fallback,
             adjusted: !!rework,
             vote: null,
             reasons: [],
@@ -730,6 +734,7 @@ export default function CraftModal({
       clarify: f.clarify,
       comment: f.vote === 'down' && f.commentOpen ? f.comment.trim() : '',
       applied: f.applied,
+      ...(f.fallback ? { fallback: f.fallback } : {}),
       answers: f.answers,
       scope: f.scope,
       sprite: { lines: item.sprite, ...(item.palette && item.colors ? { palette: item.palette, colors: item.colors } : {}) },

@@ -79,6 +79,15 @@ export const setCurrentTestSession = (s: TestSession | null) => {
 };
 export const currentTestSession = () => current;
 
+// Where in the test the player is: the active crafting design (cond), the
+// quest part and step (App keeps it current, quest/runlog.ts)
+export type RunWhere = { cond?: 'pre' | 'post'; part?: string; step?: string };
+let where: RunWhere = {};
+export const setCurrentWhere = (w: RunWhere) => {
+  where = w;
+};
+export const currentWhere = () => where;
+
 // The final survey's link with the session in it:
 // <url>?order=AB&test_id=P001 (keeps whatever query the url already has)
 export function surveyUrl(base: string, s: TestSession | null): string {

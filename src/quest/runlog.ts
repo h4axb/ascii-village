@@ -14,7 +14,7 @@
 // Only runs with a participant id log (the quest links). Events wait in a
 // small outbox in this browser when they can't be sent, like the crafting
 // feedback (feedback/client.ts), and go out with the next send.
-import { currentTestSession, inviteHeaders } from './session';
+import { currentTestSession, currentWhere, inviteHeaders, setCurrentWhere, type RunWhere } from './session';
 import { newFeedbackId } from '../feedback/client';
 
 export type RunEventType = 'craft' | 'hint' | 'step' | 'error' | 'session';
@@ -35,10 +35,10 @@ const OUTBOX_KEY = 'asciia-events-outbox';
 const OUTBOX_MAX = 300;
 const MAX_TEXT = 60000;
 
-// where in the test the player is (App keeps it current)
-let where: { cond?: 'pre' | 'post'; part?: string; step?: string } = {};
-export const setRunWhere = (w: typeof where) => {
-  where = w;
+// where in the test the player is (App keeps it current; kept in
+// quest/session.ts so feedback records can carry the design too)
+export const setRunWhere = (w: RunWhere) => {
+  setCurrentWhere(w);
 };
 
 function readOutbox(): RunEvent[] {
@@ -98,7 +98,7 @@ export function logEvent(type: RunEventType, data: Record<string, unknown>, id: 
     participant: ts.participantId,
     order: ts.order,
     link: window.location.pathname,
-    ...where,
+    ...currentWhere(),
     data,
   };
   if (JSON.stringify(ev).length > MAX_TEXT) ev = { ...ev, data: { ...data, truncated: true, thread: undefined } };

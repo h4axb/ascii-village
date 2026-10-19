@@ -80,6 +80,34 @@ export interface FeedbackRecord {
   // built when the library fell short — 'planner' = no reference body fit,
   // `miss` = words it could not place. Records with this carry no vote.
   ref?: { via: 'match' | 'model' | 'planner'; body: string; miss: string[] };
+  // drawn by the never-fail fallback (llm.ts fallbackCraft), not the AI:
+  // why (the AI unreachable, a budget used up, only the template shape)
+  // and how (a reference-library picture, or the built-in shape)
+  fallback?: Fallback;
+}
+export interface Fallback {
+  why: string;
+  via: 'library' | 'template';
+}
+
+// ---- the user test's analysis columns, one definition for the game, the
+// Worker and the dashboard ----
+//   design     the crafting panel: A = pre-clarification (cond 'pre'),
+//              B = post-reflection (cond 'post')
+//   condition  its place in the run: 1 = first half, 2 = second half
+//              (order AB: A is 1, B is 2; order BA: B is 1, A is 2)
+export type Design = 'A' | 'B';
+export const designOf = (cond: unknown): Design | null => (cond === 'pre' ? 'A' : cond === 'post' ? 'B' : null);
+export function conditionOf(order: unknown, cond: unknown): 1 | 2 | null {
+  const d = designOf(cond);
+  if (!d || (order !== 'AB' && order !== 'BA')) return null;
+  return order[0] === d ? 1 : 2;
+}
+export function fallbackOf(v: unknown): Fallback | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const x = v as Record<string, unknown>;
+  if (x.via !== 'library' && x.via !== 'template') return undefined;
+  return { why: str(x.why, 160), via: x.via };
 }
 
 const KINDS = new Set(['plant', 'pets', 'clothing', 'vehicle', 'food', 'utensils', '']);
@@ -156,6 +184,7 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
       };
   }
   if (!vote && !clarify && !rating && !ref) return 'vote must be up or down';
+  const fallback = fallbackOf(r.fallback);
   const kind = str(r.kind, 16);
   const reasons = Array.isArray(r.reasons)
     ? [...new Set(r.reasons.filter((x): x is FeedbackReason => (FEEDBACK_REASONS as readonly unknown[]).includes(x)))].slice(0, 3)
@@ -204,5 +233,6 @@ export function normalizeFeedback(raw: unknown): FeedbackRecord | string {
     ...(order ? { order } : {}),
     ...(rating ? { rating } : {}),
     ...(ref ? { ref } : {}),
+    ...(fallback ? { fallback } : {}),
   };
 }

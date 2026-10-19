@@ -4,7 +4,7 @@
 // storage not set up yet, offline — waits in a small outbox in this browser
 // and goes out with the next successful send or page load.
 import type { FeedbackRecord } from './schema';
-import { currentTestSession } from '../quest/session';
+import { currentTestSession, currentWhere } from '../quest/session';
 
 const PLAYER_KEY = 'asciia-player-id';
 const OUTBOX_KEY = 'asciia-feedback-outbox';
@@ -86,6 +86,10 @@ export async function sendFeedback(rec: FeedbackRecord): Promise<void> {
   // the user test's participant id and design order, when this run has one
   const ts = currentTestSession();
   if (ts && !rec.participant) rec = { ...rec, participant: ts.participantId, order: ts.order };
+  // and the crafting design active right now, when the record has none
+  // (crafts from the reference library, craft/refCraft.ts)
+  const cond = currentWhere().cond;
+  if (ts && cond && !rec.cond) rec = { ...rec, cond };
   // a newer version of the same record replaces a queued one
   const queued = readOutbox().filter((r) => r.id !== rec.id);
   if (await post(rec)) {

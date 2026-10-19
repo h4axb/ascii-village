@@ -23,7 +23,7 @@
 import { RATING_QUESTIONS } from '../quest/quests';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FitSprite } from '../ui';
-import { FEEDBACK_REASONS, POSITIVE_REASONS, type FeedbackRecord } from './schema';
+import { conditionOf, designOf, FEEDBACK_REASONS, POSITIVE_REASONS, type FeedbackRecord } from './schema';
 import { topTags } from '../../functions/api/feedback';
 import { KIND_LABEL, PREF_INFO, PREF_KEYS, isKind } from '../craft/prefs';
 import type { RunEvent } from '../quest/runlog';
@@ -218,6 +218,18 @@ export default function Dashboard() {
                 .sort((a, b) => b[1].length - a[1].length)
                 .map(([st, es]) => ({ label: st, value: es.length, text: `${es.length} (${new Set(es.map((e) => e.participant)).size} players)` }))}
               note={`${evs.filter((e) => e.type === 'hint').length} hints in all`}
+            />
+          </Card>
+          <Card title="Crafts drawn offline, per design">
+            <Bars
+              rows={(['A', 'B'] as const).map((dz) => {
+                const rs = evs
+                  .filter((e) => e.type === 'craft' && designOf(e.cond) === dz)
+                  .flatMap((e) => ((e.data.results as { ok?: boolean; fallback?: unknown }[] | undefined) ?? []).filter((r) => r.ok !== false));
+                const off = rs.filter((r) => r.fallback).length;
+                return { label: `Design ${dz}`, value: pct(off, rs.length), max: 100, text: `${off} of ${rs.length} (${pct(off, rs.length)}%)` };
+              })}
+              note="Results the AI couldn't make, drawn by the offline fallback instead"
             />
           </Card>
           <Card title="Technical errors">
@@ -500,6 +512,7 @@ function RatingsTable({ data }: { data: FeedbackRecord[] }) {
           <tr>
             <th>Craft</th>
             <th>Prompt</th>
+            <th>Design · cond. · order</th>
             <th>Kind</th>
             <th>Vote</th>
             <th>Reasons · comment</th>
@@ -519,6 +532,11 @@ function RatingsTable({ data }: { data: FeedbackRecord[] }) {
                 <b>{r.name}</b>
                 <div className="fbd-muted">{r.prompt}</div>
                 {r.adjusted && <div className="fbd-muted">(adjusted)</div>}
+                {r.fallback && <div className="fbd-error-text">drawn offline: {r.fallback.why}</div>}
+              </td>
+              <td className="fbd-muted">
+                {designOf(r.cond) ?? '–'} · {conditionOf(r.order, r.cond) ?? '–'} · {r.order ?? '–'}
+                {r.participant && <div>{r.participant}</div>}
               </td>
               <td>{kindName(r.kind)}</td>
               <td>{r.vote === 'up' ? '▲ like' : '▼ not quite'}</td>
@@ -665,7 +683,7 @@ function toCsv(rows: FeedbackRecord[]): string {
     'at', 'link', 'player', 'name', 'prompt', 'kind', 'adjusted', 'vote', 'reasons', 'positive', 'tags', 'comment',
     ...PREF_KEYS.map((k) => `applied_${k}`), ...PREF_KEYS.map((k) => `answer_${k}`), 'scope',
     'clarify_questions', 'clarify_answers', 'clarify_skipped', 'clarify_outcome', 'clarify_ms', 'clarify_error', 'cond', 'rating',
-    'participant', 'order',
+    'participant', 'order', 'run_order', 'condition', 'design', 'fallback_used', 'fallback_reason',
   ];
   const cell = (v: unknown) => {
     const s = v === undefined || v === null ? '' : String(v);
@@ -698,6 +716,11 @@ function toCsv(rows: FeedbackRecord[]): string {
       r.rating ? JSON.stringify(r.rating) : '',
       r.participant,
       r.order,
+      r.order,
+      conditionOf(r.order, r.cond),
+      designOf(r.cond),
+      r.fallback ? 1 : 0,
+      r.fallback?.why,
     ]
       .map(cell)
       .join(','),
@@ -876,19 +899,20 @@ function EventBody({ e }: { e: RunEvent }) {
         </span>
       );
     case 'craft':
-      return <CraftLog d={d} />;
+      return <CraftLog d={d} cond={conditionOf(e.order, e.cond)} />;
   }
 }
 
 // one crafting panel: results with their settings, the conversation, ratings
-function CraftLog({ d }: { d: Record<string, any> }) { // eslint-disable-line @typescript-eslint/no-explicit-any
+function CraftLog({ d, cond }: { d: Record<string, any>; cond: 1 | 2 | null }) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const [open, setOpen] = useState(false);
   const results: Record<string, any>[] = d.results ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
   const ratings: Record<string, any>[] = d.ratings ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
   return (
     <div className="fbd-craft">
       <div>
-        <b>{d.recraftOf ? `Recraft of ${d.recraftOf}` : 'Craft'}</b> · design {d.design === 'pre' ? 'A (pre-clarification)' : d.design === 'post' ? 'B (post-reflection)' : d.design} ·{' '}
+        <b>{d.recraftOf ? `Recraft of ${d.recraftOf}` : 'Craft'}</b> · design {d.design === 'pre' ? 'A (pre-clarification)' : d.design === 'post' ? 'B (post-reflection)' : d.design}
+        {cond && ` · condition ${cond}`} ·{' '}
         {d.outcome === 'crafted' ? 'kept' : 'left without keeping'} · {mins(d.ms)}
         {d.reworksOf > 1 && ` · reworks ${d.reworks} of ${d.reworksOf}`}
       </div>
@@ -906,6 +930,11 @@ function CraftLog({ d }: { d: Record<string, any> }) { // eslint-disable-line @t
               {prefText(r.applied) && <div className="fbd-muted">settings: {prefText(r.applied)}</div>}
               {r.clarify?.questions?.length > 0 && (
                 <div className="fbd-muted">answers: {r.clarify.questions.map((q: { topic: string; pick: string | null }) => `${q.topic}=${q.pick ?? 'You decide'}`).join(', ')}</div>
+              )}
+              {r.fallback && (
+                <div className="fbd-error-text">
+                  drawn offline ({r.fallback.via === 'library' ? 'library picture' : 'built-in shape'}): {r.fallback.why}
+                </div>
               )}
               {r.note && <div className="fbd-muted">{r.note}</div>}
             </div>
@@ -943,12 +972,21 @@ function eventsCsv(events: RunEvent[]): string {
     const s = v === undefined || v === null ? '' : typeof v === 'string' ? v : JSON.stringify(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const cols = ['at', 'participant', 'order', 'link', 'cond', 'part', 'step', 'type', 'data'];
+  const cols = ['at', 'participant', 'run_order', 'condition', 'design', 'fallback_used', 'link', 'cond', 'part', 'step', 'type', 'data'];
+  const fallbackUsed = (e: RunEvent) =>
+    (e.type === 'error' && e.data.kind === 'fallback-craft') ||
+    (e.type === 'craft' && ((e.data.results as { fallback?: unknown }[] | undefined) ?? []).some((r) => !!r?.fallback))
+      ? 1
+      : 0;
   return [
     cols.join(','),
     ...[...events]
       .sort((a, b) => a.at - b.at)
-      .map((e) => [new Date(e.at).toISOString(), e.participant, e.order, e.link, e.cond, e.part, e.step, e.type, e.data].map(cell).join(',')),
+      .map((e) =>
+        [new Date(e.at).toISOString(), e.participant, e.order, conditionOf(e.order, e.cond), designOf(e.cond), fallbackUsed(e), e.link, e.cond, e.part, e.step, e.type, e.data]
+          .map(cell)
+          .join(','),
+      ),
   ].join('\n');
 }
 

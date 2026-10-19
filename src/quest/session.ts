@@ -88,6 +88,18 @@ export const setCurrentWhere = (w: RunWhere) => {
 };
 export const currentWhere = () => where;
 
+// On a personal link the server's run is the source of truth: its
+// participant id is the one the dashboard registered, so the survey, the
+// feedback and the run log all carry that id (a save from an earlier start,
+// or an id asked for before the run answered, can't differ from it)
+export function studySession(s: TestSession | null): TestSession | null {
+  if (INVITE_KEY && run?.participantId) {
+    if (s?.participantId === run.participantId && s.order === run.order && s.key === INVITE_KEY) return s;
+    return { participantId: run.participantId, order: run.order, key: INVITE_KEY };
+  }
+  return s;
+}
+
 // The final survey's link with the session in it:
 // <url>?order=AB&test_id=P001 (keeps whatever query the url already has)
 export function surveyUrl(base: string, s: TestSession | null): string {

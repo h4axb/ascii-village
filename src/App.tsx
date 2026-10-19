@@ -119,6 +119,7 @@ import {
   setCurrentTestSession,
   startInviteRun,
   surveyUrl,
+  studySession,
   type InviteState,
   type TestSession,
 } from './quest/session';
@@ -4274,6 +4275,9 @@ function Game() {
   // records are tagged with it (feedback/client.ts).
   const sessionAskedRef = useRef(false);
   useEffect(() => {
+    // a personal link's run carries the registered id: a different one
+    // (an older save) is replaced
+    if (QUEST_ENABLED && testSession && studySession(testSession) !== testSession) return setTestSession(studySession(testSession));
     if (!QUEST_ENABLED || !quest || testSession || sessionAskedRef.current) return;
     sessionAskedRef.current = true;
     void requestTestSession().then((s) => setTestSession(s));
@@ -7543,11 +7547,12 @@ function Game() {
                   className="ds-action go"
                   onClick={() => {
                     // the survey knows who answers and in which order they played
-                    if (FINAL_SURVEY_URL) window.open(surveyUrl(FINAL_SURVEY_URL, testSession), '_blank', 'noopener');
+                    const survey = FINAL_SURVEY_URL ? surveyUrl(FINAL_SURVEY_URL, studySession(testSession)) : null;
+                    if (survey) window.open(survey, '_blank', 'noopener');
                     else console.warn('[quest] FINAL_SURVEY_URL is not set (src/quest/quests.ts)');
                     setQuest({ ...questRef.current!, part: 'end' });
                     // a personal link is done for good: no second run
-                    logEvent('session', { what: 'survey', totalMs: runClockRef.current ? Date.now() - runClockRef.current.start : null });
+                    logEvent('session', { what: 'survey', url: survey, totalMs: runClockRef.current ? Date.now() - runClockRef.current.start : null });
                     void completeInviteRun();
                   }}
                 >

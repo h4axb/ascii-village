@@ -408,3 +408,36 @@
   padding: 3px 8px;
   font-size: 12px;
 }
+.fbd .fbd-danger {
+  border-color: rgba(230, 103, 103, 0.6);
+  color: #f0b0a0;
+}
+.fbd-confirm {
+  display: grid;
+  gap: 6px;
+  flex-basis: 100%;
+  padding: 8px;
+  border: 1px solid rgba(230, 103, 103, 0.5);
+  border-radius: var(--ds-radius-sm);
+  font-size: 12px;
+}
+.fbd-confirm label {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  color: var(--ds-text-soft);
+}
+.fbd .fbd-note-edit {
+  color: var(--ds-text-muted);
+  text-decoration: none;
+}
+.fbd .fbd-note-edit:hover {
+  color: var(--ds-text);
+  text-decoration: underline;
+}
+.fbd .fbd-note-input {
+  width: 100%;
+  max-width: 180px;
+  padding: 2px 6px;
+  font-size: 12px;
+}

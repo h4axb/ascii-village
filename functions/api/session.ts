@@ -387,8 +387,29 @@ export async function handleAdmin(request: Request, env: SessionEnv): Promise<Re
   }
 
   const key = typeof body.key === 'string' ? body.key : '';
-  if (!(await invite(db, key))) return json(404, { error: 'unknown key' });
+  const inv = await invite(db, key);
+  if (!inv) return json(404, { error: 'unknown key' });
   switch (path) {
+    case '/api/admin/note': // the note, changed later
+      await db.prepare('UPDATE invites SET note = ?1 WHERE key = ?2').bind(typeof body.note === 'string' ? body.note.slice(0, 80) : '', key).run();
+      break;
+    case '/api/admin/delete': {
+      // the link goes (opening it shows "Link not found"); with data: true
+      // also everything its participant recorded (a deletion request)
+      await db.prepare('DELETE FROM craft_ids WHERE key = ?1').bind(key).run();
+      await db.prepare('DELETE FROM item_extras WHERE key = ?1').bind(key).run();
+      await db.prepare('DELETE FROM invites WHERE key = ?1').bind(key).run();
+      const removed: Record<string, number> = {};
+      if (body.data === true && inv.participant_id) {
+        for (const table of ['events', 'feedback']) {
+          const { results: has } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1").bind(table).all<{ name: string }>();
+          if (!has.length) continue;
+          const { results } = await db.prepare(`DELETE FROM ${table} WHERE participant = ?1 RETURNING id`).bind(inv.participant_id).all<{ id: string }>();
+          removed[table] = results.length;
+        }
+      }
+      return json(200, { ok: true, removed });
+    }
     case '/api/admin/token': // +1 crafting token: the game picks it up and adds it
       await db.prepare('UPDATE invites SET crafts_allowed = crafts_allowed + 1, bonus_tokens = bonus_tokens + 1 WHERE key = ?1').bind(key).run();
       break;

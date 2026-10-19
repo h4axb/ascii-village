@@ -201,7 +201,7 @@ export default function Dashboard() {
       {error && <p className="fbd-error">{error}</p>}
 
       {tab === 'participants' ? (
-        <Participants pass={pass} invites={invites} events={events} reload={() => void load(pass)} />
+        <Participants pass={pass} invites={invites} events={events} feedback={rows} reload={() => void load(pass)} />
       ) : (
         <>
       {who !== 'all' && (
@@ -991,7 +991,20 @@ function eventsCsv(events: RunEvent[]): string {
 }
 
 // ---- the Participants tab: personal links, and live help ----
-function Participants({ pass, invites, events, reload }: { pass: string; invites: Invite[]; events: RunEvent[]; reload: () => void }) {
+function Participants({
+  pass,
+  invites,
+  events,
+  feedback,
+  reload,
+}: {
+  pass: string;
+  invites: Invite[];
+  events: RunEvent[];
+  feedback: FeedbackRecord[];
+  reload: () => void;
+}) {
+  const [deleting, setDeleting] = useState<{ key: string; data: boolean } | null>(null);
   const [count, setCount] = useState(1);
   const [link, setLink] = useState('/intro/1');
   const [note, setNote] = useState('');
@@ -1094,7 +1107,8 @@ function Participants({ pass, invites, events, reload }: { pass: string; invites
                       <b>{i.participant_id ?? '–'}</b>
                     </td>
                     <td>
-                      {i.link} {i.note && <span className="fbd-muted">· {i.note}</span>}
+                      {i.link}{' '}
+                      <NoteEdit note={i.note} onSave={(note) => post('/api/admin/note', { key: i.key, note }).then((d) => !!d)} />
                       <div>
                         <button className="fbd-link" onClick={() => copy(linkOf(i))}>
                           copy link
@@ -1156,6 +1170,35 @@ function Participants({ pass, invites, events, reload }: { pass: string; invites
                         Other device
                       </button>
                       {i.completed && <button onClick={() => void post('/api/admin/reopen', { key: i.key })}>Reopen</button>}
+                      {deleting?.key !== i.key ? (
+                        <button className="fbd-danger" onClick={() => setDeleting({ key: i.key, data: false })}>
+                          Delete
+                        </button>
+                      ) : (
+                        <div className="fbd-confirm">
+                          {i.participant_id ? `Delete link ${i.participant_id}?` : 'Delete this link?'}
+                          {i.participant_id && (
+                            <label>
+                              <input type="checkbox" checked={deleting.data} onChange={(e) => setDeleting({ key: i.key, data: e.target.checked })} /> also delete
+                              everything {i.participant_id} recorded ({feedback.filter((r) => r.participant === i.participant_id).length} ratings,{' '}
+                              {events.filter((e) => e.participant === i.participant_id).length} run-log events)
+                            </label>
+                          )}
+                          <span>
+                            <button
+                              className="fbd-danger"
+                              onClick={() => {
+                                const data = deleting.data;
+                                setDeleting(null);
+                                void post('/api/admin/delete', { key: i.key, data });
+                              }}
+                            >
+                              Delete
+                            </button>{' '}
+                            <button onClick={() => setDeleting(null)}>Cancel</button>
+                          </span>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -1165,5 +1208,44 @@ function Participants({ pass, invites, events, reload }: { pass: string; invites
         </div>
       </Card>
     </section>
+  );
+}
+
+// a link's note, edited in place: click it, Enter or leaving saves, Esc cancels
+function NoteEdit({ note, onSave }: { note: string; onSave: (note: string) => Promise<boolean> }) {
+  const [editing, setEditing] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  if (editing === null)
+    return (
+      <>
+        <button className="fbd-link fbd-note-edit" onClick={() => setEditing(note)} title="Edit the note">
+          {note ? `· ${note}` : '+ add note'}
+        </button>
+        {saved && <span className="fbd-muted"> saved</span>}
+      </>
+    );
+  const save = async () => {
+    const v = editing.trim();
+    setEditing(null);
+    if (v === note) return;
+    if (await onSave(v)) {
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1500);
+    }
+  };
+  return (
+    <input
+      className="fbd-note-input"
+      autoFocus
+      value={editing}
+      maxLength={80}
+      placeholder="e.g. a name"
+      onChange={(e) => setEditing(e.target.value)}
+      onBlur={() => void save()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') void save();
+        else if (e.key === 'Escape') setEditing(null);
+      }}
+    />
   );
 }

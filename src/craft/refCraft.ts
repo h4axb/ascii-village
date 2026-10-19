@@ -30,7 +30,7 @@ import { colourPhrases, fitToGame, gameColourHint, isColourWord, type ColourPhra
 import { parseGameplayIntent, parseItemFunction, MODIFIER_PROMPT, NEUTRAL_MODIFIERS, type ItemFunction } from './functions';
 import type { Category } from '../llm';
 import { LINK } from '../link';
-import { kindOf, promptParts } from './lexicon';
+import { kindOf, promptParts, themeOfObject } from './lexicon';
 import { newFeedbackId, playerId, sendFeedback, SESSION } from '../feedback/client';
 
 // Which links craft from the library (the quest test links /1 and /2 keep the
@@ -215,6 +215,23 @@ const ADJ_AFTER = /^ (un|une|le|la|les|el|los|las|il|lo|uno|una|mon|ma|mi) /;
 const MODAL_WORDS = new Set(['can', 'could', 'kann']);
 const VERB_BEFORE = new Set(['that', 'which', 'who', 'it', 'i', 'you', 'he', 'she', 'they', 'we', 'er', 'sie', 'es', 'der', 'die', 'das']);
 // `force`: match the words against this body (a ship chosen by its rules)
+// Whether a library body is the thing the prompt asks for: the prompt's main
+// object is one of the body's own nouns (its category's words, its names) or,
+// for anything else than a boat, its title or one of its tags. A boat also
+// fits any vessel the ships list knows ("a junk", "a frigate"). No main
+// object read: as before (the scores decide).
+export function mainFitsBody(b: RefDoc, prompt: string): boolean {
+  const main = promptParts(prompt).main;
+  if (!main) return true;
+  const mainWords = words(main).map(sing);
+  // a boat only for a vessel (its title "Turtle Ship" or tags don't make a
+  // turtle a ship); anything else also by its title and tags
+  const own = [...(SYNONYMS[b.category] ?? []), ...b.category.split('-'), ...(b.names ?? [])];
+  const vocab = new Set([...own, ...(b.category === 'boat' ? [] : [...b.tags, b.title])].flatMap((n) => words(n)).map(sing));
+  if (mainWords.some((w) => vocab.has(w))) return true;
+  return b.category === 'boat' && themeOfObject(main) === 'ships';
+}
+
 export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
   // "can" after a pronoun or "that / which / who" is a verb ("a cat that
   // can fly"), never the watering can
@@ -244,6 +261,9 @@ export function matchRefs(prompt: string, force?: RefDoc): RefMatch {
       body = r;
     }
   }
+  // a body only for the thing the prompt is about: a side tag ("giant" on
+  // the turtle ship) never turns a bucket into a ship
+  if (body && !dog && !force && !mainFitsBody(body, prompt)) body = null;
   const res: RefMatch = { body: score >= 3 ? body : null, score, colours: {}, swaps: [], decorations: [], leftover: [], needsModel: false };
   if (!res.body) {
     res.needsModel = true;

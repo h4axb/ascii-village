@@ -93,6 +93,7 @@ import {
   drawnBands,
   isWateringCan,
   isAlwaysRef,
+  mainFitsBody,
   isShip,
   shapeShip,
   shapeWateringCan,
@@ -838,7 +839,10 @@ async function craftWithRefs(
         { temperature: prefs.surprise ? temperatureOf(prefs) - 0.2 : 0.5, maxTokens: 900, model: MODELS.fast, fallbackModel: MODELS.fastFallback },
       );
       const c = parseRefChoice(raw);
-      const chosen = c ? choiceToMatch(c, m) : null;
+      let chosen = c ? choiceToMatch(c, m) : null;
+      // the model may only pick a body that is the thing asked for (no ship
+      // for a bucket): anything else is drawn by the shape planner
+      if (chosen?.body && !mainFitsBody(chosen.body, prompt)) chosen = null;
       if (!chosen) {
         logRefCraft(prompt, 'planner', null, m.leftover);
         return null;
@@ -1001,11 +1005,48 @@ export interface CraftClarify {
 // `reported`: a word the game didn't know was reported for a next patch
 // (the workshop shows the bug-report toast)
 export type ClarifyResult = { questions: ClarifyQuestion[]; retry?: undefined; reported?: string } | { retry: string; questions?: undefined; reported?: string };
+// A word the game doesn't know: craft it anyway (the AI draws it freely, so
+// the result is unpredictable) or skip it; read offline, also its closest
+// known word when it looks like a typo
+const craftAnyway = (w: string) => ({ label: 'Craft it anyway', effect: `Mitchy draws "${w}" freely — the result is unpredictable.` });
+function unknownWordQuestion(w: string, closest?: string | null): ClarifyQuestion {
+  return {
+    topic: w,
+    q: `I don't know "${w}"${closest ? ` — did you mean ${closest}?` : '.'} I can craft it anyway, but how it turns out is unpredictable. Or shall I skip that detail?`,
+    options: [
+      ...(closest ? [{ label: closest, effect: `Read "${w}" as ${closest}.`, replace: [w, closest] as [string, string] }] : []),
+      craftAnyway(w),
+      { label: 'Skip this detail', effect: `Leave "${w}" out.`, drop: [w] },
+    ],
+    noDecide: true,
+  };
+}
 export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
   // a blocked prompt is refused by craftItem right after, without questions
   if (!checkPolicy(prompt).allowed) return { questions: [] };
   const read = await readPrompt(prompt);
-  if (read.via === 'model') return { questions: preQuestions(read.fixed, read) };
+  if (read.via === 'model') {
+    // the AI read it (typos fixed): every word the game still doesn't know
+    // is asked about — craft it anyway (drawn freely, unpredictable) or skip
+    const p = promptParts(read.fixed);
+    const unknown = [...new Set(p.unknown.filter((w) => w !== p.main))];
+    const qs = preQuestions(read.fixed, read, unknown);
+    const mainQ: ClarifyQuestion[] =
+      p.main && !p.mainKnown
+        ? [
+            {
+              topic: p.main,
+              q: `I don't know a "${p.main}" yet. I can try to craft it anyway, but how it turns out is unpredictable. Or do you want to try another object?`,
+              options: [craftAnyway(p.main), { label: 'Try another object', effect: 'Type another object.', tryAgain: true }],
+              noDecide: true,
+            },
+          ]
+        : [];
+    const wordQs = unknown.map((w) => unknownWordQuestion(w));
+    const at = qs.findIndex((q) => q.topic === 'Surprise');
+    const asked = [...mainQ, ...wordQs];
+    return { questions: at < 0 ? [...qs, ...asked] : [...qs.slice(0, at), ...asked, ...qs.slice(at)] };
+  }
   // read locally: the words the game doesn't know are asked about, as typed
   const parts = promptParts(prompt);
   const surprise = (theme: Theme | null) => ({
@@ -1030,7 +1071,7 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
       mainQs.push({
         topic: parts.main,
         q: `I don't know "${parts.main}". Did you mean ${obj}?`,
-        options: [{ label: obj, effect: `Read "${parts.main}" as ${obj}.`, replace: [parts.main, obj] }, surprise(themeOfObject(obj) ?? parts.theme), tryAnother],
+        options: [{ label: obj, effect: `Read "${parts.main}" as ${obj}.`, replace: [parts.main, obj] }, craftAnyway(parts.main), surprise(themeOfObject(obj) ?? parts.theme), tryAnother],
         noDecide: true,
       });
     else {
@@ -1041,8 +1082,8 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
         questions: [
           {
             topic: parts.main,
-            q: `I don't know a "${parts.main}" yet. Shall I surprise you, or do you want to try another object?`,
-            options: [surprise(parts.theme), tryAnother],
+            q: `I don't know a "${parts.main}" yet. I can try to craft it anyway, but how it turns out is unpredictable. Or shall I surprise you, or do you want to try another object?`,
+            options: [craftAnyway(parts.main), surprise(parts.theme), tryAnother],
             noDecide: true,
           },
         ],
@@ -1053,18 +1094,7 @@ export async function clarifyPrompt(prompt: string): Promise<ClarifyResult> {
   const unknown = [...new Set(parts.unknown.filter((w) => w !== parts.main))];
   const typoQs: ClarifyQuestion[] = [
     ...mainQs,
-    ...unknown.map((w) => {
-      const c = near(w);
-      return {
-        topic: w,
-        q: c ? `I don't know "${w}". Did you mean ${c}?` : `I don't know "${w}".`,
-        options: [
-          ...(c ? [{ label: c, effect: `Read "${w}" as ${c}.`, replace: [w, c] as [string, string] }] : []),
-          { label: 'Leave out this detail', effect: `Leave "${w}" out.`, drop: [w] },
-        ],
-        noDecide: true,
-      };
-    }),
+    ...unknown.map((w) => unknownWordQuestion(w, near(w))),
   ];
   // a typo that's a colour / size: its own question covers the colour / size one
   const nearKinds = new Set(unknown.flatMap((w) => closestWords(w, 1).map(kindOf)));

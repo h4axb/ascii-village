@@ -5,6 +5,7 @@
 // and goes out with the next successful send or page load.
 import type { FeedbackRecord } from './schema';
 import { currentTestSession, currentWhere } from '../quest/session';
+import { LINK } from '../link';
 
 const PLAYER_KEY = 'asciia-player-id';
 const OUTBOX_KEY = 'asciia-feedback-outbox';
@@ -83,6 +84,7 @@ async function flush() {
 
 // Store (or update — same id) one record. Never throws.
 export async function sendFeedback(rec: FeedbackRecord): Promise<void> {
+  if (LINK === 'test') return; // the testing link sends nothing (link.ts)
   // the user test's participant id and design order, when this run has one
   const ts = currentTestSession();
   if (ts && !rec.participant) rec = { ...rec, participant: ts.participantId, order: ts.order };

@@ -22,6 +22,7 @@ export type Cond = 'pre' | 'post'; // pre-clarification (CraftClarify) / post-re
 export const ORDERS: Partial<Record<string, [Cond, Cond]>> = {
   '1': ['pre', 'post'], // order "AB"
   '2': ['post', 'pre'], // order "BA"
+  test: ['pre', 'post'], // the testing link: as /1
 };
 export const QUEST_ORDER: [Cond, Cond] | null = ORDERS[LINK] ?? null;
 export const QUEST_ENABLED = QUEST_ORDER !== null;

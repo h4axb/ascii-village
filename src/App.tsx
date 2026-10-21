@@ -52,6 +52,7 @@ import {
   getFunFact,
   basePrice,
   universalToken,
+  variantToken,
   TOKENS_PER_DAY,
 } from './llm';
 import type { Category, ShopItem, OwnedItem } from './llm';
@@ -1320,6 +1321,12 @@ const PATH = window.location.pathname;
 const CRAFT_CLARIFY = LINK === '1';
 const CRAFT_FEEDBACK = LINK === '2';
 const CRAFT_CHOICES = LINK === '3';
+// /test, the testing link: the /1 quests (order AB, no intro), plus free
+// tokens of both crafting variants that open their own design and never
+// count for a quest (variantToken); nothing goes to the study's data
+const TEST_LINK = LINK === 'test';
+const TEST_START_TOKENS = 3; // per variant, in a new /test save
+const TEST_START_MONEY = 999;
 // Intro part 1 is the intro cinematic (src/cinematic/: the laptop, the
 // rejections, the falling letters, the door), then the wake-up scene.
 // /cinematic always plays it, for testing; ?shot=<id> (or ?t=<ms>) starts it
@@ -1339,7 +1346,7 @@ const CINEMATIC_START = (() => {
 const SKIP_INTRO_LINK = /^\/[12]\/?$/.test(PATH);
 // /1 and /2 (the study orders) play it like / does: once for a new save,
 // never again once it's done (quest steps autosave)
-const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/[034]\/?$/.test(PATH)
+const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/([034]|test)\/?$/.test(PATH)
   ? 'skip'
   : /^\/intro(\/[0-4])?\/?$/.test(PATH) || INTRO_CINEMATIC || INTRO_OLD
     ? 'force'
@@ -1449,7 +1456,7 @@ function Game() {
   // can turn a diagonal press into a single-axis slide), so glideDur below can
   // scale to the true distance this specific step covers. See CELL_ASPECT.
   const [lastDelta, setLastDelta] = useState<[number, number]>([1, 0]);
-  const [money, setMoney] = useState(() => saved?.money ?? 0);
+  const [money, setMoney] = useState(() => saved?.money ?? (TEST_LINK ? TEST_START_MONEY : 0));
   const [inv, setInv] = useState<Record<ItemType, number>>(() => ({
     ...emptyInv(),
     ...(saved?.inv ?? {}),
@@ -1462,7 +1469,15 @@ function Game() {
       ...(saved?.storages?.[i] ?? {}),
     })),
   );
-  const [bag, setBag] = useState<OwnedItem[]>(() => saved?.bag ?? []);
+  const [bag, setBag] = useState<OwnedItem[]>(
+    () =>
+      saved?.bag ??
+      (TEST_LINK
+        ? (['pre', 'post'] as const).flatMap((v) =>
+            Array.from({ length: TEST_START_TOKENS }, (_, i): OwnedItem => ({ ...variantToken(v, 0), ownedId: `own-test-${v}-${i}` })),
+          )
+        : []),
+  );
   const [equipped, setEquipped] = useState<OwnedItem | null>(() =>
     saved?.equippedId ? (saved.bag.find((o) => o.ownedId === saved.equippedId) ?? null) : null,
   );
@@ -1620,7 +1635,7 @@ function Game() {
   const dialogueChoiceRef = useRef<((i: number) => void) | null>(null);
   const [nameEntryOpen, setNameEntryOpen] = useState(false);
   const nameEntryResolveRef = useRef<((name: string) => void) | null>(null);
-  const [playerName, setPlayerName] = useState<string>(() => saved?.playerName ?? DEFAULT_PLAYER_NAME);
+  const [playerName, setPlayerName] = useState<string>(() => saved?.playerName ?? (TEST_LINK ? 'Tester' : DEFAULT_PLAYER_NAME));
   // Mitchy's live world position (tile units, same grid as player.x/y and
   // every scene marker). null = render him at his STRUCT_ENTS static spot
   // (x:35,y:33) — the ordinary, pre-Part-B-and-unaffected-by-it case for
@@ -1694,7 +1709,8 @@ function Game() {
   const today = daySeedOf(wt);
   // the quest links: 2 tokens from the shop per crafting design (Mitchy gives
   // the first one; the three crafts each design needs); otherwise 3 a day
-  const tokensLeftToday = SHOP_TOKENS - (QUEST_ENABLED || tokenBuys.day === today ? tokenBuys.n : 0);
+  // (/test: no limit)
+  const tokensLeftToday = TEST_LINK ? Infinity : SHOP_TOKENS - (QUEST_ENABLED || tokenBuys.day === today ? tokenBuys.n : 0);
   const coinsGrantedToday = coinGrants.day === today ? coinGrants.total : 0;
 
   // ---- the world clock (worldTime) ticks once per second ----
@@ -3105,7 +3121,7 @@ function Game() {
   const [questOpen, setQuestOpen] = useState(true);
   const [questView, setQuestView] = useState<QuestView>('quest');
   // the crafted boat waits in the bag until it is placed on the water
-  const questBoatInBag = isStep(quest, 'vehicle') && bag.some((o) => o.kind !== 'token' && o.equip?.float);
+  const questBoatInBag = isStep(quest, 'vehicle') && bag.some((o) => o.kind !== 'token' && !o.free && o.equip?.float);
   // the gift seed's name in the bag (ITEM_INFO.seed)
   seedHint = quest?.seedKind ? (SEED_CHOICES.find((c) => c.kind === quest.seedKind) ?? null) : null;
   const questTask = questBoatInBag ? 'Place it on the water' : undefined;
@@ -5374,7 +5390,11 @@ function Game() {
     }
     setMoney((mo) => mo - RECRAFT_PRICE);
     recraftDoneRef.current = false;
-    const token: OwnedItem = { ...universalToken(hourSeed), ownedId: `own-${Date.now()}-recraft` };
+    // a free item (/test) stays free and in its own design
+    const token: OwnedItem = {
+      ...(item.variant ? variantToken(item.variant, hourSeed) : universalToken(hourSeed)),
+      ownedId: `own-${Date.now()}-recraft`,
+    };
     const chat: ChatLine[] = rec?.chat ?? (rec ? [{ who: 'me', text: rec.prompt }] : []);
     setModal({ t: 'craft', token, recraft: { replaces: item.ownedId, name: item.name, chat } });
   }
@@ -5463,7 +5483,7 @@ function Game() {
     if (owned.equip.mode === 'vehicle' && owned.equip.float) {
       showToast('you can sail onto the water now!');
     }
-    if (owned.equip.mode === 'pet') questDone('companion');
+    if (owned.equip.mode === 'pet' && !owned.free) questDone('companion');
   }
 
   function unequip() {
@@ -5476,14 +5496,19 @@ function Game() {
   // the player closes it themselves. (equip here mirrors equipOwned WITHOUT the
   // setModal(null), so the modal survives.)
   function consumeCraft(tokenId: string, crafted: ShopItem, equip: boolean, replaces?: string) {
-    const item = questCraftFit(crafted);
+    // a free token (/test, variantToken): no quest shapes or counts it
+    const m = modalRef.current;
+    const tok = bag.find((x) => x.ownedId === tokenId) ?? (m?.t === 'craft' && m.token.ownedId === tokenId ? m.token : null);
+    const free = tok?.free ? { free: true, variant: tok.variant } : null;
+    const item = free ? crafted : questCraftFit(crafted);
     const panel = craftPanelRef.current;
     const owned: OwnedItem = {
       ...item,
+      ...free,
       ownedId: `own-${Date.now()}`,
       ...(panel ? { chain: panel.chain, recrafts: panel.used } : {}),
     };
-    questCrafted(owned, equip);
+    if (!free) questCrafted(owned, equip);
     // a recraft: the new item takes the old one's place
     if (replaces) {
       recraftDoneRef.current = true;
@@ -5668,7 +5693,7 @@ function Game() {
         const label = labels[i];
         if (label === 'Plant in garden') return plantOwned(owned);
         if (label === 'Place in world') return startPlacement(owned);
-        if (label === QL.launch) return isStep(questRef.current, 'vehicle') ? questLaunch(owned) : questDropBoat(owned);
+        if (label === QL.launch) return isStep(questRef.current, 'vehicle') && !owned.free ? questLaunch(owned) : questDropBoat(owned);
         return ownedAction(owned);
       },
     };
@@ -5797,7 +5822,8 @@ function Game() {
     }
     soakCrops(new Set(targets.map((c) => c.id)), slot === undefined ? 0.25 : 0);
     if (slot === undefined || !targets.some(isFillCrop)) showToast(`splash! watered ${targets.length} plant${targets.length > 1 ? 's' : ''}.`);
-    if (q?.seedCrop && targets.some((c) => c.id === q.seedCrop)) questDone('water');
+    // (a free watering can from /test waters, but doesn't count for the quest)
+    if (q?.seedCrop && !equipped.free && targets.some((c) => c.id === q.seedCrop)) questDone('water');
   }
 
   // The harvest itself, with no UI side effects — shared by the player's own
@@ -7854,7 +7880,9 @@ function Game() {
               onSell={sellPick}
               onClose={() => setModal(null)}
               buy={{
-                token: universalToken(hourSeed),
+                tokens: TEST_LINK
+                  ? [universalToken(hourSeed), variantToken('pre', hourSeed), variantToken('post', hourSeed)]
+                  : [universalToken(hourSeed)],
                 tokensLeft: tokensLeftToday,
                 daily: !QUEST_ENABLED,
                 picked: modal.confirm,
@@ -7908,13 +7936,14 @@ function Game() {
 
           {modal.t === 'craft' && (
             <CraftModal
-              key={`${modal.token.ownedId}-${questCond ?? ''}`}
+              key={`${modal.token.ownedId}-${modal.token.variant ?? questCond ?? ''}`}
               token={modal.token}
               choices={CRAFT_CHOICES}
-              feedback={questCond ? questCond === 'post' : CRAFT_FEEDBACK}
-              clarify={questCond ? questCond === 'pre' : CRAFT_CLARIFY}
-              cond={questCond ?? undefined}
-              launch={isStep(quest, 'vehicle') ? { label: QL.launch, go: () => questLaunch() } : undefined}
+              // a variant token (/test) opens its own design, whatever the quest's
+              feedback={modal.token.variant ? modal.token.variant === 'post' : questCond ? questCond === 'post' : CRAFT_FEEDBACK}
+              clarify={modal.token.variant ? modal.token.variant === 'pre' : questCond ? questCond === 'pre' : CRAFT_CLARIFY}
+              cond={modal.token.variant ?? questCond ?? undefined}
+              launch={isStep(quest, 'vehicle') && !modal.token.free ? { label: QL.launch, go: () => questLaunch() } : undefined}
               player={{
                 name: playerName || DEFAULT_PLAYER_NAME,
                 look: { sprite: avatarSprite, colors: avatarRecolored.colors, palette: avatarRecolored.palette },
@@ -7926,7 +7955,7 @@ function Game() {
               onBugReport={() => setBugReport(Date.now())}
               resume={modal.recraft ? { name: modal.recraft.name, chat: modal.recraft.chat } : undefined}
               reworks={
-                QUEST_ENABLED && craftPanelRef.current
+                QUEST_ENABLED && !modal.token.free && craftPanelRef.current
                   ? { used: craftPanelRef.current.used, of: reworksOf(craftPanelRef.current.chain), chain: craftPanelRef.current.chain, onRework }
                   : undefined
               }
@@ -8171,8 +8200,8 @@ function BaseItemText({ item, fact }: { item: ItemType; fact: string | null }) {
 // in the slots, the picked item's details on the right, her line and Buy /
 // Never mind underneath.
 interface ShopBuyProps {
-  token: ShopItem;
-  tokensLeft: number; // tokens the shop still sells (3 in all, or 3 a day)
+  tokens: ShopItem[]; // the token, or (/test) also both variant tokens
+  tokensLeft: number; // tokens the shop still sells (3 in all, or 3 a day; Infinity on /test)
   daily: boolean; // the limit is per day (not the quest links)
   picked: ShopItem | null;
   line: string | null;
@@ -8180,7 +8209,7 @@ interface ShopBuyProps {
   onBuy: () => void;
 }
 function ShopBuy({
-  token,
+  tokens,
   tokensLeft,
   daily,
   picked,
@@ -8191,15 +8220,16 @@ function ShopBuy({
   onSel,
   onClose,
 }: ShopBuyProps & { sel: number; onSel: (i: number) => void; onClose: () => void }) {
-  const items = [token];
+  const items = tokens;
   const isToken = picked?.kind === 'token';
+  const unlimited = !Number.isFinite(tokensLeft);
   return (
     <>
       <Split>
         <div className="ds-buy">
           <div className="ds-buy-head">
             <span className="ds-sec-label">Mitchy’s stock</span>
-            <span className="ds-muted">{`${Math.max(0, tokensLeft)} token${tokensLeft === 1 ? '' : 's'} left${daily ? ' today' : ''}`}</span>
+            <span className="ds-muted">{unlimited ? 'unlimited tokens' : `${Math.max(0, tokensLeft)} token${tokensLeft === 1 ? '' : 's'} left${daily ? ' today' : ''}`}</span>
           </div>
           <SlotGrid
             slots={items.map((it) => ({
@@ -8222,7 +8252,7 @@ function ShopBuy({
             title={picked.name}
             stats={[
               { icon: <IconCoin />, value: picked.price, label: 'Price' },
-              ...(isToken ? [{ icon: <IconBag />, value: Math.max(0, tokensLeft), label: daily ? 'Left today' : 'Left' }] : []),
+              ...(isToken && !unlimited ? [{ icon: <IconBag />, value: Math.max(0, tokensLeft), label: daily ? 'Left today' : 'Left' }] : []),
             ]}
           >
             <p>{picked.desc}</p>

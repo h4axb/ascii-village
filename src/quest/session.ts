@@ -44,6 +44,8 @@ function localId(): string {
 
 // A fresh session for a new run
 export async function requestTestSession(): Promise<TestSession> {
+  // the testing link: no participant id from the server (link.ts)
+  if (LINK === 'test') return { participantId: 'TEST', order: 'AB' };
   // a personal link: the run the server started for its key
   if (INVITE_KEY && run?.participantId) return { participantId: run.participantId, order: run.order, key: INVITE_KEY };
   const order = LINK_ORDER ?? 'AB';

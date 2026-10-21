@@ -196,6 +196,11 @@ export interface ShopItem {
   refId?: string;
   refMirror?: boolean;
   color?: string; // crafted items: base/default sprite colour (CSS colour)
+  // the testing link /test (variantToken): a token that opens one crafting
+  // design ('pre' = variant 1, 'post' = variant 2) whatever the quest's
+  // condition; it and what it crafts are `free`: no quest counts them
+  variant?: 'pre' | 'post';
+  free?: boolean;
   // crafted items: optional per-region colour ("paint by number"). palette maps
   // single-char keys → hex; colors is a grid the same shape as sprite, each cell
   // a palette key or '.' (= base colour). Both present or both absent.
@@ -284,6 +289,24 @@ export function universalToken(hourSeed: number): ShopItem {
     price: TOKEN_PRICE,
     kind: 'token',
     equip: null,
+  };
+}
+
+// A free token of one crafting design (the testing link /test): variant 1
+// asks first (pre-clarification), variant 2 rates after (post-reflection).
+// Tinted so the two are easy to tell apart; it never counts for a quest.
+export function variantToken(variant: 'pre' | 'post', hourSeed: number): ShopItem {
+  const one = variant === 'pre';
+  return {
+    ...universalToken(hourSeed),
+    id: `token-${one ? 'v1' : 'v2'}-${hourSeed}`,
+    name: one ? 'Craft Token · Variant 1' : 'Craft Token · Variant 2',
+    desc: one
+      ? 'Variant 1 (ask first): Mitchy asks a few questions before crafting. Free crafting, it doesn’t count for a quest.'
+      : 'Variant 2 (tune after): crafts right away, then you rate it and tune future crafts. Free crafting, it doesn’t count for a quest.',
+    color: one ? '#6fa8dc' : '#e06666',
+    variant,
+    free: true,
   };
 }
 

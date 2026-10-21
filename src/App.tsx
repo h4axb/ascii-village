@@ -4192,6 +4192,8 @@ function Game() {
     if (!INVITE_KEY || !QUEST_ENABLED) return;
     const tick = async () => {
       const r = await refreshRun();
+      // a participant id rewritten on the dashboard: from now on under it
+      setTestSession((s) => studySession(s));
       const extra = (r?.bonusTokens ?? 0) - bonusGivenRef.current;
       if (!r || extra <= 0) return;
       bonusGivenRef.current = r.bonusTokens;

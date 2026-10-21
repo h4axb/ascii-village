@@ -1104,7 +1104,16 @@ function Participants({
                 return (
                   <tr key={i.key}>
                     <td>
-                      <b>{i.participant_id ?? '–'}</b>
+                      <IdEdit
+                        id={i.participant_id}
+                        onSave={async (id) => {
+                          const d = (await post('/api/admin/participant', { key: i.key, id })) as { id?: string; moved?: Record<string, number>; next?: string } | null;
+                          if (!d?.id) return false;
+                          const n = Object.values(d.moved ?? {}).reduce((a, b) => a + b, 0);
+                          setMsg(`This link is now ${d.id}${n ? ` (${n} records moved along)` : ''}. The next new participant gets ${d.next}.`);
+                          return true;
+                        }}
+                      />
                     </td>
                     <td>
                       {i.link}{' '}
@@ -1212,6 +1221,41 @@ function Participants({
 }
 
 // a link's note, edited in place: click it, Enter or leaving saves, Esc cancels
+// The participant id, rewritable: several links of one person under one id
+// (also before the link is started); the counter goes on from the highest
+// id in use (functions/api/session.ts /api/admin/participant)
+function IdEdit({ id, onSave }: { id: string | null; onSave: (id: string) => Promise<boolean> }) {
+  const [editing, setEditing] = useState<string | null>(null);
+  if (editing === null)
+    return (
+      <button className="fbd-link fbd-note-edit" onClick={() => setEditing(id ?? '')} title="Change the participant id (e.g. to put several links of one person under one id)">
+        <b>{id ?? '–'}</b> ✎
+      </button>
+    );
+  const save = async () => {
+    const v = editing.trim();
+    setEditing(null);
+    if (!v || v === id) return;
+    await onSave(v);
+  };
+  return (
+    <input
+      className="fbd-note-input"
+      style={{ width: '6em' }}
+      autoFocus
+      value={editing}
+      maxLength={8}
+      placeholder="P003"
+      onChange={(e) => setEditing(e.target.value)}
+      onBlur={() => void save()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') void save();
+        else if (e.key === 'Escape') setEditing(null);
+      }}
+    />
+  );
+}
+
 function NoteEdit({ note, onSave }: { note: string; onSave: (note: string) => Promise<boolean> }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);

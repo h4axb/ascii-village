@@ -200,6 +200,29 @@ async function runInfo(db: D1Database, inv: Invite) {
   };
 }
 
+// The participant counter goes on from the highest id in use (links,
+// run log, feedback): numbers freed by a rewrite are given out again.
+// Returns the id the next new participant gets.
+async function resyncParticipants(db: D1Database): Promise<string> {
+  let max = 0;
+  const ids = async (sql: string) => (await db.prepare(sql).all<{ p: string | null }>()).results.map((r) => r.p);
+  const all = [...(await ids('SELECT participant_id AS p FROM invites'))];
+  for (const table of ['events', 'feedback']) {
+    const { results: has } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1").bind(table).all<{ name: string }>();
+    if (has.length) all.push(...(await ids(`SELECT DISTINCT participant AS p FROM ${table}`)));
+  }
+  for (const p of all) {
+    const m = /^P(\d+)$/.exec(p ?? '');
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  // AUTOINCREMENT gives max(sequence, highest row) + 1: both go back to max
+  await db.prepare('DELETE FROM participants WHERE n > ?1').bind(max).run();
+  const { results } = await db.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'participants'").all<{ seq: number }>();
+  if (results.length) await db.prepare("UPDATE sqlite_sequence SET seq = ?1 WHERE name = 'participants'").bind(max).run();
+  else if (max > 0) await db.prepare("INSERT INTO sqlite_sequence (name, seq) VALUES ('participants', ?1)").bind(max).run();
+  return participantIdOf(max + 1);
+}
+
 async function nextParticipant(db: D1Database, link: string): Promise<string> {
   const { results } = await db
     .prepare('INSERT INTO participants (at, link, run_order) VALUES (?1, ?2, ?3) RETURNING n')
@@ -237,7 +260,9 @@ export async function handleSession(request: Request, env: SessionEnv): Promise<
       if (body.consent !== true) return json(428, { error: 'consent' });
       // the first start: this browser owns the run from now on
       const device = newKey();
-      const pid = await nextParticipant(db, inv.link);
+      // (an id given on the dashboard beforehand stays: the same person's
+      // next link)
+      const pid = inv.participant_id ?? (await nextParticipant(db, inv.link));
       const now = Date.now();
       await db
         .prepare('UPDATE invites SET started = ?1, device = ?2, participant_id = ?3, consented = ?1 WHERE key = ?4 AND started IS NULL')
@@ -428,6 +453,26 @@ export async function handleAdmin(request: Request, env: SessionEnv): Promise<Re
     case '/api/admin/reset-device': // the next browser to open the link owns it
       await db.prepare('UPDATE invites SET device = NULL WHERE key = ?1').bind(key).run();
       break;
+    case '/api/admin/participant': {
+      // Rewrite the participant id ("3", "P3", "P003"): several links of one
+      // person under one id, with everything already recorded moved along.
+      // The counter then goes on from the highest id in use.
+      const m = /^p?0*(\d{1,6})$/i.exec(String(body.id ?? '').trim());
+      if (!m || Number(m[1]) < 1) return json(400, { error: 'id like P003' });
+      const id = participantIdOf(Number(m[1]));
+      const old = inv.participant_id;
+      await db.prepare('UPDATE invites SET participant_id = ?1 WHERE key = ?2').bind(id, key).run();
+      const moved: Record<string, number> = {};
+      if (old && old !== id)
+        for (const table of ['events', 'feedback']) {
+          const { results: has } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1").bind(table).all<{ name: string }>();
+          if (!has.length) continue;
+          const { results } = await db.prepare(`UPDATE ${table} SET participant = ?1 WHERE participant = ?2 RETURNING id`).bind(id, old).all<{ id: string }>();
+          moved[table] = results.length;
+        }
+      const next = await resyncParticipants(db);
+      return json(200, { ok: true, id, moved, next });
+    }
     case '/api/admin/reopen':
       await db.prepare('UPDATE invites SET completed = NULL WHERE key = ?1').bind(key).run();
       break;

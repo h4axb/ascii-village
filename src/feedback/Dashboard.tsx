@@ -21,7 +21,7 @@
 // quite" / the "more" end, gray = Keep. Text never wears a series colour.
 // ---------------------------------------------------------------------------
 import { RATING_QUESTIONS } from '../quest/quests';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FitSprite } from '../ui';
 import { conditionOf, designOf, FEEDBACK_REASONS, POSITIVE_REASONS, type FeedbackRecord } from './schema';
 import { topTags } from '../../functions/api/feedback';
@@ -57,6 +57,29 @@ export default function Dashboard() {
   const [kind, setKind] = useState('all');
   const [link, setLink] = useState('all');
   const [who, setWho] = useState('all'); // one participant, or everyone
+  // participants left out of the evaluation (ticked off in "Include"; '' =
+  // records without a participant, the open test links), kept in this browser
+  const [left, setLeft] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(LEFT_KEY) ?? '[]') as string[]);
+    } catch {
+      return new Set();
+    }
+  });
+  const toggleLeft = (ids: string[], out: boolean) =>
+    setLeft((cur) => {
+      const next = new Set(cur);
+      for (const id of ids) {
+        if (out) next.add(id);
+        else next.delete(id);
+      }
+      try {
+        localStorage.setItem(LEFT_KEY, JSON.stringify([...next]));
+      } catch {
+        // storage blocked: only for this visit
+      }
+      return next;
+    });
   const [tab, setTab] = useState<'feedback' | 'participants'>('feedback');
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -115,13 +138,13 @@ export default function Dashboard() {
   let data = useMemo(() => {
     const since = range === 'all' ? 0 : Date.now() - Number(range) * DAY;
     return (rows ?? []).filter(
-      (r) => r.at >= since && (kind === 'all' || r.kind === kind) && (link === 'all' || r.link === link) && (who === 'all' || r.participant === who),
+      (r) => r.at >= since && (kind === 'all' || r.kind === kind) && (link === 'all' || r.link === link) && (who === 'all' || r.participant === who) && !left.has(r.participant ?? ''),
     );
-  }, [rows, range, kind, link, who]);
+  }, [rows, range, kind, link, who, left]);
   const evs = useMemo(() => {
     const since = range === 'all' ? 0 : Date.now() - Number(range) * DAY;
-    return events.filter((e) => e.at >= since && (link === 'all' || e.link === link) && (who === 'all' || e.participant === who));
-  }, [events, range, link, who]);
+    return events.filter((e) => e.at >= since && (link === 'all' || e.link === link) && (who === 'all' || e.participant === who) && !left.has(e.participant ?? ''));
+  }, [events, range, link, who, left]);
 
   if (!rows) {
     return (
@@ -167,6 +190,7 @@ export default function Dashboard() {
               ))}
             </select>
           </label>
+          <Include people={people} anon={(rows ?? []).some((r) => !r.participant)} left={left} onToggle={toggleLeft} />
           <Seg value={range} onChange={setRange} options={[['7', '7 days'], ['30', '30 days'], ['all', 'All time']]} />
           <label>
             Kind{' '}
@@ -385,6 +409,49 @@ function Tile({ label, value, sub }: { label: string; value: ReactNode; sub?: st
       <div className="fbd-tile-value">{value}</div>
       <div className="fbd-tile-label">{label}</div>
       {sub && <div className="fbd-muted fbd-tile-sub">{sub}</div>}
+    </div>
+  );
+}
+
+// "Include": a checkbox per participant; the ones ticked off are left out
+// of every chart, table and "Save view" export (not of "Save all")
+const LEFT_KEY = 'asciia-dashboard-left-out';
+function Include({ people, anon, left, onToggle }: { people: string[]; anon: boolean; left: Set<string>; onToggle: (ids: string[], out: boolean) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  // a click anywhere else closes it
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', away);
+    return () => document.removeEventListener('mousedown', away);
+  }, [open]);
+  const all = [...people, ...(anon ? [''] : [])];
+  const inCount = all.filter((p) => !left.has(p)).length;
+  return (
+    <div className="fbd-include" ref={box}>
+      <button onClick={() => setOpen((o) => !o)} aria-expanded={open} title="Choose which participants the evaluation includes">
+        Include: {inCount === all.length ? 'everyone' : `${inCount} of ${all.length}`} ▾
+      </button>
+      {open && (
+        <div className="fbd-include-pop">
+          <div className="fbd-include-all">
+            <button className="fbd-link" onClick={() => onToggle(all, false)}>
+              all
+            </button>
+            <button className="fbd-link" onClick={() => onToggle(all, true)}>
+              none
+            </button>
+          </div>
+          {all.map((p) => (
+            <label key={p || '(none)'}>
+              <input type="checkbox" checked={!left.has(p)} onChange={(e) => onToggle([p], !e.target.checked)} /> {p || 'no participant (test links)'}
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

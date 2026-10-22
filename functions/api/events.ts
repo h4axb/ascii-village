@@ -58,10 +58,15 @@ export async function handleEvents(request: Request, env: SessionEnv): Promise<R
   if (request.method === 'GET') {
     if (!env.FEEDBACK_ADMIN_TOKEN) return json(503, { error: 'FEEDBACK_ADMIN_TOKEN is not set' });
     if (!isAdmin(request, env)) return json(401, { error: 'wrong password' });
-    const { results } = await db.prepare('SELECT data FROM events ORDER BY at DESC LIMIT ?1').bind(MAX_ROWS).all<{ data: string }>();
+    // an id changed on the dashboard before the event followed it: the
+    // column is the truth, and the stored event is set to it once
+    await db
+      .prepare("UPDATE events SET data = json_set(data, '$.participant', participant) WHERE json_extract(data, '$.participant') IS NOT participant")
+      .run();
+    const { results } = await db.prepare('SELECT participant, data FROM events ORDER BY at DESC LIMIT ?1').bind(MAX_ROWS).all<{ participant: string; data: string }>();
     const rows = results.map((r) => {
       try {
-        return JSON.parse(r.data);
+        return { ...JSON.parse(r.data), participant: r.participant };
       } catch {
         return null;
       }

@@ -449,7 +449,11 @@ export async function handleAdmin(request: Request, env: SessionEnv): Promise<Re
         for (const table of ['events', 'feedback']) {
           const { results: has } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1").bind(table).all<{ name: string }>();
           if (!has.length) continue;
-          const { results } = await db.prepare(`UPDATE ${table} SET participant = ?1 WHERE participant = ?2 RETURNING id`).bind(id, old).all<{ id: string }>();
+          // the column and the stored record both (the dashboard reads the record)
+          const { results } = await db
+            .prepare(`UPDATE ${table} SET participant = ?1, data = json_set(data, '$.participant', ?1) WHERE participant = ?2 RETURNING id`)
+            .bind(id, old)
+            .all<{ id: string }>();
           moved[table] = results.length;
         }
       const next = await nextFree(db);

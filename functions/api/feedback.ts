@@ -232,13 +232,20 @@ export async function handleFeedback(request: Request, env: FeedbackEnv): Promis
     const token = (request.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
     if (!env.FEEDBACK_ADMIN_TOKEN) return json(503, { error: 'FEEDBACK_ADMIN_TOKEN is not set' });
     if (!token || !sameToken(token, env.FEEDBACK_ADMIN_TOKEN)) return json(401, { error: 'wrong password' });
+    // an id changed on the dashboard before the record followed it: the
+    // column is the truth (session.ts /api/admin/participant), and the
+    // stored record is set to it once
+    await db
+      .prepare("UPDATE feedback SET data = json_set(data, '$.participant', participant) WHERE participant IS NOT NULL AND participant != '' AND json_extract(data, '$.participant') IS NOT participant")
+      .run();
     const { results } = await db
-      .prepare('SELECT data FROM feedback ORDER BY at DESC LIMIT ?1')
+      .prepare('SELECT participant, data FROM feedback ORDER BY at DESC LIMIT ?1')
       .bind(MAX_ROWS)
-      .all<{ data: string }>();
+      .all<{ participant: string | null; data: string }>();
     const rows = results.map((r) => {
       try {
-        return JSON.parse(r.data);
+        const rec = JSON.parse(r.data);
+        return r.participant ? { ...rec, participant: r.participant } : rec;
       } catch {
         return null;
       }

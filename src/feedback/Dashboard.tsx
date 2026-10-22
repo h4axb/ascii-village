@@ -27,6 +27,7 @@ import { conditionOf, designOf, FEEDBACK_REASONS, POSITIVE_REASONS, type Feedbac
 import { topTags } from '../../functions/api/feedback';
 import { KIND_LABEL, PREF_INFO, PREF_KEYS, isKind } from '../craft/prefs';
 import type { RunEvent } from '../quest/runlog';
+import { endOf, participantFile, studyFiles, zip } from './studyExport';
 import './dashboard.css';
 
 const PASS_KEY = 'asciia-feedback-pass';
@@ -193,9 +194,18 @@ export default function Dashboard() {
           <button onClick={() => void load(pass)} disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}
           </button>
-          <button onClick={() => download('feedback.csv', toCsv(all), 'text/csv')}>CSV</button>
-          <button onClick={() => download('feedback.json', JSON.stringify(all, null, 1), 'application/json')}>JSON</button>
-          <button onClick={() => download('run-log.csv', eventsCsv(evs), 'text/csv')}>Run log CSV</button>
+          <button className="fbd-save-all" onClick={() => saveAll(events, rows, invites)} title="Every participant, all time: one JSON file each (links, summary, the whole run with every craft and rating), in one ZIP">
+            Save all participants (ZIP)
+          </button>
+          <button onClick={() => download('feedback.csv', toCsv(all), 'text/csv')} title="Only what the filters show">
+            Save view (CSV)
+          </button>
+          <button onClick={() => download('feedback.json', JSON.stringify(all, null, 1), 'application/json')} title="Only what the filters show">
+            Save view (JSON)
+          </button>
+          <button onClick={() => download('run-log.csv', eventsCsv(evs), 'text/csv')} title="Only what the filters show">
+            Save view (run log CSV)
+          </button>
         </div>
       </header>
       {error && <p className="fbd-error">{error}</p>}
@@ -205,7 +215,14 @@ export default function Dashboard() {
       ) : (
         <>
       {who !== 'all' && (
-        <ParticipantRun id={who} events={evs} feedback={all} invite={invites.find((i) => i.participant_id === who) ?? null} />
+        <>
+          <p>
+            <button onClick={() => saveOne(who, events, rows, invites)} title="Everything about this participant, all time, in one JSON file">
+              Save {who} (JSON)
+            </button>
+          </p>
+          <ParticipantRun id={who} events={evs} feedback={all} invite={invites.find((i) => i.participant_id === who) ?? null} />
+        </>
       )}
       {who === 'all' && evs.length > 0 && (
         <section className="fbd-grid">
@@ -728,13 +745,22 @@ function toCsv(rows: FeedbackRecord[]): string {
   return [cols.join(','), ...lines].join('\n');
 }
 
-function download(name: string, text: string, type: string) {
-  const url = URL.createObjectURL(new Blob([text], { type }));
+function download(name: string, text: string | Blob, type: string) {
+  const url = URL.createObjectURL(typeof text === 'string' ? new Blob([text], { type }) : text);
   const a = document.createElement('a');
   a.href = url;
   a.download = name;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// Everything about every participant, unfiltered: one JSON file each, in a
+// ZIP (studyExport.ts); or one participant's file alone
+function saveAll(events: RunEvent[], feedback: FeedbackRecord[], invites: Invite[]) {
+  download(`asciia-study-${new Date().toISOString().slice(0, 10)}.zip`, zip(studyFiles(events, feedback, invites)), 'application/zip');
+}
+function saveOne(id: string, events: RunEvent[], feedback: FeedbackRecord[], invites: Invite[]) {
+  download(`${id}.json`, JSON.stringify(participantFile(id, events, feedback, invites), null, 1), 'application/json');
 }
 
 // ---- the run log (quest/runlog.ts) ----
@@ -773,12 +799,6 @@ const clock = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit
 
 const when = (t: number) => new Date(t).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 // when a run ended: the survey opened, or its time ran out (null: still on)
-function endOf(i: Invite): { at: number; how: 'finished' | 'expired' } | null {
-  if (i.completed) return { at: i.completed, how: 'finished' };
-  if (i.started && i.expiresAt && Date.now() > i.expiresAt) return { at: i.expiresAt, how: 'expired' };
-  return null;
-}
-
 function inviteStatus(i: Invite): string {
   if (i.completed) return 'finished';
   if (!i.started) return 'not opened';
@@ -1080,6 +1100,11 @@ function Participants({
         </p>
       </Card>
       {msg && <p className="fbd-error">{msg}</p>}
+      <p>
+        <button onClick={() => saveAll(events, feedback, invites)} title="Every participant, all time: one JSON file each, in one ZIP">
+          Save all participants (ZIP)
+        </button>
+      </p>
       <Card title={`Links (${invites.length})`} wide>
         <div className="fbd-table-wrap">
           <table className="fbd-table">
@@ -1179,6 +1204,11 @@ function Participants({
                         Other device
                       </button>
                       {i.completed && <button onClick={() => void post('/api/admin/reopen', { key: i.key })}>Reopen</button>}
+                      {i.participant_id && (
+                        <button onClick={() => saveOne(i.participant_id!, events, feedback, invites)} title="Everything about this participant in one JSON file">
+                          Save
+                        </button>
+                      )}
                       {deleting?.key !== i.key ? (
                         <button className="fbd-danger" onClick={() => setDeleting({ key: i.key, data: false })}>
                           Delete

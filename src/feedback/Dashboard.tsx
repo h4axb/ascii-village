@@ -221,7 +221,12 @@ export default function Dashboard() {
               Save {who} (JSON)
             </button>
           </p>
-          <ParticipantRun id={who} events={evs} feedback={all} invite={invites.find((i) => i.participant_id === who) ?? null} />
+          <ParticipantRun
+            id={who}
+            events={evs}
+            feedback={all}
+            invites={invites.filter((i) => i.participant_id === who).sort((a, b) => (a.started ?? a.created) - (b.started ?? b.created))}
+          />
         </>
       )}
       {who === 'all' && evs.length > 0 && (
@@ -765,6 +770,41 @@ function saveOne(id: string, events: RunEvent[], feedback: FeedbackRecord[], inv
 
 // ---- the run log (quest/runlog.ts) ----
 
+// Which of a person's links an event belongs to: the link it came from
+// (newer events carry its key), else the link of that person that had
+// started last by then (older events)
+function linkOfEvent(e: RunEvent, invites: Invite[]): Invite | null {
+  if (e.key) return invites.find((i) => i.key === e.key) ?? null;
+  const mine = invites.filter((i) => i.participant_id === e.participant && i.started && i.started <= e.at + 60000);
+  return mine.sort((a, b) => (b.started ?? 0) - (a.started ?? 0))[0] ?? null;
+}
+// a link's run as the run log saw it: its crafts, and when the survey opened
+function linkRun(i: Invite, events: RunEvent[], invites: Invite[]) {
+  const mine = events.filter((e) => e.participant === i.participant_id && linkOfEvent(e, invites)?.key === i.key);
+  return {
+    crafts: mine.filter((e) => e.type === 'craft' && !e.data.recraftOf && e.data.outcome === 'crafted').length,
+    surveyAt: mine.find((e) => e.type === 'session' && e.data.what === 'survey')?.at ?? null,
+  };
+}
+
+// The links in the table: one person's several links together (oldest
+// first), marked "link n of m"; the people in the list's own order
+function grouped(invites: Invite[]): { i: Invite; n: number; of: number }[] {
+  const out: { i: Invite; n: number; of: number }[] = [];
+  const done = new Set<string>();
+  for (const i of invites) {
+    if (!i.participant_id) {
+      out.push({ i, n: 1, of: 1 });
+      continue;
+    }
+    if (done.has(i.participant_id)) continue;
+    done.add(i.participant_id);
+    const mine = invites.filter((x) => x.participant_id === i.participant_id).sort((a, b) => (a.started ?? a.created) - (b.started ?? b.created));
+    mine.forEach((x, k) => out.push({ i: x, n: k + 1, of: mine.length }));
+  }
+  return out;
+}
+
 // one personal invite link (functions/api/session.ts, GET /api/admin/invites)
 interface Invite {
   key: string;
@@ -823,13 +863,29 @@ function StepTimes({ events }: { events: RunEvent[] }) {
 }
 
 // one participant's whole run, in order
-function ParticipantRun({ id, events, feedback, invite }: { id: string; events: RunEvent[]; feedback: FeedbackRecord[]; invite: Invite | null }) {
+// (several links of one person: together, from the first start to the end
+// of the last one, or the survey)
+function ParticipantRun({ id, events, feedback, invites }: { id: string; events: RunEvent[]; feedback: FeedbackRecord[]; invites: Invite[] }) {
   const list = [...events].sort((a, b) => a.at - b.at);
+  const started = invites.map((i) => i.started).filter((t): t is number => !!t);
+  const invite: Invite | null = invites.length
+    ? {
+        ...invites[invites.length - 1],
+        started: started.length ? Math.min(...started) : null,
+        link: invites.map((i) => i.link).join(' + '),
+        note: invites.map((i) => i.note).filter(Boolean).join(' · '),
+        crafts_used: invites.reduce((a, i) => a + i.crafts_used, 0),
+        crafts_allowed: invites.reduce((a, i) => a + i.crafts_allowed, 0),
+        completed: invites.map((i) => i.completed).filter((t): t is number => !!t).sort((a, b) => b - a)[0] ?? null,
+        expiresAt: Math.max(...invites.map((i) => i.expiresAt ?? 0)) || null,
+      }
+    : null;
   const first = invite?.started ?? list[0]?.at ?? null;
-  const end = invite ? endOf(invite) : null;
   const surveyAt = list.find((e) => e.data.what === 'survey')?.at ?? null;
-  const last = end?.at ?? surveyAt ?? list[list.length - 1]?.at ?? null;
-  const running = invite ? !end : !surveyAt;
+  // the survey opening ends the run, whichever link it was on
+  const end = surveyAt ? { at: surveyAt, how: 'finished' as const } : invite ? endOf(invite) : null;
+  const last = end?.at ?? list[list.length - 1]?.at ?? null;
+  const running = !end;
   const crafts = list.filter((e) => e.type === 'craft');
   const hints = list.filter((e) => e.type === 'hint').length;
   const errors = list.filter((e) => e.type === 'error');
@@ -842,7 +898,7 @@ function ParticipantRun({ id, events, feedback, invite }: { id: string; events: 
         <Tile label="Participant (Tally test_id)" value={id} sub={[order && `order ${order}`, invite?.link ?? list[0]?.link, invite?.note].filter(Boolean).join(' · ')} />
         <Tile
           label="Start · end"
-          value={invite ? inviteStatus(invite) : surveyAt ? 'finished' : list.length ? 'playing' : '–'}
+          value={surveyAt ? 'finished' : invite ? inviteStatus(invite) : list.length ? 'playing' : '–'}
           sub={[
             first ? `start ${when(first)}` : '',
             running ? 'end: still running' : last ? `end ${when(last)}${end?.how === 'expired' ? ' (expired)' : ''}` : '',
@@ -852,7 +908,7 @@ function ParticipantRun({ id, events, feedback, invite }: { id: string; events: 
             .join(' · ')}
         />
         <Tile label={running ? 'Time so far' : 'Total time'} value={first && last ? mins((running ? Date.now() : last) - first) : '–'} sub={steps.length ? `avg step ${mins(steps.reduce((a, e) => a + (Number(e.data.ms) || 0), 0) / steps.length)}` : undefined} />
-        <Tile label="Crafts / reworks" value={`${crafts.filter((c) => !c.data.recraftOf).length} / ${crafts.reduce((a, c) => a + (Number(c.data.reworks) || 0), 0)}`} sub={invite ? `budget ${invite.crafts_used} of ${invite.crafts_allowed} crafts` : undefined} />
+        <Tile label="Crafts / reworks" value={`${crafts.filter((c) => !c.data.recraftOf).length} / ${crafts.reduce((a, c) => a + (Number(c.data.reworks) || 0), 0)}`} sub={invite ? `budget ${invite.crafts_used} of ${invite.crafts_allowed} crafts${invites.length > 1 ? ` (${invites.length} links)` : ''}` : undefined} />
         <Tile label="Hints · errors" value={`${hints} · ${errors.length}`} />
       </section>
       {ratings.length > 0 && (
@@ -1122,13 +1178,17 @@ function Participants({
               </tr>
             </thead>
             <tbody>
-              {invites.map((i) => {
-                const st = inviteStatus(i);
+              {grouped(invites).map(({ i, n, of }) => {
+                const run = linkRun(i, events, invites);
+                // the survey opened on this link but it wasn't marked finished
+                const unmarked = !i.completed && run.surveyAt !== null;
+                const st = unmarked ? 'finished (survey seen)' : inviteStatus(i);
                 const left = i.expiresAt ? i.expiresAt - Date.now() : null;
                 const items = itemsOf(i.participant_id);
                 return (
-                  <tr key={i.key}>
+                  <tr key={i.key} className={of > 1 ? `fbd-multi${n === 1 ? ' first' : ''}${n === of ? ' last' : ''}` : undefined}>
                     <td>
+                      {of > 1 && <div className="fbd-badge" title={`${i.participant_id} has ${of} links`}>link {n} of {of}</div>}
                       <IdEdit
                         id={i.participant_id}
                         onSave={async (id) => {
@@ -1149,14 +1209,23 @@ function Participants({
                         </button>
                       </div>
                     </td>
-                    <td>{st}</td>
+                    <td>
+                      {st}
+                      {unmarked && (
+                        <div>
+                          <button className="fbd-link" onClick={() => void post('/api/admin/finish', { key: i.key, at: run.surveyAt })} title="Saves this link as finished, at the time the survey opened">
+                            mark finished
+                          </button>
+                        </div>
+                      )}
+                    </td>
                     <td className="fbd-muted">
                       {i.started ? when(i.started) : '–'}
                       {i.consented && <div>consent {when(i.consented)}</div>}
                     </td>
                     <td className="fbd-muted">
                       {(() => {
-                        const e = endOf(i);
+                        const e = unmarked ? { at: run.surveyAt!, how: 'finished' as const } : endOf(i);
                         if (!e || !i.started) return '–';
                         return (
                           <>
@@ -1171,6 +1240,8 @@ function Participants({
                     <td>
                       {i.crafts_used} of {i.crafts_allowed}
                       {i.bonus_tokens > 0 && <span className="fbd-muted"> (+{i.bonus_tokens})</span>}
+                      {/* what the run log saw crafted on this link (the budget counts AI calls) */}
+                      {i.started && <div className="fbd-muted">crafted {run.crafts}</div>}
                     </td>
                     <td className="fbd-muted">
                       {Object.entries(i.recrafts).length

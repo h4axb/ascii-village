@@ -30,6 +30,7 @@ export interface RunEvent {
   part?: string; // the quest part (q1, q2, c2, …)
   step?: string; // the quest step id
   data: Record<string, unknown>;
+  key?: string; // the personal link it came from (added by the server)
 }
 
 const OUTBOX_KEY = 'asciia-events-outbox';

@@ -200,35 +200,17 @@ async function runInfo(db: D1Database, inv: Invite) {
   };
 }
 
-// The participant counter goes on from the highest id in use (links,
-// run log, feedback): numbers freed by a rewrite are given out again.
-// Returns the id the next new participant gets.
-async function resyncParticipants(db: D1Database): Promise<string> {
-  let max = 0;
-  const ids = async (sql: string) => (await db.prepare(sql).all<{ p: string | null }>()).results.map((r) => r.p);
-  const all = [...(await ids('SELECT participant_id AS p FROM invites'))];
-  for (const table of ['events', 'feedback']) {
-    const { results: has } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1").bind(table).all<{ name: string }>();
-    if (has.length) all.push(...(await ids(`SELECT DISTINCT participant AS p FROM ${table}`)));
-  }
-  for (const p of all) {
-    const m = /^P(\d+)$/.exec(p ?? '');
-    if (m) max = Math.max(max, Number(m[1]));
-  }
-  // AUTOINCREMENT gives max(sequence, highest row) + 1: both go back to max
-  await db.prepare('DELETE FROM participants WHERE n > ?1').bind(max).run();
-  const { results } = await db.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'participants'").all<{ seq: number }>();
-  if (results.length) await db.prepare("UPDATE sqlite_sequence SET seq = ?1 WHERE name = 'participants'").bind(max).run();
-  else if (max > 0) await db.prepare("INSERT INTO sqlite_sequence (name, seq) VALUES ('participants', ?1)").bind(max).run();
-  return participantIdOf(max + 1);
-}
-
-async function nextParticipant(db: D1Database, link: string): Promise<string> {
-  const { results } = await db
-    .prepare('INSERT INTO participants (at, link, run_order) VALUES (?1, ?2, ?3) RETURNING n')
-    .bind(Date.now(), link, orderOfLink(link))
-    .all<{ n: number }>();
-  return participantIdOf(results[0]?.n ?? 0);
+// Participant ids of the personal links: P001, P002, … counted over the
+// links only (the open test links get their own T-numbers, participant.ts),
+// so the next person is always the highest P-number in use + 1, also after
+// several links were put under one id (three links P005-P007 merged into
+// P005: the next person is P006). Given in the same statement that starts
+// the link, so two starts at once can't get the same number.
+const MAX_P = "(SELECT COALESCE(MAX(CAST(substr(participant_id, 2) AS INTEGER)), 0) FROM invites WHERE participant_id GLOB 'P[0-9]*')";
+const NEXT_P = `('P' || printf('%03d', ${MAX_P} + 1))`;
+async function nextFree(db: D1Database): Promise<string> {
+  const { results } = await db.prepare(`SELECT ${NEXT_P} AS id`).all<{ id: string }>();
+  return results[0]?.id ?? participantIdOf(1);
 }
 
 async function readBody(request: Request): Promise<Record<string, unknown>> {
@@ -262,11 +244,10 @@ export async function handleSession(request: Request, env: SessionEnv): Promise<
       const device = newKey();
       // (an id given on the dashboard beforehand stays: the same person's
       // next link)
-      const pid = inv.participant_id ?? (await nextParticipant(db, inv.link));
       const now = Date.now();
       await db
-        .prepare('UPDATE invites SET started = ?1, device = ?2, participant_id = ?3, consented = ?1 WHERE key = ?4 AND started IS NULL')
-        .bind(now, device, pid, inv.key)
+        .prepare(`UPDATE invites SET started = ?1, device = ?2, participant_id = COALESCE(participant_id, ${NEXT_P}), consented = ?1 WHERE key = ?3 AND started IS NULL`)
+        .bind(now, device, inv.key)
         .run();
       const fresh = (await invite(db, inv.key))!;
       if (fresh.device !== device) return json(409, { error: 'other-device' }); // two first starts at once
@@ -300,9 +281,10 @@ export async function handleSession(request: Request, env: SessionEnv): Promise<
     const body = await readBody(request);
     const inv = await invite(db, keyOf(request, body));
     const st = runState(inv, request);
-    // a second press after completing is fine; an expired run may still finish
+    // a second press after completing is fine; an expired run, or one the
+    // server takes for another device, still finishes (the survey is open)
     if (st === 'finished') return json(200, { ok: true });
-    if (st !== 'ok' && st !== 'expired') return json(STATUS[st], { error: st });
+    if (st !== 'ok' && st !== 'expired' && st !== 'other-device') return json(STATUS[st], { error: st });
     await db.prepare('UPDATE invites SET completed = ?1 WHERE key = ?2').bind(Date.now(), inv!.key).run();
     return json(200, { ok: true });
   }
@@ -470,8 +452,14 @@ export async function handleAdmin(request: Request, env: SessionEnv): Promise<Re
           const { results } = await db.prepare(`UPDATE ${table} SET participant = ?1 WHERE participant = ?2 RETURNING id`).bind(id, old).all<{ id: string }>();
           moved[table] = results.length;
         }
-      const next = await resyncParticipants(db);
+      const next = await nextFree(db);
       return json(200, { ok: true, id, moved, next });
+    }
+    case '/api/admin/finish': {
+      // a link whose run finished (the survey opened) but wasn't marked so
+      const at = Number(body.at);
+      await db.prepare('UPDATE invites SET completed = ?1 WHERE key = ?2 AND completed IS NULL').bind(Number.isFinite(at) && at > 0 ? at : Date.now(), key).run();
+      break;
     }
     case '/api/admin/reopen':
       await db.prepare('UPDATE invites SET completed = NULL WHERE key = ?1').bind(key).run();

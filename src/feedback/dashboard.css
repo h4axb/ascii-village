@@ -289,6 +289,25 @@
   padding: 8px;
   vertical-align: top;
 }
+/* one person's several links, together and marked */
+.fbd-table tr.fbd-multi td {
+  background: color-mix(in srgb, var(--ds-name) 7%, transparent);
+}
+.fbd-table tr.fbd-multi td:first-child {
+  border-left: 3px solid var(--ds-name);
+}
+.fbd-table tr.fbd-multi:not(.last) td {
+  border-bottom-style: dashed;
+}
+.fbd-badge {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--ds-name);
+  border: 1px solid var(--ds-name);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-bottom: 3px;
+}
 .fbd-thumb {
   width: 96px;
   height: 64px;

@@ -5,7 +5,9 @@
 //   POST /api/participant  {link}  →  {participantId: "P001", order: "AB"}
 //
 // Every new run (a new player, or New Game) asks once; the game keeps the
-// answer in its save. Ids count up across every device: P001, P002, …
+// answer in its save. Ids count up across every device: T001, T002, … (T
+// for these open test links; the study's personal links count their own
+// P001, P002, … in session.ts, so tests never use up a participant number)
 // The order comes from the link: /1 runs the designs A then B ("AB"), /2
 // B then A ("BA"). The table creates itself on first use.
 import type { FeedbackEnv } from './feedback';
@@ -53,5 +55,5 @@ export async function handleParticipant(request: Request, env: FeedbackEnv): Pro
     .all<{ n: number }>();
   const n = results[0]?.n;
   if (!n) return json(500, { error: 'no id' });
-  return json(200, { participantId: participantIdOf(n), order });
+  return json(200, { participantId: participantIdOf(n).replace(/^P/, 'T'), order });
 }

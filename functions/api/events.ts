@@ -85,12 +85,23 @@ export async function handleEvents(request: Request, env: SessionEnv): Promise<R
   const participant = typeof ev.participant === 'string' ? ev.participant.slice(0, 40) : '';
   const at = Number(ev.at);
   if (!id || !EVENT_TYPES.includes(type) || !participant || !Number.isFinite(at)) return json(400, { error: 'id, type, participant, at required' });
-  // a personal-link run writes only under its own participant id
+  // A personal-link run writes only under its link's participant id: the
+  // id the link has NOW (an id rewritten on the dashboard while the game
+  // still sends the old one is taken over, never refused and lost). The
+  // event keeps its link's key, so the dashboard can tell several links of
+  // one person apart. The survey opening also finishes the link, in case
+  // the game's own call didn't get through.
   const key = (request.headers.get('X-Test-Key') ?? '').trim();
+  let participantId = participant;
+  let body = raw;
   if (key) {
     await ensureSchema(db);
-    const { results } = await db.prepare('SELECT participant_id FROM invites WHERE key = ?1').bind(key).all<{ participant_id: string | null }>();
-    if (!results.length || results[0].participant_id !== participant) return json(403, { error: 'not this run' });
+    const { results } = await db.prepare('SELECT participant_id, completed FROM invites WHERE key = ?1').bind(key).all<{ participant_id: string | null; completed: number | null }>();
+    if (!results.length || !results[0].participant_id) return json(403, { error: 'not this run' });
+    participantId = results[0].participant_id;
+    body = JSON.stringify({ ...ev, participant: participantId, key });
+    if (type === 'session' && (ev.data as { what?: unknown } | undefined)?.what === 'survey' && !results[0].completed)
+      await db.prepare('UPDATE invites SET completed = ?1 WHERE key = ?2 AND completed IS NULL').bind(at, key).run();
   }
   const link = typeof ev.link === 'string' ? ev.link.slice(0, 20) : null;
   // the analysis columns, worked out here from the event itself
@@ -105,7 +116,7 @@ export async function handleEvents(request: Request, env: SessionEnv): Promise<R
         'ON CONFLICT(id) DO UPDATE SET at = excluded.at, data = excluded.data, run_order = excluded.run_order, condition = excluded.condition, ' +
         'design = excluded.design, fallback_used = excluded.fallback_used WHERE events.participant = excluded.participant',
     )
-    .bind(id, at, participant, link, type, raw, order, conditionOf(order, ev.cond), designOf(ev.cond), fallback ? 1 : 0)
+    .bind(id, at, participantId, link, type, body, order, conditionOf(order, ev.cond), designOf(ev.cond), fallback ? 1 : 0)
     .run();
   return json(200, { ok: true });
 }

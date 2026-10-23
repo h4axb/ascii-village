@@ -20,14 +20,44 @@ export interface ExportInvite {
   crafts_used: number;
   bonus_tokens: number;
   consented?: number | null;
+  last_seen?: number | null;
   expiresAt: number | null;
 }
 
-// how a link's run ended: the survey, its 3 hours, or not yet
-export function endOf(i: ExportInvite): { at: number; how: 'finished' | 'expired' } | null {
+// how a link's run ended: the survey; or, its time over without the
+// survey, when the game was last open ('closed': left before the survey;
+// 'expired' only when the game never told); or not yet
+export function endOf(i: ExportInvite): { at: number; how: 'finished' | 'closed' | 'expired' } | null {
   if (i.completed) return { at: i.completed, how: 'finished' };
-  if (i.started && i.expiresAt && Date.now() > i.expiresAt) return { at: i.expiresAt, how: 'expired' };
+  if (i.started && i.expiresAt && Date.now() > i.expiresAt)
+    return i.last_seen ? { at: Math.min(i.last_seen, i.expiresAt), how: 'closed' } : { at: i.expiresAt, how: 'expired' };
   return null;
+}
+
+// ---- several links of one person: P009.1, P009.2, … ----
+// by start order (unstarted ones last); a person with one link keeps "P009"
+export function linkLabels(invites: ExportInvite[]): Map<string, string> {
+  const out = new Map<string, string>();
+  const by = new Map<string, ExportInvite[]>();
+  for (const i of invites) if (i.participant_id) by.set(i.participant_id, [...(by.get(i.participant_id) ?? []), i]);
+  for (const [id, list] of by) {
+    const sorted = [...list].sort((a, b) => (a.started ?? Infinity) - (b.started ?? Infinity) || a.created - b.created);
+    sorted.forEach((i, n) => out.set(i.key, list.length > 1 ? `${id}.${n + 1}` : id));
+  }
+  return out;
+}
+// which of a person's links a record belongs to: the link it came from
+// (newer run-log events carry its key), else the link of that person that
+// had started last by then
+export function linkOfRecord<T extends ExportInvite>(r: { participant?: string; at: number; key?: string }, invites: T[]): T | null {
+  if (r.key) return invites.find((i) => i.key === r.key) ?? null;
+  const mine = invites.filter((i) => i.participant_id === r.participant && i.started && i.started <= r.at + 60000);
+  return mine.sort((a, b) => (b.started ?? 0) - (a.started ?? 0))[0] ?? null;
+}
+// a record's sub-id (P009.2), or its participant id
+export function subIdOf(r: { participant?: string; at: number; key?: string }, invites: ExportInvite[], labels: Map<string, string>): string {
+  const l = r.participant ? linkOfRecord(r, invites) : null;
+  return (l && labels.get(l.key)) || r.participant || '';
 }
 
 const iso = (t: number | null | undefined) => (t ? new Date(t).toISOString() : null);
@@ -39,7 +69,11 @@ const usedFallback = (e: RunEvent) =>
 export function participantFile(id: string | null, events: RunEvent[], feedback: FeedbackRecord[], invites: ExportInvite[]) {
   const evs = events.filter((e) => (id ? e.participant === id : !e.participant)).sort((a, b) => a.at - b.at);
   const fbs = feedback.filter((r) => (id ? r.participant === id : !r.participant)).sort((a, b) => a.at - b.at);
-  const links = id ? invites.filter((i) => i.participant_id === id) : [];
+  const labels = linkLabels(invites);
+  const links = (id ? invites.filter((i) => i.participant_id === id) : []).sort((a, b) =>
+    (labels.get(a.key) ?? '').localeCompare(labels.get(b.key) ?? '', undefined, { numeric: true }),
+  );
+  const sub = (r: { participant?: string; at: number; key?: string }) => (id ? subIdOf(r, invites, labels) : null);
   const order = evs[0]?.order || fbs.find((r) => r.order)?.order || null;
 
   const survey = evs.find((e) => e.type === 'session' && e.data.what === 'survey');
@@ -63,6 +97,7 @@ export function participantFile(id: string | null, events: RunEvent[], feedback:
       return {
         at: e.at,
         type: e.type,
+        ...(links.length > 1 ? { linkId: sub(e) } : {}),
         link: e.link,
         part: e.part ?? null,
         step: e.step ?? null,
@@ -77,6 +112,7 @@ export function participantFile(id: string | null, events: RunEvent[], feedback:
       return {
         at,
         type: rating ? 'rating' : 'feedback',
+        ...(links.length > 1 ? { linkId: sub({ participant: r.participant, at }) } : {}),
         ...(d ? { design: d, condition: conditionOf(r.order, r.cond) } : {}),
         ...rest,
         // (a condition rating's 5 answers; a craft rating keeps its tuned
@@ -95,6 +131,7 @@ export function participantFile(id: string | null, events: RunEvent[], feedback:
     links: links.map((i) => {
       const e = endOf(i);
       return {
+        id: labels.get(i.key) ?? i.participant_id,
         key: i.key,
         link: i.link,
         note: i.note,
@@ -102,7 +139,8 @@ export function participantFile(id: string | null, events: RunEvent[], feedback:
         consent: iso(i.consented),
         started: iso(i.started),
         end: iso(e?.at),
-        endedBy: e ? (e.how === 'finished' ? 'survey' : 'expired') : i.started ? 'running' : 'not opened',
+        endedBy: e ? (e.how === 'finished' ? 'survey' : e.how) : i.started ? 'running' : 'not opened',
+        lastSeen: iso(i.last_seen),
         crafts: `${i.crafts_used} of ${i.crafts_allowed}`,
         bonusTokens: i.bonus_tokens,
         expires: iso(i.expiresAt),
@@ -111,7 +149,7 @@ export function participantFile(id: string | null, events: RunEvent[], feedback:
     summary: {
       start: iso(start),
       end: iso(end),
-      endedBy: running ? 'running' : survey || ends.some((e) => e?.how === 'finished') ? 'survey' : 'expired',
+      endedBy: running ? 'running' : survey || ends.some((e) => e?.how === 'finished') ? 'survey' : ends.some((e) => e?.how === 'closed') ? 'closed' : 'expired',
       totalMinutes: start ? minutes((end ?? Date.now()) - start) : null,
       crafts: {
         A: crafts.filter((c) => !c.data.recraftOf && designOf(c.data.design ?? c.cond) === 'A').length,

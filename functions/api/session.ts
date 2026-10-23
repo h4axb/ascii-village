@@ -61,6 +61,7 @@ export interface Invite {
   bonus_tokens: number;
   expires_extra: number;
   reopened?: number | null;
+  last_seen?: number | null;
   talk_used: number;
   consented: number | null; // when the participant agreed to the study (the first start)
   run_order: string | null; // AB or BA, from the link
@@ -89,6 +90,8 @@ export async function ensureSchema(db: D1Database) {
       if (!results.some((c) => c.name === 'consented')) await db.prepare('ALTER TABLE invites ADD COLUMN consented INTEGER').run();
       // when a finished link was reopened on the dashboard (finishFromSurveys)
       if (!results.some((c) => c.name === 'reopened')) await db.prepare('ALTER TABLE invites ADD COLUMN reopened INTEGER').run();
+      // the last moment the run's game was open (seen())
+      if (!results.some((c) => c.name === 'last_seen')) await db.prepare('ALTER TABLE invites ADD COLUMN last_seen INTEGER').run();
       // the design order the link runs (AB: /intro/1, BA: /intro/2)
       if (!results.some((c) => c.name === 'run_order')) {
         await db.prepare('ALTER TABLE invites ADD COLUMN run_order TEXT').run();
@@ -221,6 +224,14 @@ async function nextFree(db: D1Database): Promise<string> {
 // its survey event in the run log (with the link's key, or, older events,
 // under its participant id within the link's time). A survey before a
 // deliberate reopen doesn't count.
+// The run's game is open now: a run that ends without the survey ends
+// here (the dashboard's "left before the survey"). Every call the running
+// game makes with its key counts: its start, the status check every 20 s,
+// each run-log event, and the close when the page goes away.
+export async function seen(db: D1Database, key: string) {
+  if (key) await db.prepare('UPDATE invites SET last_seen = ?1 WHERE key = ?2 AND started IS NOT NULL').bind(Date.now(), key).run();
+}
+
 async function finishFromSurveys(db: D1Database) {
   const { results: has } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events'").all<{ name: string }>();
   if (!has.length) return;
@@ -269,9 +280,11 @@ export async function handleSession(request: Request, env: SessionEnv): Promise<
         .run();
       const fresh = (await invite(db, inv.key))!;
       if (fresh.device !== device) return json(409, { error: 'other-device' }); // two first starts at once
+      await seen(db, inv.key);
       return json(200, { ...(await runInfo(db, fresh)), first: true }, { 'Set-Cookie': deviceCookie(request, device) });
     }
     if (st !== 'ok') return json(STATUS[st], { error: st });
+    await seen(db, inv!.key);
     if (!inv!.device) {
       // reset on the dashboard: this browser owns the run now
       const device = newKey();
@@ -291,7 +304,18 @@ export async function handleSession(request: Request, env: SessionEnv): Promise<
     const inv = await invite(db, keyOf(request));
     const st = runState(inv, request);
     if (st !== 'ok') return json(STATUS[st], { error: st });
+    await seen(db, inv!.key);
     return json(200, await runInfo(db, inv!));
+  }
+
+  // the game's page is closing (or going to the background): last seen now
+  if (path === '/api/session/seen' && request.method === 'POST') {
+    if (!sameOrigin(request, env)) return json(403, { error: 'origin not allowed' });
+    const body = await readBody(request);
+    const inv = await invite(db, keyOf(request, body));
+    if (!inv || inv.completed) return json(200, { ok: true });
+    await seen(db, inv.key);
+    return json(200, { ok: true });
   }
 
   if (path === '/api/session/complete' && request.method === 'POST') {

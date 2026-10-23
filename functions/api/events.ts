@@ -8,7 +8,7 @@
 //                       must still be valid (it can't write into another run).
 //   GET  /api/events  — every event, newest first, for the /2/feedback
 //                       dashboard (dashboard password).
-import { dbOf, ensureSchema, isAdmin, json, sameOrigin, type D1Database, type SessionEnv } from './session';
+import { dbOf, ensureSchema, isAdmin, json, sameOrigin, seen, type D1Database, type SessionEnv } from './session';
 import { addColumns, SQL_CONDITION, SQL_DESIGN } from './feedback';
 import { conditionOf, designOf } from '../../src/feedback/schema';
 
@@ -104,6 +104,7 @@ export async function handleEvents(request: Request, env: SessionEnv): Promise<R
     const { results } = await db.prepare('SELECT participant_id, completed FROM invites WHERE key = ?1').bind(key).all<{ participant_id: string | null; completed: number | null }>();
     if (!results.length || !results[0].participant_id) return json(403, { error: 'not this run' });
     participantId = results[0].participant_id;
+    if (!results[0].completed) await seen(db, key);
     body = JSON.stringify({ ...ev, participant: participantId, key });
     if (type === 'session' && (ev.data as { what?: unknown } | undefined)?.what === 'survey' && !results[0].completed)
       await db.prepare('UPDATE invites SET completed = ?1 WHERE key = ?2 AND completed IS NULL').bind(at, key).run();

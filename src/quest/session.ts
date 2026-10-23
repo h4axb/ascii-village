@@ -278,6 +278,22 @@ export async function completeInviteRun(): Promise<void> {
   setPending(INVITE_KEY, true);
   await sendFinish();
 }
+// The game's page is closing or going to the background: the server notes
+// the moment (a run that ends without the survey ends there)
+export function sendSeen(): void {
+  if (!INVITE_KEY) return;
+  try {
+    void fetch('/api/session/seen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...keyHeader() },
+      body: JSON.stringify({ key: INVITE_KEY }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // the 20 s status check has the time within 20 s anyway
+  }
+}
+
 // this key's "finished" still waiting for the server: send it again
 export async function retryInviteFinish(): Promise<void> {
   if (INVITE_KEY && pendingKeys().includes(INVITE_KEY)) await sendFinish();

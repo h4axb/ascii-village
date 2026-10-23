@@ -107,6 +107,7 @@ import { flushRunLog, logEvent, setRunWhere, watchErrors } from './quest/runlog'
 import {
   completeInviteRun,
   retryInviteFinish,
+  sendSeen,
   currentRun,
   INVITE_KEY,
   inviteDoneHere,
@@ -778,6 +779,24 @@ export default function App() {
     const iv = window.setInterval(() => void retryInviteFinish(), 20000);
     return () => window.clearInterval(iv);
   }, []);
+  // the game closing (or hidden) before the survey: when, for the dashboard
+  // (a run without the survey ends there) and the run log
+  useEffect(() => {
+    if (!PERSONAL_LINK || !started) return;
+    const close = () => {
+      sendSeen();
+      logEvent('session', { what: 'close' });
+    };
+    const hidden = () => {
+      if (document.visibilityState === 'hidden') sendSeen();
+    };
+    window.addEventListener('pagehide', close);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('pagehide', close);
+      document.removeEventListener('visibilitychange', hidden);
+    };
+  }, [started]);
   // crafting feedback waiting from an earlier visit goes out now
   useEffect(() => {
     if (CRAFT_FEEDBACK || CRAFT_CLARIFY || QUEST_ENABLED) flushFeedbackOutbox();

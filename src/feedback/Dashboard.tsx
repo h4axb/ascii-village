@@ -27,7 +27,7 @@ import { conditionOf, designOf, FEEDBACK_REASONS, POSITIVE_REASONS, type Feedbac
 import { topTags } from '../../functions/api/feedback';
 import { KIND_LABEL, PREF_INFO, PREF_KEYS, isKind } from '../craft/prefs';
 import type { RunEvent } from '../quest/runlog';
-import { endOf, participantFile, studyFiles, zip } from './studyExport';
+import { endOf, linkLabels, linkOfRecord, participantFile, studyFiles, subIdOf, zip } from './studyExport';
 import './dashboard.css';
 
 const PASS_KEY = 'asciia-feedback-pass';
@@ -135,16 +135,27 @@ export default function Dashboard() {
         .sort(),
     [rows, events, invites],
   );
+  // several links of one person: P009.1, P009.2 (studyExport.ts), each its
+  // own box in "Include"
+  const labels = useMemo(() => linkLabels(invites), [invites]);
+  const boxes = useMemo(
+    () => people.flatMap((p) => {
+      const subs = invites.filter((i) => i.participant_id === p).map((i) => labels.get(i.key)!).filter((l) => l !== p).sort();
+      return subs.length ? subs : [p];
+    }),
+    [people, invites, labels],
+  );
+  const leftOut = (r: { participant?: string; at: number; key?: string }) => left.has(r.participant ?? '') || left.has(subIdOf(r, invites, labels));
   let data = useMemo(() => {
     const since = range === 'all' ? 0 : Date.now() - Number(range) * DAY;
     return (rows ?? []).filter(
-      (r) => r.at >= since && (kind === 'all' || r.kind === kind) && (link === 'all' || r.link === link) && (who === 'all' || r.participant === who) && !left.has(r.participant ?? ''),
+      (r) => r.at >= since && (kind === 'all' || r.kind === kind) && (link === 'all' || r.link === link) && (who === 'all' || r.participant === who) && !leftOut(r),
     );
-  }, [rows, range, kind, link, who, left]);
+  }, [rows, range, kind, link, who, left, labels]); // eslint-disable-line react-hooks/exhaustive-deps
   const evs = useMemo(() => {
     const since = range === 'all' ? 0 : Date.now() - Number(range) * DAY;
-    return events.filter((e) => e.at >= since && (link === 'all' || e.link === link) && (who === 'all' || e.participant === who) && !left.has(e.participant ?? ''));
-  }, [events, range, link, who, left]);
+    return events.filter((e) => e.at >= since && (link === 'all' || e.link === link) && (who === 'all' || e.participant === who) && !leftOut(e));
+  }, [events, range, link, who, left, labels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!rows) {
     return (
@@ -190,7 +201,7 @@ export default function Dashboard() {
               ))}
             </select>
           </label>
-          <Include people={people} anon={(rows ?? []).some((r) => !r.participant)} left={left} onToggle={toggleLeft} />
+          <Include people={boxes} anon={(rows ?? []).some((r) => !r.participant)} left={left} onToggle={toggleLeft} />
           <Seg value={range} onChange={setRange} options={[['7', '7 days'], ['30', '30 days'], ['all', 'All time']]} />
           <label>
             Kind{' '}
@@ -249,7 +260,7 @@ export default function Dashboard() {
             id={who}
             events={evs}
             feedback={all}
-            invites={invites.filter((i) => i.participant_id === who).sort((a, b) => (a.started ?? a.created) - (b.started ?? b.created))}
+            invites={invites.filter((i) => i.participant_id === who).sort((a, b) => (a.started ?? Infinity) - (b.started ?? Infinity) || a.created - b.created)}
           />
         </>
       )}
@@ -840,11 +851,7 @@ function saveOne(id: string, events: RunEvent[], feedback: FeedbackRecord[], inv
 // Which of a person's links an event belongs to: the link it came from
 // (newer events carry its key), else the link of that person that had
 // started last by then (older events)
-function linkOfEvent(e: RunEvent, invites: Invite[]): Invite | null {
-  if (e.key) return invites.find((i) => i.key === e.key) ?? null;
-  const mine = invites.filter((i) => i.participant_id === e.participant && i.started && i.started <= e.at + 60000);
-  return mine.sort((a, b) => (b.started ?? 0) - (a.started ?? 0))[0] ?? null;
-}
+const linkOfEvent = (e: RunEvent, invites: Invite[]) => linkOfRecord(e, invites);
 // a link's run as the run log saw it: its crafts, and when the survey opened
 function linkRun(i: Invite, events: RunEvent[], invites: Invite[]) {
   const mine = events.filter((e) => e.participant === i.participant_id && linkOfEvent(e, invites)?.key === i.key);
@@ -873,7 +880,8 @@ function grouped(invites: Invite[]): { i: Invite; n: number; of: number }[] {
     }
     if (done.has(i.participant_id)) continue;
     done.add(i.participant_id);
-    const mine = invites.filter((x) => x.participant_id === i.participant_id).sort((a, b) => (a.started ?? a.created) - (b.started ?? b.created));
+    // (the order of linkLabels: P009.1, P009.2, …)
+    const mine = invites.filter((x) => x.participant_id === i.participant_id).sort((a, b) => (a.started ?? Infinity) - (b.started ?? Infinity) || a.created - b.created);
     mine.forEach((x, k) => out.push({ i: x, n: k + 1, of: mine.length }));
   }
   return out;
@@ -895,6 +903,7 @@ interface Invite {
   talk_used: number;
   consented?: number | null;
   reopened?: number | null;
+  last_seen?: number | null;
   expiresAt: number | null;
   recrafts: Record<string, number>;
   itemExtras: Record<string, number>;
@@ -917,7 +926,9 @@ const when = (t: number) => new Date(t).toLocaleString([], { day: '2-digit', mon
 function inviteStatus(i: Invite): string {
   if (i.completed) return 'finished';
   if (!i.started) return 'not opened';
-  if (i.expiresAt && Date.now() > i.expiresAt) return 'expired';
+  // time over without the survey: left when the game was last open
+  if (i.expiresAt && Date.now() > i.expiresAt) return i.last_seen ? 'left before the survey' : 'expired';
+  if (i.last_seen && Date.now() - i.last_seen > 2 * 60000) return `playing · last seen ${when(i.last_seen)}`;
   return 'playing';
 }
 
@@ -953,6 +964,7 @@ function ParticipantRun({ id, events, feedback, invites }: { id: string; events:
         crafts_allowed: invites.reduce((a, i) => a + i.crafts_allowed, 0),
         completed: invites.map((i) => i.completed).filter((t): t is number => !!t).sort((a, b) => b - a)[0] ?? null,
         expiresAt: Math.max(...invites.map((i) => i.expiresAt ?? 0)) || null,
+        last_seen: Math.max(...invites.map((i) => i.last_seen ?? 0)) || null,
       }
     : null;
   const first = invite?.started ?? list[0]?.at ?? null;
@@ -976,7 +988,14 @@ function ParticipantRun({ id, events, feedback, invites }: { id: string; events:
           value={surveyAt ? 'finished' : invite ? inviteStatus(invite) : list.length ? 'playing' : '–'}
           sub={[
             first ? `start ${when(first)}` : '',
-            running ? 'end: still running' : last ? `end ${when(last)}${end?.how === 'expired' ? ' (expired)' : ''}` : '',
+            running ? 'end: still running' : last ? `end ${when(last)}${end?.how === 'expired' ? ' (expired)' : end?.how === 'closed' ? ' (closed before the survey)' : ''}` : '',
+            // each link of a person with several: P009.1 start–end
+            ...(invites.length > 1
+              ? invites.map((l) => {
+                  const e = endOf(l);
+                  return `${linkLabels(invites).get(l.key)}: ${l.started ? when(l.started) : 'not opened'}${e ? ` – ${when(e.at)}` : l.started ? ' – running' : ''}`;
+                })
+              : []),
             invite?.consented ? `consent ${when(invite.consented)}` : '',
           ]
             .filter(Boolean)
@@ -1267,7 +1286,11 @@ function Participants({
                 return (
                   <tr key={i.key} className={of > 1 ? `fbd-multi${n === 1 ? ' first' : ''}${n === of ? ' last' : ''}` : undefined}>
                     <td>
-                      {of > 1 && <div className="fbd-badge" title={`${i.participant_id} has ${of} links`}>link {n} of {of}</div>}
+                      {of > 1 && (
+                        <div className="fbd-badge" title={`${i.participant_id} has ${of} links: this is link ${n} of ${of}`}>
+                          {i.participant_id}.{n}
+                        </div>
+                      )}
                       <IdEdit
                         id={i.participant_id}
                         onSave={async (id) => {
@@ -1329,10 +1352,10 @@ function Participants({
                         if (!e || !i.started) return '–';
                         return (
                           <>
-                            {e.how === 'expired' ? 'expired ' : 'survey '}
+                            {e.how === 'finished' ? 'survey ' : e.how === 'closed' ? 'closed ' : 'expired '}
                             {when(e.at)}
                             <div>({mins(e.at - i.started)})</div>
-                            {e.how === 'expired' && !run.surveyAt && <div>no survey logged</div>}
+                            {e.how !== 'finished' && !run.surveyAt && <div>no survey logged</div>}
                           </>
                         );
                       })()}

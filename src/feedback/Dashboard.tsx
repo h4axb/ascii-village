@@ -146,15 +146,20 @@ export default function Dashboard() {
     [people, invites, labels],
   );
   const leftOut = (r: { participant?: string; at: number; key?: string }) => left.has(r.participant ?? '') || left.has(subIdOf(r, invites, labels));
+  // the selector: everyone, a person (all their links), or one link (P009.2)
+  const whoLink = useMemo(() => [...labels.entries()].find(([, l]) => l === who && l.includes('.'))?.[0] ?? null, [labels, who]);
+  const isWho = (r: { participant?: string; at: number; key?: string }) =>
+    who === 'all' || (whoLink ? subIdOf(r, invites, labels) === who : r.participant === who);
+  const person = whoLink ? (invites.find((i) => i.key === whoLink)?.participant_id ?? who) : who;
   let data = useMemo(() => {
     const since = range === 'all' ? 0 : Date.now() - Number(range) * DAY;
     return (rows ?? []).filter(
-      (r) => r.at >= since && (kind === 'all' || r.kind === kind) && (link === 'all' || r.link === link) && (who === 'all' || r.participant === who) && !leftOut(r),
+      (r) => r.at >= since && (kind === 'all' || r.kind === kind) && (link === 'all' || r.link === link) && isWho(r) && !leftOut(r),
     );
   }, [rows, range, kind, link, who, left, labels]); // eslint-disable-line react-hooks/exhaustive-deps
   const evs = useMemo(() => {
     const since = range === 'all' ? 0 : Date.now() - Number(range) * DAY;
-    return events.filter((e) => e.at >= since && (link === 'all' || e.link === link) && (who === 'all' || e.participant === who) && !leftOut(e));
+    return events.filter((e) => e.at >= since && (link === 'all' || e.link === link) && isWho(e) && !leftOut(e));
   }, [events, range, link, who, left, labels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!rows) {
@@ -194,11 +199,21 @@ export default function Dashboard() {
             Participant{' '}
             <select value={who} onChange={(e) => setWho(e.target.value)}>
               <option value="all">All participants</option>
-              {people.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
+              {people.flatMap((p) => {
+                // a person with several links: all of them, then each one
+                const subs = boxes.filter((b) => b.startsWith(`${p}.`));
+                return [
+                  <option key={p} value={p}>
+                    {subs.length ? `${p} (all links)` : p}
+                  </option>,
+                  ...subs.map((s) => (
+                    <option key={s} value={s}>
+                      {'\u00a0\u00a0'}
+                      {s}
+                    </option>
+                  )),
+                ];
+              })}
             </select>
           </label>
           <Include people={boxes} anon={(rows ?? []).some((r) => !r.participant)} left={left} onToggle={toggleLeft} />
@@ -252,15 +267,20 @@ export default function Dashboard() {
       {who !== 'all' && (
         <>
           <p>
-            <button onClick={() => saveOne(who, events, rows, invites)} title="Everything about this participant, all time, in one JSON file">
-              Save {who} (JSON)
+            <button onClick={() => saveOne(person, events, rows, invites)} title="Everything about this participant, all time, in one JSON file (each entry marked with its link)">
+              Save {person}
+              {invites.filter((i) => i.participant_id === person).length > 1 ? ' (all links)' : ''} (JSON)
             </button>
           </p>
           <ParticipantRun
             id={who}
             events={evs}
             feedback={all}
-            invites={invites.filter((i) => i.participant_id === who).sort((a, b) => (a.started ?? Infinity) - (b.started ?? Infinity) || a.created - b.created)}
+            invites={
+              whoLink
+                ? invites.filter((i) => i.key === whoLink)
+                : invites.filter((i) => i.participant_id === who).sort((a, b) => (a.started ?? Infinity) - (b.started ?? Infinity) || a.created - b.created)
+            }
           />
         </>
       )}
@@ -977,8 +997,9 @@ function ParticipantRun({ id, events, feedback, invites }: { id: string; events:
   const hints = list.filter((e) => e.type === 'hint').length;
   const errors = list.filter((e) => e.type === 'error');
   const steps = list.filter((e) => e.type === 'step');
-  const ratings = feedback.filter((r) => r.participant === id && r.rating);
-  const order = list[0]?.order ?? feedback.find((r) => r.participant === id)?.order ?? '';
+  // (the records come in filtered to this participant, or to one of their links)
+  const ratings = feedback.filter((r) => r.rating);
+  const order = list[0]?.order ?? feedback.find((r) => r.order)?.order ?? '';
   return (
     <section className="fbd-run">
       <section className="fbd-tiles">

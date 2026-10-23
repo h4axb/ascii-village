@@ -12,7 +12,7 @@
 // so it still has one. Every feedback record is tagged with it
 // (feedback/client.ts), and the final survey opens with it in the URL.
 import { LINK, linkKey, type Link } from '../link';
-import { ORDERS, QUEST_ORDER } from './quests';
+import { ORDERS, QUEST_ORDER, SURVEY_ID_PARAMS } from './quests';
 
 export type DesignOrder = 'AB' | 'BA';
 export interface TestSession {
@@ -103,13 +103,14 @@ export function studySession(s: TestSession | null): TestSession | null {
 }
 
 // The final survey's link with the session in it:
-// <url>?order=AB&test_id=P001 (keeps whatever query the url already has)
+// <url>?order=AB&tallyid=P001&test_id=P001 (keeps whatever query the url
+// already has; quests.ts SURVEY_ID_PARAMS)
 export function surveyUrl(base: string, s: TestSession | null): string {
   try {
     const u = new URL(base);
     if (s) {
       u.searchParams.set('order', s.order);
-      u.searchParams.set('test_id', s.participantId);
+      for (const p of SURVEY_ID_PARAMS) u.searchParams.set(p, s.participantId);
     }
     return u.toString();
   } catch {

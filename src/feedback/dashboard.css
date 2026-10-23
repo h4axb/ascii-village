@@ -495,3 +495,6 @@
   padding-bottom: 4px;
   border-bottom: 1px solid var(--ds-line-soft);
 }
+.fbd-next {
+  margin: 0 0 10px;
+}

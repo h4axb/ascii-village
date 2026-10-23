@@ -30,6 +30,11 @@ export const QUEST_ENABLED = QUEST_ORDER !== null;
 // The external survey opened at the very end (Tally), with ?order=…&test_id=…
 // added for the run (quest/session.ts surveyUrl)
 export const FINAL_SURVEY_URL = 'https://tally.so/r/7R8900';
+// The URL parameters that carry the participant id into the survey. Tally
+// fills a hidden field only from a parameter with exactly its name (case
+// matters, no spaces): the form's field is `tallyid`; `test_id` stays for
+// an older field of that name.
+export const SURVEY_ID_PARAMS = ['tallyid', 'test_id'];
 
 // The AI & data notice before a personal link's first start (App.tsx
 // Consent): nothing is recorded before the player agrees.

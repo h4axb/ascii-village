@@ -854,6 +854,13 @@ function linkRun(i: Invite, events: RunEvent[], invites: Invite[]) {
   };
 }
 
+// The id the next person gets: the highest P-number among the links + 1,
+// the server's own rule when a link starts (functions/api/session.ts NEXT_P)
+function nextId(invites: Invite[]): string {
+  const max = Math.max(0, ...invites.map((i) => Number(/^P(\d+)$/.exec(i.participant_id ?? '')?.[1] ?? 0)));
+  return `P${String(max + 1).padStart(3, '0')}`;
+}
+
 // The links in the table: one person's several links together (oldest
 // first), marked "link n of m"; the people in the list's own order
 function grouped(invites: Invite[]): { i: Invite; n: number; of: number }[] {
@@ -963,7 +970,7 @@ function ParticipantRun({ id, events, feedback, invites }: { id: string; events:
   return (
     <section className="fbd-run">
       <section className="fbd-tiles">
-        <Tile label="Participant (Tally test_id)" value={id} sub={[order && `order ${order}`, invite?.link ?? list[0]?.link, invite?.note].filter(Boolean).join(' · ')} />
+        <Tile label="Participant (Tally tallyid)" value={id} sub={[order && `order ${order}`, invite?.link ?? list[0]?.link, invite?.note].filter(Boolean).join(' · ')} />
         <Tile
           label="Start · end"
           value={surveyAt ? 'finished' : invite ? inviteStatus(invite) : list.length ? 'playing' : '–'}
@@ -1198,6 +1205,10 @@ function Participants({
   return (
     <section className="fbd-admin">
       <Card title="Create personal links" wide>
+        <p className="fbd-next">
+          Next new participant: <b>{nextId(invites)}</b>
+          <span className="fbd-muted"> · given when a link is first opened (not when it's created), so the next link someone opens gets it</span>
+        </p>
         <div className="fbd-filters">
           <label>
             How many <input type="number" min={1} max={100} value={count} onChange={(e) => setCount(Number(e.target.value) || 1)} style={{ width: 64 }} />

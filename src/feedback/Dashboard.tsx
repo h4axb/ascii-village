@@ -1291,6 +1291,26 @@ function Participants({
                     <td>
                       {st}
                       {i.reopened && !i.completed && <div className="fbd-muted">reopened {when(i.reopened)}</div>}
+                      {i.started && (
+                        <div>
+                          <button
+                            className="fbd-link"
+                            title="Set when the run ended: the play time from the start until the final survey"
+                            onClick={() => {
+                              const cur = i.completed ? Math.round((i.completed - i.started!) / 1000) : null;
+                              const v = window.prompt(
+                                `Play time of ${i.participant_id ?? 'this link'} until the final survey (minutes:seconds):`,
+                                cur !== null ? `${Math.floor(cur / 60)}:${String(cur % 60).padStart(2, '0')}` : '',
+                              );
+                              const m = v ? /^\s*(\d+)(?::(\d{1,2}))?\s*$/.exec(v) : null;
+                              if (!m) return;
+                              void post('/api/admin/finish', { key: i.key, at: i.started! + (Number(m[1]) * 60 + Number(m[2] ?? 0)) * 1000 });
+                            }}
+                          >
+                            set finish time
+                          </button>
+                        </div>
+                      )}
                       {unmarked && (
                         <div>
                           <button className="fbd-link" onClick={() => void post('/api/admin/finish', { key: i.key, at: run.surveyAt })} title="Saves this link as finished, at the time the survey opened">
@@ -1398,7 +1418,89 @@ function Participants({
           </table>
         </div>
       </Card>
+      <Orphans events={events} feedback={feedback} invites={invites} post={post} />
     </section>
+  );
+}
+
+// Ids with records but no personal link: e.g. an open /1, /2 test run from
+// before those got T-numbers, or an id a link no longer has. Each can be
+// deleted or moved to another id.
+function Orphans({
+  events,
+  feedback,
+  invites,
+  post,
+}: {
+  events: RunEvent[];
+  feedback: FeedbackRecord[];
+  invites: Invite[];
+  post: (path: string, body: Record<string, unknown>) => Promise<unknown>;
+}) {
+  const linked = new Set(invites.map((i) => i.participant_id).filter(Boolean));
+  const ids = [...new Set([...events.map((e) => e.participant), ...feedback.map((r) => r.participant ?? '')])].filter((p) => p && !linked.has(p)).sort();
+  if (!ids.length) return null;
+  return (
+    <Card title={`Ids without a link (${ids.length})`} wide>
+      <p className="fbd-muted fbd-note">
+        Records under an id no personal link has: usually a run on an open test link (/1, /2), or an id that was changed. Delete them, or move them to the person
+        they belong to.
+      </p>
+      <div className="fbd-table-wrap">
+        <table className="fbd-table">
+          <thead>
+            <tr>
+              <th>Id</th>
+              <th>Played on</th>
+              <th>From · to</th>
+              <th>Records</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {ids.map((id) => {
+              const evs = events.filter((e) => e.participant === id);
+              const fbs = feedback.filter((r) => r.participant === id);
+              const times = [...evs.map((e) => e.at), ...fbs.map((r) => r.at)];
+              const links = [...new Set([...evs.map((e) => e.link), ...fbs.map((r) => r.link)].filter(Boolean))];
+              return (
+                <tr key={id}>
+                  <td>
+                    <b>{id}</b>
+                  </td>
+                  <td>{links.join(', ') || '–'}</td>
+                  <td className="fbd-muted">
+                    {when(Math.min(...times))} · {when(Math.max(...times))}
+                  </td>
+                  <td className="fbd-muted">
+                    {evs.length} run-log events, {fbs.length} ratings
+                  </td>
+                  <td className="fbd-help">
+                    <button
+                      onClick={() => {
+                        const into = window.prompt(`Move everything ${id} recorded to which id? (e.g. P008)`, '')?.trim();
+                        if (into) void post('/api/admin/records', { id, into: /^\d+$/.test(into) ? `P${into.padStart(3, '0')}` : into.toUpperCase() });
+                      }}
+                    >
+                      Move to…
+                    </button>
+                    <button
+                      className="fbd-danger"
+                      onClick={() => {
+                        if (window.confirm(`Delete everything ${id} recorded (${evs.length} run-log events, ${fbs.length} ratings)? This can't be undone.`))
+                          void post('/api/admin/records', { id });
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }
 

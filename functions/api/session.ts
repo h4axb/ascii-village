@@ -412,6 +412,24 @@ export async function handleAdmin(request: Request, env: SessionEnv): Promise<Re
     return json(200, { keys, link });
   }
 
+  // Records under an id that has no personal link (e.g. an open /1 test run
+  // from before those got T-numbers): deleted, or moved to another id
+  if (path === '/api/admin/records') {
+    const id = typeof body.id === 'string' ? body.id.trim() : '';
+    if (!id) return json(400, { error: 'no id' });
+    const into = typeof body.into === 'string' ? body.into.trim() : '';
+    const done: Record<string, number> = {};
+    for (const table of ['events', 'feedback']) {
+      const { results: has } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1").bind(table).all<{ name: string }>();
+      if (!has.length) continue;
+      const { results } = into
+        ? await db.prepare(`UPDATE ${table} SET participant = ?1, data = json_set(data, '$.participant', ?1) WHERE participant = ?2 RETURNING id`).bind(into, id).all<{ id: string }>()
+        : await db.prepare(`DELETE FROM ${table} WHERE participant = ?1 RETURNING id`).bind(id).all<{ id: string }>();
+      done[table] = results.length;
+    }
+    return json(200, { ok: true, [into ? 'moved' : 'removed']: done });
+  }
+
   const key = typeof body.key === 'string' ? body.key : '';
   const inv = await invite(db, key);
   if (!inv) return json(404, { error: 'unknown key' });
@@ -479,9 +497,10 @@ export async function handleAdmin(request: Request, env: SessionEnv): Promise<Re
       return json(200, { ok: true, id, moved, next });
     }
     case '/api/admin/finish': {
-      // a link whose run finished (the survey opened) but wasn't marked so
+      // a link whose run finished (the survey opened) but wasn't marked so,
+      // or its finish time set by hand (the play time until the survey)
       const at = Number(body.at);
-      await db.prepare('UPDATE invites SET completed = ?1 WHERE key = ?2 AND completed IS NULL').bind(Number.isFinite(at) && at > 0 ? at : Date.now(), key).run();
+      await db.prepare('UPDATE invites SET completed = ?1 WHERE key = ?2').bind(Number.isFinite(at) && at > 0 ? at : Date.now(), key).run();
       break;
     }
     case '/api/admin/reopen':

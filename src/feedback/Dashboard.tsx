@@ -887,6 +887,7 @@ interface Invite {
   bonus_tokens: number;
   talk_used: number;
   consented?: number | null;
+  reopened?: number | null;
   expiresAt: number | null;
   recrafts: Record<string, number>;
   itemExtras: Record<string, number>;
@@ -1278,6 +1279,7 @@ function Participants({
                     </td>
                     <td>
                       {st}
+                      {i.reopened && !i.completed && <div className="fbd-muted">reopened {when(i.reopened)}</div>}
                       {unmarked && (
                         <div>
                           <button className="fbd-link" onClick={() => void post('/api/admin/finish', { key: i.key, at: run.surveyAt })} title="Saves this link as finished, at the time the survey opened">
@@ -1296,9 +1298,10 @@ function Participants({
                         if (!e || !i.started) return '–';
                         return (
                           <>
-                            {e.how === 'expired' ? 'expired ' : ''}
+                            {e.how === 'expired' ? 'expired ' : 'survey '}
                             {when(e.at)}
                             <div>({mins(e.at - i.started)})</div>
+                            {e.how === 'expired' && !run.surveyAt && <div>no survey logged</div>}
                           </>
                         );
                       })()}

@@ -60,6 +60,7 @@ export interface Invite {
   crafts_used: number;
   bonus_tokens: number;
   expires_extra: number;
+  reopened?: number | null;
   talk_used: number;
   consented: number | null; // when the participant agreed to the study (the first start)
   run_order: string | null; // AB or BA, from the link
@@ -86,6 +87,8 @@ export async function ensureSchema(db: D1Database) {
       // a database made before the consent step: add its column
       const { results } = await db.prepare('PRAGMA table_info(invites)').all<{ name: string }>();
       if (!results.some((c) => c.name === 'consented')) await db.prepare('ALTER TABLE invites ADD COLUMN consented INTEGER').run();
+      // when a finished link was reopened on the dashboard (finishFromSurveys)
+      if (!results.some((c) => c.name === 'reopened')) await db.prepare('ALTER TABLE invites ADD COLUMN reopened INTEGER').run();
       // the design order the link runs (AB: /intro/1, BA: /intro/2)
       if (!results.some((c) => c.name === 'run_order')) {
         await db.prepare('ALTER TABLE invites ADD COLUMN run_order TEXT').run();
@@ -211,6 +214,21 @@ const NEXT_P = `('P' || printf('%03d', ${MAX_P} + 1))`;
 async function nextFree(db: D1Database): Promise<string> {
   const { results } = await db.prepare(`SELECT ${NEXT_P} AS id`).all<{ id: string }>();
   return results[0]?.id ?? participantIdOf(1);
+}
+
+// A link whose player opened the final survey is finished at that click,
+// stored for good, even when the game's own "finished" call never arrived:
+// its survey event in the run log (with the link's key, or, older events,
+// under its participant id within the link's time). A survey before a
+// deliberate reopen doesn't count.
+async function finishFromSurveys(db: D1Database) {
+  const { results: has } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events'").all<{ name: string }>();
+  if (!has.length) return;
+  const survey =
+    "SELECT MIN(e.at) FROM events e WHERE e.type = 'session' AND json_extract(e.data, '$.data.what') = 'survey' " +
+    "AND e.at > COALESCE(invites.reopened, 0) AND (json_extract(e.data, '$.key') = invites.key OR (json_extract(e.data, '$.key') IS NULL " +
+    `AND e.participant = invites.participant_id AND e.at >= invites.started AND e.at <= invites.started + ${RUN_MS} + invites.expires_extra))`;
+  await db.prepare(`UPDATE invites SET completed = (${survey}) WHERE completed IS NULL AND started IS NOT NULL AND (${survey}) IS NOT NULL`).run();
 }
 
 async function readBody(request: Request): Promise<Record<string, unknown>> {
@@ -356,6 +374,7 @@ export async function handleAdmin(request: Request, env: SessionEnv): Promise<Re
   const path = new URL(request.url).pathname;
 
   if (path === '/api/admin/invites' && request.method === 'GET') {
+    await finishFromSurveys(db);
     const { results } = await db.prepare('SELECT * FROM invites ORDER BY created DESC LIMIT 2000').all<Invite>();
     const { results: rc } = await db
       .prepare("SELECT key, item, COUNT(*) AS n FROM craft_ids WHERE kind = 'recraft' GROUP BY key, item")
@@ -466,7 +485,7 @@ export async function handleAdmin(request: Request, env: SessionEnv): Promise<Re
       break;
     }
     case '/api/admin/reopen':
-      await db.prepare('UPDATE invites SET completed = NULL WHERE key = ?1').bind(key).run();
+      await db.prepare('UPDATE invites SET completed = NULL, reopened = ?1 WHERE key = ?2').bind(Date.now(), key).run();
       break;
     default:
       return new Response('Not Found', { status: 404 });

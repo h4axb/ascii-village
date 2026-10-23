@@ -106,6 +106,7 @@ import { onThemeChange, themeRevision, pondLook, themeSwatch } from './theme';
 import { flushRunLog, logEvent, setRunWhere, watchErrors } from './quest/runlog';
 import {
   completeInviteRun,
+  retryInviteFinish,
   currentRun,
   INVITE_KEY,
   inviteDoneHere,
@@ -758,7 +759,10 @@ export default function App() {
   useEffect(() => {
     if (!PERSONAL_LINK) return;
     if (!INVITE_KEY) return setInvite('no-key');
-    if (inviteDoneHere()) return setInvite('finished');
+    if (inviteDoneHere()) {
+      void retryInviteFinish(); // in case the server never heard it
+      return setInvite('finished');
+    }
     fetch('/api/session/check', { headers: inviteHeaders() })
       .then((r) => r.json())
       .then((d: { state?: string }) => {
@@ -767,6 +771,12 @@ export default function App() {
         setInvite(st === 'finished' || st === 'expired' || st === 'other-device' || st === 'unknown' ? st : 'ok');
       })
       .catch(() => setInvite('ok')); // offline: play (crafting goes offline too)
+  }, []);
+  // the survey's "finished" until the server has it (quest/session.ts)
+  useEffect(() => {
+    if (!PERSONAL_LINK) return;
+    const iv = window.setInterval(() => void retryInviteFinish(), 20000);
+    return () => window.clearInterval(iv);
   }, []);
   // crafting feedback waiting from an earlier visit goes out now
   useEffect(() => {

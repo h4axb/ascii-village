@@ -234,20 +234,52 @@ export async function refreshRun(): Promise<RunInfo | null> {
   return run;
 }
 
-// The survey opened: the key is done for good
-export async function completeInviteRun(): Promise<void> {
-  if (!INVITE_KEY) return;
-  markInviteDone();
+// The survey opened: the key is done for good. The server must hear it
+// (that ends the run's time on the dashboard): until it answers, the key
+// stays "finish pending" in this browser and retryInviteFinish sends it
+// again (every 20 s while the page is open, and on the next visit).
+const PENDING_STORE = 'asciia-invite-finish-pending';
+const pendingKeys = () => {
   try {
-    await fetch('/api/session/complete', {
+    return (localStorage.getItem(PENDING_STORE) ?? '').split(' ').filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+const setPending = (key: string, on: boolean) => {
+  try {
+    const rest = pendingKeys().filter((k) => k !== key);
+    localStorage.setItem(PENDING_STORE, (on ? [...rest, key] : rest).join(' '));
+  } catch {
+    // no storage: the one try only
+  }
+};
+async function sendFinish(): Promise<boolean> {
+  if (!INVITE_KEY) return true;
+  try {
+    const res = await fetch('/api/session/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...keyHeader() },
       body: JSON.stringify({ key: INVITE_KEY }),
       keepalive: true,
     });
+    // done, or nothing left to finish (the link is gone)
+    const settled = res.ok || res.status === 404;
+    if (settled) setPending(INVITE_KEY, false);
+    return settled;
   } catch {
-    // the local mark stays; the key also expires on its own
+    return false;
   }
+}
+export async function completeInviteRun(): Promise<void> {
+  if (!INVITE_KEY) return;
+  markInviteDone();
+  setPending(INVITE_KEY, true);
+  await sendFinish();
+}
+// this key's "finished" still waiting for the server: send it again
+export async function retryInviteFinish(): Promise<void> {
+  if (INVITE_KEY && pendingKeys().includes(INVITE_KEY)) await sendFinish();
 }
 
 // Which craft an AI call belongs to (set while a crafting panel is open):

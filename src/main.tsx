@@ -6,8 +6,10 @@ import './styles.css';
 
 // /2/feedback is the crafting-feedback dashboard, not the game. Loaded on
 // demand, so it adds nothing to the game's own download.
-const Dashboard = lazy(() => import('./feedback/Dashboard'));
-const DASHBOARD = /^\/2\/feedback\/?$/.test(window.location.pathname);
+// (left out of the review build entirely: review.ts)
+const Dashboard = import.meta.env.VITE_APP_MODE === 'review' ? () => null : lazy(() => import('./feedback/Dashboard'));
+// (never in the review build: review.ts)
+const DASHBOARD = import.meta.env.VITE_APP_MODE !== 'review' && /^\/2\/feedback\/?$/.test(window.location.pathname);
 
 const rootEl = document.getElementById('root')!;
 

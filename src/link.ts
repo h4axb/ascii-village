@@ -11,7 +11,8 @@
 export type Link = '0' | '1' | '2' | '3' | '4' | 'test';
 
 const m = /^(?:\/intro)?\/([0-4]|test)\/?$/.exec(window.location.pathname);
-export const LINK: Link = (m?.[1] as Link | undefined) ?? '0';
+// (the review build plays the study flow, as /1, on every path: review.ts)
+export const LINK: Link = import.meta.env.VITE_APP_MODE === 'review' ? '1' : ((m?.[1] as Link | undefined) ?? '0');
 
 export const linkKey = (base: string) => (LINK === '0' ? base : `${base}-${LINK}`);
 // the key `base` has on another link (an uploaded save that belongs there)

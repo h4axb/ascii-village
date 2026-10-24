@@ -136,6 +136,8 @@ import { EditorWorldLayers } from './editor/EditorLayers';
 import DialogueBox from './DialogueBox';
 import type { DialogueLine } from './DialogueBox';
 import NameEntryPanel from './NameEntryPanel';
+import ReviewAi from './ReviewAi';
+import { REVIEW } from './review';
 import Letterbox from './Letterbox';
 import IntroA, { type IntroAHandle } from './IntroA';
 import IntroCinematic from './cinematic/IntroCinematic';
@@ -626,7 +628,7 @@ const LABEL_BESIDE: Partial<Record<EntityKind, number>> = { palm: 0.78 };
 // The players' links /intro/1 and /intro/2 keep the camera at the closest
 // zoom, on the player: the mouse wheel does nothing there (cinematics and
 // hints still move it)
-const ZOOM_LOCKED = /^\/intro\/[12]\/?$/.test(window.location.pathname);
+const ZOOM_LOCKED = /^\/intro\/[12]\/?$/.test(window.location.pathname) || REVIEW;
 
 // O (options) opens Settings, like the profile menu's Settings, and closes it
 const SETTINGS_KEY = 'o';
@@ -1287,6 +1289,8 @@ function Landing({ onStart }: { onStart: () => void }) {
           ))}
         </div>
         {error && <div className="landing-save-error">{error}</div>}
+        {/* the review build: the developer's own AI key (review.ts) */}
+        {REVIEW && <ReviewAi compact />}
       </div>
 
       {confirmNewGame && (
@@ -1372,7 +1376,9 @@ const CINEMATIC_START = (() => {
 })();
 // The test links /1 and /2 (not the players' /intro/1, /intro/2) can skip
 // the intro, in the live game too
-const SKIP_INTRO_LINK = /^\/[12]\/?$/.test(PATH);
+const SKIP_INTRO_LINK = /^\/[12]\/?$/.test(PATH) || REVIEW; // (the review build too)
+// the review build's last words instead of the survey (review.ts)
+const REVIEW_END = ['That’s the end of the game. Thank you for playing!', 'Finish the game to go back to the start screen.'];
 // /1 and /2 (the study orders) play it like / does: once for a new save,
 // never again once it's done (quest steps autosave)
 const INTRO_LINK: 'skip' | 'force' | 'default' = /^\/([034]|test)\/?$/.test(PATH)
@@ -7595,11 +7601,24 @@ function Game() {
               </div>
             ) : (
               <div className="rq-end">
-                {QL.end.map((t) => (
+                {(REVIEW ? REVIEW_END : QL.end).map((t) => (
                   <p key={t} className="ds-panel-text">
                     {t}
                   </p>
                 ))}
+                {/* the review build: no survey; back to the start screen, a new game */}
+                {REVIEW && (
+                  <button
+                    className="ds-action go"
+                    onClick={() => {
+                      deleteSave();
+                      window.location.assign('/');
+                    }}
+                  >
+                    <span>Finish game</span>
+                  </button>
+                )}
+                {!REVIEW && (
                 <button
                   className="ds-action go"
                   onClick={() => {
@@ -7615,6 +7634,7 @@ function Game() {
                 >
                   <span>Open final survey</span>
                 </button>
+                )}
                 {quest.part === 'end' && <p className="ds-muted">Thank you for playing. You can close this tab now.</p>}
               </div>
             )
@@ -7767,8 +7787,15 @@ function Game() {
                   </button>
                 )}
               </div>
+              {/* the review build: the developer's own AI key (review.ts) */}
+              {REVIEW && (
+                <>
+                  <div className="ds-settings-section">AI</div>
+                  <ReviewAi />
+                </>
+              )}
               {/* the user test's id for this run (quest/session.ts) */}
-              {testSession && (
+              {testSession && !REVIEW && (
                 <div className="ds-muted ds-settings-note">
                   Test ID {testSession.participantId} · order {testSession.order}
                 </div>

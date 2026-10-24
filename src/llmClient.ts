@@ -28,11 +28,17 @@
 // VITE_LLM_DISABLED=1 at build time ships a build with the mock/offline
 // behavior instead (no proxy calls at all).
 import { aiHeaders } from './quest/session';
+import { REVIEW, readReviewAi } from './review';
+// the review build: the developer's own provider and key (review.ts), called
+// straight from their browser; no key, no AI (the offline crafting)
+const REVIEW_AI = REVIEW ? readReviewAi() : null;
 
-const API_KEY = import.meta.env.DEV ? (import.meta.env.VITE_LLM_API_KEY?.trim() ?? '') : '';
+const API_KEY = import.meta.env.DEV ? (import.meta.env.VITE_LLM_API_KEY?.trim() ?? '') : (REVIEW_AI?.key ?? '');
 const BASE_URL = import.meta.env.DEV
   ? (import.meta.env.VITE_LLM_BASE_URL?.trim() || 'https://router.requesty.ai/v1').replace(/\/$/, '')
-  : '/api';
+  : REVIEW_AI
+    ? REVIEW_AI.base
+    : '/api';
 const authHeader = (): Record<string, string> => (API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {});
 
 // ONE model for everything (user directive): sprite generation, fun facts,
@@ -44,7 +50,7 @@ const authHeader = (): Record<string, string> => (API_KEY ? { Authorization: `Be
 // earlier version defaulted SMART to claude-sonnet-5, which silently put
 // sprite generation back on an expensive model whenever the env line went
 // missing. Now a missing env line can only ever mean "use the one model".
-const MODEL = import.meta.env.VITE_LLM_MODEL?.trim() || 'google/gemini-2.5-flash-lite';
+const MODEL = REVIEW_AI?.model || import.meta.env.VITE_LLM_MODEL?.trim() || 'google/gemini-2.5-flash-lite';
 const MODEL_FAST = import.meta.env.VITE_LLM_MODEL_FAST?.trim() || MODEL;
 const MODEL_SMART = import.meta.env.VITE_LLM_MODEL_SMART?.trim() || MODEL;
 // Optional retry-once-with-a-different-model fallbacks; unset = disabled.
@@ -63,7 +69,9 @@ export const MODELS = {
 // proxy holds the key) unless the build opted out with VITE_LLM_DISABLED=1.
 export const llmEnabled = import.meta.env.DEV
   ? API_KEY.length > 0
-  : import.meta.env.VITE_LLM_DISABLED !== '1';
+  : REVIEW_AI
+    ? API_KEY.length > 0
+    : import.meta.env.VITE_LLM_DISABLED !== '1';
 
 // A message part — text, or an image (data URL or https URL). Vision-capable
 // models (Claude via the gateway) accept an array of parts as `content`.

@@ -13,6 +13,7 @@
 // (feedback/client.ts), and the final survey opens with it in the URL.
 import { LINK, linkKey, type Link } from '../link';
 import { ORDERS, QUEST_ORDER, SURVEY_ID_PARAMS } from './quests';
+import { REVIEW } from '../review';
 
 export type DesignOrder = 'AB' | 'BA';
 export interface TestSession {
@@ -46,6 +47,7 @@ function localId(): string {
 export async function requestTestSession(): Promise<TestSession> {
   // the testing link: no participant id from the server (link.ts)
   if (LINK === 'test') return { participantId: 'TEST', order: 'AB' };
+  if (REVIEW) return { participantId: 'REVIEW', order: 'AB' };
   // a personal link: the run the server started for its key
   if (INVITE_KEY && run?.participantId) return { participantId: run.participantId, order: run.order, key: INVITE_KEY };
   const order = LINK_ORDER ?? 'AB';

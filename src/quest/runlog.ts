@@ -17,6 +17,7 @@
 import { currentTestSession, currentWhere, inviteHeaders, setCurrentWhere, type RunWhere } from './session';
 import { newFeedbackId } from '../feedback/client';
 import { LINK } from '../link';
+import { REVIEW } from '../review';
 
 export type RunEventType = 'craft' | 'hint' | 'step' | 'error' | 'session';
 export interface RunEvent {
@@ -92,7 +93,7 @@ export async function flushRunLog() {
 // Log (or update, same id) one event. Never throws. Returns the id.
 export function logEvent(type: RunEventType, data: Record<string, unknown>, id: string = newFeedbackId()): string {
   const ts = currentTestSession();
-  if (!ts || LINK === 'test') return id; // the testing link logs nothing
+  if (!ts || LINK === 'test' || REVIEW) return id; // the testing link and the review build log nothing
   let ev: RunEvent = {
     id,
     at: Date.now(),

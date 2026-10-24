@@ -5084,3 +5084,45 @@ pre {
   flex-wrap: wrap;
   gap: 10px;
 }
+
+/* the review build's AI key (ReviewAi.tsx) */
+.review-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+  margin-top: 14px;
+  font-size: 14px;
+  pointer-events: auto;
+}
+.review-ai label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.review-ai input {
+  font: inherit;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+}
+.review-ai-actions {
+  display: flex;
+  gap: 8px;
+}
+.review-ai.compact {
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.review-ai .ds-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}

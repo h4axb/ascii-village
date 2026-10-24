@@ -86,7 +86,9 @@ export default function Dashboard() {
   const [tip, setTip] = useState<Tip>(null);
   showTip = setTip;
 
-  async function load(p: string) {
+  // `quiet`: a first try without a password (the site was unlocked with it,
+  // worker/lock.ts): no "wrong password" when it isn't
+  async function load(p: string, quiet = false) {
     setLoading(true);
     setError(null);
     try {
@@ -95,7 +97,7 @@ export default function Dashboard() {
       if (res.status === 401) {
         sessionStorage.removeItem(PASS_KEY);
         setPass('');
-        setError('Wrong password.');
+        if (!quiet) setError('Wrong password.');
       } else if (res.status === 503) {
         setError(`Feedback storage isn't set up yet: ${body?.error ?? ''}. See docs/Deploy-Cloudflare.md → Crafting feedback.`);
       } else if (!res.ok || !Array.isArray(body)) {
@@ -118,7 +120,7 @@ export default function Dashboard() {
     }
   }
   useEffect(() => {
-    if (pass) void load(pass);
+    void load(pass, !pass);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const links = useMemo(() => [...new Set((rows ?? []).map((r) => r.link))].sort(), [rows]);
@@ -194,6 +196,9 @@ export default function Dashboard() {
       <header className="fbd-head">
         <h1>Crafting feedback</h1>
         <Seg value={tab} onChange={setTab} options={[['feedback', 'Evaluation'], ['participants', 'Participants']]} />
+        <a className="fbd-link fbd-lock" href="/api/lock" title="Lock the site again in this browser (the password is asked next time)">
+          Lock
+        </a>
         <div className="fbd-filters" style={tab !== 'feedback' ? { display: 'none' } : undefined}>
           <label>
             Participant{' '}

@@ -1,0 +1,24 @@
+// The review Worker: the game alone for a developer, separate from the main
+// site (wrangler.jsonc). Built with `npm run build:review` (→ dist-review/),
+// deployed with `npx wrangler deploy --config wrangler.review.jsonc`.
+// Setup: docs/Review-Deploy.md.
+//
+// On purpose: no database, no AI key, no other bindings. The only secret is
+// REVIEW_PASSWORD (the lock), set once:
+//   npx wrangler secret put REVIEW_PASSWORD --config wrangler.review.jsonc
+{
+	"name": "island-preview",
+	"main": "worker/review.ts",
+	"compatibility_date": "2026-09-01",
+	"assets": {
+		"directory": "./dist-review",
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application",
+		// the lock (worker/lock.ts) is checked before any page is served
+		"run_worker_first": true
+	},
+	"workers_dev": true,
+	"observability": {
+		"enabled": false
+	}
+}

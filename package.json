@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:review": "tsc --noEmit && vite build --mode review --outDir dist-review",
     "preview": "vite preview",
     "build:catalog": "node --env-file=.env scripts/build-catalog.mjs",
     "build:sprites": "node --env-file=.env scripts/build-sprites.mjs",

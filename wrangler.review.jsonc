@@ -3,9 +3,8 @@
 // deployed with `npx wrangler deploy --config wrangler.review.jsonc`.
 // Setup: docs/Review-Deploy.md.
 //
-// On purpose: no database, no AI key, no other bindings. The only secret is
-// REVIEW_PASSWORD (the lock), set once:
-//   npx wrangler secret put REVIEW_PASSWORD --config wrangler.review.jsonc
+// On purpose: no database, no AI key, no secrets, no other bindings; open
+// to whoever has the link (worker/review.ts).
 {
 	"name": "island-preview",
 	"main": "worker/review.ts",
@@ -14,7 +13,7 @@
 		"directory": "./dist-review",
 		"binding": "ASSETS",
 		"not_found_handling": "single-page-application",
-		// the lock (worker/lock.ts) is checked before any page is served
+		// the Worker answers /api/* (404) and marks pages noindex
 		"run_worker_first": true
 	},
 	"workers_dev": true,

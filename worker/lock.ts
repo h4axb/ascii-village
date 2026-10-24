@@ -1,8 +1,8 @@
 // The site lock: every page and API that isn't a participant's needs a
 // password first, checked here before anything of the game is sent.
 // Unlocking sets a signed, HttpOnly cookie (30 days); the dashboard's
-// password and the main site's lock are the same (FEEDBACK_ADMIN_TOKEN),
-// the review Worker has its own (REVIEW_PASSWORD, worker/review.ts).
+// password and the main site's lock are the same (FEEDBACK_ADMIN_TOKEN).
+// (The review Worker, worker/review.ts, has no lock: nothing to protect.)
 //
 //   POST /api/unlock   the login form (password, next) → cookie + back
 //   GET  /api/lock     forget the cookie

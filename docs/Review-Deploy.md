@@ -14,7 +14,7 @@ The game's JavaScript is public by nature: anyone can read it in DevTools, inclu
 A separate Worker, `island-preview`, built from the same repository:
 
 - **What it plays:** the game alone (`npm run build:review`, `src/review.ts`). That is the intro (with "Skip intro"), then the quests from questline 1, design A then B. At the end there is "Finish game" instead of the survey, which goes back to the start screen.
-- **Its own password** (`REVIEW_PASSWORD`), never the dashboard's.
+- **No password:** whoever has the link plays. There is nothing on it to protect.
 - **No database, no AI key, no API** (`worker/review.ts` answers 404 for `/api/*`). It can't reach the main Worker or its data.
 - **AI:** the developer enters their own OpenAI-compatible endpoint, key and model, on the start screen or in Settings → AI. The key stays in their browser, and the game calls their provider directly. Without a key, crafting runs offline.
 
@@ -24,25 +24,23 @@ A separate Worker, `island-preview`, built from the same repository:
 2. **Build settings:**
    - **Build command:** `npm run build:review`
    - **Deploy command:** `npx wrangler deploy --config wrangler.review.jsonc`
-3. **Settings → Variables and Secrets:** add a **Secret** `REVIEW_PASSWORD` with the password you give the developer. Use a different one from the dashboard password.
-4. **Deploy.** The link is `https://island-preview.<your-account>.workers.dev`. Send the developer the link and the review password, separately.
+3. **Deploy.** The link is `https://island-preview.<your-account>.workers.dev`. Send it to the developer.
 
 From a terminal instead of the dashboard:
 
 ```sh
 npm run build:review
 npx wrangler deploy --config wrangler.review.jsonc
-npx wrangler secret put REVIEW_PASSWORD --config wrangler.review.jsonc
 ```
 
 ### Before sending the link
 
-- In a private window, open the review link: you should get the password page.
-- After entering the password, DevTools → Network should show requests only to the review link and, once a key is entered, to the AI provider. Nothing goes to the main site.
+- In a private window, open the review link: the game should start directly.
+- DevTools → Network should show requests only to the review link and, once a key is entered, to the AI provider. Nothing goes to the main site.
 - `https://island-preview…/api/admin/invites` → 404.
 
 Both Workers share your `workers.dev` account subdomain, which shows they belong to the same account but opens nothing. For full separation, use a second Cloudflare account or a custom domain.
 
 ### Afterwards
 
-Change `REVIEW_PASSWORD` to lock the developer out, or delete the `island-preview` Worker. The main site is not affected.
+Delete the `island-preview` Worker to end the developer's access. The main site is not affected.

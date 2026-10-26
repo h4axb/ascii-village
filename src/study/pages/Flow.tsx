@@ -9,6 +9,7 @@ import { FitSprite } from '../../ui';
 import { Bars } from '../charts';
 import { describe, fmt } from '../stats';
 import { csv, Empty, Fig, Section, useCtx } from '../ui';
+import { GAP_MIN } from '../model';
 
 const PART_LABEL: Record<string, string> = {
   q1: 'Quest 1',
@@ -35,6 +36,7 @@ const STEP_LABEL: Record<string, string> = {
 };
 const SESSION_LABEL: Record<string, string> = { start: 'Start', resume: 'Fortgesetzt (neu geladen)', survey: 'Umfrage geöffnet', close: 'Spiel geschlossen', 'extra-token': 'Zusatz-Token', 'budget-refused': 'KI-Budget erschöpft' };
 const clock = (t: number) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const minOf = (m: number | null | undefined) => (m == null || !Number.isFinite(m) ? '–' : mins(m * 60000));
 const mins = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.round((ms % 60000) / 1000)).padStart(2, '0')}`;
 
 interface Result {
@@ -368,6 +370,9 @@ export function GameFlow() {
   const parts = [...new Set(perRun.flatMap((r) => Object.keys(r.t)))].sort((a, b) => Object.keys(PART_LABEL).indexOf(a) - Object.keys(PART_LABEL).indexOf(b));
   const total = (t: Record<string, number>) => Object.values(t).reduce((a, b) => a + b, 0);
   const single = scope.kind !== 'all';
+  // the durations: of the person, or of the one link chosen
+  const personOf = (id: string) => slice.persons.find((p) => p.id === id);
+  const one = scope.kind === 'link' ? slice.links[0] : slice.persons[0];
 
   return (
     <Section title="Spielablauf" id="ablauf">
@@ -385,7 +390,9 @@ export function GameFlow() {
                   {PART_LABEL[p] ?? p}
                 </th>
               ))}
-              <th className="num">Summe</th>
+              <th className="num">Summe Schritte</th>
+              <th className="num">Spiel-Uhr</th>
+              <th className="num">Link-Dauer</th>
             </tr>
           </thead>
           <tbody>
@@ -400,6 +407,8 @@ export function GameFlow() {
                   </td>
                 ))}
                 <td className="num">{mins(total(r.t))}</td>
+                <td className="num">{minOf(personOf(r.k)?.clockMinutes)}</td>
+                <td className="num">{minOf(personOf(r.k)?.linkMinutes)}</td>
               </tr>
             ))}
             <tr className="st-sumrow">
@@ -413,9 +422,22 @@ export function GameFlow() {
                 );
               })}
               <td className="num">{mins(describe(perRun.map((r) => total(r.t))).median || 0)}</td>
+              <td className="num">{minOf(describe(perRun.map((r) => personOf(r.k)?.clockMinutes).filter((x): x is number => x != null)).median)}</td>
+              <td className="num">{minOf(describe(perRun.map((r) => personOf(r.k)?.linkMinutes).filter((x): x is number => x != null)).median)}</td>
             </tr>
           </tbody>
         </table>
+      )}
+      {single && (
+        <p className="st-flowsum">
+          Spiel-Uhr bis Umfrage: <strong>{minOf(one?.clockMinutes)}</strong> · Link-Dauer: {minOf(one?.linkMinutes)} · Summe der Schritte: {minOf(one?.stepMinutes)}
+          {one && one.gaps.count > 0 && (
+            <span className="st-flag">
+              {' '}
+              · {one.gaps.count} Unterbrechung{one.gaps.count > 1 ? 'en' : ''} über {GAP_MIN} min ({Math.round(one.gaps.minutes)} min)
+            </span>
+          )}
+        </p>
       )}
       {single && (
         <ol className="st-timeline">

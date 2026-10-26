@@ -7,10 +7,12 @@ import { part4, type P4Field } from '../analysis';
 import { useState } from 'react';
 import { describe, fmt } from '../stats';
 import { CATEGORY } from '../types';
-import { csv, Empty, Fig, fmtDate, Section, Stat, useCtx } from '../ui';
+import { csv, DurationSelect, Empty, Fig, fmtDate, Section, Stat, useCtx } from '../ui';
 import { SurveySummary, TrackingSummary } from './Survey';
 import { CraftLog, GameFlow } from './Flow';
 import { FeedbackLists } from './Notes';
+
+const m1 = (x: number | null) => (x != null ? fmt(x, 1) : '');
 
 export function ageOf(info: Record<string, string>): number | null {
   const v = info.Alter ?? Object.entries(info).find(([k]) => /alter|age/i.test(k))?.[1];
@@ -82,7 +84,16 @@ export default function Overview() {
               ]}
             />
           </Fig>
-          <Fig id="laufzeit" table={() => csv([['Teilnehmende', 'Link', 'Minuten'], ...slice.links.map((l) => [l.person, l.label, l.minutes != null ? fmt(l.minutes, 1) : ''])])}>
+          <Fig
+            id="laufzeit"
+            table={() =>
+              csv([
+                ['Teilnehmende', 'Link', 'Bearbeitungsdauer (min)', 'Spiel-Uhr (min)', 'Link-Dauer (min)', 'Schritte (min)', 'Unterbrechungen', 'Unterbrechungen (min)'],
+                ...slice.links.map((l) => [l.person, l.label, m1(l.minutes), m1(l.clockMinutes), m1(l.linkMinutes), m1(l.stepMinutes), l.gaps.count, m1(l.gaps.minutes)]),
+              ])
+            }
+          >
+            <DurationSelect />
             {times.length ? (
               <>
                 <Bars rows={slice.persons.filter((p) => p.minutes != null).map((p) => ({ label: p.id, values: [p.minutes!], note: p.links.length > 1 ? `${fmt(p.minutes!, 1)} (${p.links.length} Links)` : undefined }))} digits={1} />

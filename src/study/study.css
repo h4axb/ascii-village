@@ -1035,3 +1035,34 @@ body:has(.st-root) {
 .st-table tr.is-picked td {
   background: var(--st-accent-soft);
 }
+.st-durations {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.st-durations th {
+  font-weight: 500;
+  color: var(--st-muted);
+  text-align: left;
+  padding: 2px 4px;
+}
+.st-durations td {
+  padding: 3px 4px;
+  vertical-align: top;
+}
+.st-durations .num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.st-durations td.is-used {
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--st-accent);
+}
+.st-durations tr.st-total td {
+  border-top: 1px solid var(--st-line);
+}
+.st-flowsum {
+  margin: 10px 0 0;
+  font-size: 14px;
+}

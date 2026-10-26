@@ -19,7 +19,13 @@ export interface LinkInfo {
   started: number | null;
   end: number | null;
   endedBy: string;
-  minutes: number | null;
+  minutes: number | null; // per the chosen duration measure
+  linkMinutes: number | null; // link opened → survey done (or the game's last contact)
+  clockMinutes: number | null; // the game's run clock: first quest step → survey opened
+  stepMinutes: number | null; // the quest steps' own durations, added up
+  firstAt: number | null; // first and last run-log event
+  lastAt: number | null;
+  gaps: { count: number; minutes: number }; // pauses of more than GAP_MIN without any event
   order: 'AB' | 'BA' | null;
   crafts: number;
 }
@@ -33,7 +39,12 @@ export interface Person {
   trackedGroup: 'AB' | 'BA' | null;
   notesGroup: string | null; // from the notes header
   groupMismatch: boolean;
-  minutes: number | null; // per the run-time rule
+  minutes: number | null; // per the run-time rule and the chosen measure
+  linkMinutes: number | null;
+  clockMinutes: number | null;
+  stepMinutes: number | null;
+  durationUsed: Duration | null; // the measure behind `minutes`
+  gaps: { count: number; minutes: number };
   tallyRow: number | null;
   tallyVia: MatchVia | null; // how the row was matched
   tallyConflict: boolean; // the row's AB/BA differs from the person's group
@@ -76,6 +87,16 @@ export interface Model {
 }
 
 const P_ID = /^P\d{3,}$/;
+// the duration measure for "Bearbeitungsdauer"; auto = Spiel-Uhr where recorded, else Link-Dauer
+export type Duration = 'link' | 'clock' | 'steps';
+export type DurationBy = Duration | 'auto';
+export const DURATION_LABEL: Record<DurationBy, string> = {
+  auto: 'Spiel-Uhr (sonst Link-Dauer)',
+  clock: 'Spiel-Uhr: erster Quest-Schritt bis Umfrage',
+  link: 'Link-Dauer: Öffnen des Links bis Ende',
+  steps: 'Summe der Quest-Schritte',
+};
+export const GAP_MIN = 10; // minutes without any event that count as an interruption
 export type MatchOrder = 'notes' | 'pid' | 'start';
 export const MATCH_ORDER_LABEL: Record<MatchOrder, string> = { notes: 'Reihenfolge der Notizen', pid: 'P-ID (P001, P002, …)', start: 'Start der Session (Tracking)' };
 
@@ -105,10 +126,25 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
   for (const it of Object.values(docs.items)) if (P_ID.test(it.person)) ids.add(it.person);
 
   const notesMeta = (docs.settings.notesMeta ?? {}) as Record<string, { group?: string; slot?: string }>;
+  const durationBy = ((docs.settings.durationBy as { by?: DurationBy } | undefined)?.by ?? 'auto') as DurationBy;
 
   const linkInfo = (i: Invite): LinkInfo => {
     const e = endOf(i);
     const evs = game.events.filter((x) => x.key === i.key || (!x.key && x.participant === i.participant_id && i.started && x.at >= i.started && (!e || x.at <= e.at + 60000)));
+    const sorted = [...evs].sort((a, b) => a.at - b.at);
+    const clock = sorted.filter((x) => x.type === 'session' && x.data.what === 'survey' && typeof x.data.totalMs === 'number').pop();
+    const steps = sorted.filter((x) => x.type === 'step' && typeof x.data.ms === 'number');
+    const gaps = { count: 0, minutes: 0 };
+    for (let k = 1; k < sorted.length; k++) {
+      const d = (sorted[k].at - sorted[k - 1].at) / 60000;
+      if (d > GAP_MIN) {
+        gaps.count++;
+        gaps.minutes += d;
+      }
+    }
+    const linkMinutes = i.started && e ? (e.at - i.started) / 60000 : null;
+    const clockMinutes = clock ? (clock.data.totalMs as number) / 60000 : null;
+    const stepMinutes = steps.length ? steps.reduce((a, x) => a + (x.data.ms as number), 0) / 60000 : null;
     return {
       key: i.key,
       label: labels.get(i.key) ?? i.participant_id!,
@@ -116,7 +152,13 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
       started: i.started,
       end: e?.at ?? null,
       endedBy: e ? (e.how === 'finished' ? 'Umfrage' : e.how === 'closed' ? 'geschlossen' : 'abgelaufen') : i.started ? 'läuft' : 'nicht geöffnet',
-      minutes: i.started && e ? (e.at - i.started) / 60000 : null,
+      minutes: pickDuration(durationBy, linkMinutes, clockMinutes, stepMinutes).minutes,
+      linkMinutes,
+      clockMinutes,
+      stepMinutes,
+      firstAt: sorted[0]?.at ?? null,
+      lastAt: sorted[sorted.length - 1]?.at ?? null,
+      gaps,
       order: asOrder(i.run_order) ?? asOrder(evs[0]?.order),
       crafts: i.crafts_used,
     };
@@ -130,9 +172,19 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
     const trackedGroup = links.find((l) => l.order)?.order ?? asOrder(game.events.find((e) => e.participant === id)?.order) ?? asOrder(game.feedback.find((r) => r.participant === id)?.order);
     const notesGroup = notesMeta[id]?.group?.toUpperCase().replace(/[^AB]/g, '') || null;
-    const timed = links.filter((l) => l.minutes != null);
-    const main = links.find((l) => l.key === doc.mainLink) ?? [...timed].sort((a, b) => (b.minutes ?? 0) - (a.minutes ?? 0))[0];
-    const minutes = !timed.length ? null : doc.runtime === 'main' ? (main?.minutes ?? null) : timed.reduce((a, l) => a + (l.minutes ?? 0), 0);
+    // several links: their times added up, or the main link's only
+    const main = links.find((l) => l.key === doc.mainLink) ?? [...links].sort((a, b) => (b.linkMinutes ?? 0) - (a.linkMinutes ?? 0))[0];
+    const agg = (f: (l: LinkInfo) => number | null) => {
+      if (doc.runtime === 'main') return main ? f(main) : null;
+      const xs = links.map(f).filter((x): x is number => x != null);
+      return xs.length ? xs.reduce((a, b) => a + b, 0) : null;
+    };
+    const linkMinutes = agg((l) => l.linkMinutes);
+    const clockMinutes = agg((l) => l.clockMinutes);
+    const stepMinutes = agg((l) => l.stepMinutes);
+    const picked = pickDuration(durationBy, linkMinutes, clockMinutes, stepMinutes);
+    const minutes = picked.minutes;
+    const gaps = (doc.runtime === 'main' && main ? [main] : links).reduce((a, l) => ({ count: a.count + l.gaps.count, minutes: a.minutes + l.gaps.minutes }), { count: 0, minutes: 0 });
     const surveyAt =
       game.events.filter((e) => e.participant === id && e.type === 'session' && e.data.what === 'survey').map((e) => e.at).sort((a, b) => a - b)[0] ??
       invites.filter((i) => i.participant_id === id && i.completed).map((i) => i.completed!).sort((a, b) => a - b)[0] ??
@@ -147,6 +199,11 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
       notesGroup,
       groupMismatch: !!notesGroup && !!trackedGroup && notesGroup !== trackedGroup,
       minutes,
+      linkMinutes,
+      clockMinutes,
+      stepMinutes,
+      durationUsed: picked.used,
+      gaps,
       tallyRow: null,
       tallyVia: null,
       tallyConflict: false,
@@ -362,3 +419,11 @@ export function itemsWithRole(items: ItemDoc[], m: Model, role: ChipRole) {
   return items.filter((i) => i.chips.some((c) => m.chipRole.get(c) === role));
 }
 export const distinctPersons = (items: ItemDoc[]) => new Set(items.map((i) => i.person)).size;
+
+// the chosen duration measure (auto: the game's clock where recorded, else the link)
+export function pickDuration(by: DurationBy, link: number | null, clock: number | null, steps: number | null): { minutes: number | null; used: Duration | null } {
+  if (by === 'link') return { minutes: link, used: link != null ? 'link' : null };
+  if (by === 'clock') return { minutes: clock, used: clock != null ? 'clock' : null };
+  if (by === 'steps') return { minutes: steps, used: steps != null ? 'steps' : null };
+  return clock != null ? { minutes: clock, used: 'clock' } : { minutes: link, used: link != null ? 'link' : null };
+}

@@ -1,7 +1,7 @@
 // Shared pieces of the /feedback pages: the context every page reads (model,
 // scope, saving), figure numbering and captions, small layout parts.
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { Model, Scope, Slice } from './model';
+import { DURATION_LABEL, type DurationBy, type Model, type Scope, type Slice } from './model';
 import type { Study } from './store';
 import { Figure } from './charts';
 
@@ -103,4 +103,29 @@ export interface LogEntry {
 export function logChange(study: Study, what: string) {
   const old = ((study.latest().settings.log as { entries?: LogEntry[] } | undefined)?.entries ?? []).slice(0, 299);
   study.commit([{ coll: 'settings', id: 'log', data: { entries: [{ at: Date.now(), what }, ...old] } }]);
+}
+
+// which measure "Bearbeitungsdauer" uses (applies everywhere)
+export function DurationSelect() {
+  const { study } = useCtx();
+  const by = ((study.docs.settings.durationBy as { by?: DurationBy } | undefined)?.by ?? 'auto') as DurationBy;
+  return (
+    <label className="st-scope">
+      <span>Bearbeitungsdauer =</span>
+      <select
+        value={by}
+        onChange={(e) => {
+          const next = e.target.value as DurationBy;
+          study.commit([{ coll: 'settings', id: 'durationBy', data: { by: next } }]);
+          logChange(study, `Bearbeitungsdauer: ${DURATION_LABEL[by]} → ${DURATION_LABEL[next]}`);
+        }}
+      >
+        {(Object.keys(DURATION_LABEL) as DurationBy[]).map((k) => (
+          <option key={k} value={k}>
+            {DURATION_LABEL[k]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }

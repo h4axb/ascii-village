@@ -1,10 +1,10 @@
 // Daten & Validierung: the imports, the data sources, the checks (missing
 // values, conflicts, open work), the matching rules, and the change log.
 import type { ColumnRole } from '../types';
-import { MATCH_ORDER_LABEL, personIdOf, type MatchOrder } from '../model';
+import { GAP_MIN, MATCH_ORDER_LABEL, personIdOf, type MatchOrder } from '../model';
 import { timeOf } from '../match';
 import { download } from '../charts';
-import { csv, logChange, Section, useCtx, type LogEntry } from '../ui';
+import { csv, DurationSelect, fmtMin, logChange, Section, useCtx, type LogEntry } from '../ui';
 import Import from './Import';
 import { VIA } from './People';
 
@@ -40,6 +40,11 @@ export function useChecks(): Check[] {
   add('Sessions', 'Alle Links beendet', !open.length, open.map((l) => `${l.label} (${l.endedBy})`).join(', '));
   const noTime = inc.filter((p) => p.minutes == null);
   add('Sessions', 'Dauer vorhanden', !noTime.length, noTime.map((p) => p.id).join(', '));
+  // the game's clock and the link's time far apart, or pauses: a duration worth a look
+  const odd = inc.filter((p) => p.clockMinutes != null && p.linkMinutes != null && Math.abs(p.linkMinutes - p.clockMinutes) > 0.5 * p.clockMinutes);
+  add('Sessions', 'Spiel-Uhr und Link-Dauer stimmig (Abweichung ≤ 50 %)', !odd.length, odd.map((p) => `${p.id}: Spiel-Uhr ${fmtMin(p.clockMinutes)}, Link ${fmtMin(p.linkMinutes)}`).join('; '));
+  const paused = inc.filter((p) => p.gaps.count);
+  add('Sessions', `Keine Unterbrechungen über ${GAP_MIN} min`, !paused.length, paused.map((p) => `${p.id}: ${p.gaps.count}× (${Math.round(p.gaps.minutes)} min)`).join('; '));
 
   // Tally
   add('Umfrage', 'Tally-Export importiert', !!tally, tally ? `${tally.rows.length} Antworten` : '');
@@ -187,12 +192,20 @@ export default function Data() {
 
       {tally && <MatchTable />}
 
+      <Section title="Bearbeitungsdauer">
+        <DurationSelect />
+        <p className="st-note">
+          Spiel-Uhr: vom ersten Quest-Schritt bis zum Öffnen der Umfrage (die Uhr des Spiels, über Neuladen hinweg). Link-Dauer: vom Öffnen des Links (inkl. Einwilligung und Intro) bis zum Abschluss der Umfrage bzw. dem letzten Kontakt. Summe der Schritte: die gemessenen
+          Dauern der Quest-Schritte. Mehrere Links: Summe oder Hauptlink (Teilnehmende &amp; Sessions).
+        </p>
+      </Section>
+
       <Section title="Zuordnungsregeln">
         <ul className="st-rules">
           <li>Teilnehmende: P-ID aus dem persönlichen Link bzw. den Notizen.</li>
           <li>Umfrage-Zeilen ↔ Teilnehmende, in dieser Reihenfolge: 1. manuell gewählt; 2. Teilnehmer-ID (tallyid); 3. Zeit (nur wenn eingeschaltet): Abgabe 10 min vor bis 120 min nach dem Öffnen der Umfrage im Spiel, nächste zuerst; 4. Reihenfolge: übrige Teilnehmende in der gewählten Reihenfolge (Notizen, P-ID oder Sessionstart), übrige Zeilen nach Abgabezeit. Abweichende AB/BA-Angaben werden markiert.</li>
           <li>Mehrere Links einer Person: P009.1, P009.2 … in der Reihenfolge des Starts; Dauer als Summe oder nur Hauptlink.</li>
-          <li>Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links.</li>
+          <li>Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links. Unterbrechung: mehr als 10 min ohne Ereignis im Spiel-Tracking.</li>
           <li>Testgruppe: aus dem Link (AB/BA); eine Korrektur überschreibt sie; Abweichungen zu den Notizen werden markiert.</li>
           <li>Teil 1: „vertauscht“ kehrt A und B der betreffenden Person um; „keine Präferenz“ zählt nicht im Vorzeichentest.</li>
           <li>Teil 3: Antworten 1–7, gedrehte Items umgepolt, Werte −3 bis +3; nur vollständige Skalen.</li>

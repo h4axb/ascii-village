@@ -33,25 +33,7 @@ export default function People() {
                 {p.excluded && <span className="st-flag">ausgeschlossen</span>}
               </header>
 
-              <div className="st-links">
-                {p.links.length ? (
-                  p.links.map((l) => (
-                    <div key={l.key} className="st-linkrow">
-                      <span className="st-pid">{l.label}</span>
-                      <span>{fmtMin(l.minutes)}</span>
-                      <span className="st-muted">
-                        {l.endedBy} · {l.crafts} Crafts
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <span className="st-muted">kein Link</span>
-                )}
-                <div className="st-linkrow st-total">
-                  <span>Dauer</span>
-                  <span>{fmtMin(p.minutes)}</span>
-                </div>
-              </div>
+              <Durations p={p} />
 
               <div className="st-fields">
                 {p.links.length > 1 && (
@@ -191,5 +173,58 @@ function PersonDetails({ p }: { p: Person }) {
         </details>
       )}
     </>
+  );
+}
+
+const clockT = (t: number | null) => (t ? new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '–');
+const USED: Record<string, string> = { link: 'Link-Dauer', clock: 'Spiel-Uhr', steps: 'Schritte' };
+
+// the three duration measures per link and in total, the one used marked
+function Durations({ p }: { p: Person }) {
+  const cell = (v: number | null, used: boolean) => <td className={`num${used ? ' is-used' : ''}`}>{fmtMin(v)}</td>;
+  const u = p.durationUsed;
+  return (
+    <div className="st-links">
+      {p.links.length ? (
+        <table className="st-durations">
+          <thead>
+            <tr>
+              <th>Link</th>
+              <th>Zeit</th>
+              <th className="num">Spiel-Uhr</th>
+              <th className="num">Link-Dauer</th>
+              <th className="num">Schritte</th>
+            </tr>
+          </thead>
+          <tbody>
+            {p.links.map((l) => (
+              <tr key={l.key}>
+                <td>
+                  <span className="st-pid">{l.label}</span>
+                </td>
+                <td className="st-muted">
+                  {clockT(l.started)}–{clockT(l.end)} · {l.endedBy} · {l.crafts} Crafts
+                  {l.gaps.count > 0 && <span className="st-flag"> · {l.gaps.count} Unterbrechung{l.gaps.count > 1 ? 'en' : ''} ({Math.round(l.gaps.minutes)} min)</span>}
+                </td>
+                {cell(l.clockMinutes, u === 'clock')}
+                {cell(l.linkMinutes, u === 'link')}
+                {cell(l.stepMinutes, u === 'steps')}
+              </tr>
+            ))}
+            <tr className="st-total">
+              <td colSpan={2}>
+                Dauer{p.links.length > 1 ? (p.doc.runtime === 'main' ? ' (Hauptlink)' : ' (Summe)') : ''}: <strong>{fmtMin(p.minutes)}</strong>
+                {u && <span className="st-muted"> · {USED[u]}</span>}
+              </td>
+              {cell(p.clockMinutes, u === 'clock')}
+              {cell(p.linkMinutes, u === 'link')}
+              {cell(p.stepMinutes, u === 'steps')}
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <span className="st-muted">kein Link</span>
+      )}
+    </div>
   );
 }

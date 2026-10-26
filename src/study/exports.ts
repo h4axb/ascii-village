@@ -93,6 +93,7 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
   const lik = [...new Set(rows.flatMap((r) => Object.keys(r.likert)))];
   const lik1 = [...new Set(rows.flatMap((r) => Object.keys(r.likertSingle)))];
   const chq = [...new Set(rows.flatMap((r) => Object.keys(r.choice)))];
+  const mq = model.optionQuestions.map((q) => q.question);
   const scales = Object.keys(UEQS_SCALE_ITEMS) as UeqScale[];
   const score = (vals: (number | null)[], idx: number[]) => {
     const v = idx.map((k) => vals[k]).filter((x): x is number => x != null);
@@ -113,6 +114,7 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
       ...lik.flatMap((q) => [`Teil 2 A: ${q}`, `Teil 2 B: ${q}`]),
       ...lik1.map((q) => `Teil 2: ${q}`),
       ...chq.map((q) => `Auswahl: ${q}`),
+      ...mq.map((q) => `Mehrfachauswahl: ${q}`),
       ...scales.flatMap((s) => [`UEQ-S A ${s}`, `UEQ-S B ${s}`, `UEQ-S gesamt ${s}`]),
       ...ratingQs.flatMap((q) => [`Spiel A ${RATING_LABEL[q] ?? q}`, `Spiel B ${RATING_LABEL[q] ?? q}`]),
     ],
@@ -126,6 +128,7 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
         ...lik.flatMap((q) => [n2(r?.likert[q]?.A), n2(r?.likert[q]?.B)]),
         ...lik1.map((q) => n2(r?.likertSingle[q])),
         ...chq.map((q) => r?.choice[q] ?? ''),
+        ...mq.map((q) => (r?.multi[q] ?? []).join(', ')),
         ...scales.flatMap((s) => (r ? [n2(score(r.ueqs.A, UEQS_SCALE_ITEMS[s])), n2(score(r.ueqs.B, UEQS_SCALE_ITEMS[s])), n2(score(r.ueqs.O, UEQS_SCALE_ITEMS[s]))] : ['', '', ''])),
         ...ratingQs.flatMap((q) => [n2(ratingOf(p.id, q, 'A')), n2(ratingOf(p.id, q, 'B'))]),
       ];

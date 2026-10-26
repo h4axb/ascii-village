@@ -2,7 +2,7 @@
 // file. Re-importing keeps the column roles (by header) and every tag.
 import { useState } from 'react';
 import type { ColumnRole, Side, TallyDoc } from '../types';
-import { carryMapping, choiceOf, conditionIn, designIn, likertOf, parseCsv, reassignParts, suggestMapping, ueqsItemIn } from '../tally';
+import { splitOption, carryMapping, choiceOf, conditionIn, designIn, likertOf, parseCsv, reassignParts, suggestMapping, ueqsItemIn } from '../tally';
 import { UEQS_ITEMS } from '../stats';
 import { LazyInput, logChange, Section, useCtx } from '../ui';
 import { translateTally } from '../translations';
@@ -15,6 +15,7 @@ const ROLE_NAME: Record<ColumnRole['role'], string> = {
   time: 'Zeitpunkt',
   p1: 'Teil 1: Vergleich',
   choice: 'Auswahl (eine Antwort)',
+  option: 'Antwortoption (Mehrfachauswahl)',
   likert: 'Teil 2: Likert',
   ueqs: 'Teil 3: UEQ-S',
   info: 'Teil 4: Angabe',
@@ -34,6 +35,10 @@ function roleFor(role: ColumnRole['role'], header: string, vals: string[]): Colu
     }
     case 'choice':
       return { role, question: header };
+    case 'option': {
+      const sp = splitOption(header);
+      return { role, question: sp?.question ?? header, option: sp?.option ?? header };
+    }
     case 'info':
       return { role, label: header, numeric: vals.every((v) => /^-?\d+([.,]\d+)?$/.test(v)) };
     case 'text':
@@ -240,6 +245,13 @@ function RoleDetail({ m, onChange }: { m: ColumnRole; onChange: (r: ColumnRole) 
             <input type="checkbox" checked={m.reversed} onChange={(e) => onChange({ ...m, reversed: e.target.checked })} />
             Pole vertauscht (positiv links)
           </label>
+        </div>
+      );
+    case 'option':
+      return (
+        <div className="st-role-detail">
+          <LazyInput value={m.question} onSave={(question) => onChange({ ...m, question })} aria-label="Frage" />
+          <LazyInput value={m.option} onSave={(option) => onChange({ ...m, option })} aria-label="Antwortoption" />
         </div>
       );
     case 'choice':

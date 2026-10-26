@@ -7,7 +7,7 @@ import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
 import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
 import { matchRows, timeOf, type MatchVia } from './match';
-import { partOf } from './tally';
+import { optionChosen, partOf } from './tally';
 
 // ---- the scope filter: everyone, one person, or one of their links ----
 export type Scope = { kind: 'all' } | { kind: 'person'; id: string } | { kind: 'link'; id: string; key: string };
@@ -61,6 +61,7 @@ export interface SurveyRow {
   group: 'AB' | 'BA' | null; // resolves "1st / 2nd run" to A / B
   p1: Record<string, Design | 'neutral' | null>; // question → answer (swap applied)
   choice: Record<string, string>; // single-choice question → the option chosen
+  multi: Record<string, string[]>; // a question exported as one column per option → the options ticked
   likert: Record<string, Partial<Record<Design, number | null>>>; // item → design → 1..7
   likertSingle: Record<string, number | null>; // statements about both designs
   ueqs: Record<Design | 'O', (number | null)[]>; // 8 raw answers 1..7 (reversal applied); O: one UEQ-S for the whole game
@@ -78,6 +79,7 @@ export interface Model {
   orderPos: Map<string, number>; // each participant's place in the order used for pairing
   mapping: ColumnRole[];
   parts: (number | null)[] | undefined; // where Teil 1–4 start (Daten & Validierung)
+  optionQuestions: OptionQuestion[]; // questions exported as one column per option
   headers: string[];
   // the game's records, of included persons, per scope
   events: RunEvent[];
@@ -92,7 +94,7 @@ export interface Model {
 const P_ID = /^P\d{3,}$/;
 // the part (Teil 1–4) a survey column sits in, by its position (Daten & Validierung)
 export function partOfKey(m: { mapping: ColumnRole[] }, parts: (number | null)[] | undefined, key: string): number {
-  const j = m.mapping.findIndex((c) => ((c.role === 'p1' || c.role === 'choice') && c.question === key) || (c.role === 'likert' && c.item === key) || ((c.role === 'info' || c.role === 'text') && c.label === key));
+  const j = m.mapping.findIndex((c) => ((c.role === 'p1' || c.role === 'choice' || c.role === 'option') && c.question === key) || (c.role === 'likert' && c.item === key) || ((c.role === 'info' || c.role === 'text') && c.label === key));
   return j < 0 || !parts ? 0 : partOf(j, parts);
 }
 // the duration measure for "Bearbeitungsdauer"; auto = Spiel-Uhr where recorded, else Link-Dauer
@@ -273,7 +275,7 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     const group = (person ? byId.get(person)?.group : null) ?? (orderCol >= 0 ? asOrder((r[orderCol] ?? '').trim().toUpperCase()) : null);
     // the 1st / 2nd run → A / B by the person's group
     const resolve = (x: Side | 'neutral' | null): Design | 'neutral' | null => (x === '1' || x === '2' ? (group ? (group[Number(x) - 1] as Design) : null) : x);
-    const out: SurveyRow = { row, person, swapped, group, p1: {}, likert: {}, likertSingle: {}, ueqs: { A: Array(8).fill(null), B: Array(8).fill(null), O: Array(8).fill(null) }, choice: {}, info: {}, text: {} };
+    const out: SurveyRow = { row, person, swapped, group, p1: {}, likert: {}, likertSingle: {}, ueqs: { A: Array(8).fill(null), B: Array(8).fill(null), O: Array(8).fill(null) }, choice: {}, multi: {}, info: {}, text: {} };
     mapping.forEach((m, j) => {
       const v = (r[j] ?? '').trim();
       if (m.role === 'p1') {
@@ -293,6 +295,8 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
         if (d === 'A' || d === 'B' || d === 'O') out.ueqs[d][m.item] = n >= 1 && n <= 7 ? (m.reversed ? 8 - n : n) : null;
       } else if (m.role === 'choice') {
         if (v) out.choice[m.question] = v;
+      } else if (m.role === 'option') {
+        if (v && optionChosen(v)) (out.multi[m.question] ??= []).push(m.option);
       } else if (m.role === 'info') {
         if (v) out.info[m.label] = v;
       } else if (m.role === 'text') {
@@ -327,6 +331,7 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     orderPos,
     mapping,
     parts: tally?.parts,
+    optionQuestions: optionQuestionsOf(mapping, tally?.parts),
     headers,
     events: game.events.filter((e) => incIds.has(e.participant)),
     feedback: game.feedback.filter((r) => !!r.participant && incIds.has(r.participant)),
@@ -438,4 +443,22 @@ export function pickDuration(by: DurationBy, link: number | null, clock: number 
   if (by === 'clock') return { minutes: clock, used: clock != null ? 'clock' : null };
   if (by === 'steps') return { minutes: steps, used: steps != null ? 'steps' : null };
   return clock != null ? { minutes: clock, used: 'clock' } : { minutes: link, used: link != null ? 'link' : null };
+}
+
+// the questions Tally exported as one column per option, with every option
+// (in column order) and the part they sit in
+export interface OptionQuestion {
+  question: string;
+  options: string[];
+  part: number;
+}
+export function optionQuestionsOf(mapping: ColumnRole[], parts: (number | null)[] | undefined): OptionQuestion[] {
+  const out: OptionQuestion[] = [];
+  mapping.forEach((m, j) => {
+    if (m.role !== 'option') return;
+    let q = out.find((x) => x.question === m.question);
+    if (!q) out.push((q = { question: m.question, options: [], part: parts ? partOf(j, parts) : 4 }));
+    if (!q.options.includes(m.option)) q.options.push(m.option);
+  });
+  return out;
 }

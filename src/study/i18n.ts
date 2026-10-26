@@ -106,6 +106,8 @@ const EN: Record<string, string> = {
   'Teil 3: Auswahlfrage': 'Part 3: choice question',
   'Verteilung der Antworten (Einfachauswahl).': 'Distribution of the answers (single choice).',
   'Auswahl (eine Antwort)': 'Single choice',
+  'Antwortoption (Mehrfachauswahl)': 'Answer option (multiple choice)',
+  Antwortoption: 'Answer option',
   'jede Antwortoption einzeln ausgewertet': 'each answer option evaluated separately',
   Anteil: 'Share',
   'Einfachauswahl, n =': 'Single choice, n =',

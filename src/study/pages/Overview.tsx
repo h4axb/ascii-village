@@ -52,7 +52,7 @@ export default function Overview() {
   ];
 
   // Teil 4 (age has its own figure)
-  const p4 = part4(slice.survey).filter((f) => !/^alter$|^age$/i.test(f.label));
+  const p4 = part4(slice.survey, model.optionQuestions).filter((f) => !/^alter$|^age$/i.test(f.label));
 
   return (
     <>
@@ -153,8 +153,12 @@ function Profile({ fields }: { fields: P4Field[] }) {
   const [aq, av] = answer ? answer.split('\u0000') : ['', ''];
   const shown = aq ? fields.filter((f) => f.label === aq) : listed;
   const persons = slice.persons.map((p) => p.id);
-  const answerOf = (person: string, label: string) => slice.survey.find((r) => r.person === person)?.info[label] ?? '';
+  const rowOf = (person: string) => slice.survey.find((r) => r.person === person);
+  // (a question exported as one column per option: the options ticked)
+  const answerOf = (person: string, label: string) => rowOf(person)?.multi[label]?.join(', ') ?? rowOf(person)?.info[label] ?? '';
   const gave = (person: string, label: string, v: string) => {
+    const multi = rowOf(person)?.multi[label];
+    if (multi) return multi.includes(v);
     const a = answerOf(person, label);
     return a === v || a.split(/\s*,\s*(?=[A-ZÄÖÜ])/).includes(v);
   };

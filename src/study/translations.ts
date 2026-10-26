@@ -60,7 +60,10 @@ export function tallyTexts(t: TallyDoc): string[] {
   t.mapping.forEach((m, j) => {
     const vals = () => t.rows.map((r) => (r[j] ?? '').trim()).filter(Boolean);
     if (m.role === 'p1') out.add(m.question);
-    else if (m.role === 'choice') {
+    else if (m.role === 'option') {
+      out.add(m.question);
+      out.add(m.option);
+    } else if (m.role === 'choice') {
       out.add(m.question);
       for (const v of vals()) out.add(v);
     }

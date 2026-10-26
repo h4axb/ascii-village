@@ -129,8 +129,37 @@ export function ueqsItemIn(header: string): { item: number; reversed: boolean } 
   return null;
 }
 
+// ---- a question exported as one column per option ----
+// "How often …? (Never)", "How often …? (Weekly)" with true / false: the
+// question and its option, for neighbouring columns of the same question
+const BOOL = /^(true|false|1|0|ja|nein|yes|no|wahr|falsch|x)$/i;
+export function splitOption(header: string): { question: string; option: string } | null {
+  const h = header.trim();
+  const m = /^(.*\S)\s*\(([^()]+)\)$/.exec(h) ?? /^(.*\S)\s*\[([^\]]+)\]$/.exec(h) ?? /^(.*\S)\s+[-–]\s+([^-–]+)$/.exec(h);
+  return m ? { question: m[1].trim(), option: m[2].trim() } : null;
+}
+export const isOptionValue = (v: string) => BOOL.test(v.trim());
+export const optionChosen = (v: string) => /^(true|1|ja|yes|wahr|x)$/i.test(v.trim());
+export function optionColumns(headers: string[], rows: string[][]): Map<number, { question: string; option: string }> {
+  const cand = headers.map((h, j) => {
+    const sp = splitOption(h);
+    const vals = rows.map((r) => (r[j] ?? '').trim()).filter(Boolean);
+    return sp && vals.every(isOptionValue) ? sp : null;
+  });
+  const out = new Map<number, { question: string; option: string }>();
+  for (let j = 0; j < cand.length; j++) {
+    const c = cand[j];
+    if (!c) continue;
+    let k = j;
+    while (k + 1 < cand.length && cand[k + 1]?.question === c.question) k++;
+    if (k > j) for (let x = j; x <= k; x++) out.set(x, cand[x]!);
+    j = k;
+  }
+  return out;
+}
+
 // what a column looks like on its own
-type Kind = 'id' | 'order' | 'time' | 'ignore' | 'empty' | 'ueqs' | 'p1' | 'likert' | 'age' | 'info' | 'text';
+type Kind = 'id' | 'order' | 'time' | 'ignore' | 'empty' | 'ueqs' | 'p1' | 'likert' | 'age' | 'info' | 'text' | 'option';
 function kindOf(h: string, vals: string[], nRows: number): Kind {
   const n = norm(h);
   if (/^(tallyid|test_?id|teilnehmer.?id|participant.?id|p-?id)$/.test(n.replace(/\s/g, '')) || /tallyid|test_id/.test(n)) return 'id';
@@ -165,12 +194,12 @@ export function guessParts(kinds: Kind[]): (number | null)[] {
   kinds.forEach((k, j) => k === 'ueqs' && (lastUeq = j));
   // Teil 3 without pole words: the run of 1–7 answers after Teil 2's last item is not knowable; only with pole words
   const after = lastUeq >= 0 ? lastUeq + 1 : Math.max(p2ok ?? -1, p1 ?? -1) + 1;
-  let p4 = first(['age', 'info'], after);
+  let p4 = first(['age', 'info', 'option'], after);
   if (lastUeq < 0 && p2ok != null) {
     // no UEQ-S found: Teil 4 starts after the last Likert column
     let lastLik = p2ok;
     kinds.forEach((k, j) => j >= p2ok && k === 'likert' && (lastLik = j));
-    p4 = first(['age', 'info', 'text'], lastLik + 1);
+    p4 = first(['age', 'info', 'text', 'option'], lastLik + 1);
   }
   return [p1, p2ok, p3, p4];
 }
@@ -192,7 +221,8 @@ const stripSide = (h: string) =>
 // a role for each column, from its header, its answers and the part it is in
 export function suggestMapping(headers: string[], rows: string[][], partsIn?: (number | null)[]): { mapping: ColumnRole[]; parts: (number | null)[] } {
   const valsOf = (j: number) => rows.map((r) => (r[j] ?? '').trim()).filter(Boolean);
-  const kinds = headers.map((h, j) => kindOf(h, valsOf(j), rows.length));
+  const opts = optionColumns(headers, rows);
+  const kinds = headers.map((h, j) => (opts.has(j) ? ('option' as Kind) : kindOf(h, valsOf(j), rows.length)));
   const parts = partsIn ?? guessParts(kinds);
   const values = <T,>(j: number, f: (v: string) => T) => Object.fromEntries([...new Set(valsOf(j))].map((v) => [v, f(v)])) as Record<string, T>;
 
@@ -219,6 +249,8 @@ export function suggestMapping(headers: string[], rows: string[][], partsIn?: (n
 
   const mapping = headers.map((h, j): ColumnRole => {
     const k = kinds[j];
+    const op = opts.get(j);
+    if (op) return { role: 'option', question: op.question, option: op.option };
     if (k === 'id' || k === 'order' || k === 'time') return { role: k };
     if (k === 'ignore' || k === 'empty') return { role: 'ignore' };
     const part = partOf(j, parts);

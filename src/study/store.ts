@@ -3,7 +3,7 @@
 // browser memory of it, as /2/feedback). Changes show at once and are saved
 // in the background; a failed save says so.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { partOf } from './tally';
+import { optionColumns, partOf } from './tally';
 import { DEFAULT_TAGS, type Coll, type GameData, type StudyDocs, type TagGroup } from './types';
 
 const PASS_KEY = 'asciia-feedback-pass';
@@ -99,6 +99,23 @@ export function useStudy() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...auth(p) },
           body: JSON.stringify({ put: [...(changed ? [{ coll: 'tally', id: 'main', data: d.tally.main }] : []), { coll: 'settings', id: 'choiceMigrated', data: d.settings.choiceMigrated }] }),
+        });
+      }
+      // (once: questions exported as one column per option were single fields "true/false")
+      const tm = d.tally.main;
+      if (tm && !d.settings.optionsMigrated) {
+        const opts = optionColumns(tm.headers, tm.rows);
+        const mapping = tm.mapping.map((m, j) => {
+          const op = opts.get(j);
+          return op && (m.role === 'info' || m.role === 'p1' || m.role === 'text' || m.role === 'choice' || m.role === 'ignore') ? { role: 'option' as const, question: op.question, option: op.option } : m;
+        });
+        const changed = mapping.some((m, j) => m !== tm.mapping[j]);
+        if (changed) d.tally = { ...d.tally, main: { ...tm, mapping } };
+        d.settings = { ...d.settings, optionsMigrated: { at: Date.now() } };
+        void fetch('/api/study/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...auth(p) },
+          body: JSON.stringify({ put: [...(changed ? [{ coll: 'tally', id: 'main', data: d.tally.main }] : []), { coll: 'settings', id: 'optionsMigrated', data: d.settings.optionsMigrated }] }),
         });
       }
       setDocs(d);

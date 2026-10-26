@@ -1,6 +1,6 @@
 // The survey's evaluation per method (Teil 1–4), from the corrected rows of
 // the model. The Umfrage page, the Übersicht and the claims all read these.
-import type { SurveyRow } from './model';
+import type { OptionQuestion, SurveyRow } from './model';
 import type { Design } from './types';
 import { binomTest, cronbachAlpha, describe, mean, meanCI, ueqsBenchmark, UEQS_SCALE_ITEMS, wilcoxon, wilson, type Describe, type UeqScale, type Wilcoxon } from './stats';
 
@@ -52,9 +52,25 @@ export interface ChoiceResult {
   n: number; // answered
   options: { option: string; k: number; share: number; ci: [number, number]; persons: string[] }[];
 }
-export function choices(rows: SurveyRow[]): ChoiceResult[] {
+export function choices(rows: SurveyRow[], optionQs: OptionQuestion[] = []): ChoiceResult[] {
   const qs = [...new Set(rows.flatMap((r) => Object.keys(r.choice)))];
-  return qs.map((question) => {
+  // questions exported as one column per option, in Teil 2/3: every option counted (also at 0)
+  const fromOptions = optionQs
+    .filter((q) => q.part === 2 || q.part === 3)
+    .map((q): ChoiceResult => {
+      const ans = rows.filter((r) => r.multi[q.question]?.length);
+      return {
+        question: q.question,
+        n: ans.length,
+        options: q.options
+          .map((option) => {
+            const who = ans.filter((r) => r.multi[q.question].includes(option));
+            return { option, k: who.length, share: ans.length ? who.length / ans.length : 0, ci: wilson(who.length, ans.length), persons: who.map((r) => r.person ?? `#${r.row + 1}`) };
+          })
+          .sort((a, b) => b.k - a.k),
+      };
+    });
+  return [...fromOptions, ...qs.map((question) => {
     const ans = rows.filter((r) => r.choice[question]);
     const opts = [...new Set(ans.map((r) => r.choice[question]))];
     return {
@@ -67,7 +83,7 @@ export function choices(rows: SurveyRow[]): ChoiceResult[] {
         })
         .sort((a, b) => b.k - a.k || a.option.localeCompare(b.option)),
     };
-  });
+  })];
 }
 
 export interface P2Result {
@@ -204,9 +220,22 @@ export interface P4Field {
   stats: Describe | null;
   n: number;
 }
-export function part4(rows: SurveyRow[]): P4Field[] {
+export function part4(rows: SurveyRow[], optionQs: OptionQuestion[] = []): P4Field[] {
   const labels = [...new Set(rows.flatMap((r) => Object.keys(r.info)))];
-  return labels.map((label) => {
+  // questions exported as one column per option (not in Teil 2/3): all options, also at 0
+  const fromOptions = optionQs
+    .filter((q) => q.part !== 2 && q.part !== 3)
+    .map((q): P4Field => {
+      const ans = rows.filter((r) => r.multi[q.question]?.length);
+      return {
+        label: q.question,
+        numeric: false,
+        counts: q.options.map((o) => [o, ans.filter((r) => r.multi[q.question].includes(o)).length] as [string, number]),
+        stats: null,
+        n: ans.length,
+      };
+    });
+  return [...fromOptions, ...labels.map((label) => {
     const vals = rows.map((r) => r.info[label]).filter((v): v is string => !!v);
     const nums = vals.map((v) => Number(v.replace(',', '.')));
     const numeric = vals.length > 0 && nums.every((x) => Number.isFinite(x));
@@ -220,5 +249,5 @@ export function part4(rows: SurveyRow[]): P4Field[] {
       stats: numeric ? describe(nums) : null,
       n: vals.length,
     };
-  });
+  })];
 }

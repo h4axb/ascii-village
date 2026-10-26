@@ -38,7 +38,7 @@ export default function Survey() {
   const p3 = part3(rows);
   // choice questions go to the part they sit in (Daten & Validierung), not all to Teil 1
   const parts = study.docs.tally.main?.parts;
-  const ch = choices(rows);
+  const ch = choices(rows, model.optionQuestions);
   const chIn = (k: number) => ch.filter((c) => Math.max(2, Math.min(3, partOfKey(model, parts, c.question) || 2)) === k);
   const p1In = (k: number) => p1.filter((r) => Math.max(1, Math.min(3, partOfKey(model, parts, r.question) || 1)) === k);
   return (
@@ -294,7 +294,7 @@ export function SurveySummary() {
               <td className="num">–</td>
             </tr>
           ))}
-          {choices(slice.survey).map((c) => (
+          {choices(slice.survey, model.optionQuestions).map((c) => (
             <tr key={`c${c.question}`}>
               <td>
                 Teil {Math.max(2, partOfKey(model, study.docs.tally.main?.parts, c.question) || 2)}: {T(c.question)}

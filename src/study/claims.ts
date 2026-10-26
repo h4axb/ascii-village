@@ -47,7 +47,7 @@ export function buildClaims(m: Model, s: Slice, findings: Record<string, Finding
     });
   }
   // single-choice questions: descriptive, the most chosen option
-  for (const c of choices(rows)) {
+  for (const c of choices(rows, m.optionQuestions)) {
     if (!c.n) continue;
     const top = c.options[0];
     const list = c.options.map((o) => `${o.option} ${o.k}/${c.n}`).join(', ');

@@ -545,6 +545,9 @@ body:has(.st-root) {
   color: var(--st-muted);
   font-style: italic;
 }
+.st-item-q[title] {
+  cursor: text;
+}
 .st-item-text p {
   margin: 2px 0 0;
   cursor: text;

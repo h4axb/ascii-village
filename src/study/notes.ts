@@ -232,7 +232,7 @@ export function mergeStatements(parsed: Parsed['statements'], existing: ItemDoc[
     if (hit) {
       used.add(hit.id);
       kept++;
-      put.push({ ...hit, order: s.order, question: s.question, link: s.link ?? hit.link, status: hit.status === 'removed' || hit.status === 'new' ? undefined : hit.status });
+      put.push({ ...hit, order: s.order, question: hit.questionOwn ? hit.question : s.question, link: s.link ?? hit.link, status: hit.status === 'removed' || hit.status === 'new' ? undefined : hit.status });
     } else pending.push(s);
   }
   for (const s of pending) {
@@ -250,7 +250,7 @@ export function mergeStatements(parsed: Parsed['statements'], existing: ItemDoc[
       used.add(best.id);
       changed++;
       // (its German version, interpretation and addition stay; the German one is marked to check)
-      put.push({ ...best, text: s.text, order: s.order, question: s.question, link: s.link ?? best.link, status: 'changed', confirmed: false, deStale: !!best.de });
+      put.push({ ...best, text: s.text, order: s.order, question: best.questionOwn ? best.question : s.question, link: s.link ?? best.link, status: 'changed', confirmed: false, deStale: !!best.de });
     } else {
       added++;
       const id = `n-${s.person}-${hash(`${s.section}|${norm(s.text)}|${s.order}|${Date.now()}`)}`;

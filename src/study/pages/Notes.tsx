@@ -223,6 +223,7 @@ function ItemRow({ item, model, save, remove, fresh }: { item: ItemDoc; model: M
   const { study } = useCtx();
   const view = useContentView();
   const [editDe, setEditDe] = useState(false);
+  const [editQ, setEditQ] = useState(false);
   // a statement just added: open for typing and scrolled into view
   const [editOrig, setEditOrig] = useState(!!fresh);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -255,6 +256,14 @@ function ItemRow({ item, model, save, remove, fresh }: { item: ItemDoc; model: M
     logChange(study, `${item.person}: Original korrigiert „${item.text}“ → „${parts.join(' | ')}“`);
     save({ ...item, original: item.original ?? item.text, text: parts[0], deStale: !!item.de });
     parts.slice(1).forEach((t, i) => save({ ...item, id: `${item.id}-${Date.now().toString(36)}${i}`, original: t, text: t, de: undefined, deAuto: undefined, order: item.order + (i + 1) / 100, chips: [...item.chips], suggested: [], manual: true }));
+  };
+  // the follow-up question: changed on every answer of that person under the same question
+  const saveQuestion = (draft: string) => {
+    const q = draft.trim().replace(/\s*\n\s*/g, ' ') || undefined;
+    if (q === item.question) return;
+    logChange(study, `${item.person}: Frage geändert „${item.question ?? ''}“ → „${q ?? ''}“`);
+    const same = item.question ? Object.values(study.latest().items).filter((i) => i.person === item.person && i.section === item.section && i.question === item.question) : [item];
+    for (const i of same) save({ ...i, question: q, questionOwn: true });
   };
   const saveDe = (de: string) => save({ ...item, de: de.trim() || undefined, deAuto: false, deStale: false });
   const deBlock = (
@@ -306,7 +315,15 @@ function ItemRow({ item, model, save, remove, fresh }: { item: ItemDoc; model: M
           {item.status === 'changed' && <span className="st-flag">geändert – prüfen</span>}
           {item.status === 'new' && <span className="st-flag">neu</span>}
         </div>
-        {item.question && <div className="st-item-q" data-notr>{item.question}</div>}
+        {editQ ? (
+          <LazyArea value={item.question ?? ''} onSave={saveQuestion} autoFocus onDone={() => setEditQ(false)} placeholder="Frage im Nachgespräch …" />
+        ) : (
+          item.question && (
+            <div className="st-item-q" data-notr onClick={() => setEditQ(true)} title="Klicken: Frage bearbeiten">
+              {item.question}
+            </div>
+          )
+        )}
         {/* (while correcting it, the original is shown in every view) */}
         {view === 'orig' ? origBlock : view === 'de' && !editOrig ? (item.de || editDe ? deBlock : (
           <>
@@ -376,6 +393,11 @@ function ItemRow({ item, model, save, remove, fresh }: { item: ItemDoc; model: M
         <button type="button" onClick={() => setEditOrig(true)} title="Original korrigieren: wird mit altem und neuem Wortlaut protokolliert; neue Zeile teilt die Aussage">
           Original korrigieren
         </button>
+        {(item.section === 'followup' || item.question) && (
+          <button type="button" onClick={() => setEditQ(true)} title="Frage im Nachgespräch bearbeiten (gilt für alle Antworten darunter)">
+            Frage bearbeiten
+          </button>
+        )}
         <button type="button" onClick={() => confirm('Aussage löschen?') && remove(item)} title="Löschen">
           Löschen
         </button>

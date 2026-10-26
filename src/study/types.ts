@@ -74,6 +74,7 @@ export interface ItemDoc {
   link?: string; // the link from the notes header (P009.2's)
   section: Section;
   question?: string; // the Follow-up question it answers
+  questionOwn?: boolean; // the question was edited by hand (kept on re-import)
   text: string; // the statement as noted (the original)
   original?: string; // the wording first imported (never overwritten)
   de?: string; // the German version (AI draft or own wording)

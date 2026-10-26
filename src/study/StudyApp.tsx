@@ -1,7 +1,8 @@
 // /feedback: the user test's evaluation for the thesis. Six pages in a
 // sidebar (a drawer on phones), one participant filter for all of them, and
 // one model (model.ts) recomputed on every change.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { setLang, useLang, useTranslator } from './i18n';
 import { buildModel, slice as sliceOf, type Scope } from './model';
 import { useStudy } from './store';
 import { StudyCtx } from './ui';
@@ -68,13 +69,16 @@ export default function StudyApp() {
   const [scopeKey, setScopeKey] = useState(readScope);
   const [drawer, setDrawer] = useState(false);
   const [typed, setTyped] = useState('');
+  const lang = useLang();
+  const rootRef = useRef<HTMLDivElement>(null);
+  useTranslator(rootRef, lang);
 
   useEffect(() => {
-    document.title = 'Auswertung Usertest';
+    document.title = lang === 'en' ? 'User test evaluation' : 'Auswertung Usertest';
     const on = () => setRoute(readHash());
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
-  }, []);
+  }, [lang]);
   // a sub-page that is a section: scroll to it
   useEffect(() => {
     const p = PAGES.find((x) => x.id === page);
@@ -145,7 +149,8 @@ export default function StudyApp() {
 
   return (
     <StudyCtx.Provider value={{ study, model, scope, slice }}>
-      <div className={`st-root st-app${drawer ? ' has-drawer' : ''}`}>
+      {/* (a language change rebuilds the page, so the translator starts from the German text) */}
+      <div key={lang} ref={rootRef} className={`st-root st-app${drawer ? ' has-drawer' : ''}`} lang={lang}>
         <header className="st-topbar">
           <button type="button" className="st-menu" onClick={() => setDrawer((d) => !d)} aria-expanded={drawer} aria-controls="st-nav">
             Menü
@@ -192,6 +197,14 @@ export default function StudyApp() {
           <div className="st-navfoot">
             <span>{study.saving ? 'Speichern …' : study.saveError ? '' : 'Gespeichert'}</span>
             {study.saveError && <span className="st-flag">{study.saveError}</span>}
+            <div className="st-seg st-lang" role="group" aria-label="Sprache / Language">
+              <button type="button" className={lang === 'de' ? 'is-on' : ''} onClick={() => setLang('de')}>
+                DE
+              </button>
+              <button type="button" className={lang === 'en' ? 'is-on' : ''} onClick={() => setLang('en')}>
+                EN
+              </button>
+            </div>
             <a href="/2/feedback">/2/feedback</a>
           </div>
         </nav>

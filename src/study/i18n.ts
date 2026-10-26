@@ -1,0 +1,877 @@
+// The dashboard in German (default) or English. The pages are written in
+// German; in English, a translator rewrites the rendered interface text
+// (text nodes and title / placeholder / aria-label attributes) from this
+// dictionary, so every page, chart and table follows without each string
+// being wrapped. Content is never touched: notes, survey answers and
+// anything else inside [data-notr] stays as written. Numbers, captions and
+// the generated result texts have proper English versions of their own
+// (stats.ts, ui.tsx, claims.ts).
+import { useEffect, useState } from 'react';
+import { setNumberLang } from './stats';
+
+export type Lang = 'de' | 'en';
+const LANG_KEY = 'asciia-study-lang';
+let lang: Lang = (() => {
+  try {
+    return localStorage.getItem(LANG_KEY) === 'en' ? 'en' : 'de';
+  } catch {
+    return 'de';
+  }
+})();
+setNumberLang(lang);
+const listeners = new Set<(l: Lang) => void>();
+export const getLang = () => lang;
+export function setLang(l: Lang) {
+  lang = l;
+  setNumberLang(l);
+  try {
+    localStorage.setItem(LANG_KEY, l);
+  } catch {
+    // (not remembered)
+  }
+  listeners.forEach((f) => f(l));
+}
+export function useLang(): Lang {
+  const [l, setL] = useState(lang);
+  useEffect(() => {
+    listeners.add(setL);
+    return () => {
+      listeners.delete(setL);
+    };
+  }, []);
+  return l;
+}
+
+// ---- the English dictionary (German interface text → English) ----
+const EN: Record<string, string> = {
+  // navigation and frame
+  Übersicht: 'Overview',
+  'Quantitative Analyse': 'Quantitative analysis',
+  'Direkter Vergleich': 'Direct comparison',
+  'Ratings & Telemetrie': 'Ratings & telemetry',
+  'Likert-Skalen': 'Likert scales',
+  ', Spanne': ', range',
+  Spanne: 'range',
+  'Qualitatives Feedback': 'Qualitative feedback',
+  'Nach Priorität': 'By priority',
+  Codes: 'Codes',
+  'Wiederkehrende Befunde': 'Recurring findings',
+  Tags: 'Tags',
+  'Teilnehmende & Sessions': 'Participants & sessions',
+  'Daten & Validierung': 'Data & validation',
+  'Ergebnisse & Export': 'Results & export',
+  Aussagen: 'Statements',
+  'Auswertung Usertest': 'User test evaluation',
+  Passwort: 'Password',
+  Öffnen: 'Open',
+  'Laden …': 'Loading …',
+  Menü: 'Menu',
+  'Speichern …': 'Saving …',
+  Gespeichert: 'Saved',
+  Teilnehmende: 'Participants',
+  'Alle (': 'All (',
+  Deutsch: 'German',
+  Original: 'Original',
+  Beides: 'Both',
+  Textfassung: 'Text version',
+  // figures
+  Alter: 'Age',
+  'Altersverteilung der Teilnehmenden.': 'Age distribution of the participants.',
+  Testgruppe: 'Test group',
+  'Verteilung der Teilnehmenden auf die Testreihenfolgen AB und BA.': 'Distribution of the participants across the test orders AB and BA.',
+  Bearbeitungsdauer: 'Duration',
+  'Bearbeitungsdauer je Teilnehmenden in Minuten.': 'Duration per participant in minutes.',
+  'Angaben zur Person': 'Participant details',
+  'Angaben der Teilnehmenden (Umfrage, Teil 4).': 'Participant details (survey, part 4).',
+  'Dauer je Spielabschnitt': 'Duration per game section',
+  'Dauer je Spielabschnitt in Minuten (Median über die Teilnehmenden).': 'Duration per game section in minutes (median across participants).',
+  'Rückmeldungen nach Kategorie': 'Feedback by category',
+  'Anzahl der Rückmeldungen je Kategorie und Anzahl der Teilnehmenden, die sie äußerten.': 'Number of feedback statements per category and number of participants who made them.',
+  'Teil 1: Direkter Vergleich': 'Part 1: Direct comparison',
+  'Bevorzugte Variante je Frage im direkten Vergleich.': 'Preferred variant per question in the direct comparison.',
+  'Teil 2: Likert-Skala': 'Part 2: Likert scale',
+  'Antwortverteilung der Likert-Items je Variante.': 'Response distribution of the Likert items per variant.',
+  'Teil 2: Aussagen zu beiden Varianten': 'Part 2: Statements about both variants',
+  'Antwortverteilung der Aussagen, die sich auf beide Varianten beziehen.': 'Response distribution of the statements referring to both variants.',
+  'Teil 3: UEQ-S': 'Part 3: UEQ-S',
+  'UEQ-S-Skalenmittelwerte (−3 bis +3) je Variante mit 95 %-Konfidenzintervall.': 'UEQ-S scale means (−3 to +3) per variant with 95% confidence interval.',
+  'Teil 3: UEQ-S (gesamtes Spiel)': 'Part 3: UEQ-S (whole game)',
+  'UEQ-S-Skalen- und Itemmittelwerte (−3 bis +3) für das gesamte Spiel mit 95 %-Konfidenzintervall.': 'UEQ-S scale and item means (−3 to +3) for the whole game with 95% confidence interval.',
+  'Teil 3: UEQ-S-Items': 'Part 3: UEQ-S items',
+  'Mittelwerte der einzelnen UEQ-S-Items je Variante.': 'Means of the individual UEQ-S items per variant.',
+  'Crafting-Vorgänge je Variante': 'Crafting sessions per variant',
+  'Abgeschlossene Crafting-Vorgänge, Überarbeitungen und Ersatzergebnisse je Variante.': 'Completed crafting sessions, reworks and fallback results per variant.',
+  'Bewertung der Ergebnisse': 'Rating of the results',
+  'Bewertungen der erzeugten Ergebnisse je Variante.': 'Ratings of the generated results per variant.',
+  'Bewertung im Spiel': 'In-game rating',
+  'Mittelwerte der Bewertungsfragen im Spiel (1–5) je Variante mit 95 %-Konfidenzintervall.': 'Means of the in-game rating questions (1–5) per variant with 95% confidence interval.',
+  'Präferenzen in Variante B': 'Preferences in variant B',
+  'Gewählte Einstellungen in den Präferenzfragen von Variante B.': 'Settings chosen in the preference questions of variant B.',
+  'Wiederkehrende Befunde nach Anzahl der Teilnehmenden.': 'Recurring findings by number of participants.',
+  'Bearbeitungsdauer =': 'Duration =',
+  'Abb.': 'Fig.',
+  PNG: 'PNG',
+  Kopiert: 'Copied',
+  'Text kopieren': 'Copy text',
+  // codes
+  'Keine Code-Kategorie (unter „Tags“ eine Kategorie „Code“ anlegen).': 'No code category (create a category "Code" under "Tags").',
+  'Pragmatische Qualität': 'Pragmatic quality',
+  'Hedonische Qualität': 'Hedonic quality',
+  'UEQ-S gesamt': 'UEQ-S overall',
+  'Codes nach Variante': 'Codes by variant',
+  Code: 'Code',
+  'Variante A': 'Variant A',
+  'Variante B': 'Variant B',
+  'ohne Variante': 'without variant',
+  'Aussagen (Teilnehmende). Die Variante einer Aussage ist ihr Tag „Variante A/B“. Nur bestätigte Tags zählen.': 'Statements (participants). A statement\'s variant is its tag "Variante A/B". Only confirmed tags count.',
+  'Aussagen und Messwerte': 'Statements and measures',
+  Variante: 'Variant',
+  'alle Varianten': 'all variants',
+  'Aussagen (': 'Statements (',
+  'Interpretation:': 'Interpretation:',
+  'Keine.': 'None.',
+  'Verknüpfte Messwerte': 'Linked measures',
+  Messwert: 'Measure',
+  'beide:': 'both:',
+  'Keine Messwerte verknüpft.': 'No measures linked.',
+  'Verknüpfung bearbeiten': 'Edit links',
+  fertig: 'done',
+  // data & validation
+  Stichprobe: 'Sample',
+  'Ausbalancierte Reihenfolge': 'Balanced order',
+  'Testgruppe bekannt': 'Test group known',
+  'Ausschlüsse begründet': 'Exclusions justified',
+  Sessions: 'Sessions',
+  'Mehrere Links je Person': 'Several links per person',
+  Hauptlink: 'main link',
+  Summe: 'Sum',
+  läuft: 'running',
+  'nicht geöffnet': 'not opened',
+  'Alle Links beendet': 'All links finished',
+  'Dauer vorhanden': 'Duration available',
+  'Spiel-Uhr und Link-Dauer stimmig (Abweichung ≤ 50 %)': 'Game clock and link duration consistent (difference ≤ 50%)',
+  Umfrage: 'Survey',
+  'Tally-Export importiert': 'Tally export imported',
+  'Teilnehmer-ID in der Umfrage': 'Participant ID in the survey',
+  'keine IDs – Zuordnung nach Zeit bzw. Reihenfolge der Notizen': 'no IDs – matched by time or by the order of the notes',
+  'Keine doppelten IDs': 'No duplicate IDs',
+  'Alle Antworten zugeordnet': 'All responses matched',
+  'Alle Teilnehmenden mit Antworten': 'All participants have responses',
+  'Zuordnung nach Reihenfolge: Anzahl Zeilen = Teilnehmende': 'Matching by order: number of rows = participants',
+  'Reihenfolge in der Umfrage = Testgruppe': 'Order in the survey = test group',
+  'Korrekturen Teil 1': 'Corrections part 1',
+  'Keine fehlenden Werte': 'No missing values',
+  'Teil 2: Items paarweise (A und B)': 'Part 2: items in pairs (A and B)',
+  '1. Durchgang': '1st run',
+  '2. Durchgang': '2nd run',
+  'Teil 3: je 8 UEQ-S-Items': 'Part 3: 8 UEQ-S items each',
+  '1./2. Durchgang auflösbar (Testgruppe bekannt)': '1st/2nd run resolvable (test group known)',
+  'Teil 1: alle Antworten lesbar': 'Part 1: all responses readable',
+  Notizen: 'Notes',
+  'Notizen für alle Teilnehmenden': 'Notes for all participants',
+  'Testgruppe Notizen = Tracking': 'Test group notes = tracking',
+  'Alle Aussagen geprüft': 'All statements checked',
+  'Geänderte Aussagen geprüft': 'Changed statements checked',
+  'Entfernte Aussagen bereinigt': 'Removed statements cleaned up',
+  'Geprüfte Aussagen mit „Art“': 'Checked statements have a "type"',
+  'Probleme mit Priorität': 'Problems have a priority',
+  Datenquellen: 'Data sources',
+  Quelle: 'Source',
+  Umfang: 'Size',
+  Stand: 'Version',
+  'Spiel-Tracking (Links, Ereignisse, Bewertungen)': 'Game tracking (links, events, ratings)',
+  'Links,': 'links,',
+  'Ereignisse,': 'events,',
+  Bewertungen: 'Ratings',
+  live: 'live',
+  'Tally-Umfrage': 'Tally survey',
+  'nicht importiert': 'not imported',
+  Testnotizen: 'Test notes',
+  'Teilnehmende,': 'participants,',
+  eingefügt: 'pasted',
+  'alle erfüllt': 'all met',
+  Bereich: 'Area',
+  Prüfung: 'Check',
+  Ergebnis: 'Result',
+  Details: 'Details',
+  '✓ erfüllt': '✓ met',
+  '! offen': '! open',
+  erfüllt: 'met',
+  offen: 'open',
+  'Validierungsbericht (CSV)': 'Validation report (CSV)',
+  'Spiel-Uhr: vom ersten Quest-Schritt bis zum Öffnen der Umfrage (die Uhr des Spiels, über Neuladen hinweg). Link-Dauer: vom Öffnen des Links (inkl. Einwilligung und Intro) bis zum Abschluss der Umfrage bzw. dem letzten Kontakt. Summe der Schritte: die gemessenen Dauern der Quest-Schritte. Mehrere Links: Summe oder Hauptlink (Teilnehmende & Sessions).':
+    'Game clock: from the first quest step to opening the survey (the game\'s clock, across reloads). Link duration: from opening the link (incl. consent and intro) to finishing the survey or the last contact. Sum of steps: the measured durations of the quest steps. Several links: sum or main link (Participants & sessions).',
+  Zuordnungsregeln: 'Matching rules',
+  'Teilnehmende: P-ID aus dem persönlichen Link bzw. den Notizen.': 'Participants: P-ID from the personal link or the notes.',
+  'Umfrage-Zeilen ↔ Teilnehmende, in dieser Reihenfolge: 1. manuell gewählt; 2. Teilnehmer-ID (tallyid); 3. Zeit (nur wenn eingeschaltet): Abgabe 10 min vor bis 120 min nach dem Öffnen der Umfrage im Spiel, nächste zuerst; 4. Reihenfolge: übrige Teilnehmende in der gewählten Reihenfolge (Notizen, P-ID oder Sessionstart), übrige Zeilen nach Abgabezeit. Abweichende AB/BA-Angaben werden markiert.':
+    'Survey rows ↔ participants, in this order: 1. chosen by hand; 2. participant ID (tallyid); 3. time (only when switched on): submitted 10 min before to 120 min after opening the survey in the game, nearest first; 4. order: the remaining participants in the chosen order (notes, P-ID or session start), the remaining rows by submission time. Differing AB/BA values are flagged.',
+  'Mehrere Links einer Person: P009.1, P009.2 … in der Reihenfolge des Starts; Dauer als Summe oder nur Hauptlink.': 'Several links of one person: P009.1, P009.2 … in the order they started; duration as the sum or the main link only.',
+  'Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links. Unterbrechung: mehr als 10 min ohne Ereignis im Spiel-Tracking.':
+    'End of a session: finishing the survey; otherwise the game\'s last contact before the link expired. Interruption: more than 10 min without an event in the game tracking.',
+  'Testgruppe: aus dem Link (AB/BA); eine Korrektur überschreibt sie; Abweichungen zu den Notizen werden markiert.': 'Test group: from the link (AB/BA); a correction overrides it; differences to the notes are flagged.',
+  'Teil 1: „vertauscht“ kehrt A und B der betreffenden Person um; „keine Präferenz“ zählt nicht im Vorzeichentest.': 'Part 1: "swapped" reverses A and B for that person; "no preference" does not count in the sign test.',
+  'Teil 3: Antworten 1–7, gedrehte Items umgepolt, Werte −3 bis +3; nur vollständige Skalen.': 'Part 3: answers 1–7, reversed items recoded, values −3 to +3; complete scales only.',
+  'Rückmeldungen: nur bestätigte Tags zählen; Vorschläge der KI bleiben bis zur Bestätigung unberücksichtigt; „Verworfen“ schließt eine Aussage aus.': 'Feedback: only confirmed tags count; AI suggestions are ignored until confirmed; "Verworfen" excludes a statement.',
+  'Ausgeschlossene Teilnehmende fehlen in allen Abbildungen, Tests und Listen.': 'Excluded participants are left out of all figures, tests and lists.',
+  Änderungen: 'Changes',
+  'Noch keine Änderungen.': 'No changes yet.',
+  'Zuordnung Umfrage ↔ Teilnehmende': 'Matching survey ↔ participants',
+  'Zuordnung nach Reihenfolge:': 'Matching by order:',
+  'zuerst über Zeitabgleich zuordnen (Abgabezeit ↔ Öffnen der Umfrage im Spiel)': 'match by time first (submission time ↔ opening the survey in the game)',
+  'Abgabe-Nr.': 'Submission no.',
+  Zeile: 'Row',
+  'Abgabe (dt. Zeit)': 'Submitted (German time)',
+  'AB/BA': 'AB/BA',
+  'Pos.': 'Pos.',
+  'Termin (Notizen)': 'Time slot (notes)',
+  Gruppe: 'Group',
+  Zuordnung: 'Matching',
+  ignoriert: 'ignored',
+  keine: 'none',
+  abweichend: 'differs',
+  'Zeile wieder werten': 'Count the row again',
+  'z. B. Testlauf oder doppelte Abgabe: nicht zuordnen und nicht auswerten': 'e.g. a test run or a double submission: neither match nor evaluate',
+  Werten: 'Count',
+  Ignorieren: 'Ignore',
+  'Nach Abgabezeit sortiert. „Abgabe-Nr.“ und „Pos.“ (Platz der Person in der gewählten Reihenfolge) sind bei der Zuordnung nach Reihenfolge gleich; weichen sie ab, wurde die Zeile anders zugeordnet (siehe „Zuordnung“). Eine Zeile ignorieren (Testlauf, doppelte Abgabe) ordnet die übrigen neu zu. Einzelne Personen: auf „Teilnehmende & Sessions“ die Tally-Zeile wählen.':
+    'Sorted by submission time. "Submission no." and "Pos." (the person\'s place in the chosen order) are equal when matched by order; if they differ, the row was matched differently (see "Matching"). Ignoring a row (test run, double submission) re-matches the rest. Single persons: choose the Tally row under "Participants & sessions".',
+  'Reihenfolge der Notizen': 'Order of the notes',
+  'P-ID (P001, P002, …)': 'P-ID (P001, P002, …)',
+  'Start der Session (Tracking)': 'Session start (tracking)',
+  'Spiel-Uhr (sonst Link-Dauer)': 'Game clock (else link duration)',
+  'Spiel-Uhr: erster Quest-Schritt bis Umfrage': 'Game clock: first quest step to survey',
+  'Link-Dauer: Öffnen des Links bis Ende': 'Link duration: opening the link to the end',
+  'Summe der Quest-Schritte': 'Sum of the quest steps',
+  // findings
+  'Neuer Befund': 'New finding',
+  Anlegen: 'Create',
+  'Vorgeschlagene Befunde': 'Suggested findings',
+  Verwerfen: 'Discard',
+  Befund: 'Finding',
+  'Noch keine Befunde. Befunde entstehen aus den Aussagen (Spalte „Befund“) oder hier.': 'No findings yet. Findings come from the statements (column "Finding") or are created here.',
+  'Name des Befunds': 'Name of the finding',
+  'Teilnehmende ·': 'participants ·',
+  'Zusammenführen mit': 'Merge with',
+  'Zusammenführen mit …': 'Merge with …',
+  Löschen: 'Delete',
+  'Aus dem Befund lösen (Teilen)': 'Remove from the finding (split)',
+  Lösen: 'Remove',
+  Zuordnen: 'Assign',
+  Alle: 'All',
+  'Vorschläge zuordnen': 'suggestions assign',
+  // game flow and crafting
+  'Quest 1': 'Quest 1',
+  'Quest 2': 'Quest 2',
+  'Bewertung 1': 'Rating 1',
+  Übergang: 'Transition',
+  'Bewertung 2': 'Rating 2',
+  Ende: 'End',
+  Erkunden: 'Explore',
+  Sammeln: 'Gather',
+  Einlagern: 'Store',
+  'Zu Mitchy': 'To Mitchy',
+  Fahrzeug: 'Vehicle',
+  Werkzeug: 'Tool',
+  Füllen: 'Fill',
+  Pflanzen: 'Plant',
+  Gießen: 'Water',
+  Ernten: 'Harvest',
+  Begleiter: 'Companion',
+  Berichten: 'Report',
+  Start: 'Start',
+  'Fortgesetzt (neu geladen)': 'Resumed (reloaded)',
+  'Umfrage geöffnet': 'Survey opened',
+  'Spiel geschlossen': 'Game closed',
+  'KI-Budget erschöpft': 'AI budget used up',
+  passt: 'fits',
+  'nicht ganz': 'not quite',
+  Überarbeitung: 'Rework',
+  Ersatzergebnis: 'Fallback result',
+  'nur Bewertung': 'rating only',
+  abgebrochen: 'aborted',
+  'Ohne Zuordnung': 'Unassigned',
+  Zeit: 'Time',
+  Durchgang: 'Run',
+  Eingabe: 'Input',
+  Bewertung: 'Rating',
+  Gründe: 'Reasons',
+  Kommentar: 'Comment',
+  'Dauer (min)': 'Duration (min)',
+  Ansicht: 'View',
+  'Nach Durchgang': 'By run',
+  Tabelle: 'Table',
+  'Keine Crafting-Vorgänge.': 'No crafting sessions.',
+  TN: 'P',
+  'Var.': 'Var.',
+  'Eingabe und Verlauf': 'Input and conversation',
+  '. DG': '. run',
+  'Gesprächsverlauf (': 'Conversation (',
+  Spielablauf: 'Game flow',
+  'Keine Ereignisse im Spiel-Tracking.': 'No events in the game tracking.',
+  'Dauer je Abschnitt in Minuten.': 'Duration per section in minutes.',
+  'Summe Schritte': 'Sum of steps',
+  'Spiel-Uhr': 'Game clock',
+  'Link-Dauer': 'Link duration',
+  Median: 'Median',
+  'Spiel-Uhr bis Umfrage:': 'Game clock to survey:',
+  '· Link-Dauer:': '· Link duration:',
+  '· Summe der Schritte:': '· Sum of steps:',
+  Unterbrechung: 'interruption',
+  Unterbrechungen: 'Interruptions',
+  über: 'over',
+  // import
+  Reihenfolge: 'Order',
+  Zeitpunkt: 'Time',
+  ignorieren: 'ignore',
+  'Teilnehmer-ID': 'Participant ID',
+  'Teil 1: Vergleich': 'Part 1: comparison',
+  'Teil 2: Likert': 'Part 2: Likert',
+  'Teil 4: Angabe': 'Part 4: detail',
+  Freitext: 'Free text',
+  'Die Datei enthält keine Antworten.': 'The file contains no responses.',
+  'Import: Tally-Export': 'Import: Tally export',
+  'CSV-Datei wählen': 'Choose CSV file',
+  'Antworten ·': 'responses ·',
+  'Zuordnung neu vorschlagen': 'Suggest roles again',
+  'ignorierte ausblenden': 'hide ignored',
+  'beide / gesamt': 'both / overall',
+  'Teil 4: Angaben': 'Part 4: details',
+  ab: 'from',
+  'Frage (Kurzname)': 'Question (short name)',
+  ungültig: 'invalid',
+  'keine Präferenz': 'no preference',
+  'Item (gleicher Name für A und B)': 'Item (same name for A and B)',
+  'Pole vertauscht (positiv links)': 'Poles reversed (positive left)',
+  Bezeichnung: 'Label',
+  'Keine Teilnehmenden gefunden (jeder Block beginnt mit der P-ID, z. B. „P001“).': 'No participants found (each block starts with the P-ID, e.g. "P001").',
+  'Import: Notizen': 'Import: notes',
+  'Datei wählen (.md, .txt)': 'Choose file (.md, .txt)',
+  Einlesen: 'Read in',
+  'Tally-Freitexte übernehmen': 'Take over Tally free texts',
+  'UEQ-S-Item': 'UEQ-S item',
+  // notes
+  'Vorschlag: klicken zum Bestätigen': 'Suggestion: click to confirm',
+  'Deutsche Fassung': 'German version',
+  'Klicken: bearbeiten': 'Click: edit',
+  '+ Deutsche Fassung': '+ German version',
+  automatisch: 'automatic',
+  'Original geändert – Übersetzung prüfen': 'Original changed – check the translation',
+  'als geprüft übernehmen': 'accept as checked',
+  'geändert – prüfen': 'changed – check',
+  neu: 'new',
+  Interpretation: 'Interpretation',
+  'Nachträgliche Ergänzung': 'Later addition',
+  '+ Interpretation': '+ Interpretation',
+  'Woran du dich später erinnerst – getrennt von der Originalnotiz': 'What you remembered later – kept apart from the original note',
+  '+ Nachträgliche Ergänzung': '+ Later addition',
+  'neuer Befund vorgeschlagen (unter „Befunde“ anlegen)': 'new finding suggested (create it under "Findings")',
+  'Vorschläge übernehmen und als geprüft markieren': 'Accept the suggestions and mark as checked',
+  Geprüft: 'Checked',
+  Bestätigen: 'Confirm',
+  'Geprüft?': 'Checked?',
+  'Deutsche Fassung bearbeiten': 'Edit German version',
+  'Deutsch bearbeiten': 'Edit German',
+  'Original korrigieren (protokolliert)': 'Correct the original (logged)',
+  'Original korrigieren': 'Correct original',
+  Beobachtung: 'Observation',
+  Nachgespräch: 'Follow-up interview',
+  'Umfrage (Freitext)': 'Survey (free text)',
+  'KI-Vorschläge …': 'AI suggestions …',
+  'Noch keine Notizen. Unter „Import“ einlesen.': 'No notes yet. Read them in under "Import".',
+  Anzeige: 'Show',
+  'Alle Aussagen (': 'All statements (',
+  'Ungeprüft (': 'Unchecked (',
+  'Geändert / neu (': 'Changed / new (',
+  Suchen: 'Search',
+  'KI-Vorschläge für ungeprüfte': 'AI suggestions for unchecked',
+  'In der neuen Fassung nicht mehr enthalten (': 'No longer in the new version (',
+  Behalten: 'Keep',
+  'Alle löschen': 'Delete all',
+  'Tracking:': 'Tracking:',
+  ausgeschlossen: 'excluded',
+  'Alle bestätigen': 'Confirm all',
+  'Neue Aussage': 'New statement',
+  '+ Aussage': '+ Statement',
+  Essenziell: 'Essential',
+  'Offen (t.b.d.)': 'Open (t.b.d.)',
+  'Nice-to-have': 'Nice-to-have',
+  'Ohne Priorität': 'Without priority',
+  'Bereich: Spiel': 'Area: game',
+  'Bereich: Umfrage': 'Area: survey',
+  'Bereich: Ablauf': 'Area: procedure',
+  'Art: Problem': 'Type: problem',
+  'Art: Positiv': 'Type: positive',
+  'Art: Überraschung': 'Type: surprise',
+  'Art: Anmerkung': 'Type: remark',
+  'Moderation: Eingriff': 'Moderation: intervention',
+  'Priorität: essenziell': 'Priority: essential',
+  'Priorität: offen': 'Priority: open',
+  'Priorität: nice-to-have': 'Priority: nice-to-have',
+  'verworfen (zählt nicht)': 'rejected (does not count)',
+  'Name der Kategorie': 'Name of the category',
+  'mehrere je Aussage': 'several per statement',
+  'Kategorie löschen': 'Delete category',
+  Tag: 'Tag',
+  Bedeutung: 'Meaning',
+  'Neuer Tag': 'New tag',
+  '+ Tag': '+ Tag',
+  'Neue Kategorie': 'New category',
+  '+ Kategorie': '+ Category',
+  'Keine bestätigten Einträge.': 'No confirmed entries.',
+  // default tags (stored in German; shown translated)
+  Spiel: 'Game',
+  Testablauf: 'Test procedure',
+  Art: 'Type',
+  Problem: 'Problem',
+  Positiv: 'Positive',
+  Überraschung: 'Surprise',
+  Anmerkung: 'Remark',
+  Priorität: 'Priority',
+  Thema: 'Topic',
+  Steuerung: 'Controls',
+  'Quests & Hinweise': 'Quests & hints',
+  Dialoge: 'Dialogues',
+  Darstellung: 'Visuals',
+  Technik: 'Technology',
+  Kontrolle: 'Control',
+  Erwartung: 'Expectation',
+  Feedbackwirkung: 'Effect of feedback',
+  Verständlichkeit: 'Comprehensibility',
+  Spielfluss: 'Game flow',
+  Outputqualität: 'Output quality',
+  'Technische Probleme': 'Technical problems',
+  'Positives Erlebnis': 'Positive experience',
+  Moderation: 'Moderation',
+  Eingriff: 'Intervention',
+  Gültigkeit: 'Validity',
+  Verworfen: 'Rejected',
+  'Kritische Usability-Probleme': 'Critical usability problems',
+  'Positive Rückmeldungen': 'Positive feedback',
+  'Unerwartete Beobachtungen': 'Unexpected observations',
+  Moderationseingriffe: 'Moderator interventions',
+  // overview
+  Testgruppen: 'Test groups',
+  Zeitraum: 'Period',
+  Teilnehmerprofil: 'Participant profile',
+  Anzahl: 'Count',
+  'Keine Altersangaben (Import: Tally-Spalte als „Alter“ zuordnen).': 'No ages (Import: assign a Tally column as "Alter").',
+  'AB (zuerst A)': 'AB (A first)',
+  'BA (zuerst B)': 'BA (B first)',
+  Link: 'Link',
+  'Keine abgeschlossenen Durchläufe.': 'No finished runs.',
+  Kategorie: 'Category',
+  Rückmeldungen: 'Feedback',
+  'Noch keine bestätigten Rückmeldungen (Notizen).': 'No confirmed feedback yet (notes).',
+  'keine Angabe': 'no answer',
+  Frage: 'Question',
+  Antwort: 'Answer',
+  'Alle Fragen (': 'All questions (',
+  'Alle Antworten': 'All answers',
+  von: 'of',
+  '(Mehrfachauswahl)': '(multiple choice)',
+  'Antworten je Teilnehmer': 'Answers per participant',
+  // participants
+  'nach ID': 'by ID',
+  'nach Zeit': 'by time',
+  'nach Reihenfolge': 'by order',
+  manuell: 'by hand',
+  Grund: 'Reason',
+  'Teil 1 vertauscht': 'Part 1 swapped',
+  'Dauer aus': 'Duration from',
+  'Umfrage-Zeile: andere Gruppe – Zuordnung prüfen': 'Survey row: different group – check the matching',
+  'Notizen:': 'Notes:',
+  'Summe aller Links': 'Sum of all links',
+  'nur Hauptlink': 'main link only',
+  längster: 'longest',
+  'Tally-Zeile': 'Tally row',
+  'aus Tally': 'from Tally',
+  'Teil 1: A und B vertauscht': 'Part 1: A and B swapped',
+  'Von der Auswertung ausschließen': 'Exclude from the evaluation',
+  'Tally-Zeilen ohne Zuordnung:': 'Tally rows without a match:',
+  Crafting: 'Crafting',
+  Hinweis: 'Hint',
+  Fehler: 'Error',
+  Sitzung: 'Session',
+  'Rohantworten (Tally-Zeile': 'Raw answers (Tally row',
+  'Spielereignisse (': 'Game events (',
+  Schritte: 'Steps',
+  Crafts: 'Crafts',
+  Dauer: 'Duration',
+  '(Hauptlink)': '(main link)',
+  '(Summe)': '(sum)',
+  'kein Link': 'no link',
+  'Dauer:': 'Duration:',
+  // results
+  Ergebnisse: 'Results',
+  Methode: 'Method',
+  Richtung: 'Direction',
+  'Noch keine Ergebnisse (Umfrage, Spiel-Tracking oder Befunde).': 'No results yet (survey, game tracking or findings).',
+  'Hypothesen und Evidenzbewertung': 'Hypotheses and evidence rating',
+  Hypothese: 'Hypothesis',
+  'Erwartete Richtung': 'Expected direction',
+  'ohne Richtung (qualitativ)': 'no direction (qualitative)',
+  'erwartet: A besser': 'expected: A better',
+  'erwartet: B besser': 'expected: B better',
+  'Verknüpfte Ergebnisse (': 'Linked results (',
+  '+ Hypothese': '+ Hypothesis',
+  'Aussagekraft des Usertests': 'What the user test can show',
+  Design: 'Design',
+  'Within-Subject, zwei Varianten (A: Vorab-Klärung, B: Nachträgliche Reflexion), Reihenfolge ausbalanciert (AB/BA)': 'Within-subject, two variants (A: clarification before, B: reflection after), counterbalanced order (AB/BA)',
+  'Vorzeichentest (α = ,05)': 'Sign test (α = .05)',
+  'mit dieser Stichprobe nicht erreichbar': 'not reachable with this sample',
+  'Kleinstes p (Wilcoxon)': 'Smallest p (Wilcoxon)',
+  'Breite des 95 %-KI': 'Width of the 95% CI',
+  'Nachweisbarer Effekt': 'Detectable effect',
+  Aussagekraft: 'Explanatory power',
+  'Explorativ: große Effekte und wiederkehrende Probleme sind erkennbar, kleine und mittlere Unterschiede nicht abgesichert.': 'Exploratory: large effects and recurring problems can be seen; small and medium differences are not established.',
+  Abbildungen: 'Figures',
+  'Nr.': 'No.',
+  Abbildung: 'Figure',
+  Bildunterschrift: 'Caption',
+  Zurücksetzen: 'Reset',
+  'Alle Bildunterschriften kopieren': 'Copy all captions',
+  'PNG-Export und Bearbeitung an jeder Abbildung; Unterabbildungen (z. B. 4.1) folgen der Nummer ihrer Abbildung.': 'PNG export and editing at each figure; sub-figures (e.g. 4.1) follow the number of their figure.',
+  Exporte: 'Exports',
+  'Ergebnisse (CSV)': 'Results (CSV)',
+  Begründung: 'Reasoning',
+  'Hypothesen (CSV)': 'Hypotheses (CSV)',
+  Abschnitt: 'Section',
+  Aussage: 'Statement',
+  geprüft: 'checked',
+  'Aussagen, codiert (CSV)': 'Statements, coded (CSV)',
+  Datum: 'Date',
+  Links: 'Links',
+  'Teilnehmende (CSV)': 'Participants (CSV)',
+  'Gesamtdaten (ZIP, pseudonymisiert)': 'All data (ZIP, pseudonymised)',
+  'Doppelklick: bearbeiten': 'Double-click: edit',
+  bearbeitet: 'edited',
+  Gesamt: 'Overall',
+  stark: 'strong',
+  mittel: 'medium',
+  schwach: 'weak',
+  'nicht gestützt': 'not supported',
+  widersprochen: 'contradicted',
+  // survey
+  'Noch keine Umfragedaten. Den Tally-Export unter „Import“ hochladen.': 'No survey data yet. Upload the Tally export under "Import".',
+  'Keine Präferenz': 'No preference',
+  'Anteil Mehrheit': 'Majority share',
+  'KI unten': 'CI lower',
+  'KI oben': 'CI upper',
+  'p (Vorzeichentest)': 'p (sign test)',
+  Keine: 'None',
+  Mehrheit: 'Majority',
+  '95 %-KI': '95% CI',
+  '× korrigiert': '× corrected',
+  'Exakter Vorzeichentest (zweiseitig) über die Urteile mit Präferenz; „keine Präferenz“ ausgeschlossen. Wilson-Intervall für den Anteil der Mehrheit.': 'Exact sign test (two-sided) over the judgements with a preference; "no preference" excluded. Wilson interval for the majority share.',
+  'Keine Spalte als „Teil 1“ zugeordnet.': 'No column assigned as "Part 1".',
+  Item: 'Item',
+  'A: Mdn (IQR)': 'A: Mdn (IQR)',
+  'B: Mdn (IQR)': 'B: Mdn (IQR)',
+  'n Paare': 'n pairs',
+  'Exakter Wilcoxon-Vorzeichen-Rang-Test (zweiseitig, B − A, Nulldifferenzen ausgeschlossen); r = Rang-biseriale Korrelation (positiv: B höher).': 'Exact Wilcoxon signed-rank test (two-sided, B − A, zero differences excluded); r = rank-biserial correlation (positive: B higher).',
+  'Keine Spalte als „Teil 2“ zugeordnet.': 'No column assigned as "Part 2".',
+  Skala: 'Scale',
+  'Benchmark A': 'Benchmark A',
+  'Benchmark B': 'Benchmark B',
+  'p (Wilcoxon)': 'p (Wilcoxon)',
+  'A: M [95 %-KI]': 'A: M [95% CI]',
+  Benchmark: 'Benchmark',
+  'B: M [95 %-KI]': 'B: M [95% CI]',
+  'Skalenwerte −3 bis +3 (Schrepp, Hinderks & Thomaschewski, 2017); nur vollständige Skalen. Benchmark-Grenzen vor der Verwendung mit der aktuellen UEQ-S-Handreichung abgleichen.':
+    'Scale values −3 to +3 (Schrepp, Hinderks & Thomaschewski, 2017); complete scales only. Check the benchmark limits against the current UEQ-S handbook before use.',
+  'Keine Spalte als „Teil 3“ zugeordnet.': 'No column assigned as "Part 3".',
+  Freitextantworten: 'Free-text answers',
+  'Teil 1:': 'Part 1:',
+  'Teil 2:': 'Part 2:',
+  'Teil 3:': 'Part 3:',
+  'Teil 1': 'Part 1',
+  'Teil 2': 'Part 2',
+  'Teil 3': 'Part 3',
+  'Mdn A': 'Mdn A',
+  Mdn: 'Mdn',
+  '(gesamtes Spiel)': '(whole game)',
+  'In-Game-Ratings und Telemetrie': 'In-game ratings and telemetry',
+  'Spiel-Tracking': 'Game tracking',
+  Kennzahl: 'Measure',
+  Überarbeitungen: 'Reworks',
+  Ersatzergebnisse: 'Fallback results',
+  'Minuten im Crafting': 'Minutes crafting',
+  'Zeit im Crafting: A': 'Time crafting: A',
+  Passt: 'Fits',
+  'Nicht ganz': 'Not quite',
+  'Anteil „Passt“: A': 'Share "fits": A',
+  'Keine Bewertungen im Spiel.': 'No in-game ratings.',
+  Einstellung: 'Setting',
+  Wert: 'Value',
+  'Gültigkeit:': 'Scope:',
+  'Keine Präferenzen gewählt.': 'No preferences chosen.',
+  'Crafts / Überarbeitungen': 'Crafts / reworks',
+  'Anteil „Passt“': 'Share "fits"',
+  'Bewertung:': 'Rating:',
+  'Mdn (IQR)': 'Mdn (IQR)',
+  'M (SD)': 'M (SD)',
+  'Gesamtes Spiel': 'Whole game',
+  'M [95 %-KI]': 'M [95% CI]',
+  // translations section
+  'Übersetzen …': 'Translating …',
+  Übersetzungen: 'Translations',
+  'zu prüfen (automatisch / fehlend)': 'to check (automatic / missing)',
+  'nur fehlende': 'missing only',
+  alle: 'all',
+  'Fehlende Übersetzungen erstellen': 'Create missing translations',
+  'Umfrage (Fragen, Antwortoptionen, Freitexte)': 'Survey (questions, answer options, free texts)',
+  übernehmen: 'accept',
+  fehlt: 'missing',
+  'Notizen (Aussagen)': 'Notes (statements)',
+  'Original geändert': 'Original changed',
+  // tracking labels
+  Detailgrad: 'Detail',
+  Farbe: 'Colour',
+  weniger: 'less',
+  normal: 'normal',
+  mehr: 'more',
+  pastell: 'pastel',
+  kräftig: 'vivid',
+  kontrolliert: 'controlled',
+  beibehalten: 'keep',
+  überraschen: 'surprise me',
+  'Unbekannte Wörter': 'Unknown words',
+  weglassen: 'leave out',
+  'trotzdem erzeugen': 'craft anyway',
+  'gleiche Art': 'same kind',
+  'alle Crafts': 'all crafts',
+  'nur diese Sitzung': 'this session only',
+  Erwartungstreue: 'Match with expectation',
+  Frustration: 'Frustration',
+  Gesamteindruck: 'Overall impression',
+  // UEQ-S benchmark words
+  exzellent: 'excellent',
+  gut: 'good',
+  überdurchschnittlich: 'above average',
+  unterdurchschnittlich: 'below average',
+  schlecht: 'bad',
+  'Aussagen (Teilnehmende).': 'Statements (participants).',
+  'Umfrage:': 'Survey:',
+  'Texte,': 'texts,',
+  'ohne,': 'missing,',
+  'automatisch · Notizen:': 'automatic · Notes:',
+  'Aussagen,': 'statements,',
+  'automatisch. Das Original bleibt immer unverändert; die Antworten der Umfrage werden nicht übersetzt, nur ihre Texte angezeigt.': 'automatic. The original always stays unchanged; the survey answers are not translated, only their texts are shown.',
+  '* p < ,05. Die Texte werden aus den aktuellen Daten erzeugt; eine Bearbeitung bleibt bestehen, bis sie zurückgesetzt wird.': '* p < .05. The texts are generated from the current data; an edit stays until it is reset.',
+  'Überarb.': 'reworks',
+  // UEQ-S poles (official English wording)
+  behindernd: 'obstructive',
+  unterstützend: 'supportive',
+  kompliziert: 'complicated',
+  einfach: 'easy',
+  ineffizient: 'inefficient',
+  effizient: 'efficient',
+  verwirrend: 'confusing',
+  übersichtlich: 'clear',
+  langweilig: 'boring',
+  spannend: 'exciting',
+  uninteressant: 'not interesting',
+  interessant: 'interesting',
+  konventionell: 'conventional',
+  originell: 'inventive',
+  herkömmlich: 'usual',
+  neuartig: 'leading edge',
+  'zuerst A': 'A first',
+  unentschieden: 'tie',
+  ja: 'yes',
+  nein: 'no',
+};
+
+// texts with numbers or names in them: [pattern, English]
+const PATTERNS: [RegExp, string][] = [
+  [/^Abbildung (\S+): /, 'Figure $1: '],
+  [/^Bildunterschrift (.+)$/, 'Caption $1'],
+  [/^(.+) hinzufügen$/, 'Add $1'],
+  [/^eingefügt( ?[,·] .*)$/, 'pasted$1'],
+  [/^in der Datei \(UTC\): (.*)$/, 'in the file (UTC): $1'],
+  [/^Bildunterschrift Abbildung (\S+)$/, 'Caption figure $1'],
+  [/^(\d+) ausgeschlossen$/, '$1 excluded'],
+  [/^Median, IQR (.+)$/, 'Median, IQR $1'],
+  [/^(\d+) Antworten$/, '$1 responses'],
+  [/^(\d+) von (\d+) Zeilen mit ID$/, '$1 of $2 rows with an ID'],
+  [/^(\d+) von (\d+) offen$/, '$1 of $2 open'],
+  [/^(\d+) geprüft$/, '$1 checked'],
+  [/^(\d+) ohne Art$/, '$1 without type'],
+  [/^(\d+) ohne Priorität$/, '$1 without priority'],
+  [/^(\d+) Antworten ohne Zuordnung \(Import\)$/, '$1 responses without a mapping (import)'],
+  [/^Prüfergebnisse \((\d+) offen\)$/, 'Check results ($1 open)'],
+  [/^Prüfergebnisse \(alle erfüllt\)$/, 'Check results (all met)'],
+  [/^Keine Unterbrechungen über (\d+) min$/, 'No interruptions over $1 min'],
+  [/^Median der Dauer je Abschnitt in Minuten \(n = (\d+)\)\.$/, 'Median duration per section in minutes (n = $1).'],
+  [/^Crafting-Ergebnisse \((\d+) \+ (\d+) abgebrochen\)$/, 'Crafting results ($1 + $2 aborted)'],
+  [/^Crafting-Ergebnisse \((\d+)\)$/, 'Crafting results ($1)'],
+  [/^(\d+)\. Durchgang · Variante ([AB])$/, 'Run $1 · variant $2'],
+  [/^(\d+)\. Durchgang$/, 'Run $1'],
+  [/^(\d+) Ergebnis(?:se)?$/, '$1 result(s)'],
+  [/^Vorschläge: (.*)$/, 'Suggestions: $1'],
+  [/^(\d+) Optionen$/, '$1 options'],
+  [/^Hinweis \((.+)\)$/, 'Hint ($1)'],
+  [/^(.+) abgeschlossen$/, '$1 completed'],
+  [/^Fehler: (.*)$/, 'Error: $1'],
+  [/^(\d+) Unterbrechung(?:en)? \((\d+) min\)$/, '$1 interruption(s) ($2 min)'],
+  [/^Tally-Zeile (\d+)$/, 'Tally row $1'],
+  [/^Zeile (\d+)$/, 'Row $1'],
+  [/^Spalte (\d+)$/, 'Column $1'],
+  [/^signifikant ab (\d+) von (\d+) gleichgerichteten Urteilen$/, 'significant from $1 of $2 agreeing judgements'],
+  [/^(.+) \(alle (\d+) Differenzen gleichgerichtet\)$/, '$1 (all $2 differences in the same direction)'],
+  [/^± (\d+) Prozentpunkte bei einem Anteil von 50 %$/, '± $1 percentage points at a share of 50%'],
+  [/^d_z ≥ (.+) \(gepaarter Test, Power (.+), α = (.+)\)$/, 'd_z ≥ $1 (paired test, power $2, α = $3)'],
+  [/^unentschieden \((\d+):(\d+)\)$/, 'tie ($1:$2)'],
+  [/^([AB]) (\d+)\/(\d+) \((.+)\), keine Präferenz (\d+)$/, '$1 $2/$3 ($4), no preference $5'],
+  [/^\((\d+) gleich\)$/, '($1 equal)'],
+  [/^(\d+) \((\d+) TN\)$/, '$1 ($2 P)'],
+  [/^(.+) \(n = (\d+)\)$/, '$1 (n = $2)'],
+  [/^Bewertung im Spiel: (.+)$/, 'In-game rating: $1'],
+  [/^Teil (\d): (.+)$/, 'Part $1: $2'],
+  [/^Umfrage: (\d+) von (\d+) …$/, 'Survey: $1 of $2 …'],
+  [/^Notizen: (\d+) von (\d+) …$/, 'Notes: $1 of $2 …'],
+  [/^(\d+) Texte übersetzt \(automatisch, bitte prüfen\)\.$/, '$1 texts translated (automatic, please check).'],
+  [/^Übersetzung nicht verfügbar: (.*)$/, 'Translation not available: $1'],
+  [/^KI nicht verfügbar: (.*)$/, 'AI not available: $1'],
+  [/^KI-Vorschläge: (\d+) von (\d+) …$/, 'AI suggestions: $1 of $2 …'],
+  [/^Deutsche Fassungen: (\d+) von (\d+) …$/, 'German versions: $1 of $2 …'],
+  [/^Wirklich (.+)\?$/, 'Really $1?'],
+];
+
+// short words for the remaining texts with numbers (check details and the like)
+const WORDS: [RegExp, string][] = [
+  [/\bTeilnehmende\b/g, 'participants'],
+  [/\bAntworten\b/g, 'responses'],
+  [/\bZeilen\b/g, 'rows'],
+  [/\bZeile\b/g, 'row'],
+  [/\bSpalten\b/g, 'columns'],
+  [/\bignoriert\b/g, 'ignored'],
+  [/\bnach Reihenfolge zugeordnet\b/g, 'matched by order'],
+  [/\bVerschiebung möglich, Zuordnung prüfen\b/g, 'shift possible, check the matching'],
+  [/\bUmfrage\b/g, 'survey'],
+  [/\bGruppe\b/g, 'group'],
+  [/\bNotizen\b/g, 'notes'],
+  [/\bSpiel-Uhr\b/g, 'game clock'],
+  [/\bLink-Dauer\b/g, 'link duration'],
+  [/\bDauer\b/g, 'duration'],
+  [/\bSumme\b/g, 'sum'],
+  [/\bHauptlink\b/g, 'main link'],
+  [/\bPaare\b/g, 'pairs'],
+  [/\bAussagen zu beiden\b/g, 'statements about both'],
+  [/\bohne Gegenstück\b/g, 'without counterpart'],
+  [/\bgedreht\b/g, 'reversed'],
+  [/\bgesamt\b/g, 'overall'],
+  [/\bvertauscht\b/g, 'swapped'],
+  [/\bohne Grund\b/g, 'no reason'],
+  [/\bvon\b/g, 'of'],
+  [/\bohne\b/g, 'without'],
+  [/\bautomatisch\b/g, 'automatic'],
+  [/\bAussagen\b/g, 'statements'],
+  [/\bAbgabe\b/g, 'submission'],
+  [/Überarb\./g, 'reworks'],
+  [/\bpasst\b/g, 'fits'],
+  [/\babgebrochen\b/g, 'aborted'],
+  [/\bHinweis\(e\)/g, 'hint(s)'],
+  [/\bDurchgang\b/g, 'run'],
+  [/\bTexte\b/g, 'texts'],
+];
+
+// one interface text in English (unchanged in German, or when unknown)
+export function tr(s: string): string {
+  if (lang === 'de' || !s) return s;
+  const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(s)!;
+  if (!m[2]) return s;
+  const out = trCore(m[2], 0);
+  return out === undefined ? s : m[1] + out + m[3];
+}
+function trCore(core: string, depth: number): string | undefined {
+  const exact = EN[core];
+  if (exact !== undefined) return exact;
+  for (const [re, rep] of PATTERNS) if (re.test(core)) return core.replace(re, (...g: string[]) => rep.replace(/\$(\d)/g, (_, k: string) => trCore(g[Number(k)], depth + 1) ?? g[Number(k)]));
+  if (depth > 3) return undefined;
+  // composites: "A – B – C", "Label: value", "Name (3)"
+  if (core.includes(' – ')) {
+    const parts = core.split(' – ');
+    const t = parts.map((x) => trCore(x, depth + 1));
+    if (t.some((x) => x !== undefined)) return parts.map((x, i) => t[i] ?? x).join(' – ');
+  }
+  const k = core.indexOf(': ');
+  if (k > 0) {
+    const left = trCore(core.slice(0, k), depth + 1);
+    const right = trCore(core.slice(k + 2), depth + 1);
+    if (left !== undefined || right !== undefined) return `${left ?? core.slice(0, k)}: ${right ?? core.slice(k + 2)}`;
+  }
+  const paren = /^(.+?) (\(.*\))$/.exec(core);
+  if (paren) {
+    const left = trCore(paren[1], depth + 1);
+    if (left !== undefined) return `${left} ${paren[2]}`;
+  }
+  // short texts with numbers (check details and the like): word by word
+  if (core.length < 90 && /\d/.test(core)) {
+    let w = core;
+    for (const [re, rep] of WORDS) w = w.replace(re, rep);
+    if (w !== core) return w;
+  }
+  return undefined;
+}
+
+// ---- rewriting the rendered page ----
+const ATTRS = ['title', 'placeholder', 'aria-label', 'label'];
+const skip = (n: Node) => {
+  const el = n.nodeType === 1 ? (n as Element) : n.parentElement;
+  return !el || !!el.closest('[data-notr], textarea, script, style');
+};
+function translateAttrs(e: Element) {
+  for (const a of ATTRS) {
+    const v = e.getAttribute(a);
+    if (v) {
+      const t = tr(v);
+      if (t !== v) e.setAttribute(a, t);
+    }
+  }
+}
+function translateText(t: Node) {
+  const v = t.nodeValue ?? '';
+  const out = tr(v);
+  if (out !== v) t.nodeValue = out;
+}
+// a node and everything below it (content marked [data-notr] left out)
+function translateNode(n: Node) {
+  if (skip(n)) return;
+  if (n.nodeType === 3) return translateText(n);
+  if (n.nodeType !== 1) return;
+  translateAttrs(n as Element);
+  const walker = document.createTreeWalker(n, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (x) => (x.nodeType === 1 && ((x as Element).hasAttribute('data-notr') || /^(TEXTAREA|SCRIPT|STYLE)$/.test((x as Element).tagName)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  });
+  for (let cur = walker.nextNode(); cur; cur = walker.nextNode()) {
+    if (cur.nodeType === 3) translateText(cur);
+    else translateAttrs(cur as Element);
+  }
+}
+// keeps everything under `root` in English while the language is English
+export function useTranslator(root: React.RefObject<HTMLElement>, l: Lang) {
+  useEffect(() => {
+    const el = root.current;
+    if (!el || l === 'de') return;
+    translateNode(el);
+    const mo = new MutationObserver((list) => {
+      for (const m of list) {
+        if (m.type === 'characterData') translateNode(m.target);
+        else if (m.type === 'attributes') translateNode(m.target);
+        else m.addedNodes.forEach(translateNode);
+      }
+    });
+    mo.observe(el, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+    // browser dialogs too
+    const confirm0 = window.confirm;
+    const prompt0 = window.prompt;
+    window.confirm = (m?: string) => confirm0(tr(m ?? ''));
+    window.prompt = (m?: string, d?: string) => prompt0(tr(m ?? ''), d);
+    return () => {
+      mo.disconnect();
+      window.confirm = confirm0;
+      window.prompt = prompt0;
+    };
+  }, [root, l]);
+}

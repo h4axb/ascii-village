@@ -262,14 +262,14 @@ function FreeText() {
     <Section title="Freitextantworten">
       {labels.map((l) => (
         <div key={l} className="st-quotes">
-          <h3>{T(l)}</h3>
+          <h3 data-notr>{T(l)}</h3>
           <ul>
             {slice.survey
               .filter((r) => r.text[l])
               .sort(byPerson)
               .map((r) => (
                 <li key={r.row}>
-                  <span className="st-pid">{r.person ?? `Zeile ${r.row + 1}`}</span> {T(r.text[l])}
+                  <span className="st-pid">{r.person ?? `Zeile ${r.row + 1}`}</span> <span data-notr>{T(r.text[l])}</span>
                 </li>
               ))}
           </ul>

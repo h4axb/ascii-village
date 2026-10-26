@@ -221,7 +221,7 @@ export default function Data() {
 
       <Section title="Änderungen">
         {log.length ? (
-          <ol className="st-log">
+          <ol className="st-log" data-notr>
             {log.slice(0, 100).map((e, i) => (
               <li key={i}>
                 <span className="st-muted">{new Date(e.at).toLocaleString('de-DE')}</span> {e.what}

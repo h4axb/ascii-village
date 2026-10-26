@@ -4,7 +4,8 @@
 // Names from the notes never leave the Notizen page: no export carries them.
 import { useState } from 'react';
 import type { HypothesisDoc, Design } from '../types';
-import { buildClaims, rate, RATING_RULE, type Claim } from '../claims';
+import { buildClaims, rate, ratingRule, type Claim } from '../claims';
+import { getLang } from '../i18n';
 import { download } from '../charts';
 import { detectableEffect, fmt, fmtP, signTestThreshold, wilson } from '../stats';
 import { csv, Empty, figNumber, FIGURES, LazyInput, Section, useCtx } from '../ui';
@@ -13,7 +14,9 @@ import { studyFiles, zip } from '../../feedback/studyExport';
 export default function Results() {
   const { model, slice, study } = useCtx();
   const claims = buildClaims(model, slice, study.docs.findings);
-  const text = (c: Claim) => (study.docs.claims[c.id] as { text?: string } | undefined)?.text ?? c.text;
+  // edited result texts per language (the English one under id.en)
+  const cid = (c: Claim) => (getLang() === 'en' ? `${c.id}.en` : c.id);
+  const text = (c: Claim) => (study.docs.claims[cid(c)] as { text?: string } | undefined)?.text ?? c.text;
   const hyps = Object.values(study.docs.hypotheses).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const saveH = (h: HypothesisDoc) => study.commit([{ coll: 'hypotheses', id: h.id, data: h }]);
   const nAll = model.included.length;
@@ -39,7 +42,7 @@ export default function Results() {
                 <tr key={c.id}>
                   <td>{c.method}</td>
                   <td>
-                    <ClaimText value={text(c)} generated={c.text} onSave={(t) => (t === c.text ? study.commit([], [{ coll: 'claims', id: c.id }]) : study.commit([{ coll: 'claims', id: c.id, data: { text: t } }]))} />
+                    <ClaimText value={text(c)} generated={c.text} onSave={(t) => (t === c.text ? study.commit([], [{ coll: 'claims', id: cid(c) }]) : study.commit([{ coll: 'claims', id: cid(c), data: { text: t } }]))} />
                   </td>
                   <td>{c.direction ? `${c.direction}${c.p != null && c.p < 0.05 ? ' *' : ''}` : '–'}</td>
                 </tr>
@@ -103,7 +106,7 @@ export default function Results() {
           </button>
         </div>
         <ul className="st-rules">
-          {RATING_RULE.map((r) => (
+          {ratingRule().map((r) => (
             <li key={r}>{r}</li>
           ))}
         </ul>
@@ -267,7 +270,7 @@ function ClaimText({ value, generated, onSave }: { value: string; generated: str
   if (!edit)
     return (
       <span className="st-claim" onDoubleClick={() => (setDraft(value), setEdit(true))} title="Doppelklick: bearbeiten">
-        {value}
+        <span data-notr>{value}</span>
         {value !== generated && <span className="st-flag"> bearbeitet</span>}
       </span>
     );

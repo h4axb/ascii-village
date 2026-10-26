@@ -143,8 +143,12 @@ export default function Codes() {
                       {i.link ?? i.person}
                       {designOfItem(i) ? ` · ${designOfItem(i)}` : ''}
                     </span>{' '}
-                    {itemText(view, i)}
-                    {i.interpretation && <span className="st-tags">Interpretation: {i.interpretation}</span>}
+                    <span data-notr>{itemText(view, i)}</span>
+                    {i.interpretation && (
+                      <span className="st-tags">
+                        Interpretation: <span data-notr>{i.interpretation}</span>
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { DURATION_LABEL, type DurationBy, type Model, type Scope, type Slice } from './model';
 import type { Study } from './store';
 import { Figure } from './charts';
+import { getLang, tr } from './i18n';
 
 export interface Ctx {
   study: Study;
@@ -43,10 +44,13 @@ export const figNumber = (id: string) => FIGURES.findIndex((f) => f.id === id) +
 
 export function Fig({ id, sub, title, children, table }: { id: string; sub?: { n: number; title: string }; title?: string; children: ReactNode; table?: () => string }) {
   const { study } = useCtx();
+  const en = getLang() === 'en';
   const f = FIGURES.find((x) => x.id === id)!;
-  const key = sub ? `${id}.${sub.n}` : id;
+  // captions per language: the German one under the figure's id, the English one under id.en
+  const key = (sub ? `${id}.${sub.n}` : id) + (en ? '.en' : '');
   const stored = (study.docs.captions[key] as { caption?: string } | undefined)?.caption;
-  const caption = stored ?? (sub ? `${f.caption.replace(/\.$/, '')}: ${sub.title}.` : f.caption);
+  const base = en ? tr(f.caption) : f.caption;
+  const caption = stored ?? (sub ? `${base.replace(/\.$/, '')}: ${sub.title}.` : base);
   const n = figNumber(id);
   return (
     <Figure
@@ -82,8 +86,9 @@ export function Stat({ label, value, sub }: { label: string; value: ReactNode; s
 
 export const Empty = ({ children }: { children: ReactNode }) => <p className="st-empty">{children}</p>;
 
+// (the header row in the dashboard's language)
 export const csv = (rows: (string | number | null | undefined)[][]) =>
-  rows.map((r) => r.map((c) => (c == null ? '' : /[;"\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c))).join(';')).join('\n');
+  rows.map((r, i) => (i ? r : r.map((c) => (typeof c === 'string' ? tr(c) : c)))).map((r) => r.map((c) => (c == null ? '' : /[;"\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c))).join(';')).join('\n');
 
 export const fmtDate = (t: number | null | undefined) => (t ? new Date(t).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–');
 export const fmtMin = (m: number | null | undefined) => (m == null ? '–' : `${Math.floor(m)}:${String(Math.round((m % 1) * 60)).padStart(2, '0')} min`);

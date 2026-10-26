@@ -247,7 +247,7 @@ function ItemRow({ item, model, save, remove }: { item: ItemDoc; model: Model; s
       {editDe ? (
         <LazyArea value={item.de ?? ''} onSave={saveDe} autoFocus onDone={() => setEditDe(false)} placeholder="Deutsche Fassung" />
       ) : item.de ? (
-        <p onClick={() => setEditDe(true)} title="Klicken: bearbeiten">
+        <p data-notr onClick={() => setEditDe(true)} title="Klicken: bearbeiten">
           {item.de}
         </p>
       ) : (
@@ -269,7 +269,7 @@ function ItemRow({ item, model, save, remove }: { item: ItemDoc; model: Model; s
   const origBlock = (
     <div className={view === 'both' ? 'st-orig is-secondary' : 'st-orig'}>
       {view === 'both' && <span className="st-cell-label">Original</span>}
-      {editOrig ? <LazyArea value={item.text} onSave={saveOriginal} autoFocus onDone={() => setEditOrig(false)} /> : <p>{item.text}</p>}
+      {editOrig ? <LazyArea value={item.text} onSave={saveOriginal} autoFocus onDone={() => setEditOrig(false)} /> : <p data-notr>{item.text}</p>}
     </div>
   );
   return (
@@ -284,7 +284,7 @@ function ItemRow({ item, model, save, remove }: { item: ItemDoc; model: Model; s
           {item.status === 'changed' && <span className="st-flag">geändert – prüfen</span>}
           {item.status === 'new' && <span className="st-flag">neu</span>}
         </div>
-        {item.question && <div className="st-item-q">{item.question}</div>}
+        {item.question && <div className="st-item-q" data-notr>{item.question}</div>}
         {view === 'orig' ? origBlock : view === 'de' ? (item.de || editDe ? deBlock : (
           <>
             {origBlock}
@@ -436,7 +436,7 @@ export default function Notes() {
           <h3>In der neuen Fassung nicht mehr enthalten ({removed.length})</h3>
           {removed.map((i) => (
             <div key={i.id} className="st-removed-row">
-              <span className="st-pid">{i.person}</span> <span>{i.text}</span>
+              <span className="st-pid">{i.person}</span> <span data-notr>{i.text}</span>
               <button type="button" onClick={() => remove(i)}>
                 Löschen
               </button>
@@ -459,9 +459,9 @@ export default function Notes() {
           <section key={pid} className="st-section st-notes-person">
             <header className="st-notes-head">
               <h2>{pid}</h2>
-              {meta?.name && <span className="st-name">{meta.name}</span>}
-              {meta?.link && <span className="st-muted">{meta.link}</span>}
-              {meta?.slot && <span className="st-muted">{meta.slot}</span>}
+              {meta?.name && <span className="st-name" data-notr>{meta.name}</span>}
+              {meta?.link && <span className="st-muted" data-notr>{meta.link}</span>}
+              {meta?.slot && <span className="st-muted" data-notr>{meta.slot}</span>}
               {meta?.group && <span className="st-muted">Gruppe {meta.group}</span>}
               {person?.groupMismatch && <span className="st-flag">Tracking: {person.trackedGroup}</span>}
               {person?.excluded && <span className="st-flag">ausgeschlossen</span>}
@@ -531,7 +531,7 @@ function ItemList({ items, model }: { items: ItemDoc[]; model: Model }) {
     <ul className="st-list">
       {items.map((i) => (
         <li key={i.id}>
-          <span className="st-pid">{i.link ?? i.person}</span> {itemText(view, i)}
+          <span className="st-pid">{i.link ?? i.person}</span> <span data-notr>{itemText(view, i)}</span>
           <span className="st-tags">
             {i.chips
               .filter((c) => !['essential', 'tbd', 'nice'].includes(model.chipRole.get(c) ?? ''))
@@ -672,7 +672,7 @@ export function FeedbackLists() {
             {rows.map((r) => (
               <li key={r.k}>
                 <div className="st-finding-head">
-                  <span className="st-finding-title">{r.title}</span>
+                  <span className="st-finding-title" data-notr>{r.title}</span>
                   <span className="st-muted">
                     {r.persons}/{total} · {[...new Set(r.list.map((i) => i.person))].sort().join(', ')}
                   </span>
@@ -681,7 +681,7 @@ export function FeedbackLists() {
                   <ul className="st-quotes-inline">
                     {r.list.map((i) => (
                       <li key={i.id}>
-                        <span className="st-pid">{i.link ?? i.person}</span> {itemText(view, i)}
+                        <span className="st-pid">{i.link ?? i.person}</span> <span data-notr>{itemText(view, i)}</span>
                       </li>
                     ))}
                   </ul>

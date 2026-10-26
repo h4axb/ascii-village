@@ -137,8 +137,8 @@ function PersonDetails({ p }: { p: Person }) {
               {tally.headers.map((h, j) =>
                 row[j] ? (
                   <tr key={j}>
-                    <th>{h}</th>
-                    <td>{row[j]}</td>
+                    <th data-notr>{h}</th>
+                    <td data-notr>{row[j]}</td>
                   </tr>
                 ) : null,
               )}

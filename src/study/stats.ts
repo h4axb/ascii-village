@@ -196,6 +196,12 @@ export function ueqsBenchmark(scale: UeqScale, value: number): string {
 export const detectableEffect = (n: number) => (n > 1 ? (t975(n - 1) + 0.8416) / Math.sqrt(n) : NaN);
 
 // ---- formatting (German, APA-like) ----
-export const fmt = (x: number, digits = 2) => (Number.isFinite(x) ? x.toFixed(digits).replace('.', ',') : '–');
-export const fmtP = (p: number) => (!Number.isFinite(p) ? '–' : p < 0.001 ? '< ,001' : fmt(p, 3).replace(/^0/, '').replace(/^-0/, '-'));
-export const pct = (x: number, digits = 0) => (Number.isFinite(x) ? `${(x * 100).toFixed(digits).replace('.', ',')} %` : '–');
+// (English: decimal point and "12%"; set by i18n.ts)
+let EN_NUMBERS = false;
+export const setNumberLang = (l: 'de' | 'en') => {
+  EN_NUMBERS = l === 'en';
+};
+const dec = (t: string) => (EN_NUMBERS ? t : t.replace('.', ','));
+export const fmt = (x: number, digits = 2) => (Number.isFinite(x) ? dec(x.toFixed(digits)) : '–');
+export const fmtP = (p: number) => (!Number.isFinite(p) ? '–' : p < 0.001 ? (EN_NUMBERS ? '< .001' : '< ,001') : fmt(p, 3).replace(/^0/, '').replace(/^-0/, '-'));
+export const pct = (x: number, digits = 0) => (Number.isFinite(x) ? `${dec((x * 100).toFixed(digits))}${EN_NUMBERS ? '%' : ' %'}` : '–');

@@ -3,6 +3,8 @@
 // sits in a <Figure> with its number, an editable caption, and a PNG export
 // (the figure with its caption below, 2400 px wide, white) for Word.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { fmt } from './stats';
+import { getLang, tr } from './i18n';
 
 export const INK = '#1d1d1b';
 export const MUTED = '#6b6b66';
@@ -25,7 +27,7 @@ function useWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
   return [ref, w];
 }
 
-const nf = (x: number, d = 0) => (Number.isFinite(x) ? x.toFixed(d).replace('.', ',') : '–');
+const nf = (x: number, d = 0) => fmt(x, d);
 
 // a nice axis maximum and its ticks
 function ticks(max: number, count = 4, integer = false): number[] {
@@ -329,7 +331,7 @@ export function Figure({
   const [draft, setDraft] = useState(caption);
   const [copied, setCopied] = useState(false);
   useEffect(() => setDraft(caption), [caption]);
-  const full = `Abbildung ${n}: ${draft}`;
+  const full = `${getLang() === 'en' ? 'Figure' : 'Abbildung'} ${n}: ${draft}`;
   return (
     <figure className="st-figure">
       <figcaption className="st-figtitle">
@@ -345,7 +347,7 @@ export function Figure({
         aria-label={`Bildunterschrift Abbildung ${n}`}
       />
       <div className="st-figtools">
-        <button type="button" onClick={() => void exportPng(ref.current, full, `Abbildung-${n}.png`)}>
+        <button type="button" onClick={() => void exportPng(ref.current, full, `${tr('Abbildung')}-${n}.png`)}>
           PNG
         </button>
         <button
@@ -360,7 +362,7 @@ export function Figure({
           {copied ? 'Kopiert' : 'Text kopieren'}
         </button>
         {table && (
-          <button type="button" onClick={() => download(new Blob(['\uFEFF' + table()], { type: 'text/csv;charset=utf-8' }), `Abbildung-${n}.csv`)}>
+          <button type="button" onClick={() => download(new Blob(['\uFEFF' + table()], { type: 'text/csv;charset=utf-8' }), `${tr('Abbildung')}-${n}.csv`)}>
             CSV
           </button>
         )}

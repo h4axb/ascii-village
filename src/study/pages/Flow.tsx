@@ -134,8 +134,8 @@ function CraftCard({ it }: { it: CraftItem }) {
         )}
       </div>
       <div className="st-card-body">
-        <div className="st-card-name">{it.name ?? 'abgebrochen'}</div>
-        {it.prompt && <div className="st-card-prompt">„{it.prompt}“</div>}
+        <div className="st-card-name" data-notr={it.name ? '' : undefined}>{it.name ?? 'abgebrochen'}</div>
+        {it.prompt && <div className="st-card-prompt" data-notr>„{it.prompt}“</div>}
         <div className="st-card-meta">
           <span>{clock(it.at)}</span>
           {vote(it.rating) && <span className={it.rating?.vote === 'up' ? 'is-up' : 'is-down'}>{vote(it.rating)}</span>}
@@ -144,7 +144,7 @@ function CraftCard({ it }: { it: CraftItem }) {
           {it.source === 'rating' && <span className="st-muted">nur Bewertung</span>}
         </div>
         {it.rating?.reasons?.length ? <div className="st-muted">{it.rating.reasons.join(', ')}</div> : null}
-        {it.rating?.comment ? <div className="st-card-comment">„{it.rating.comment}“</div> : null}
+        {it.rating?.comment ? <div className="st-card-comment" data-notr>„{it.rating.comment}“</div> : null}
       </div>
     </div>
   );
@@ -163,7 +163,7 @@ function RunColumns({ items }: { items: CraftItem[] }) {
         <div className="st-run-head">
           <span>{title}</span>
           <span className="st-muted">
-            {done.length} Ergebnis{done.length === 1 ? '' : 'se'}
+            {`${done.length} Ergebnis${done.length === 1 ? '' : 'se'}`}
             {list.length > done.length ? ` · ${list.length - done.length} abgebrochen` : ''}
             {done.some((x) => x.rework) ? ` · ${done.filter((x) => x.rework).length} Überarb.` : ''}
             {rated.length ? ` · ${Math.round((up / rated.length) * 100)} % passt` : ''}
@@ -294,12 +294,12 @@ function CraftTable({ items }: { items: CraftItem[] }) {
                   {it.cond && <div className="st-muted">{it.cond}. DG</div>}
                 </td>
                 <td>
-                  <div>{it.prompt || <span className="st-muted">–</span>}</div>
+                  <div data-notr>{it.prompt || <span className="st-muted">–</span>}</div>
                   {it.rework && <span className="st-flag">Überarbeitung</span>}
                   {it.thread.length > 0 && (
                     <details className="st-details">
                       <summary>Gesprächsverlauf ({it.thread.length})</summary>
-                      <ol className="st-thread">
+                      <ol className="st-thread" data-notr>
                         {it.thread.map((t, k) => (
                           <li key={k}>
                             <span className="st-muted">{t.who === 'player' ? 'TN' : 'Mitchy'}:</span> {t.text ?? (t.concepts ? `Vorschläge: ${t.concepts.join(', ')}` : `${(t.options ?? []).length} Optionen`)}

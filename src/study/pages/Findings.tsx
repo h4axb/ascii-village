@@ -49,7 +49,7 @@ export default function Findings() {
           <ul className="st-list">
             {[...fresh].map(([n, items]) => (
               <li key={n}>
-                <strong>{n}</strong> <span className="st-muted">{items.map((i) => i.person).join(', ')}</span>{' '}
+                <strong data-notr>{n}</strong> <span className="st-muted">{items.map((i) => i.person).join(', ')}</span>{' '}
                 <button type="button" onClick={() => create(n, items)}>
                   Anlegen
                 </button>
@@ -111,7 +111,7 @@ export default function Findings() {
             <ul className="st-list">
               {items.map((i) => (
                 <li key={i.id}>
-                  <span className="st-pid">{i.link ?? i.person}</span> {itemText(view, i)}{' '}
+                  <span className="st-pid">{i.link ?? i.person}</span> <span data-notr>{itemText(view, i)}</span>{' '}
                   <button type="button" title="Aus dem Befund lösen (Teilen)" onClick={() => save([{ ...i, finding: null }])}>
                     Lösen
                   </button>
@@ -119,7 +119,7 @@ export default function Findings() {
               ))}
               {prop.map((i) => (
                 <li key={i.id} className="is-suggested">
-                  <span className="st-pid">{i.link ?? i.person}</span> {itemText(view, i)}{' '}
+                  <span className="st-pid">{i.link ?? i.person}</span> <span data-notr>{itemText(view, i)}</span>{' '}
                   <button type="button" onClick={() => save([{ ...i, finding: f.id, suggestedFinding: null }])}>
                     Zuordnen
                   </button>

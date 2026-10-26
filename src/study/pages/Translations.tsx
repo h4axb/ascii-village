@@ -83,7 +83,7 @@ export default function Translations() {
                 .filter((t) => keep(stateOf(mem[t]?.de, mem[t]?.auto)))
                 .map((t) => (
                   <tr key={t}>
-                    <td>{t}</td>
+                    <td data-notr>{t}</td>
                     <td>
                       <LazyArea value={mem[t]?.de ?? ''} onSave={(v) => saveTally(t, v)} placeholder="Deutsche Fassung" />
                     </td>
@@ -125,7 +125,7 @@ export default function Translations() {
                     <td>
                       <span className="st-pid">{i.link ?? i.person}</span>
                     </td>
-                    <td>{i.text}</td>
+                    <td data-notr>{i.text}</td>
                     <td>
                       <LazyArea value={i.de ?? ''} onSave={(v) => saveItem(i, v)} placeholder="Deutsche Fassung" />
                     </td>

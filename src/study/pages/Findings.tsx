@@ -6,11 +6,13 @@ import type { FindingDoc, ItemDoc } from '../types';
 import { Bars } from '../charts';
 import { distinctPersons } from '../model';
 import { csv, Empty, Fig, Section, useCtx } from '../ui';
+import { itemText, useContentView } from '../translations';
 
 const slugId = () => `f-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
 export default function Findings() {
   const { study, model, slice } = useCtx();
+  const view = useContentView();
   const [name, setName] = useState('');
   const total = model.included.length;
   const findings = Object.values(study.docs.findings);
@@ -109,7 +111,7 @@ export default function Findings() {
             <ul className="st-list">
               {items.map((i) => (
                 <li key={i.id}>
-                  <span className="st-pid">{i.link ?? i.person}</span> {i.text}{' '}
+                  <span className="st-pid">{i.link ?? i.person}</span> {itemText(view, i)}{' '}
                   <button type="button" title="Aus dem Befund lösen (Teilen)" onClick={() => save([{ ...i, finding: null }])}>
                     Lösen
                   </button>
@@ -117,7 +119,7 @@ export default function Findings() {
               ))}
               {prop.map((i) => (
                 <li key={i.id} className="is-suggested">
-                  <span className="st-pid">{i.link ?? i.person}</span> {i.text}{' '}
+                  <span className="st-pid">{i.link ?? i.person}</span> {itemText(view, i)}{' '}
                   <button type="button" onClick={() => save([{ ...i, finding: f.id, suggestedFinding: null }])}>
                     Zuordnen
                   </button>

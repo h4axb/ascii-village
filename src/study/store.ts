@@ -144,8 +144,22 @@ export function useStudy() {
     return d?.suggestions ?? [];
   }, []);
 
+  // AI translations (drafts), in batches; throws when the AI is unavailable
+  const translate = useCallback(async (texts: { id: string; text: string }[], to: 'de' | 'en' = 'de', onProgress?: (done: number, all: number) => void) => {
+    const out = new Map<string, string>();
+    for (let i = 0; i < texts.length; i += 40) {
+      const batch = texts.slice(i, i + 40);
+      const res = await fetch('/api/study/translate', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify({ texts: batch, to }) });
+      const d = (await res.json().catch(() => null)) as { translations?: { id: string; text: string }[]; error?: string } | null;
+      if (!res.ok) throw new Error(d?.error ?? String(res.status));
+      for (const t of d?.translations ?? []) out.set(t.id, t.text);
+      onProgress?.(Math.min(texts.length, i + 40), texts.length);
+    }
+    return out;
+  }, []);
+
   // (the newest documents, for changes that build on the one just made)
   const latest = useCallback(() => docsRef.current, []);
-  return { state, error, docs, game, saving, saveError, load, commit, suggest, pass, latest };
+  return { state, error, docs, game, saving, saveError, load, commit, suggest, translate, pass, latest };
 }
 export type Study = ReturnType<typeof useStudy>;

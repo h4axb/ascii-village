@@ -9,6 +9,7 @@ import { describe, fmt } from '../stats';
 import { CATEGORY } from '../types';
 import { csv, DurationSelect, Empty, Fig, fmtDate, Section, Stat, useCtx } from '../ui';
 import { SurveySummary, TrackingSummary } from './Survey';
+import { useSurveyText } from '../translations';
 import { CraftLog, GameFlow } from './Flow';
 import { FeedbackLists } from './Notes';
 
@@ -133,7 +134,8 @@ export default function Overview() {
 // questions by default); a question filter shows one question in its place,
 // an answer filter marks one answer and names who gave it
 function Profile({ fields }: { fields: P4Field[] }) {
-  const { slice } = useCtx();
+  const { slice, study } = useCtx();
+  const T = useSurveyText(study);
   const [pick, setPick] = useState('');
   const [answer, setAnswer] = useState(''); // "question\u0000answer"
   const i = fields.findIndex((f) => f.label === pick);
@@ -149,7 +151,7 @@ function Profile({ fields }: { fields: P4Field[] }) {
   const rowsOf = (f: P4Field) => {
     const missing = persons.filter((p) => !answerOf(p, f.label)).length;
     return [
-      ...f.counts.map(([v, c]) => ({ label: v, values: [c], color: aq === f.label ? (v === av ? SERIES.B : '#c9c8c2') : undefined })),
+      ...f.counts.map(([v, c]) => ({ label: T(v), values: [c], color: aq === f.label ? (v === av ? SERIES.B : '#c9c8c2') : undefined })),
       ...(missing ? [{ label: 'keine Angabe', values: [missing], color: '#c9c8c2' }] : []),
     ];
   };
@@ -172,17 +174,17 @@ function Profile({ fields }: { fields: P4Field[] }) {
           <option value="">Alle Fragen ({fields.length})</option>
           {fields.map((f) => (
             <option key={f.label} value={f.label}>
-              {f.label}
+              {T(f.label)}
             </option>
           ))}
         </select>
         <select className="st-figfilter" value={answer} onChange={(e) => setAnswer(e.target.value)} aria-label="Antwort">
           <option value="">Alle Antworten</option>
           {shown.map((f) => (
-            <optgroup key={f.label} label={f.label}>
+            <optgroup key={f.label} label={T(f.label)}>
               {f.counts.map(([v, c]) => (
                 <option key={v} value={`${f.label}\u0000${v}`}>
-                  {v} ({c})
+                  {T(v)} ({c})
                 </option>
               ))}
             </optgroup>
@@ -191,12 +193,12 @@ function Profile({ fields }: { fields: P4Field[] }) {
       </div>
       {aq && (
         <p className="st-note">
-          „{av}“ ({aq}): {chosenBy.length} von {persons.length} – {chosenBy.join(', ') || 'niemand'}
+          „{T(av)}“ ({T(aq)}): {chosenBy.length} von {persons.length} – {chosenBy.join(', ') || 'niemand'}
         </p>
       )}
       {shown.map((f) => (
         <div key={f.label} className="st-subfig">
-          <Bars title={shown.length > 1 ? f.label : undefined} rows={rowsOf(f)} />
+          <Bars title={shown.length > 1 ? T(f.label) : undefined} rows={rowsOf(f)} />
           <p className="st-note">
             n = {f.n} von {persons.length}
             {f.counts.reduce((s, [, c]) => s + c, 0) > f.n ? ' (Mehrfachauswahl)' : ''}
@@ -212,7 +214,7 @@ function Profile({ fields }: { fields: P4Field[] }) {
               <tr>
                 <th>TN</th>
                 {shown.map((f) => (
-                  <th key={f.label}>{f.label}</th>
+                  <th key={f.label}>{T(f.label)}</th>
                 ))}
               </tr>
             </thead>
@@ -223,7 +225,7 @@ function Profile({ fields }: { fields: P4Field[] }) {
                     <span className="st-pid">{p}</span>
                   </td>
                   {shown.map((f) => (
-                    <td key={f.label}>{answerOf(p, f.label) || <span className="st-muted">–</span>}</td>
+                    <td key={f.label}>{answerOf(p, f.label) ? T(answerOf(p, f.label)) : <span className="st-muted">–</span>}</td>
                   ))}
                 </tr>
               ))}

@@ -249,11 +249,12 @@ export function mergeStatements(parsed: Parsed['statements'], existing: ItemDoc[
     if (best) {
       used.add(best.id);
       changed++;
-      put.push({ ...best, text: s.text, order: s.order, question: s.question, link: s.link ?? best.link, status: 'changed', confirmed: false });
+      // (its German version, interpretation and addition stay; the German one is marked to check)
+      put.push({ ...best, text: s.text, order: s.order, question: s.question, link: s.link ?? best.link, status: 'changed', confirmed: false, deStale: !!best.de });
     } else {
       added++;
       const id = `n-${s.person}-${hash(`${s.section}|${norm(s.text)}|${s.order}|${Date.now()}`)}`;
-      put.push({ ...s, id, chips: [], suggested: [], status: firstImport ? undefined : 'new' });
+      put.push({ ...s, id, original: s.text, chips: [], suggested: [], status: firstImport ? undefined : 'new' });
     }
   }
   let removed = 0;

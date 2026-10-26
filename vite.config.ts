@@ -272,6 +272,8 @@ function workerApiDevPlugin(): Plugin {
       FEEDBACK_ADMIN_TOKEN: e.FEEDBACK_ADMIN_TOKEN || 'dev',
       LLM_API_KEY: e.LLM_API_KEY || e.VITE_LLM_API_KEY,
       LLM_BASE_URL: e.LLM_BASE_URL,
+      // (dev only: /api/study/translate answers "[DE] …" without a key, for testing)
+      STUDY_FAKE_AI: e.STUDY_FAKE_AI,
       LLM_ALLOWED_MODELS: e.LLM_ALLOWED_MODELS,
       LLM_OPEN_DAILY_LIMIT: e.LLM_OPEN_DAILY_LIMIT,
     };

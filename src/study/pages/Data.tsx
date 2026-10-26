@@ -6,6 +6,7 @@ import { timeOf } from '../match';
 import { download } from '../charts';
 import { csv, DurationSelect, fmtMin, logChange, Section, useCtx, type LogEntry } from '../ui';
 import Import from './Import';
+import Translations from './Translations';
 import { VIA } from './People';
 
 interface Check {
@@ -215,6 +216,8 @@ export default function Data() {
       </Section>
 
       <Import />
+
+      <Translations />
 
       <Section title="Änderungen">
         {log.length ? (

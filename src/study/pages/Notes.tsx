@@ -7,7 +7,8 @@ import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } fro
 import { CATEGORY, SECTION_LABEL } from '../types';
 import { distinctPersons, itemsWithRole, type Model } from '../model';
 import { linkLabelOf, mergeStatements, parseNotes } from '../notes';
-import { Empty, logChange, Section, useCtx, type Ctx } from '../ui';
+import { itemText, setContentView, translateNotes, useContentView, type ContentView } from '../translations';
+import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
 
 // ---- chip logic ----
 const groupOfChip = (tags: TagGroup[], chip: string) => tags.find((g) => g.chips.some((c) => c.id === chip));
@@ -41,7 +42,7 @@ export async function suggestFor(ctx: Ctx, items: ItemDoc[], onProgress?: (done:
   let done = 0;
   for (let i = 0; i < items.length; i += 25) {
     const batch = items.slice(i, i + 25);
-    const out = (await study.suggest({ items: batch.map((x) => ({ id: x.id, text: x.text, section: SECTION_LABEL[x.section], question: x.question })), groups, findings })) as {
+    const out = (await study.suggest({ items: batch.map((x) => { const cur = study.latest().items[x.id] ?? x; return { id: x.id, text: cur.de || cur.text, section: SECTION_LABEL[x.section], question: x.question }; }), groups, findings })) as {
       id?: string;
       chips?: Record<string, string[]>;
       finding?: string | null;
@@ -104,6 +105,16 @@ export function NotesImport() {
     setMsg(`${summary}.`);
     logChange(study, `Notizen-Import${file ? ` (${file})` : ''}: ${summary}`);
     // suggestions for what is new or changed
+    // German versions first (the AI suggestions then read them)
+    setBusy(true);
+    try {
+      const n = await translateNotes(study, undefined, (d, a) => setMsg(`Deutsche Fassungen: ${d} von ${a} …`));
+      if (n) setMsg(`${summary}. ${n} deutsche Fassungen erstellt (automatisch, bitte prüfen).`);
+    } catch (e) {
+      setMsg(`${summary}. Deutsche Fassungen nicht verfügbar (${String((e as Error).message)}).`);
+    } finally {
+      setBusy(false);
+    }
     const todo = r.put.filter((p) => (p.status === 'new' || p.status === 'changed' || !p.chips.length) && p.status !== 'removed' && !p.confirmed);
     if (todo.length) {
       setBusy(true);
@@ -207,39 +218,110 @@ function ChipCell({ item, g, onChange, labelOnly }: { item: ItemDoc; g: TagGroup
   );
 }
 
+// the statement's design: its Variante chip
+const designOfItem = (i: ItemDoc) => (i.chips.includes('variante-a') && !i.chips.includes('variante-b') ? 'A' : i.chips.includes('variante-b') && !i.chips.includes('variante-a') ? 'B' : null);
+
 function ItemRow({ item, model, save, remove }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void }) {
   const { study } = useCtx();
-  const [edit, setEdit] = useState(false);
-  const [draft, setDraft] = useState(item.text);
+  const view = useContentView();
+  const [editDe, setEditDe] = useState(false);
+  const [editOrig, setEditOrig] = useState(false);
+  const [showInt, setShowInt] = useState(!!item.interpretation);
+  const [showAdd, setShowAdd] = useState(!!item.addition);
   const findings = Object.values(study.docs.findings).sort((a, b) => a.name.localeCompare(b.name));
   const sf = item.suggestedFinding ? study.docs.findings[item.suggestedFinding] : null;
   const open = item.suggested.length > 0 || !!item.suggestedFinding;
-  const finishEdit = () => {
-    setEdit(false);
+  const d = designOfItem(item);
+  // the original: corrections are logged with before and after; new lines split the statement
+  const saveOriginal = (draft: string) => {
     const parts = draft
       .split('\n')
-      .map((s) => s.trim())
+      .map((x) => x.trim())
       .filter(Boolean);
     if (!parts.length || (parts.length === 1 && parts[0] === item.text)) return;
-    // more lines: the statement is split; the first keeps its tags
-    save({ ...item, text: parts[0] });
-    parts.slice(1).forEach((t, i) => save({ ...item, id: `${item.id}-${Date.now().toString(36)}${i}`, text: t, order: item.order + (i + 1) / 100, chips: [...item.chips], suggested: [], manual: true }));
+    logChange(study, `${item.person}: Original korrigiert „${item.text}“ → „${parts.join(' | ')}“`);
+    save({ ...item, original: item.original ?? item.text, text: parts[0], deStale: !!item.de });
+    parts.slice(1).forEach((t, i) => save({ ...item, id: `${item.id}-${Date.now().toString(36)}${i}`, original: t, text: t, de: undefined, deAuto: undefined, order: item.order + (i + 1) / 100, chips: [...item.chips], suggested: [], manual: true }));
   };
+  const saveDe = (de: string) => save({ ...item, de: de.trim() || undefined, deAuto: false, deStale: false });
+  const deBlock = (
+    <div className="st-de">
+      {editDe ? (
+        <LazyArea value={item.de ?? ''} onSave={saveDe} autoFocus onDone={() => setEditDe(false)} placeholder="Deutsche Fassung" />
+      ) : item.de ? (
+        <p onClick={() => setEditDe(true)} title="Klicken: bearbeiten">
+          {item.de}
+        </p>
+      ) : (
+        <button type="button" className="st-linkbtn" onClick={() => setEditDe(true)}>
+          + Deutsche Fassung
+        </button>
+      )}
+      {item.de && (item.deAuto || item.deStale) && (
+        <div className="st-item-meta">
+          {item.deAuto && <span className="st-badge">automatisch</span>}
+          {item.deStale && <span className="st-flag">Original geändert – Übersetzung prüfen</span>}
+          <button type="button" className="st-linkbtn" onClick={() => save({ ...item, deAuto: false, deStale: false })}>
+            als geprüft übernehmen
+          </button>
+        </div>
+      )}
+    </div>
+  );
+  const origBlock = (
+    <div className={view === 'both' ? 'st-orig is-secondary' : 'st-orig'}>
+      {view === 'both' && <span className="st-cell-label">Original</span>}
+      {editOrig ? <LazyArea value={item.text} onSave={saveOriginal} autoFocus onDone={() => setEditOrig(false)} /> : <p>{item.text}</p>}
+    </div>
+  );
   return (
     <div className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}`}>
       <div className="st-item-text">
         <div className="st-item-meta">
+          <span className="st-pid">
+            {item.link ?? item.person}
+            {d ? ` · ${d}` : ''}
+          </span>
           <span>{SECTION_LABEL[item.section]}</span>
-          {item.link && <span>{item.link}</span>}
           {item.status === 'changed' && <span className="st-flag">geändert – prüfen</span>}
           {item.status === 'new' && <span className="st-flag">neu</span>}
         </div>
         {item.question && <div className="st-item-q">{item.question}</div>}
-        {edit ? (
-          <textarea autoFocus value={draft} rows={Math.max(2, Math.ceil(draft.length / 60))} onChange={(e) => setDraft(e.target.value)} onBlur={finishEdit} onKeyDown={(e) => e.key === 'Escape' && setEdit(false)} />
-        ) : (
-          <p onDoubleClick={() => setEdit(true)}>{item.text}</p>
+        {view === 'orig' ? origBlock : view === 'de' ? (item.de || editDe ? deBlock : (
+          <>
+            {origBlock}
+            {deBlock}
+          </>
+        )) : (
+          <>
+            {origBlock}
+            {deBlock}
+          </>
         )}
+        {showInt && (
+          <label className="st-extra">
+            <span className="st-cell-label">Interpretation</span>
+            <LazyArea value={item.interpretation ?? ''} onSave={(v) => save({ ...item, interpretation: v.trim() || undefined })} autoFocus={!item.interpretation} />
+          </label>
+        )}
+        {showAdd && (
+          <label className="st-extra is-addition">
+            <span className="st-cell-label">Nachträgliche Ergänzung</span>
+            <LazyArea value={item.addition ?? ''} onSave={(v) => save({ ...item, addition: v.trim() || undefined })} autoFocus={!item.addition} />
+          </label>
+        )}
+        <div className="st-item-more">
+          {!showInt && (
+            <button type="button" className="st-linkbtn" onClick={() => setShowInt(true)}>
+              + Interpretation
+            </button>
+          )}
+          {!showAdd && (
+            <button type="button" className="st-linkbtn" onClick={() => setShowAdd(true)} title="Woran du dich später erinnerst – getrennt von der Originalnotiz">
+              + Nachträgliche Ergänzung
+            </button>
+          )}
+        </div>
       </div>
       <div className="st-item-chips">
         {model.tags.map((g) => (
@@ -267,13 +349,35 @@ function ItemRow({ item, model, save, remove }: { item: ItemDoc; model: Model; s
         <button type="button" className={item.confirmed && !open ? 'is-on' : ''} onClick={() => save(confirmItem(item, model.tags))} title="Vorschläge übernehmen und als geprüft markieren">
           {item.confirmed && !open ? 'Geprüft' : open ? 'Bestätigen' : 'Geprüft?'}
         </button>
-        <button type="button" onClick={() => setEdit(true)} title="Bearbeiten (neue Zeile: Aussage teilen)">
-          Bearbeiten
+        <button type="button" onClick={() => setEditDe(true)} title="Deutsche Fassung bearbeiten">
+          Deutsch bearbeiten
+        </button>
+        <button type="button" onClick={() => confirm('Die Originalnotiz ändern? Die Änderung wird mit altem und neuem Wortlaut protokolliert. (Neue Zeile: Aussage teilen)') && setEditOrig(true)} title="Original korrigieren (protokolliert)">
+          Original korrigieren
         </button>
         <button type="button" onClick={() => confirm('Aussage löschen?') && remove(item)} title="Löschen">
           Löschen
         </button>
       </div>
+    </div>
+  );
+}
+
+// Deutsch / Original / Beides: which text of notes and survey the dashboard shows
+export function ContentSwitch() {
+  const v = useContentView();
+  const OPTS: [ContentView, string][] = [
+    ['de', 'Deutsch'],
+    ['orig', 'Original'],
+    ['both', 'Beides'],
+  ];
+  return (
+    <div className="st-seg" role="group" aria-label="Textfassung">
+      {OPTS.map(([k, l]) => (
+        <button key={k} type="button" className={v === k ? 'is-on' : ''} onClick={() => setContentView(k)}>
+          {l}
+        </button>
+      ))}
     </div>
   );
 }
@@ -298,7 +402,7 @@ export default function Notes() {
   const shown = live.filter(
     (i) =>
       (filter === 'all' || (filter === 'open' ? !i.confirmed || i.suggested.length > 0 : i.status === 'changed' || i.status === 'new')) &&
-      (!q || i.text.toLowerCase().includes(q.toLowerCase())),
+      (!q || `${i.text} ${i.de ?? ''}`.toLowerCase().includes(q.toLowerCase())),
   );
   const byPerson = [...new Set(shown.map((i) => i.person))].sort();
   const open = live.filter((i) => !i.confirmed);
@@ -423,12 +527,13 @@ export function Priority() {
 
 function ItemList({ items, model }: { items: ItemDoc[]; model: Model }) {
   const { study } = useCtx();
+  const view = useContentView();
   if (!items.length) return <Empty>Keine.</Empty>;
   return (
     <ul className="st-list">
       {items.map((i) => (
         <li key={i.id}>
-          <span className="st-pid">{i.link ?? i.person}</span> {i.text}
+          <span className="st-pid">{i.link ?? i.person}</span> {itemText(view, i)}
           <span className="st-tags">
             {i.chips
               .filter((c) => !['essential', 'tbd', 'nice'].includes(model.chipRole.get(c) ?? ''))
@@ -552,6 +657,7 @@ export function Tags() {
 // ---- the Übersicht's lists: essential problems, positive, unexpected ----
 export function FeedbackLists() {
   const { model, slice, study } = useCtx();
+  const view = useContentView();
   const total = model.included.length;
   const block = (role: ChipRole, title: string) => {
     const items = itemsWithRole(slice.items, model, role);
@@ -560,7 +666,7 @@ export function FeedbackLists() {
       const k = i.finding && study.docs.findings[i.finding] ? `f:${i.finding}` : `i:${i.id}`;
       groups.set(k, [...(groups.get(k) ?? []), i]);
     }
-    const rows = [...groups].map(([k, list]) => ({ k, title: k.startsWith('f:') ? study.docs.findings[k.slice(2)].name : list[0].text, list, persons: distinctPersons(list) })).sort((a, b) => b.persons - a.persons || a.title.localeCompare(b.title));
+    const rows = [...groups].map(([k, list]) => ({ k, title: k.startsWith('f:') ? study.docs.findings[k.slice(2)].name : itemText(view, list[0]), list, persons: distinctPersons(list) })).sort((a, b) => b.persons - a.persons || a.title.localeCompare(b.title));
     return (
       <Section key={role} title={`${title} (${items.length})`}>
         {rows.length ? (
@@ -577,7 +683,7 @@ export function FeedbackLists() {
                   <ul className="st-quotes-inline">
                     {r.list.map((i) => (
                       <li key={i.id}>
-                        <span className="st-pid">{i.link ?? i.person}</span> {i.text}
+                        <span className="st-pid">{i.link ?? i.person}</span> {itemText(view, i)}
                       </li>
                     ))}
                   </ul>

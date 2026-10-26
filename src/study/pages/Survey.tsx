@@ -7,6 +7,7 @@ import { part1, part2, part2Single, part3, type P2Single, type P3Result } from '
 import { craftStats, gameRatings, prefChoices, PREF_LABEL, RATING_LABEL, SCOPE_LABEL } from '../model';
 import { describe, fmt, fmtP, meanCI, pct, UEQS_ITEMS } from '../stats';
 import { csv, Empty, Fig, Section, useCtx } from '../ui';
+import { useSurveyText } from '../translations';
 
 const AB = [
   { name: 'Variante A', color: SERIES.A },
@@ -21,7 +22,8 @@ function NoTally() {
 }
 
 export default function Survey() {
-  const { slice, model } = useCtx();
+  const { slice, model, study } = useCtx();
+  const T = useSurveyText(study);
   const rows = slice.survey;
   if (!model.headers.length)
     return (
@@ -44,7 +46,7 @@ export default function Survey() {
               table={() => csv([['Frage', 'A', 'B', 'Keine Präferenz', 'n', 'Anteil Mehrheit', 'KI unten', 'KI oben', 'p (Vorzeichentest)'], ...p1.map((r) => [r.question, r.A, r.B, r.neutral, r.n, fmt(r.share), fmt(r.ci[0]), fmt(r.ci[1]), fmtP(r.p)])])}
             >
               <Bars
-                rows={p1.map((r) => ({ label: r.question, values: [r.A, r.B, r.neutral] }))}
+                rows={p1.map((r) => ({ label: T(r.question), values: [r.A, r.B, r.neutral] }))}
                 series={[...AB, { name: 'Keine Präferenz', color: NEUTRAL }]}
               />
             </Fig>
@@ -64,7 +66,7 @@ export default function Survey() {
                 {p1.map((r) => (
                   <tr key={r.question}>
                     <td>
-                      {r.question}
+                      {T(r.question)}
                       {r.swapped > 0 && <span className="st-flag"> {r.swapped}× korrigiert</span>}
                     </td>
                     <td className="num">{r.A}</td>
@@ -102,8 +104,8 @@ export default function Survey() {
               <Diverging
                 scale={p2[0].scale === 7 ? LIKERT7 : LIKERT5}
                 rows={p2.flatMap((r) => [
-                  { label: `${r.item} – A`, counts: r.countsA },
-                  { label: `${r.item} – B`, counts: r.countsB },
+                  { label: `${T(r.item)} – A`, counts: r.countsA },
+                  { label: `${T(r.item)} – B`, counts: r.countsB },
                 ])}
               />
             </Fig>
@@ -122,7 +124,7 @@ export default function Survey() {
               <tbody>
                 {p2.map((r) => (
                   <tr key={r.item}>
-                    <td>{r.item}</td>
+                    <td>{T(r.item)}</td>
                     <td>
                       {fmt(r.A.median, 1)} ({fmt(r.A.q1, 1)}–{fmt(r.A.q3, 1)})
                     </td>
@@ -252,21 +254,22 @@ export default function Survey() {
 }
 
 function FreeText() {
-  const { slice } = useCtx();
+  const { slice, study } = useCtx();
+  const T = useSurveyText(study);
   const labels = [...new Set(slice.survey.flatMap((r) => Object.keys(r.text)))];
   if (!labels.length) return null;
   return (
     <Section title="Freitextantworten">
       {labels.map((l) => (
         <div key={l} className="st-quotes">
-          <h3>{l}</h3>
+          <h3>{T(l)}</h3>
           <ul>
             {slice.survey
               .filter((r) => r.text[l])
               .sort(byPerson)
               .map((r) => (
                 <li key={r.row}>
-                  <span className="st-pid">{r.person ?? `Zeile ${r.row + 1}`}</span> {r.text[l]}
+                  <span className="st-pid">{r.person ?? `Zeile ${r.row + 1}`}</span> {T(r.text[l])}
                 </li>
               ))}
           </ul>
@@ -278,7 +281,8 @@ function FreeText() {
 
 // the short form on the Übersicht
 export function SurveySummary() {
-  const { slice, model } = useCtx();
+  const { slice, model, study } = useCtx();
+  const T = useSurveyText(study);
   if (!model.headers.length) return null;
   const p1 = part1(slice.survey);
   const p2 = part2(slice.survey);
@@ -296,14 +300,14 @@ export function SurveySummary() {
         <tbody>
           {p1.map((r) => (
             <tr key={`1${r.question}`}>
-              <td>Teil 1: {r.question}</td>
+              <td>Teil 1: {T(r.question)}</td>
               <td>{r.winner ? `${r.winner} ${r.k}/${r.decided} (${pct(r.share)}), keine Präferenz ${r.neutral}` : `unentschieden (${r.A}:${r.B})`}</td>
               <td className="num">{fmtP(r.p)}</td>
             </tr>
           ))}
           {p2.map((r) => (
             <tr key={`2${r.item}`}>
-              <td>Teil 2: {r.item}</td>
+              <td>Teil 2: {T(r.item)}</td>
               <td>
                 Mdn A {fmt(r.A.median, 1)}, B {fmt(r.B.median, 1)}; r = {fmt(r.test.r)}
               </td>
@@ -312,7 +316,7 @@ export function SurveySummary() {
           ))}
           {part2Single(slice.survey).map((r) => (
             <tr key={`2s${r.item}`}>
-              <td>Teil 2: {r.item}</td>
+              <td>Teil 2: {T(r.item)}</td>
               <td>
                 Mdn {fmt(r.stats.median, 1)} (IQR {fmt(r.stats.q1, 1)}–{fmt(r.stats.q3, 1)}), M = {fmt(r.stats.mean)}
               </td>
@@ -484,11 +488,13 @@ export function TrackingSummary() {
 
 // Teil 2 statements about both designs: distribution and median
 function Part2Single({ items }: { items: P2Single[] }) {
+  const { study } = useCtx();
+  const T = useSurveyText(study);
   const scale = items[0].scale === 7 ? LIKERT7 : LIKERT5;
   return (
     <>
       <Fig id="teil2single" table={() => csv([['Aussage', ...scale, 'Median', 'Q1', 'Q3', 'M', 'SD', 'n'], ...items.map((r) => [r.item, ...r.counts, fmt(r.stats.median, 1), fmt(r.stats.q1, 1), fmt(r.stats.q3, 1), fmt(r.stats.mean), fmt(r.stats.sd), r.stats.n])])}>
-        <Diverging scale={scale} rows={items.map((r) => ({ label: r.item, counts: r.counts }))} />
+        <Diverging scale={scale} rows={items.map((r) => ({ label: T(r.item), counts: r.counts }))} />
       </Fig>
       <table className="st-table">
         <thead>
@@ -502,7 +508,7 @@ function Part2Single({ items }: { items: P2Single[] }) {
         <tbody>
           {items.map((r) => (
             <tr key={r.item}>
-              <td>{r.item}</td>
+              <td>{T(r.item)}</td>
               <td>
                 {fmt(r.stats.median, 1)} ({fmt(r.stats.q1, 1)}–{fmt(r.stats.q3, 1)})
               </td>

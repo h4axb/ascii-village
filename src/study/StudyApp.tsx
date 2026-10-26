@@ -7,7 +7,7 @@ import { useStudy } from './store';
 import { StudyCtx } from './ui';
 import Overview from './pages/Overview';
 import Survey from './pages/Survey';
-import Notes, { Priority, Tags } from './pages/Notes';
+import Notes, { ContentSwitch, Priority, Tags } from './pages/Notes';
 import Findings from './pages/Findings';
 import People from './pages/People';
 import Data from './pages/Data';
@@ -200,6 +200,8 @@ export default function StudyApp() {
               {current.title}
               {subTitle && <span className="st-subtitle"> · {subTitle}</span>}
             </h1>
+            <div className="st-pagetools">
+            <ContentSwitch />
             <label className="st-scope">
               <span>Teilnehmende</span>
               <select value={scope.kind === 'all' ? 'all' : scope.kind === 'link' ? scope.key : scope.id} onChange={(e) => setScope(e.target.value)}>
@@ -218,6 +220,7 @@ export default function StudyApp() {
                 ])}
               </select>
             </label>
+            </div>
           </div>
           {body}
         </main>

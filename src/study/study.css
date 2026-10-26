@@ -1066,3 +1066,71 @@ body:has(.st-root) {
   margin: 10px 0 0;
   font-size: 14px;
 }
+.st-pagetools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.st-linkbtn {
+  border: 0 !important;
+  background: none !important;
+  padding: 0 !important;
+  color: var(--st-muted);
+  font-size: 12.5px !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.st-linkbtn:hover {
+  color: var(--st-ink);
+}
+.st-badge {
+  font-size: 11.5px;
+  border: 1px dashed var(--st-accent);
+  color: var(--st-accent);
+  border-radius: 999px;
+  padding: 0 7px;
+}
+.st-de p {
+  margin: 2px 0 0;
+  cursor: text;
+}
+.st-orig p {
+  margin: 2px 0 0;
+}
+.st-orig.is-secondary {
+  color: var(--st-muted);
+  font-size: 13.5px;
+  border-left: 2px solid var(--st-line);
+  padding-left: 8px;
+  margin: 4px 0;
+}
+.st-extra {
+  display: block;
+  margin-top: 6px;
+}
+.st-extra.is-addition {
+  border-left: 2px solid var(--st-accent);
+  padding-left: 8px;
+}
+.st-item-more {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+.st-area {
+  font-size: 14px !important;
+}
+.st-trtable td:nth-child(1),
+.st-trtable td:nth-child(2) {
+  font-size: 13.5px;
+}
+.st-trtable td {
+  width: auto;
+}
+.st-trtable td:last-child {
+  white-space: nowrap;
+}
+.st-trtable .st-area {
+  min-width: min(340px, 60vw);
+}

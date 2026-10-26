@@ -9,6 +9,8 @@
 //   POST   /api/study/batch           several puts/deletes at once {put: [...], del: [...]}
 //   POST   /api/study/suggest         AI tag suggestions for statements (never stored:
 //                                    the dashboard shows them as suggestions to confirm)
+//   POST   /api/study/translate       AI translations of notes and survey texts (the
+//                                    dashboard stores them as editable drafts)
 import { dbOf, isAdmin, json, type D1Database, type SessionEnv } from './session';
 
 export const STUDY_COLLS = ['tally', 'notes', 'items', 'findings', 'tags', 'people', 'captions', 'hypotheses', 'claims', 'settings'] as const;
@@ -18,6 +20,7 @@ interface StudyEnv extends SessionEnv {
   'asciia-bay-crafting'?: string;
   LLM_API_KEY?: string;
   LLM_BASE_URL?: string;
+  STUDY_FAKE_AI?: string; // dev only (vite.config.ts): translations without a key
 }
 
 const MAX_DOC = 900_000; // D1 row limit is 1 MB
@@ -75,6 +78,7 @@ export async function handleStudy(request: Request, env: StudyEnv): Promise<Resp
   }
 
   if (request.method === 'POST' && parts[0] === 'suggest') return suggest(request, env);
+  if (request.method === 'POST' && parts[0] === 'translate') return translate(request, env);
 
   const [coll, id] = parts;
   if (!coll || !id || !isColl(coll)) return json(404, { error: 'unknown collection' });
@@ -89,6 +93,59 @@ export async function handleStudy(request: Request, env: StudyEnv): Promise<Resp
     return json(200, { ok: true });
   }
   return json(405, { error: 'method not allowed' });
+}
+
+async function chat(env: StudyEnv, key: string, system: string, user: string): Promise<{ ok: true; value: unknown } | { ok: false; res: Response }> {
+  const base = (env.LLM_BASE_URL || 'https://router.requesty.ai/v1').replace(/\/$/, '');
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash-lite',
+      temperature: 0,
+      max_tokens: 6000,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    }),
+  }).catch(() => null);
+  if (!res?.ok) return { ok: false, res: json(502, { error: `AI unavailable (${res?.status ?? 'network'})` }) };
+  const data = (await res.json().catch(() => null)) as { choices?: { message?: { content?: string } }[] } | null;
+  const text = data?.choices?.[0]?.message?.content ?? '';
+  try {
+    return { ok: true, value: JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')) };
+  } catch {
+    return { ok: false, res: json(502, { error: 'AI answer was not JSON' }) };
+  }
+}
+
+// ---- AI translations ----
+// Faithful, neutral translations of note statements and survey texts; text
+// already in the target language comes back as it is. Only drafts: the
+// dashboard marks them "automatisch" until they are edited.
+async function translate(request: Request, env: StudyEnv): Promise<Response> {
+  const body = (await request.json().catch(() => null)) as { texts?: { id: string; text: string }[]; to?: 'de' | 'en' } | null;
+  const texts = (body?.texts ?? []).filter((t) => t && typeof t.text === 'string').slice(0, 40);
+  if (!texts.length) return json(400, { error: 'texts required' });
+  const to = body?.to === 'en' ? 'en' : 'de';
+  const key = env['asciia-bay-crafting'] ?? env.LLM_API_KEY;
+  if (!key) {
+    if (env.STUDY_FAKE_AI === '1') return json(200, { translations: texts.map((t) => ({ id: t.id, text: `[${to.toUpperCase()}] ${t.text}` })) });
+    return json(503, { error: 'no AI key on the server' });
+  }
+  const lang = to === 'de' ? 'Deutsch' : 'Englisch';
+  const system =
+    `Du übersetzt Notizen und Umfragetexte aus einem Usability-Test eines Spiels ins ${lang}. Antworte nur mit JSON. ` +
+    'Übersetze sinngetreu und neutral, ohne etwas hinzuzufügen, wegzulassen oder zu deuten; behalte Stichpunktstil und Kürze bei. ' +
+    `Texte, die schon auf ${lang} sind, gib unverändert zurück; gemischte Texte vollständig auf ${lang}. ` +
+    'Behalte Teilnehmer-IDs (P001), Eigennamen (Mitchy, Asciia Bay), Variante A/B und Zahlen unverändert.';
+  const user = JSON.stringify({ texte: texts.map((t) => ({ id: t.id, text: t.text.slice(0, 2000) })), format: { texte: [{ id: 'string', text: 'string' }] } });
+  const r = await chat(env, key, system, user);
+  if (!r.ok) return r.res;
+  const out = (r.value as { texte?: { id?: string; text?: string }[] }).texte ?? [];
+  return json(200, { translations: out.filter((t) => t?.id && typeof t.text === 'string') });
 }
 
 // ---- AI tag suggestions ----

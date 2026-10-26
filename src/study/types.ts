@@ -22,6 +22,9 @@ export type ColumnRole =
   | { role: 'ueqs'; item: number; design: Side | null; reversed: boolean }
   | { role: 'info'; label: string; numeric: boolean } // Teil 4
   | { role: 'text'; label: string }; // free text
+// German versions of the survey's English texts (questions, answer options,
+// free-text answers), keyed by the original text; the answers stay as given
+export type TranslationMemory = Record<string, { de: string; auto: boolean }>;
 export interface TallyDoc {
   file: string;
   importedAt: number;
@@ -67,7 +70,13 @@ export interface ItemDoc {
   link?: string; // the link from the notes header (P009.2's)
   section: Section;
   question?: string; // the Follow-up question it answers
-  text: string;
+  text: string; // the statement as noted (the original)
+  original?: string; // the wording first imported (never overwritten)
+  de?: string; // the German version (AI draft or own wording)
+  deAuto?: boolean; // the German version is still the unedited AI draft
+  deStale?: boolean; // the original changed after the German version was made
+  interpretation?: string;
+  addition?: string; // remembered later ("nachträgliche Ergänzung"), kept apart from the note
   order: number;
   chips: string[]; // confirmed chip ids
   suggested: string[]; // AI suggestions, not counted

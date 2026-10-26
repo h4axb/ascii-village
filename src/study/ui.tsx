@@ -129,3 +129,24 @@ export function DurationSelect() {
     </label>
   );
 }
+
+// a multi-line text saved when it loses focus
+export function LazyArea({ value, onSave, placeholder, autoFocus, onDone }: { value: string; onSave: (v: string) => void; placeholder?: string; autoFocus?: boolean; onDone?: () => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <textarea
+      className="st-area"
+      autoFocus={autoFocus}
+      placeholder={placeholder}
+      value={draft}
+      rows={Math.max(2, Math.ceil(draft.length / 70))}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== value) onSave(draft);
+        onDone?.();
+      }}
+      onKeyDown={(e) => e.key === 'Escape' && (e.target as HTMLTextAreaElement).blur()}
+    />
+  );
+}

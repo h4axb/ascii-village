@@ -5,6 +5,7 @@ import type { ColumnRole, Side, TallyDoc } from '../types';
 import { carryMapping, choiceOf, conditionIn, designIn, likertOf, parseCsv, reassignParts, suggestMapping, ueqsItemIn } from '../tally';
 import { UEQS_ITEMS } from '../stats';
 import { LazyInput, logChange, Section, useCtx } from '../ui';
+import { translateTally } from '../translations';
 import { NotesImport } from './Notes';
 
 const ROLE_NAME: Record<ColumnRole['role'], string> = {
@@ -56,6 +57,12 @@ export default function Import() {
     study.commit([{ coll: 'tally', id: 'main', data: doc }]);
     setMsg(`${rows.length} Antworten, ${headers.length} Spalten importiert${tally ? ' (Zuordnung übernommen)' : ''}.`);
     logChange(study, `Tally-Import: ${f.name}, ${rows.length} Antworten, ${headers.length} Spalten`);
+    try {
+      const n = await translateTally(study, (d, a) => setMsg(`Deutsche Fassungen der Umfragetexte: ${d} von ${a} …`));
+      setMsg(`${rows.length} Antworten, ${headers.length} Spalten importiert${tally ? ' (Zuordnung übernommen)' : ''}${n ? `; ${n} Texte automatisch übersetzt (unter „Übersetzungen“ prüfen)` : ''}.`);
+    } catch (e) {
+      setMsg(`${rows.length} Antworten importiert; Übersetzung nicht verfügbar (${String((e as Error).message)}).`);
+    }
   }
 
   const setRole = (j: number, r: ColumnRole) => {

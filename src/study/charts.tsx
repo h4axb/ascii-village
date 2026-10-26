@@ -107,12 +107,17 @@ export interface BarRow {
   values: number[]; // one per series
   note?: string; // shown after the bar instead of the value
   color?: string; // this row's colour (a single series only)
+  heading?: boolean; // a group heading over the rows below it (no bar)
 }
 // `title`: a heading inside the drawing (kept in the PNG export)
 export function Bars({ rows, series, unit = '', digits = 0, max, title }: { rows: BarRow[]; series?: { name: string; color: string }[]; unit?: string; digits?: number; max?: number; title?: string }) {
   const [ref, w] = useWidth<HTMLDivElement>();
   const ser = series ?? [{ name: '', color: INK }];
-  const { labelW, lines } = labelColumn(rows.map((r) => r.label), w, 0.45);
+  const bars = rows.filter((r) => !r.heading);
+  const col = labelColumn(bars.map((r) => r.label), w, 0.45);
+  const labelW = col.labelW;
+  // headings span the whole width, in bold
+  const lines = rows.map((r) => (r.heading ? wrapText(r.label, w, 13) : col.lines[bars.indexOf(r)]));
   const barH = ser.length > 1 ? 11 : 16;
   const block = ser.length * (barH + 2);
   const titleLines = title ? wrapText(title, w, 13) : [];
@@ -120,14 +125,14 @@ export function Bars({ rows, series, unit = '', digits = 0, max, title }: { rows
   const legend = ser.length > 1 ? legendLayout(ser.map((s) => s.name), labelW, w) : { pos: [], height: 0 };
   const top = (ser.length > 1 ? legend.height + 8 : 6) + head;
   // every row as tall as its label
-  const rowHs = lines.map((l) => Math.max(block, l.length * LINE) + 12);
+  const rowHs = rows.map((r, i) => (r.heading ? lines[i].length * 17 + (i ? 16 : 4) : Math.max(block, lines[i].length * LINE) + 12));
   const rowY = rowHs.map((_, i) => top + rowHs.slice(0, i).reduce((a, b) => a + b, 0));
   const h = top + rowHs.reduce((a, b) => a + b, 0) + 22;
-  const top_ = max ?? Math.max(digits ? 0.1 : 1, ...rows.flatMap((r) => r.values));
+  const top_ = max ?? Math.max(digits ? 0.1 : 1, ...bars.flatMap((r) => r.values));
   const tk = ticks(top_, 4, !digits);
   const xMax = tk[tk.length - 1];
   // room on the right for the longest value text
-  const right = Math.max(44, ...rows.flatMap((r) => r.values.map((v, j) => textW(j === r.values.length - 1 && r.note ? r.note : `${nf(v, digits)}${unit}`, 11) + 14)));
+  const right = Math.max(44, ...bars.flatMap((r) => r.values.map((v, j) => textW(j === r.values.length - 1 && r.note ? r.note : `${nf(v, digits)}${unit}`, 11) + 14)));
   const plotW = Math.max(40, w - labelW - right);
   const x = (v: number) => labelW + (v / xMax) * plotW;
   return (
@@ -160,6 +165,16 @@ export function Bars({ rows, series, unit = '', digits = 0, max, title }: { rows
           </g>
         ))}
         {rows.map((r, i) => {
+          if (r.heading)
+            return (
+              <text key={r.label + i} x={0} y={rowY[i] + rowHs[i] - lines[i].length * 17 + 9} fontSize={13} fontWeight={500} fill={INK}>
+                {lines[i].map((l, k) => (
+                  <tspan key={k} x={0} dy={k ? 17 : 0}>
+                    {l}
+                  </tspan>
+                ))}
+              </text>
+            );
           const y0 = rowY[i] + 6 + (rowHs[i] - 12 - block) / 2;
           return (
             <g key={r.label + i}>

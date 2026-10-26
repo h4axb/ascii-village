@@ -148,8 +148,10 @@ function Profile({ fields }: { fields: P4Field[] }) {
   const [pick, setPick] = useState('');
   const [answer, setAnswer] = useState(''); // "question\u0000answer"
   const i = fields.findIndex((f) => f.label === pick);
-  const shown = i >= 0 ? [fields[i]] : fields;
+  // the questions offered (all or the one picked), and the ones drawn: an answer filter narrows to its question
+  const listed = i >= 0 ? [fields[i]] : fields;
   const [aq, av] = answer ? answer.split('\u0000') : ['', ''];
+  const shown = aq ? fields.filter((f) => f.label === aq) : listed;
   const persons = slice.persons.map((p) => p.id);
   const answerOf = (person: string, label: string) => slice.survey.find((r) => r.person === person)?.info[label] ?? '';
   const gave = (person: string, label: string, v: string) => {
@@ -167,7 +169,7 @@ function Profile({ fields }: { fields: P4Field[] }) {
   return (
     <Fig
       id="teil4"
-      sub={i >= 0 ? { n: i + 1, title: fields[i].label } : undefined}
+      sub={shown.length === 1 && fields.length > 1 ? { n: fields.indexOf(shown[0]) + 1, title: T(shown[0].label) } : undefined}
       table={() => csv([['Frage', 'Antwort', 'Anzahl', 'Teilnehmende'], ...shown.flatMap((f) => f.counts.map(([v, c]) => [f.label, v, c, persons.filter((p) => gave(p, f.label, v)).join(' ')]))])}
     >
       <div className="st-figfilters">
@@ -189,7 +191,7 @@ function Profile({ fields }: { fields: P4Field[] }) {
         </select>
         <select className="st-figfilter" value={answer} onChange={(e) => setAnswer(e.target.value)} aria-label="Antwort">
           <option value="">Alle Antworten</option>
-          {shown.map((f) => (
+          {listed.map((f) => (
             <optgroup key={f.label} label={T(f.label)}>
               {f.counts.map(([v, c]) => (
                 <option key={v} value={`${f.label}\u0000${v}`}>
@@ -205,16 +207,17 @@ function Profile({ fields }: { fields: P4Field[] }) {
           „{T(av)}“ ({T(aq)}): {chosenBy.length} von {persons.length} – {chosenBy.join(', ') || 'niemand'}
         </p>
       )}
-      {shown.map((f) => (
-        <div key={f.label} className="st-subfig">
-          <Bars title={shown.length > 1 ? T(f.label) : undefined} rows={rowsOf(f)} />
-          <p className="st-note">
-            n = {f.n} von {persons.length}
-            {f.counts.reduce((s, [, c]) => s + c, 0) > f.n ? ' (Mehrfachauswahl)' : ''}
+      {/* all questions in one chart: each question a heading, its options below */}
+      <Bars rows={shown.flatMap((f) => [...(shown.length > 1 ? [{ label: `${T(f.label)} (n = ${f.n})`, values: [], heading: true }] : []), ...rowsOf(f)])} />
+      {shown
+        .filter((f) => shown.length === 1 || f.stats || f.counts.reduce((x, [, c]) => x + c, 0) > f.n)
+        .map((f) => (
+          <p key={f.label} className="st-note">
+            {shown.length > 1 && <>{T(f.label)}: </>}n = {f.n} von {persons.length}
+            {f.counts.reduce((x, [, c]) => x + c, 0) > f.n ? ' (Mehrfachauswahl)' : ''}
             {f.stats ? ` · M = ${fmt(f.stats.mean, 1)}, SD = ${fmt(f.stats.sd, 1)}, Spanne ${f.stats.min}–${f.stats.max}` : ''}
           </p>
-        </div>
-      ))}
+        ))}
       <details className="st-details">
         <summary>Antworten je Teilnehmer</summary>
         <div className="st-table-wrap">
@@ -222,7 +225,7 @@ function Profile({ fields }: { fields: P4Field[] }) {
             <thead>
               <tr>
                 <th>TN</th>
-                {shown.map((f) => (
+                {listed.map((f) => (
                   <th key={f.label}>{T(f.label)}</th>
                 ))}
               </tr>
@@ -233,7 +236,7 @@ function Profile({ fields }: { fields: P4Field[] }) {
                   <td>
                     <span className="st-pid">{p}</span>
                   </td>
-                  {shown.map((f) => (
+                  {listed.map((f) => (
                     <td key={f.label}>{answerOf(p, f.label) ? T(answerOf(p, f.label)) : <span className="st-muted">–</span>}</td>
                   ))}
                 </tr>

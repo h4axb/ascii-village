@@ -1027,3 +1027,11 @@ body:has(.st-root) {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.st-figfilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.st-table tr.is-picked td {
+  background: var(--st-accent-soft);
+}

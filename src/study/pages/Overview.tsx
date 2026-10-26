@@ -118,50 +118,108 @@ export default function Overview() {
 }
 
 
-// Teil 4: every question in one figure; the filter shows one question in its place
+// Teil 4: every question with all its answer options in one figure (all
+// questions by default); a question filter shows one question in its place,
+// an answer filter marks one answer and names who gave it
 function Profile({ fields }: { fields: P4Field[] }) {
-  const [pick, setPick] = useState<string>(() => {
-    try {
-      return localStorage.getItem(PROFILE_KEY) ?? '';
-    } catch {
-      return '';
-    }
-  });
+  const { slice } = useCtx();
+  const [pick, setPick] = useState('');
+  const [answer, setAnswer] = useState(''); // "question\u0000answer"
   const i = fields.findIndex((f) => f.label === pick);
   const shown = i >= 0 ? [fields[i]] : fields;
-  const choose = (v: string) => {
-    setPick(v);
-    try {
-      localStorage.setItem(PROFILE_KEY, v);
-    } catch {
-      // (not remembered)
-    }
+  const [aq, av] = answer ? answer.split('\u0000') : ['', ''];
+  const persons = slice.persons.map((p) => p.id);
+  const answerOf = (person: string, label: string) => slice.survey.find((r) => r.person === person)?.info[label] ?? '';
+  const gave = (person: string, label: string, v: string) => {
+    const a = answerOf(person, label);
+    return a === v || a.split(/\s*,\s*(?=[A-ZÄÖÜ])/).includes(v);
+  };
+  const chosenBy = aq ? persons.filter((p) => gave(p, aq, av)) : [];
+  const rowsOf = (f: P4Field) => {
+    const missing = persons.filter((p) => !answerOf(p, f.label)).length;
+    return [
+      ...f.counts.map(([v, c]) => ({ label: v, values: [c], color: aq === f.label ? (v === av ? SERIES.B : '#c9c8c2') : undefined })),
+      ...(missing ? [{ label: 'keine Angabe', values: [missing], color: '#c9c8c2' }] : []),
+    ];
   };
   return (
     <Fig
       id="teil4"
       sub={i >= 0 ? { n: i + 1, title: fields[i].label } : undefined}
-      table={() => csv([['Frage', 'Antwort', 'Anzahl'], ...shown.flatMap((f) => f.counts.map(([v, c]) => [f.label, v, c]))])}
+      table={() => csv([['Frage', 'Antwort', 'Anzahl', 'Teilnehmende'], ...shown.flatMap((f) => f.counts.map(([v, c]) => [f.label, v, c, persons.filter((p) => gave(p, f.label, v)).join(' ')]))])}
     >
-      <select className="st-figfilter" value={i >= 0 ? pick : ''} onChange={(e) => choose(e.target.value)} aria-label="Frage">
-        <option value="">Alle Fragen ({fields.length})</option>
-        {fields.map((f) => (
-          <option key={f.label} value={f.label}>
-            {f.label}
-          </option>
-        ))}
-      </select>
+      <div className="st-figfilters">
+        <select
+          className="st-figfilter"
+          value={i >= 0 ? pick : ''}
+          onChange={(e) => {
+            setPick(e.target.value);
+            if (e.target.value && aq && aq !== e.target.value) setAnswer('');
+          }}
+          aria-label="Frage"
+        >
+          <option value="">Alle Fragen ({fields.length})</option>
+          {fields.map((f) => (
+            <option key={f.label} value={f.label}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+        <select className="st-figfilter" value={answer} onChange={(e) => setAnswer(e.target.value)} aria-label="Antwort">
+          <option value="">Alle Antworten</option>
+          {shown.map((f) => (
+            <optgroup key={f.label} label={f.label}>
+              {f.counts.map(([v, c]) => (
+                <option key={v} value={`${f.label}\u0000${v}`}>
+                  {v} ({c})
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+      {aq && (
+        <p className="st-note">
+          „{av}“ ({aq}): {chosenBy.length} von {persons.length} – {chosenBy.join(', ') || 'niemand'}
+        </p>
+      )}
       {shown.map((f) => (
         <div key={f.label} className="st-subfig">
-          <Bars title={shown.length > 1 ? f.label : undefined} rows={f.counts.map(([v, c]) => ({ label: v, values: [c] }))} />
-          {f.stats && (
-            <p className="st-note">
-              M = {fmt(f.stats.mean, 1)}, SD = {fmt(f.stats.sd, 1)}, Spanne {f.stats.min}–{f.stats.max} (n = {f.n})
-            </p>
-          )}
+          <Bars title={shown.length > 1 ? f.label : undefined} rows={rowsOf(f)} />
+          <p className="st-note">
+            n = {f.n} von {persons.length}
+            {f.counts.reduce((s, [, c]) => s + c, 0) > f.n ? ' (Mehrfachauswahl)' : ''}
+            {f.stats ? ` · M = ${fmt(f.stats.mean, 1)}, SD = ${fmt(f.stats.sd, 1)}, Spanne ${f.stats.min}–${f.stats.max}` : ''}
+          </p>
         </div>
       ))}
+      <details className="st-details">
+        <summary>Antworten je Teilnehmer</summary>
+        <div className="st-table-wrap">
+          <table className="st-table">
+            <thead>
+              <tr>
+                <th>TN</th>
+                {shown.map((f) => (
+                  <th key={f.label}>{f.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {persons.map((p) => (
+                <tr key={p} className={aq && gave(p, aq, av) ? 'is-picked' : ''}>
+                  <td>
+                    <span className="st-pid">{p}</span>
+                  </td>
+                  {shown.map((f) => (
+                    <td key={f.label}>{answerOf(p, f.label) || <span className="st-muted">–</span>}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </Fig>
   );
 }
-const PROFILE_KEY = 'asciia-study-profile';

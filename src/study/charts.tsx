@@ -44,6 +44,7 @@ export interface BarRow {
   label: string;
   values: number[]; // one per series
   note?: string; // shown after the bar instead of the value
+  color?: string; // this row's colour (a single series only)
 }
 // `title`: a heading inside the drawing (kept in the PNG export)
 export function Bars({ rows, series, unit = '', digits = 0, max, title }: { rows: BarRow[]; series?: { name: string; color: string }[]; unit?: string; digits?: number; max?: number; title?: string }) {
@@ -98,7 +99,7 @@ export function Bars({ rows, series, unit = '', digits = 0, max, title }: { rows
                 const bw = Math.max(0, x(v) - labelW);
                 return (
                   <g key={j}>
-                    <rect x={labelW} y={y} width={Math.max(bw, v > 0 ? 2 : 0)} height={barH} rx={Math.min(3, bw / 2)} fill={ser[j].color}>
+                    <rect x={labelW} y={y} width={Math.max(bw, v > 0 ? 2 : 0)} height={barH} rx={Math.min(3, bw / 2)} fill={ser.length === 1 && r.color ? r.color : ser[j].color}>
                       <title>{`${r.label}${ser[j].name ? ` – ${ser[j].name}` : ''}: ${nf(v, digits)}${unit}`}</title>
                     </rect>
                     <text x={labelW + bw + 5} y={y + barH / 2 + 4} fontSize={11} fill={MUTED}>

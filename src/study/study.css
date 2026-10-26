@@ -940,3 +940,90 @@ body:has(.st-root) {
 .st-subfig + .st-subfig {
   margin-top: 14px;
 }
+.st-seg {
+  display: inline-flex;
+}
+.st-seg button {
+  border-radius: 0 !important;
+}
+.st-seg button:first-child {
+  border-radius: 6px 0 0 6px !important;
+}
+.st-seg button:last-child {
+  border-radius: 0 6px 6px 0 !important;
+  margin-left: -1px;
+}
+.st-craftperson {
+  margin: 18px 0 8px;
+}
+.st-craftperson h3 {
+  margin-bottom: 8px;
+}
+.st-runs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.st-run {
+  background: var(--st-paper);
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+.st-run-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-weight: 500;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--st-line);
+}
+.st-card {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--st-line);
+  font-size: 13.5px;
+}
+.st-card:last-child {
+  border-bottom: 0;
+}
+.st-card.is-aborted {
+  opacity: 0.6;
+}
+.st-card-body {
+  min-width: 0;
+}
+.st-card-name {
+  font-weight: 500;
+}
+.st-card-prompt,
+.st-card-comment {
+  color: var(--st-muted);
+  overflow-wrap: anywhere;
+}
+.st-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--st-muted);
+}
+.st-card-meta .is-up {
+  color: var(--st-ink);
+}
+.st-card-meta .is-down {
+  color: var(--st-warn);
+}
+.st-sprite-empty {
+  display: grid;
+  place-items: center;
+  color: #888;
+}
+@media (max-width: 700px) {
+  .st-runs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

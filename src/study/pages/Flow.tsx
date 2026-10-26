@@ -1,7 +1,7 @@
 // Übersicht: every craft (prompt, Mitchy's questions, result, rating) and
 // the run of the game (quest steps with their times), from the game's run
 // log and ratings. Follows the participant filter.
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { conditionOf, designOf, type FeedbackRecord } from '../../feedback/schema';
 import { linkLabels, subIdOf } from '../../feedback/studyExport';
 import type { RunEvent } from '../../quest/runlog';
@@ -65,115 +65,271 @@ function ratingOf(fb: FeedbackRecord[], person: string, name: string | undefined
   return fb.filter((r) => r.participant === person && !r.rating && r.name === name && Math.abs(r.at - at) < 30 * 60000).sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
 }
 
+// one crafted result (or an aborted craft), from the run log or, when the
+// run log lacks it, from its rating record alone
+interface CraftItem {
+  key: string;
+  person: string;
+  label: string; // P009 or P009.2
+  at: number;
+  design: 'A' | 'B' | null;
+  cond: 1 | 2 | null;
+  prompt: string;
+  name: string | null; // null: aborted
+  rework: boolean;
+  fallback: boolean;
+  rating?: FeedbackRecord;
+  source: 'log' | 'rating';
+  thread: Turn[]; // the craft's conversation (first result of a craft only)
+  ms: number | null; // the craft's duration (first result only)
+}
+
+function craftItems(events: RunEvent[], feedback: FeedbackRecord[], label: (r: { participant?: string; at: number; key?: string }) => string): CraftItem[] {
+  const out: CraftItem[] = [];
+  const used = new Set<string>();
+  for (const e of events.filter((x) => x.type === 'craft').sort((x, y) => x.at - y.at)) {
+    const design = designOf(e.data.design ?? e.cond);
+    const cond = conditionOf(e.order, e.data.design ?? e.cond);
+    const thread = ((e.data.thread as Turn[] | undefined) ?? []).filter((t) => t.text || t.options || t.concepts);
+    const results = ((e.data.results as Result[] | undefined) ?? []).filter((r) => r.name);
+    if (!results.length) {
+      // opened and left without a result: an aborted craft (only when something was typed)
+      if (!thread.some((t) => t.who === 'player' && t.text)) continue;
+      out.push({ key: e.id, person: e.participant, label: label(e), at: e.at, design, cond, prompt: thread.find((t) => t.who === 'player')?.text ?? '', name: null, rework: false, fallback: false, source: 'log', thread, ms: typeof e.data.ms === 'number' ? e.data.ms : null });
+      continue;
+    }
+    results.forEach((r, i) => {
+      const at = r.at ?? e.at;
+      const rating = ratingOf(feedback, e.participant, r.name, at);
+      if (rating) used.add(rating.id);
+      out.push({ key: `${e.id}-${i}`, person: e.participant, label: label(e), at, design, cond, prompt: r.prompt ?? '', name: r.name ?? null, rework: !!r.rework, fallback: !!r.fallback, rating, source: 'log', thread: i === 0 ? thread : [], ms: i === 0 && typeof e.data.ms === 'number' ? e.data.ms : null });
+    });
+  }
+  // results the run log doesn't have (lost, or from before it existed): their rating
+  for (const r of feedback) {
+    if (r.rating || used.has(r.id) || !r.participant || !r.name) continue;
+    if (out.some((x) => x.person === r.participant && x.name === r.name && Math.abs(x.at - r.at) < 2 * 60000)) continue;
+    const design = designOf(r.cond);
+    out.push({ key: `fb-${r.id}`, person: r.participant, label: label({ participant: r.participant, at: r.at }), at: r.at, design, cond: conditionOf(r.order, r.cond), prompt: r.prompt, name: r.name, rework: r.adjusted, fallback: !!r.fallback, rating: r, source: 'rating', thread: [], ms: null });
+  }
+  return out.sort((x, y) => x.at - y.at);
+}
+
+const VIEW_KEY = 'asciia-study-crafts-view';
+const vote = (r?: FeedbackRecord) => (r?.vote === 'up' ? 'passt' : r?.vote === 'down' ? 'nicht ganz' : null);
+
+function CraftCard({ it }: { it: CraftItem }) {
+  const sprite = it.rating?.sprite;
+  return (
+    <div className={`st-card${it.name ? '' : ' is-aborted'}`}>
+      <div className="st-card-sprite">
+        {sprite?.lines?.length ? (
+          <div className="st-sprite">
+            <FitSprite look={{ sprite: sprite.lines, colors: sprite.colors, palette: sprite.palette }} fill={0.85} maxScale={1.4} />
+          </div>
+        ) : (
+          <div className="st-sprite st-sprite-empty">{it.name ? '–' : '×'}</div>
+        )}
+      </div>
+      <div className="st-card-body">
+        <div className="st-card-name">{it.name ?? 'abgebrochen'}</div>
+        {it.prompt && <div className="st-card-prompt">„{it.prompt}“</div>}
+        <div className="st-card-meta">
+          <span>{clock(it.at)}</span>
+          {vote(it.rating) && <span className={it.rating?.vote === 'up' ? 'is-up' : 'is-down'}>{vote(it.rating)}</span>}
+          {it.rework && <span className="st-flag">Überarbeitung</span>}
+          {it.fallback && <span className="st-flag">Ersatzergebnis</span>}
+          {it.source === 'rating' && <span className="st-muted">nur Bewertung</span>}
+        </div>
+        {it.rating?.reasons?.length ? <div className="st-muted">{it.rating.reasons.join(', ')}</div> : null}
+        {it.rating?.comment ? <div className="st-card-comment">„{it.rating.comment}“</div> : null}
+      </div>
+    </div>
+  );
+}
+
+// a person's (or link's) results in two columns: 1st and 2nd run
+function RunColumns({ items }: { items: CraftItem[] }) {
+  const runs = ([1, 2] as const).map((c) => items.filter((it) => it.cond === c));
+  const other = items.filter((it) => it.cond == null);
+  const col = (list: CraftItem[], title: string) => {
+    const done = list.filter((x) => x.name);
+    const rated = done.filter((x) => x.rating?.vote);
+    const up = rated.filter((x) => x.rating?.vote === 'up').length;
+    return (
+      <div className="st-run">
+        <div className="st-run-head">
+          <span>{title}</span>
+          <span className="st-muted">
+            {done.length} Ergebnis{done.length === 1 ? '' : 'se'}
+            {list.length > done.length ? ` · ${list.length - done.length} abgebrochen` : ''}
+            {done.some((x) => x.rework) ? ` · ${done.filter((x) => x.rework).length} Überarb.` : ''}
+            {rated.length ? ` · ${Math.round((up / rated.length) * 100)} % passt` : ''}
+          </span>
+        </div>
+        {list.length ? list.map((it) => <CraftCard key={it.key} it={it} />) : <p className="st-empty">Keine.</p>}
+      </div>
+    );
+  };
+  const designOfRun = (list: CraftItem[]) => list.find((x) => x.design)?.design;
+  return (
+    <div className="st-runs">
+      {runs.map((list, i) => col(list, `${i + 1}. Durchgang${designOfRun(list) ? ` · Variante ${designOfRun(list)}` : ''}`))}
+      {other.length > 0 && col(other, 'Ohne Zuordnung')}
+    </div>
+  );
+}
+
 export function CraftLog() {
   const { slice } = useCtx();
   const label = useLabel();
-  const crafts = slice.events.filter((e) => e.type === 'craft' && ((e.data.results as Result[] | undefined)?.length || e.data.outcome === 'crafted')).sort((a, b) => a.at - b.at);
-  const rows = crafts.flatMap((e) => {
-    const results = ((e.data.results as Result[] | undefined) ?? []).filter((r) => r.name);
-    return (results.length ? results : [{} as Result]).map((r, i) => ({ e, r, i, rating: r.name ? ratingOf(slice.feedback, e.participant, r.name, r.at ?? e.at) : undefined }));
+  const items = craftItems(slice.events, slice.feedback, label);
+  const [view, setView] = useState<'gallery' | 'table'>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'table' ? 'table' : 'gallery';
+    } catch {
+      return 'gallery';
+    }
   });
+  const choose = (v: 'gallery' | 'table') => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      // (not remembered)
+    }
+  };
+  const done = items.filter((x) => x.name);
+  const groups = [...new Set(items.map((x) => x.label))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   const table = () =>
     csv([
-      ['Zeit', 'Teilnehmende', 'Variante', 'Durchgang', 'Eingabe', 'Ergebnis', 'Überarbeitung', 'Bewertung', 'Gründe', 'Kommentar', 'Dauer (min)', 'Ersatzergebnis'],
-      ...rows.map(({ e, r, rating }) => [
-        new Date(r.at ?? e.at).toISOString(),
-        label(e),
-        designOf(e.data.design ?? e.cond) ?? '',
-        conditionOf(e.order, e.data.design ?? e.cond) ?? '',
-        r.prompt ?? '',
-        r.name ?? '',
-        r.rework ? 'ja' : '',
-        rating?.vote === 'up' ? 'passt' : rating?.vote === 'down' ? 'nicht ganz' : '',
-        rating?.reasons?.join(', ') ?? '',
-        rating?.comment ?? '',
-        typeof e.data.ms === 'number' ? fmt(e.data.ms / 60000, 1) : '',
-        r.fallback ? 'ja' : '',
+      ['Zeit', 'Teilnehmende', 'Variante', 'Durchgang', 'Eingabe', 'Ergebnis', 'Überarbeitung', 'Bewertung', 'Gründe', 'Kommentar', 'Dauer (min)', 'Ersatzergebnis', 'Quelle'],
+      ...items.map((it) => [
+        new Date(it.at).toISOString(),
+        it.label,
+        it.design ?? '',
+        it.cond ?? '',
+        it.prompt,
+        it.name ?? 'abgebrochen',
+        it.rework ? 'ja' : '',
+        vote(it.rating) ?? '',
+        it.rating?.reasons?.join(', ') ?? '',
+        it.rating?.comment ?? '',
+        it.ms != null ? fmt(it.ms / 60000, 1) : '',
+        it.fallback ? 'ja' : '',
+        it.source === 'log' ? 'Run-Log' : 'nur Bewertung',
       ]),
     ]);
   return (
-    <Section title={`Crafting-Vorgänge (${rows.length})`} id="crafting">
-      {rows.length ? (
+    <Section title={`Crafting-Ergebnisse (${done.length}${items.length > done.length ? ` + ${items.length - done.length} abgebrochen` : ''})`} id="crafting">
+      {items.length ? (
         <>
           <div className="st-toolbar">
+            <div className="st-seg" role="group" aria-label="Ansicht">
+              <button type="button" className={view === 'gallery' ? 'is-on' : ''} onClick={() => choose('gallery')}>
+                Nach Durchgang
+              </button>
+              <button type="button" className={view === 'table' ? 'is-on' : ''} onClick={() => choose('table')}>
+                Tabelle
+              </button>
+            </div>
             <button type="button" onClick={() => downloadCsv(table(), 'Crafting.csv')}>
               CSV
             </button>
           </div>
-          <div className="st-table-wrap">
-            <table className="st-table st-crafts">
-              <thead>
-                <tr>
-                  <th>Zeit</th>
-                  <th>TN</th>
-                  <th>Var.</th>
-                  <th>Eingabe und Verlauf</th>
-                  <th>Ergebnis</th>
-                  <th>Bewertung</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ e, r, i, rating }) => {
-                  const d = designOf(e.data.design ?? e.cond);
-                  const c = conditionOf(e.order, e.data.design ?? e.cond);
-                  const thread = ((e.data.thread as Turn[] | undefined) ?? []).filter((t) => t.text || t.options || t.concepts);
-                  const sprite = rating?.sprite;
-                  return (
-                    <tr key={`${e.id}-${i}`}>
-                      <td className="num">
-                        {clock(r.at ?? e.at)}
-                        {i === 0 && typeof e.data.ms === 'number' && <div className="st-muted">{mins(e.data.ms)} min</div>}
-                      </td>
-                      <td>
-                        <span className="st-pid">{label(e)}</span>
-                      </td>
-                      <td>
-                        {d ?? '–'}
-                        {c && <div className="st-muted">{c}. DG</div>}
-                      </td>
-                      <td>
-                        <div>{r.prompt ?? <span className="st-muted">–</span>}</div>
-                        {r.rework && <span className="st-flag">Überarbeitung</span>}
-                        {i === 0 && thread.length > 0 && (
-                          <details className="st-details">
-                            <summary>Gesprächsverlauf ({thread.length})</summary>
-                            <ol className="st-thread">
-                              {thread.map((t, k) => (
-                                <li key={k}>
-                                  <span className="st-muted">{t.who === 'player' ? 'TN' : 'Mitchy'}:</span> {t.text ?? (t.concepts ? `Vorschläge: ${t.concepts.join(', ')}` : `${(t.options ?? []).length} Optionen`)}
-                                </li>
-                              ))}
-                            </ol>
-                          </details>
-                        )}
-                      </td>
-                      <td>
-                        <div className="st-craft-result">
-                          {sprite?.lines?.length ? (
-                            <div className="st-sprite">
-                              <FitSprite look={{ sprite: sprite.lines, colors: sprite.colors, palette: sprite.palette }} fill={0.85} maxScale={1.4} />
-                            </div>
-                          ) : null}
-                          <span>{r.name ?? (e.data.outcome === 'crafted' ? '–' : 'abgebrochen')}</span>
-                        </div>
-                        {r.fallback ? <span className="st-flag">Ersatzergebnis</span> : null}
-                      </td>
-                      <td>
-                        {rating?.vote === 'up' ? 'passt' : rating?.vote === 'down' ? 'nicht ganz' : <span className="st-muted">–</span>}
-                        {rating?.reasons?.length ? <div className="st-muted">{rating.reasons.join(', ')}</div> : null}
-                        {rating?.comment ? <div>„{rating.comment}“</div> : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {view === 'gallery' ? (
+            groups.length === 1 ? (
+              <RunColumns items={items} />
+            ) : (
+              groups.map((g) => (
+                <div key={g} className="st-craftperson">
+                  <h3>
+                    <span className="st-pid">{g}</span>
+                  </h3>
+                  <RunColumns items={items.filter((x) => x.label === g)} />
+                </div>
+              ))
+            )
+          ) : (
+            <CraftTable items={items} />
+          )}
         </>
       ) : (
         <Empty>Keine Crafting-Vorgänge.</Empty>
       )}
     </Section>
+  );
+}
+
+function CraftTable({ items }: { items: CraftItem[] }) {
+  return (
+    <div className="st-table-wrap">
+      <table className="st-table st-crafts">
+        <thead>
+          <tr>
+            <th>Zeit</th>
+            <th>TN</th>
+            <th>Var.</th>
+            <th>Eingabe und Verlauf</th>
+            <th>Ergebnis</th>
+            <th>Bewertung</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it) => {
+            const sprite = it.rating?.sprite;
+            return (
+              <tr key={it.key}>
+                <td className="num">
+                  {clock(it.at)}
+                  {it.ms != null && <div className="st-muted">{mins(it.ms)} min</div>}
+                </td>
+                <td>
+                  <span className="st-pid">{it.label}</span>
+                </td>
+                <td>
+                  {it.design ?? '–'}
+                  {it.cond && <div className="st-muted">{it.cond}. DG</div>}
+                </td>
+                <td>
+                  <div>{it.prompt || <span className="st-muted">–</span>}</div>
+                  {it.rework && <span className="st-flag">Überarbeitung</span>}
+                  {it.thread.length > 0 && (
+                    <details className="st-details">
+                      <summary>Gesprächsverlauf ({it.thread.length})</summary>
+                      <ol className="st-thread">
+                        {it.thread.map((t, k) => (
+                          <li key={k}>
+                            <span className="st-muted">{t.who === 'player' ? 'TN' : 'Mitchy'}:</span> {t.text ?? (t.concepts ? `Vorschläge: ${t.concepts.join(', ')}` : `${(t.options ?? []).length} Optionen`)}
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
+                </td>
+                <td>
+                  <div className="st-craft-result">
+                    {sprite?.lines?.length ? (
+                      <div className="st-sprite">
+                        <FitSprite look={{ sprite: sprite.lines, colors: sprite.colors, palette: sprite.palette }} fill={0.85} maxScale={1.4} />
+                      </div>
+                    ) : null}
+                    <span>{it.name ?? 'abgebrochen'}</span>
+                  </div>
+                  {it.fallback ? <span className="st-flag">Ersatzergebnis</span> : null}
+                  {it.source === 'rating' ? <div className="st-muted">nur Bewertung</div> : null}
+                </td>
+                <td>
+                  {vote(it.rating) ?? <span className="st-muted">–</span>}
+                  {it.rating?.reasons?.length ? <div className="st-muted">{it.rating.reasons.join(', ')}</div> : null}
+                  {it.rating?.comment ? <div>„{it.rating.comment}“</div> : null}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

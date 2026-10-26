@@ -1,7 +1,7 @@
 // Daten & Validierung: the imports, the data sources, the checks (missing
 // values, conflicts, open work), the matching rules, and the change log.
 import type { ColumnRole } from '../types';
-import { personIdOf } from '../model';
+import { MATCH_ORDER_LABEL, personIdOf, type MatchOrder } from '../model';
 import { download } from '../charts';
 import { csv, logChange, Section, useCtx, type LogEntry } from '../ui';
 import Import from './Import';
@@ -189,7 +189,7 @@ export default function Data() {
       <Section title="Zuordnungsregeln">
         <ul className="st-rules">
           <li>Teilnehmende: P-ID aus dem persönlichen Link bzw. den Notizen.</li>
-          <li>Umfrage-Zeilen ↔ Teilnehmende, in dieser Reihenfolge: 1. manuell gewählt; 2. Teilnehmer-ID (tallyid); 3. Zeit: Abgabe 10 min vor bis 120 min nach dem Öffnen der Umfrage im Spiel, nächste zuerst; 4. Reihenfolge: übrige Teilnehmende in der Reihenfolge der Notizen, übrige Zeilen nach Abgabezeit. Abweichende AB/BA-Angaben werden markiert.</li>
+          <li>Umfrage-Zeilen ↔ Teilnehmende, in dieser Reihenfolge: 1. manuell gewählt; 2. Teilnehmer-ID (tallyid); 3. Zeit: Abgabe 10 min vor bis 120 min nach dem Öffnen der Umfrage im Spiel, nächste zuerst; 4. Reihenfolge: übrige Teilnehmende in der gewählten Reihenfolge (Notizen, P-ID oder Sessionstart), übrige Zeilen nach Abgabezeit. Abweichende AB/BA-Angaben werden markiert.</li>
           <li>Mehrere Links einer Person: P009.1, P009.2 … in der Reihenfolge des Starts; Dauer als Summe oder nur Hauptlink.</li>
           <li>Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links.</li>
           <li>Testgruppe: aus dem Link (AB/BA); eine Korrektur überschreibt sie; Abweichungen zu den Notizen werden markiert.</li>
@@ -227,8 +227,25 @@ function MatchTable() {
   const orderCol = model.mapping.findIndex((m) => m.role === 'order');
   const owner = new Map(model.persons.filter((p) => p.tallyRow != null).map((p) => [p.tallyRow!, p]));
   const meta = (study.docs.settings.notesMeta ?? {}) as Record<string, { slot?: string; group?: string }>;
+  const order = ((study.docs.settings.matchOrder as { by?: MatchOrder } | undefined)?.by ?? 'notes') as MatchOrder;
   return (
     <Section title="Zuordnung Umfrage ↔ Teilnehmende">
+      <label className="st-scope">
+        <span>Zuordnung nach Reihenfolge:</span>
+        <select
+          value={order}
+          onChange={(e) => {
+            study.commit([{ coll: 'settings', id: 'matchOrder', data: { by: e.target.value } }]);
+            logChange(study, `Zuordnung nach Reihenfolge: ${MATCH_ORDER_LABEL[order]} → ${MATCH_ORDER_LABEL[e.target.value as MatchOrder]}`);
+          }}
+        >
+          {(Object.keys(MATCH_ORDER_LABEL) as MatchOrder[]).map((k) => (
+            <option key={k} value={k}>
+              {MATCH_ORDER_LABEL[k]}
+            </option>
+          ))}
+        </select>
+      </label>
       <table className="st-table">
         <thead>
           <tr>

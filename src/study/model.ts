@@ -75,6 +75,8 @@ export interface Model {
 }
 
 const P_ID = /^P\d{3,}$/;
+export type MatchOrder = 'notes' | 'pid' | 'start';
+export const MATCH_ORDER_LABEL: Record<MatchOrder, string> = { notes: 'Reihenfolge der Notizen', pid: 'P-ID (P001, P002, …)', start: 'Start der Session (Tracking)' };
 
 export function personIdOf(v: string): string | null {
   const m = /p\s*-?\s*(\d{1,4})/i.exec(v.trim());
@@ -154,8 +156,17 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
   // the survey rows → participants (match.ts); the notes give the order
   // rows set aside (a test run, a duplicate): in no pairing and no statistic
   const ignoredRows = new Set((docs.settings.ignoredRows as { rows?: number[] } | undefined)?.rows ?? []);
+  // the participants' order for the pairing by order: the notes (default),
+  // the P-IDs, or when their first tracked link started
+  const matchOrder = ((docs.settings.matchOrder as { by?: MatchOrder } | undefined)?.by ?? 'notes') as MatchOrder;
+  const byPid = persons.map((p) => p.id);
   const notesOrder = ((docs.settings.notesOrder as { ids?: string[] } | undefined)?.ids ?? []).filter((id) => ids.has(id));
-  const ordered = [...notesOrder, ...persons.map((p) => p.id).filter((id) => !notesOrder.includes(id))];
+  const ordered =
+    matchOrder === 'pid'
+      ? byPid
+      : matchOrder === 'start'
+        ? [...persons].sort((a, b) => (a.date ?? Infinity) - (b.date ?? Infinity) || a.id.localeCompare(b.id, undefined, { numeric: true })).map((p) => p.id)
+        : [...notesOrder, ...byPid.filter((id) => !notesOrder.includes(id))];
   const byId = new Map(persons.map((p) => [p.id, p]));
   const matched = matchRows(
     (tally?.rows ?? []).map((r, row) => ({ row, id: tallyIds[row], submitted: timeCol >= 0 ? timeOf(r[timeCol] ?? '') : null })).filter((r) => !ignoredRows.has(r.row)),

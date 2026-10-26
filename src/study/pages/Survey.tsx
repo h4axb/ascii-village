@@ -263,6 +263,7 @@ function FreeText() {
           <ul>
             {slice.survey
               .filter((r) => r.text[l])
+              .sort(byPerson)
               .map((r) => (
                 <li key={r.row}>
                   <span className="st-pid">{r.person ?? `Zeile ${r.row + 1}`}</span> {r.text[l]}
@@ -562,3 +563,7 @@ function Part3Overall({ p3 }: { p3: P3Result }) {
     </>
   );
 }
+
+// survey rows by participant (P001, P002, …; unmatched rows last)
+const byPerson = (a: { person: string | null; row: number }, b: { person: string | null; row: number }) =>
+  (a.person ?? '\uffff').localeCompare(b.person ?? '\uffff', undefined, { numeric: true }) || a.row - b.row;

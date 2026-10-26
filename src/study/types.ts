@@ -198,19 +198,36 @@ export const DEFAULT_TAGS: TagGroup[] = [
       { id: 'technik', label: 'Technik' },
     ],
   },
+  // the qualitative codes: what a statement is about (several per statement)
+  {
+    id: 'code',
+    name: 'Code',
+    multi: true,
+    order: 4,
+    chips: [
+      { id: 'c-kontrolle', label: 'Kontrolle' },
+      { id: 'c-erwartung', label: 'Erwartung' },
+      { id: 'c-feedbackwirkung', label: 'Feedbackwirkung' },
+      { id: 'c-verstaendlichkeit', label: 'Verständlichkeit' },
+      { id: 'c-spielfluss', label: 'Spielfluss' },
+      { id: 'c-outputqualitaet', label: 'Outputqualität' },
+      { id: 'c-technik', label: 'Technische Probleme' },
+      { id: 'c-positiv', label: 'Positives Erlebnis' },
+    ],
+  },
   // the moderator had to step in (combinable with any "Art")
   {
     id: 'moderation',
     name: 'Moderation',
     multi: false,
-    order: 4,
+    order: 5,
     chips: [{ id: 'eingriff', label: 'Eingriff', role: 'intervention' }],
   },
   {
     id: 'gueltigkeit',
     name: 'Gültigkeit',
     multi: false,
-    order: 5,
+    order: 6,
     chips: [{ id: 'verworfen', label: 'Verworfen', role: 'rejected' }],
   },
 ];

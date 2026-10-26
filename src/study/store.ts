@@ -3,7 +3,7 @@
 // browser memory of it, as /2/feedback). Changes show at once and are saved
 // in the background; a failed save says so.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_TAGS, type Coll, type GameData, type StudyDocs } from './types';
+import { DEFAULT_TAGS, type Coll, type GameData, type StudyDocs, type TagGroup } from './types';
 
 const PASS_KEY = 'asciia-feedback-pass';
 // (the same list as functions/api/study.ts STUDY_COLLS)
@@ -73,7 +73,11 @@ export function useStudy() {
       docsRef.current = d;
       // tag sets added after the first visit, once each (deleting one keeps it deleted)
       const added = ((d.settings.tagsAdded as { ids?: string[] } | undefined)?.ids ?? []);
-      const missing = DEFAULT_TAGS.filter((g) => g.id === 'moderation' && !added.includes(g.id) && !Object.values(d.tags).some((t) => t.chips.some((c) => c.role === 'intervention')));
+      const later: Record<string, (t: TagGroup[]) => boolean> = {
+        moderation: (t) => t.some((g) => g.chips.some((c) => c.role === 'intervention')),
+        code: (t) => t.some((g) => g.id === 'code'),
+      };
+      const missing = DEFAULT_TAGS.filter((g) => later[g.id] && !added.includes(g.id) && !later[g.id](Object.values(d.tags)));
       if (missing.length) {
         d.tags = { ...d.tags, ...Object.fromEntries(missing.map((g) => [g.id, { ...g, order: Object.keys(d.tags).length }])) };
         d.settings = { ...d.settings, tagsAdded: { ids: [...added, ...missing.map((g) => g.id)] } };

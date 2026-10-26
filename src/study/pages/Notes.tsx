@@ -7,6 +7,7 @@ import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } fro
 import { CATEGORY, SECTION_LABEL } from '../types';
 import { distinctPersons, itemsWithRole, type Model } from '../model';
 import { linkLabelOf, mergeStatements, parseNotes } from '../notes';
+import { designOfItem } from './Codes';
 import { itemText, setContentView, translateNotes, useContentView, type ContentView } from '../translations';
 import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
 
@@ -217,9 +218,6 @@ function ChipCell({ item, g, onChange, labelOnly }: { item: ItemDoc; g: TagGroup
     </div>
   );
 }
-
-// the statement's design: its Variante chip
-const designOfItem = (i: ItemDoc) => (i.chips.includes('variante-a') && !i.chips.includes('variante-b') ? 'A' : i.chips.includes('variante-b') && !i.chips.includes('variante-a') ? 'B' : null);
 
 function ItemRow({ item, model, save, remove }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void }) {
   const { study } = useCtx();

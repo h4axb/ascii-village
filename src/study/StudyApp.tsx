@@ -9,6 +9,7 @@ import Overview from './pages/Overview';
 import Survey from './pages/Survey';
 import Notes, { ContentSwitch, Priority, Tags } from './pages/Notes';
 import Findings from './pages/Findings';
+import Codes from './pages/Codes';
 import People from './pages/People';
 import Data from './pages/Data';
 import Results from './pages/Results';
@@ -36,6 +37,7 @@ const PAGES: Page[] = [
     title: 'Qualitatives Feedback',
     sub: [
       { id: 'prioritaet', title: 'Nach Priorität' },
+      { id: 'codes', title: 'Codes' },
       { id: 'befunde', title: 'Wiederkehrende Befunde' },
       { id: 'tags', title: 'Tags' },
     ],
@@ -128,7 +130,7 @@ export default function StudyApp() {
       case 'quantitativ':
         return <Survey />;
       case 'qualitativ':
-        return sub === 'prioritaet' ? <Priority /> : sub === 'befunde' ? <Findings /> : sub === 'tags' ? <Tags /> : <Notes />;
+        return sub === 'prioritaet' ? <Priority /> : sub === 'befunde' ? <Findings /> : sub === 'codes' ? <Codes /> : sub === 'tags' ? <Tags /> : <Notes />;
       case 'teilnehmende':
         return <People />;
       case 'daten':

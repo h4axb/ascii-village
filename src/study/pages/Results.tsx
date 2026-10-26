@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { HypothesisDoc, Design } from '../types';
 import { buildClaims, rate, ratingRule, type Claim } from '../claims';
 import { getLang } from '../i18n';
+import { analysisExport, rawExport } from '../exports';
 import { download } from '../charts';
 import { detectableEffect, fmt, fmtP, signTestThreshold, wilson } from '../stats';
 import { csv, Empty, figNumber, FIGURES, LazyInput, Section, useCtx } from '../ui';
@@ -193,6 +194,12 @@ export default function Results() {
 
       <Section title="Exporte">
         <div className="st-exports">
+          <button type="button" onClick={() => download(rawExport(study.docs, study.game), 'Rohdaten.zip')} title="Originale unverändert: Notizen (ohne Namen), Aussagen im ersten Wortlaut, Tally-Export, Spiel-Tracking">
+            Rohdaten (ZIP)
+          </button>
+          <button type="button" onClick={() => download(analysisExport(study.docs, model), 'Analyse.zip')} title="Deutsche Fassungen, Interpretationen, Codes, Befunde und die Messwerte je Teilnehmer">
+            Analyse (ZIP)
+          </button>
           <button type="button" onClick={() => dl([['Methode', 'Ergebnis', 'Richtung', 'p', 'n'], ...claims.map((c) => [c.method, text(c), c.direction ?? '', c.p == null ? '' : fmtP(c.p), c.n])], 'Ergebnisse.csv')}>
             Ergebnisse (CSV)
           </button>

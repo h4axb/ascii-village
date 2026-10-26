@@ -1147,3 +1147,15 @@ body:has(.st-root) {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.st-item-actions {
+  flex-wrap: wrap;
+}
+.st-scope {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.st-scope select,
+.st-toolbar select {
+  max-width: 100%;
+  min-width: 0;
+}

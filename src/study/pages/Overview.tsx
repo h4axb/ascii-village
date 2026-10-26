@@ -60,7 +60,16 @@ export default function Overview() {
         <Stat label="Teilnehmende" value={n} sub={all && model.persons.length > nAll ? `${model.persons.length - nAll} ausgeschlossen` : undefined} />
         <Stat label="Testgruppen" value={`${groups.AB} AB · ${groups.BA} BA`} />
         <Stat label="Zeitraum" value={dates.length ? `${fmtDate(Math.min(...dates))}${dates.length > 1 && fmtDate(Math.min(...dates)) !== fmtDate(Math.max(...dates)) ? ` – ${fmtDate(Math.max(...dates))}` : ''}` : '–'} />
-        <Stat label="Bearbeitungsdauer" value={times.length ? `${fmt(t.median, 1)} min` : '–'} sub={times.length > 1 ? `Median, IQR ${fmt(t.q1, 1)}–${fmt(t.q3, 1)}` : undefined} />
+        <Stat
+          label="Bearbeitungsdauer"
+          value={times.length ? `${Math.round(t.median)} min` : '–'}
+          sub={
+            <>
+              {times.length > 1 ? `Median, IQR ${Math.round(t.q1)}–${Math.round(t.q3)} min · ` : ''}
+              <a href="#teilnehmende">bearbeiten</a>
+            </>
+          }
+        />
       </div>
 
       <Section title="Teilnehmerprofil">

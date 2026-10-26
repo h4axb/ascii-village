@@ -45,6 +45,7 @@ export interface PersonDoc {
   tallyRow?: number | null; // the Tally row (index), null = none; undefined = matched automatically
   group?: 'AB' | 'BA'; // test group, when it differs from what was tracked
   age?: number | null; // overrides the Tally answer
+  minutes?: number | null; // the duration set by hand (overrides every measured one)
 }
 
 // ---- notes ----

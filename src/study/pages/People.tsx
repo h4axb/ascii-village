@@ -7,7 +7,7 @@ import { personIdOf, type Person } from '../model';
 import { fmtDate, fmtMin, LazyInput, logChange, Section, useCtx } from '../ui';
 
 export const VIA: Record<string, string> = { manuell: 'manuell', id: 'nach ID', zeit: 'nach Zeit', reihenfolge: 'nach Reihenfolge' };
-const CHANGE_NAME: Record<string, string> = { excluded: 'ausgeschlossen', reason: 'Grund', swapP1: 'Teil 1 vertauscht', runtime: 'Dauer aus', mainLink: 'Hauptlink', tallyRow: 'Tally-Zeile', group: 'Testgruppe', age: 'Alter' };
+const CHANGE_NAME: Record<string, string> = { minutes: 'Dauer manuell (min)', excluded: 'ausgeschlossen', reason: 'Grund', swapP1: 'Teil 1 vertauscht', runtime: 'Dauer aus', mainLink: 'Hauptlink', tallyRow: 'Tally-Zeile', group: 'Testgruppe', age: 'Alter' };
 
 export default function People() {
   const { model, study } = useCtx();
@@ -81,6 +81,17 @@ export default function People() {
                       </option>
                     ))}
                   </select>
+                </label>
+                <label>
+                  Dauer manuell (min)
+                  <LazyInput
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={p.doc.minutes == null ? '' : String(p.doc.minutes)}
+                    placeholder={p.minutes != null && p.durationUsed !== 'manual' ? `gemessen: ${Math.round(p.minutes)}` : 'gemessen'}
+                    onSave={(v) => set(p, { minutes: v.trim() === '' ? null : Number(v.replace(',', '.')) })}
+                  />
                 </label>
                 <label>
                   Alter
@@ -177,7 +188,7 @@ function PersonDetails({ p }: { p: Person }) {
 }
 
 const clockT = (t: number | null) => (t ? new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '–');
-const USED: Record<string, string> = { link: 'Link-Dauer', clock: 'Spiel-Uhr', steps: 'Schritte' };
+const USED: Record<string, string> = { link: 'Link-Dauer', clock: 'Spiel-Uhr', steps: 'Schritte', manual: 'manuell gesetzt' };
 
 // the three duration measures per link and in total, the one used marked
 function Durations({ p }: { p: Person }) {

@@ -3,8 +3,8 @@
 // Wilson interval), Teil 2 Likert (Wilcoxon, r), Teil 3 UEQ-S (scale means,
 // intervals, benchmark, α), Teil 4 the participants' details.
 import { Bars, Diverging, Dots, NEUTRAL, SERIES } from '../charts';
-import { part1, part2, part2Single, part3, type P2Single, type P3Result } from '../analysis';
-import { craftStats, gameRatings, prefChoices, PREF_LABEL, RATING_LABEL, SCOPE_LABEL } from '../model';
+import { part1, part2, part2Single, part3, type P1Result, type P2Single, type P3Result } from '../analysis';
+import { craftStats, gameRatings, partOfKey, prefChoices, PREF_LABEL, RATING_LABEL, SCOPE_LABEL } from '../model';
 import { describe, fmt, fmtP, meanCI, pct, UEQS_ITEMS } from '../stats';
 import { csv, Empty, Fig, Section, useCtx } from '../ui';
 import { useSurveyText } from '../translations';
@@ -36,54 +36,13 @@ export default function Survey() {
   const p2 = part2(rows);
   const p2s = part2Single(rows);
   const p3 = part3(rows);
+  // choice questions go to the part they sit in (Daten & Validierung), not all to Teil 1
+  const parts = study.docs.tally.main?.parts;
+  const p1In = (k: number) => p1.filter((r) => Math.max(1, Math.min(3, partOfKey(model, parts, r.question) || 1)) === k);
   return (
     <>
       <Section title="Teil 1: Direkter Vergleich" id="teil1">
-        {p1.length ? (
-          <>
-            <Fig
-              id="teil1"
-              table={() => csv([['Frage', 'A', 'B', 'Keine Präferenz', 'n', 'Anteil Mehrheit', 'KI unten', 'KI oben', 'p (Vorzeichentest)'], ...p1.map((r) => [r.question, r.A, r.B, r.neutral, r.n, fmt(r.share), fmt(r.ci[0]), fmt(r.ci[1]), fmtP(r.p)])])}
-            >
-              <Bars
-                rows={p1.map((r) => ({ label: T(r.question), values: [r.A, r.B, r.neutral] }))}
-                series={[...AB, { name: 'Keine Präferenz', color: NEUTRAL }]}
-              />
-            </Fig>
-            <table className="st-table">
-              <thead>
-                <tr>
-                  <th>Frage</th>
-                  <th>A</th>
-                  <th>B</th>
-                  <th>Keine</th>
-                  <th>Mehrheit</th>
-                  <th>95 %-KI</th>
-                  <th>p</th>
-                </tr>
-              </thead>
-              <tbody>
-                {p1.map((r) => (
-                  <tr key={r.question}>
-                    <td>
-                      {T(r.question)}
-                      {r.swapped > 0 && <span className="st-flag"> {r.swapped}× korrigiert</span>}
-                    </td>
-                    <td className="num">{r.A}</td>
-                    <td className="num">{r.B}</td>
-                    <td className="num">{r.neutral}</td>
-                    <td>{r.winner ? `${r.winner}: ${r.k}/${r.decided} (${pct(r.share)})` : 'unentschieden'}</td>
-                    <td>{r.decided ? `${pct(r.ci[0])}–${pct(r.ci[1])}` : '–'}</td>
-                    <td className="num">{fmtP(r.p)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="st-note">Exakter Vorzeichentest (zweiseitig) über die Urteile mit Präferenz; „keine Präferenz“ ausgeschlossen. Wilson-Intervall für den Anteil der Mehrheit.</p>
-          </>
-        ) : (
-          <Empty>Keine Spalte als „Teil 1“ zugeordnet.</Empty>
-        )}
+        {p1In(1).length ? <ChoiceBlock results={p1In(1)} figId="teil1" /> : <Empty>Keine Spalte als „Teil 1“ zugeordnet.</Empty>}
       </Section>
 
       <Section title="Teil 2: Likert-Skala" id="teil2">
@@ -150,6 +109,7 @@ export default function Survey() {
           <Empty>Keine Spalte als „Teil 2“ zugeordnet.</Empty>
         ) : null}
         {p2s.length > 0 && <Part2Single items={p2s} />}
+        {p1In(2).length > 0 && <ChoiceBlock results={p1In(2)} figId="teil2wahl" />}
       </Section>
 
       <Section title="Teil 3: UEQ-S" id="teil3">
@@ -245,6 +205,7 @@ export default function Survey() {
           <Empty>Keine Spalte als „Teil 3“ zugeordnet.</Empty>
         ) : null}
         {p3.overall && <Part3Overall p3={p3} />}
+        {p1In(3).length > 0 && <ChoiceBlock results={p1In(3)} figId="teil3wahl" />}
       </Section>
 
       <Telemetry />
@@ -300,7 +261,9 @@ export function SurveySummary() {
         <tbody>
           {p1.map((r) => (
             <tr key={`1${r.question}`}>
-              <td>Teil 1: {T(r.question)}</td>
+              <td>
+                Teil {Math.max(1, partOfKey(model, study.docs.tally.main?.parts, r.question) || 1)}: {T(r.question)}
+              </td>
               <td>{r.winner ? `${r.winner} ${r.k}/${r.decided} (${pct(r.share)}), keine Präferenz ${r.neutral}` : `unentschieden (${r.A}:${r.B})`}</td>
               <td className="num">{fmtP(r.p)}</td>
             </tr>
@@ -573,3 +536,53 @@ function Part3Overall({ p3 }: { p3: P3Result }) {
 // survey rows by participant (P001, P002, …; unmatched rows last)
 const byPerson = (a: { person: string | null; row: number }, b: { person: string | null; row: number }) =>
   (a.person ?? '\uffff').localeCompare(b.person ?? '\uffff', undefined, { numeric: true }) || a.row - b.row;
+
+// choice questions (A / B / no preference, or the 1st / 2nd run): figure, table, sign test
+function ChoiceBlock({ results, figId }: { results: P1Result[]; figId: string }) {
+  const { study } = useCtx();
+  const T = useSurveyText(study);
+  const p1 = results;
+  return (
+    <>
+            <Fig
+              id={figId}
+              table={() => csv([['Frage', 'A', 'B', 'Keine Präferenz', 'n', 'Anteil Mehrheit', 'KI unten', 'KI oben', 'p (Vorzeichentest)'], ...p1.map((r) => [r.question, r.A, r.B, r.neutral, r.n, fmt(r.share), fmt(r.ci[0]), fmt(r.ci[1]), fmtP(r.p)])])}
+            >
+              <Bars
+                rows={p1.map((r) => ({ label: T(r.question), values: [r.A, r.B, r.neutral] }))}
+                series={[...AB, { name: 'Keine Präferenz', color: NEUTRAL }]}
+              />
+            </Fig>
+            <table className="st-table">
+              <thead>
+                <tr>
+                  <th>Frage</th>
+                  <th>A</th>
+                  <th>B</th>
+                  <th>Keine</th>
+                  <th>Mehrheit</th>
+                  <th>95 %-KI</th>
+                  <th>p</th>
+                </tr>
+              </thead>
+              <tbody>
+                {p1.map((r) => (
+                  <tr key={r.question}>
+                    <td>
+                      {T(r.question)}
+                      {r.swapped > 0 && <span className="st-flag"> {r.swapped}× korrigiert</span>}
+                    </td>
+                    <td className="num">{r.A}</td>
+                    <td className="num">{r.B}</td>
+                    <td className="num">{r.neutral}</td>
+                    <td>{r.winner ? `${r.winner}: ${r.k}/${r.decided} (${pct(r.share)})` : 'unentschieden'}</td>
+                    <td>{r.decided ? `${pct(r.ci[0])}–${pct(r.ci[1])}` : '–'}</td>
+                    <td className="num">{fmtP(r.p)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="st-note">Exakter Vorzeichentest (zweiseitig) über die Urteile mit Präferenz; „keine Präferenz“ ausgeschlossen. Wilson-Intervall für den Anteil der Mehrheit.</p>
+    </>
+  );
+}

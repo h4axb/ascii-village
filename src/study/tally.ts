@@ -175,7 +175,7 @@ export function guessParts(kinds: Kind[]): (number | null)[] {
   return [p1, p2ok, p3, p4];
 }
 
-const partOf = (j: number, parts: (number | null)[]) => {
+export const partOf = (j: number, parts: (number | null)[]) => {
   let p = 0;
   parts.forEach((start, i) => start != null && j >= start && (p = i + 1));
   return p; // 0: before Teil 1

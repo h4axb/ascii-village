@@ -7,6 +7,7 @@ import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
 import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
 import { matchRows, timeOf, type MatchVia } from './match';
+import { partOf } from './tally';
 
 // ---- the scope filter: everyone, one person, or one of their links ----
 export type Scope = { kind: 'all' } | { kind: 'person'; id: string } | { kind: 'link'; id: string; key: string };
@@ -75,6 +76,7 @@ export interface Model {
   ignoredRows: Set<number>;
   orderPos: Map<string, number>; // each participant's place in the order used for pairing
   mapping: ColumnRole[];
+  parts: (number | null)[] | undefined; // where Teil 1–4 start (Daten & Validierung)
   headers: string[];
   // the game's records, of included persons, per scope
   events: RunEvent[];
@@ -87,9 +89,14 @@ export interface Model {
 }
 
 const P_ID = /^P\d{3,}$/;
+// the part (Teil 1–4) a survey column sits in, by its position (Daten & Validierung)
+export function partOfKey(m: { mapping: ColumnRole[] }, parts: (number | null)[] | undefined, key: string): number {
+  const j = m.mapping.findIndex((c) => (c.role === 'p1' && c.question === key) || (c.role === 'likert' && c.item === key) || ((c.role === 'info' || c.role === 'text') && c.label === key));
+  return j < 0 || !parts ? 0 : partOf(j, parts);
+}
 // the duration measure for "Bearbeitungsdauer"; auto = Spiel-Uhr where recorded, else Link-Dauer
-export type Duration = 'link' | 'clock' | 'steps';
-export type DurationBy = Duration | 'auto';
+export type Duration = 'link' | 'clock' | 'steps' | 'manual';
+export type DurationBy = Exclude<Duration, 'manual'> | 'auto';
 export const DURATION_LABEL: Record<DurationBy, string> = {
   auto: 'Spiel-Uhr (sonst Link-Dauer)',
   clock: 'Spiel-Uhr: erster Quest-Schritt bis Umfrage',
@@ -182,7 +189,8 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     const linkMinutes = agg((l) => l.linkMinutes);
     const clockMinutes = agg((l) => l.clockMinutes);
     const stepMinutes = agg((l) => l.stepMinutes);
-    const picked = pickDuration(durationBy, linkMinutes, clockMinutes, stepMinutes);
+    // a duration set by hand wins over every measured one
+    const picked = doc.minutes != null ? { minutes: doc.minutes, used: 'manual' as Duration } : pickDuration(durationBy, linkMinutes, clockMinutes, stepMinutes);
     const minutes = picked.minutes;
     const gaps = (doc.runtime === 'main' && main ? [main] : links).reduce((a, l) => ({ count: a.count + l.gaps.count, minutes: a.minutes + l.gaps.minutes }), { count: 0, minutes: 0 });
     const surveyAt =
@@ -315,6 +323,7 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     ignoredRows,
     orderPos,
     mapping,
+    parts: tally?.parts,
     headers,
     events: game.events.filter((e) => incIds.has(e.participant)),
     feedback: game.feedback.filter((r) => !!r.participant && incIds.has(r.participant)),

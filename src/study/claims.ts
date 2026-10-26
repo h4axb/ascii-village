@@ -2,7 +2,7 @@
 // thesis wording, and the evidence rating of a hypothesis from the
 // statements linked to it. The rule is shown next to every rating.
 import type { Model, Slice } from './model';
-import { craftStats, distinctPersons, gameRatings, RATING_LABEL } from './model';
+import { craftStats, distinctPersons, gameRatings, partOfKey, RATING_LABEL } from './model';
 import { part1, part2, part3 } from './analysis';
 import { describe, fmt, fmtP, pct, wilcoxon } from './stats';
 import { getLang, tr } from './i18n';
@@ -31,7 +31,8 @@ export function buildClaims(m: Model, s: Slice, findings: Record<string, Finding
     if (!r.n) continue;
     out.push({
       id: `p1:${r.question}`,
-      method: 'Teil 1',
+      // (the part the question sits in, not its type)
+      method: (['Teil 1', 'Teil 2', 'Teil 3'] as const)[Math.max(1, Math.min(3, partOfKey(m, m.parts, r.question) || 1)) - 1],
       text: r.winner
         ? en
           ? `${lead(r.question)}: ${r.k} of ${r.decided} participants with a preference preferred variant ${r.winner} (${pct(r.share)}, 95% CI ${pct(r.ci[0])}–${pct(r.ci[1])}; exact sign test ${pText(r.p)}${r.neutral ? `; ${r.neutral} without a preference` : ''}).`

@@ -62,6 +62,7 @@ export interface Model {
   survey: SurveyRow[]; // rows of included persons (and unmatched rows)
   unmatchedRows: number[];
   ignoredRows: Set<number>;
+  orderPos: Map<string, number>; // each participant's place in the order used for pairing
   mapping: ColumnRole[];
   headers: string[];
   // the game's records, of included persons, per scope
@@ -160,6 +161,7 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
   // the P-IDs, or when their first tracked link started
   const matchOrder = ((docs.settings.matchOrder as { by?: MatchOrder } | undefined)?.by ?? 'notes') as MatchOrder;
   const byPid = persons.map((p) => p.id);
+  let orderPos = new Map<string, number>();
   const notesOrder = ((docs.settings.notesOrder as { ids?: string[] } | undefined)?.ids ?? []).filter((id) => ids.has(id));
   const ordered =
     matchOrder === 'pid'
@@ -171,7 +173,11 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
   const matched = matchRows(
     (tally?.rows ?? []).map((r, row) => ({ row, id: tallyIds[row], submitted: timeCol >= 0 ? timeOf(r[timeCol] ?? '') : null })).filter((r) => !ignoredRows.has(r.row)),
     ordered.map((id) => ({ id, manual: byId.get(id)!.doc.tallyRow, surveyAt: byId.get(id)!.surveyAt })),
+    // (the time step is off unless chosen: the tracked survey time of a person
+    // with several links, or a time zone, can pair the wrong row)
+    !!(docs.settings.matchTime as { on?: boolean } | undefined)?.on,
   );
+  orderPos = new Map(ordered.map((id, i) => [id, i + 1]));
   for (const p of persons) {
     const m = matched.get(p.id);
     if (!m) continue;
@@ -250,6 +256,7 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     survey,
     unmatchedRows,
     ignoredRows,
+    orderPos,
     mapping,
     headers,
     events: game.events.filter((e) => incIds.has(e.participant)),

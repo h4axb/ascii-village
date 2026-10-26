@@ -2,6 +2,7 @@
 // values, conflicts, open work), the matching rules, and the change log.
 import type { ColumnRole } from '../types';
 import { MATCH_ORDER_LABEL, personIdOf, type MatchOrder } from '../model';
+import { timeOf } from '../match';
 import { download } from '../charts';
 import { csv, logChange, Section, useCtx, type LogEntry } from '../ui';
 import Import from './Import';
@@ -189,7 +190,7 @@ export default function Data() {
       <Section title="Zuordnungsregeln">
         <ul className="st-rules">
           <li>Teilnehmende: P-ID aus dem persönlichen Link bzw. den Notizen.</li>
-          <li>Umfrage-Zeilen ↔ Teilnehmende, in dieser Reihenfolge: 1. manuell gewählt; 2. Teilnehmer-ID (tallyid); 3. Zeit: Abgabe 10 min vor bis 120 min nach dem Öffnen der Umfrage im Spiel, nächste zuerst; 4. Reihenfolge: übrige Teilnehmende in der gewählten Reihenfolge (Notizen, P-ID oder Sessionstart), übrige Zeilen nach Abgabezeit. Abweichende AB/BA-Angaben werden markiert.</li>
+          <li>Umfrage-Zeilen ↔ Teilnehmende, in dieser Reihenfolge: 1. manuell gewählt; 2. Teilnehmer-ID (tallyid); 3. Zeit (nur wenn eingeschaltet): Abgabe 10 min vor bis 120 min nach dem Öffnen der Umfrage im Spiel, nächste zuerst; 4. Reihenfolge: übrige Teilnehmende in der gewählten Reihenfolge (Notizen, P-ID oder Sessionstart), übrige Zeilen nach Abgabezeit. Abweichende AB/BA-Angaben werden markiert.</li>
           <li>Mehrere Links einer Person: P009.1, P009.2 … in der Reihenfolge des Starts; Dauer als Summe oder nur Hauptlink.</li>
           <li>Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links.</li>
           <li>Testgruppe: aus dem Link (AB/BA); eine Korrektur überschreibt sie; Abweichungen zu den Notizen werden markiert.</li>
@@ -228,6 +229,13 @@ function MatchTable() {
   const owner = new Map(model.persons.filter((p) => p.tallyRow != null).map((p) => [p.tallyRow!, p]));
   const meta = (study.docs.settings.notesMeta ?? {}) as Record<string, { slot?: string; group?: string }>;
   const order = ((study.docs.settings.matchOrder as { by?: MatchOrder } | undefined)?.by ?? 'notes') as MatchOrder;
+  const useTime = !!(study.docs.settings.matchTime as { on?: boolean } | undefined)?.on;
+  // the rows in the order they were submitted (file order without a time), with their place
+  const sorted = tally.rows
+    .map((r, i) => ({ r, i, t: timeCol >= 0 ? timeOf(r[timeCol] ?? '') : null }))
+    .sort((a, b) => (a.t != null && b.t != null ? a.t - b.t : a.i - b.i));
+  const rank = new Map<number, number>();
+  sorted.filter((x) => !model.ignoredRows.has(x.i)).forEach((x, k) => rank.set(x.i, k + 1));
   return (
     <Section title="Zuordnung Umfrage ↔ Teilnehmende">
       <label className="st-scope">
@@ -246,13 +254,26 @@ function MatchTable() {
           ))}
         </select>
       </label>
+      <label className="st-check">
+        <input
+          type="checkbox"
+          checked={useTime}
+          onChange={(e) => {
+            study.commit([{ coll: 'settings', id: 'matchTime', data: { on: e.target.checked } }]);
+            logChange(study, `Zuordnung über Zeitabgleich ${e.target.checked ? 'an' : 'aus'}`);
+          }}
+        />
+        zuerst über Zeitabgleich zuordnen (Abgabezeit ↔ Öffnen der Umfrage im Spiel)
+      </label>
       <table className="st-table">
         <thead>
           <tr>
+            <th className="num">Abgabe-Nr.</th>
             <th>Zeile</th>
             <th>Abgabe</th>
             <th>AB/BA</th>
             <th>Teilnehmende</th>
+            <th className="num">Pos.</th>
             <th>Termin (Notizen)</th>
             <th>Gruppe</th>
             <th>Zuordnung</th>
@@ -260,7 +281,7 @@ function MatchTable() {
           </tr>
         </thead>
         <tbody>
-          {tally.rows.map((r, i) => {
+          {sorted.map(({ r, i }) => {
             const p = owner.get(i);
             const ignored = model.ignoredRows.has(i);
             const toggle = () => {
@@ -270,10 +291,12 @@ function MatchTable() {
             };
             return (
               <tr key={i} className={ignored ? 'is-ignored' : !p || p.tallyConflict ? 'is-open' : ''}>
+                <td className="num">{rank.get(i) ?? '–'}</td>
                 <td className="num">{i + 1}</td>
                 <td>{timeCol >= 0 ? r[timeCol] : '–'}</td>
                 <td>{orderCol >= 0 ? r[orderCol] || '–' : '–'}</td>
                 <td>{ignored ? <span className="st-muted">ignoriert</span> : p ? p.id : <span className="st-flag">keine</span>}</td>
+                <td className="num">{p && !ignored ? (model.orderPos.get(p.id) ?? '–') : ''}</td>
                 <td>{p ? (meta[p.id]?.slot ?? '–') : ''}</td>
                 <td>
                   {p ? (p.doc.group ?? p.trackedGroup ?? p.notesGroup ?? '–') : ''}
@@ -290,7 +313,7 @@ function MatchTable() {
           })}
         </tbody>
       </table>
-      <p className="st-note">Eine Zeile ignorieren (Testlauf, doppelte Abgabe) ordnet die übrigen neu zu. Einzelne Personen: auf „Teilnehmende &amp; Sessions“ die Tally-Zeile wählen.</p>
+      <p className="st-note">Nach Abgabezeit sortiert. „Abgabe-Nr.“ und „Pos.“ (Platz der Person in der gewählten Reihenfolge) sind bei der Zuordnung nach Reihenfolge gleich; weichen sie ab, wurde die Zeile anders zugeordnet (siehe „Zuordnung“). Eine Zeile ignorieren (Testlauf, doppelte Abgabe) ordnet die übrigen neu zu. Einzelne Personen: auf „Teilnehmende &amp; Sessions“ die Tally-Zeile wählen.</p>
     </Section>
   );
 }

@@ -2,8 +2,8 @@
 // is empty. In this order, each step only for what is still open:
 //   1. a row chosen by hand (Teilnehmende & Sessions)
 //   2. the id the game sent to the survey (tallyid / test_id)
-//   3. time: the submission 10 min before to 120 min after the participant's
-//      tracked survey start, nearest first
+//   3. time (only when switched on): the submission 10 min before to 120 min
+//      after the participant's tracked survey start, nearest first
 //   4. order: the remaining participants in the order of the notes, paired
 //      with the remaining rows in the order they were submitted
 // A pairing by order is checked against the AB/BA value the survey got.
@@ -36,7 +36,7 @@ export function timeOf(v: string): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-export function matchRows(rows: MatchRow[], persons: MatchPerson[]): Map<string, { row: number; via: MatchVia }> {
+export function matchRows(rows: MatchRow[], persons: MatchPerson[], useTime = false): Map<string, { row: number; via: MatchVia }> {
   const out = new Map<string, { row: number; via: MatchVia }>();
   const taken = new Set<number>();
   const set = (p: string, row: number, via: MatchVia) => {
@@ -53,7 +53,7 @@ export function matchRows(rows: MatchRow[], persons: MatchPerson[]): Map<string,
   }
   // 3. by time, nearest pairs first
   const pairs: { p: string; row: number; gap: number }[] = [];
-  for (const p of open())
+  for (const p of useTime ? open() : [])
     for (const r of rows)
       if (!taken.has(r.row) && !r.id && p.surveyAt && r.submitted && r.submitted >= p.surveyAt - SUBMIT_BEFORE && r.submitted <= p.surveyAt + SUBMIT_AFTER)
         pairs.push({ p: p.id, row: r.row, gap: Math.abs(r.submitted - p.surveyAt) });

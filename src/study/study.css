@@ -933,3 +933,10 @@ body:has(.st-root) {
     display: none;
   }
 }
+.st-figfilter {
+  margin-bottom: 8px;
+  max-width: 100%;
+}
+.st-subfig + .st-subfig {
+  margin-top: 14px;
+}

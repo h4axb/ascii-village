@@ -3,7 +3,8 @@
 // the confirmed tags). Opens on the whole sample.
 import { Bars, SERIES, INK } from '../charts';
 import { distinctPersons, itemsWithRole } from '../model';
-import { part4 } from '../analysis';
+import { part4, type P4Field } from '../analysis';
+import { useState } from 'react';
 import { describe, fmt } from '../stats';
 import { CATEGORY } from '../types';
 import { csv, Empty, Fig, fmtDate, Section, Stat, useCtx } from '../ui';
@@ -93,11 +94,7 @@ export default function Overview() {
               <Empty>Keine abgeschlossenen Durchläufe.</Empty>
             )}
           </Fig>
-          {p4.map((f, i) => (
-            <Fig key={f.label} id="teil4" sub={{ n: i + 1, title: f.label }} table={() => csv([[f.label, 'Anzahl'], ...f.counts])}>
-              <Bars rows={f.counts.map(([v, c]) => ({ label: v, values: [c] }))} />
-            </Fig>
-          ))}
+          {p4.length > 0 && <Profile fields={p4} />}
           <Fig id="kategorien" table={() => csv([['Kategorie', 'Rückmeldungen', 'Teilnehmende'], ...cats.map((c) => [c.label, c.items.length, distinctPersons(c.items)])])}>
             <Bars
               rows={cats.map((c) => ({ label: c.label, values: [c.items.length, distinctPersons(c.items)] }))}
@@ -120,3 +117,51 @@ export default function Overview() {
   );
 }
 
+
+// Teil 4: every question in one figure; the filter shows one question in its place
+function Profile({ fields }: { fields: P4Field[] }) {
+  const [pick, setPick] = useState<string>(() => {
+    try {
+      return localStorage.getItem(PROFILE_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const i = fields.findIndex((f) => f.label === pick);
+  const shown = i >= 0 ? [fields[i]] : fields;
+  const choose = (v: string) => {
+    setPick(v);
+    try {
+      localStorage.setItem(PROFILE_KEY, v);
+    } catch {
+      // (not remembered)
+    }
+  };
+  return (
+    <Fig
+      id="teil4"
+      sub={i >= 0 ? { n: i + 1, title: fields[i].label } : undefined}
+      table={() => csv([['Frage', 'Antwort', 'Anzahl'], ...shown.flatMap((f) => f.counts.map(([v, c]) => [f.label, v, c]))])}
+    >
+      <select className="st-figfilter" value={i >= 0 ? pick : ''} onChange={(e) => choose(e.target.value)} aria-label="Frage">
+        <option value="">Alle Fragen ({fields.length})</option>
+        {fields.map((f) => (
+          <option key={f.label} value={f.label}>
+            {f.label}
+          </option>
+        ))}
+      </select>
+      {shown.map((f) => (
+        <div key={f.label} className="st-subfig">
+          <Bars title={shown.length > 1 ? f.label : undefined} rows={f.counts.map(([v, c]) => ({ label: v, values: [c] }))} />
+          {f.stats && (
+            <p className="st-note">
+              M = {fmt(f.stats.mean, 1)}, SD = {fmt(f.stats.sd, 1)}, Spanne {f.stats.min}–{f.stats.max} (n = {f.n})
+            </p>
+          )}
+        </div>
+      ))}
+    </Fig>
+  );
+}
+const PROFILE_KEY = 'asciia-study-profile';

@@ -45,13 +45,15 @@ export interface BarRow {
   values: number[]; // one per series
   note?: string; // shown after the bar instead of the value
 }
-export function Bars({ rows, series, unit = '', digits = 0, max }: { rows: BarRow[]; series?: { name: string; color: string }[]; unit?: string; digits?: number; max?: number }) {
+// `title`: a heading inside the drawing (kept in the PNG export)
+export function Bars({ rows, series, unit = '', digits = 0, max, title }: { rows: BarRow[]; series?: { name: string; color: string }[]; unit?: string; digits?: number; max?: number; title?: string }) {
   const [ref, w] = useWidth<HTMLDivElement>();
   const ser = series ?? [{ name: '', color: INK }];
   const labelW = Math.min(Math.max(...rows.map((r) => r.label.length), 4) * 7 + 12, w * 0.42);
   const barH = ser.length > 1 ? 11 : 16;
   const rowH = ser.length * (barH + 2) + 12;
-  const top = ser.length > 1 ? 26 : 6;
+  const head = title ? 22 : 0;
+  const top = (ser.length > 1 ? 26 : 6) + head;
   const h = top + rows.length * rowH + 22;
   const top_ = max ?? Math.max(digits ? 0.1 : 1, ...rows.flatMap((r) => r.values));
   const tk = ticks(top_, 4, !digits);
@@ -61,9 +63,14 @@ export function Bars({ rows, series, unit = '', digits = 0, max }: { rows: BarRo
   return (
     <div ref={ref} className="st-chart">
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fontFamily={FONT} role="img">
+        {title && (
+          <text x={0} y={14} fontSize={13} fontWeight={500} fill={INK}>
+            {title}
+          </text>
+        )}
         {ser.length > 1 &&
           ser.map((s, i) => (
-            <g key={s.name} transform={`translate(${labelW + i * 110}, 8)`}>
+            <g key={s.name} transform={`translate(${labelW + i * 110}, ${8 + head})`}>
               <rect width={10} height={10} rx={2} fill={s.color} />
               <text x={15} y={9} fontSize={12} fill={INK}>
                 {s.name}

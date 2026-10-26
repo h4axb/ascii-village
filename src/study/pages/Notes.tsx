@@ -284,7 +284,14 @@ function ItemRow({ item, model, save, remove, fresh }: { item: ItemDoc; model: M
   const origBlock = (
     <div className={view === 'both' ? 'st-orig is-secondary' : 'st-orig'}>
       {view === 'both' && <span className="st-cell-label">Original</span>}
-      {editOrig ? <LazyArea value={item.text} onSave={saveOriginal} autoFocus onDone={() => setEditOrig(false)} placeholder="Neue Aussage …" /> : <p data-notr>{item.text}</p>}
+      {editOrig ? (
+        <>
+          <LazyArea value={item.text} onSave={saveOriginal} autoFocus onDone={() => setEditOrig(false)} placeholder="Neue Aussage …" />
+          {item.text && <div className="st-muted">Korrektur wird protokolliert · neue Zeile teilt die Aussage · Esc: fertig</div>}
+        </>
+      ) : (
+        <p data-notr>{item.text}</p>
+      )}
     </div>
   );
   return (
@@ -300,7 +307,8 @@ function ItemRow({ item, model, save, remove, fresh }: { item: ItemDoc; model: M
           {item.status === 'new' && <span className="st-flag">neu</span>}
         </div>
         {item.question && <div className="st-item-q" data-notr>{item.question}</div>}
-        {view === 'orig' ? origBlock : view === 'de' ? (item.de || editDe ? deBlock : (
+        {/* (while correcting it, the original is shown in every view) */}
+        {view === 'orig' ? origBlock : view === 'de' && !editOrig ? (item.de || editDe ? deBlock : (
           <>
             {origBlock}
             {deBlock}
@@ -365,7 +373,7 @@ function ItemRow({ item, model, save, remove, fresh }: { item: ItemDoc; model: M
         <button type="button" onClick={() => setEditDe(true)} title="Deutsche Fassung bearbeiten">
           Deutsch bearbeiten
         </button>
-        <button type="button" onClick={() => confirm('Die Originalnotiz ändern? Die Änderung wird mit altem und neuem Wortlaut protokolliert. (Neue Zeile: Aussage teilen)') && setEditOrig(true)} title="Original korrigieren (protokolliert)">
+        <button type="button" onClick={() => setEditOrig(true)} title="Original korrigieren: wird mit altem und neuem Wortlaut protokolliert; neue Zeile teilt die Aussage">
           Original korrigieren
         </button>
         <button type="button" onClick={() => confirm('Aussage löschen?') && remove(item)} title="Löschen">

@@ -406,6 +406,8 @@ const EN: Record<string, string> = {
   'Alle bestätigen': 'Confirm all',
   'Neue Aussage': 'New statement',
   'Neue Aussage …': 'New statement …',
+  'Original korrigieren: wird mit altem und neuem Wortlaut protokolliert; neue Zeile teilt die Aussage': 'Correct the original: logged with the old and new wording; a new line splits the statement',
+  'Korrektur wird protokolliert · neue Zeile teilt die Aussage · Esc: fertig': 'The correction is logged · a new line splits the statement · Esc: done',
   '+ Aussage': '+ Statement',
   Essenziell: 'Essential',
   'Offen (t.b.d.)': 'Open (t.b.d.)',

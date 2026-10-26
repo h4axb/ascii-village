@@ -22,3 +22,4 @@ project settings
 # the local stand-in for Cloudflare D1 under pnpm dev / vite preview (vite.config.ts)
 .dev-d1.sqlite
 dist-review
+package-lock.json

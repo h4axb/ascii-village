@@ -10,6 +10,10 @@ import './styles.css';
 const Dashboard = import.meta.env.VITE_APP_MODE === 'review' ? () => null : lazy(() => import('./feedback/Dashboard'));
 // (never in the review build: review.ts)
 const DASHBOARD = import.meta.env.VITE_APP_MODE !== 'review' && /^\/2\/feedback\/?$/.test(window.location.pathname);
+// /feedback is the user test's evaluation for the thesis (src/study/), also
+// on demand and never in the review build
+const StudyApp = import.meta.env.VITE_APP_MODE === 'review' ? () => null : lazy(() => import('./study/StudyApp'));
+const STUDY = import.meta.env.VITE_APP_MODE !== 'review' && /^\/feedback\/?$/.test(window.location.pathname);
 
 const rootEl = document.getElementById('root')!;
 
@@ -18,7 +22,11 @@ function mount(font: FontLoad) {
   document.documentElement.dataset.font = font;
   rootEl.replaceChildren();
   createRoot(rootEl).render(
-    DASHBOARD ? (
+    STUDY ? (
+      <Suspense fallback={null}>
+        <StudyApp />
+      </Suspense>
+    ) : DASHBOARD ? (
       <Suspense fallback={null}>
         <Dashboard />
       </Suspense>
@@ -41,6 +49,7 @@ function mount(font: FontLoad) {
 // and glyph atlas uses it. If it fails: say so and offer a retry, or play
 // with the emergency fallback (styles.css "Game Fallback …").
 async function start() {
+  if (STUDY) return mount('ok');
   if (DASHBOARD) return mount(await loadGameFont());
   rootEl.innerHTML = '<div class="font-gate"><p>loading…</p></div>';
   const r = await loadGameFont();

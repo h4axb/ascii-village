@@ -1,0 +1,103 @@
+// Shared pieces of the /feedback pages: the context every page reads (model,
+// scope, saving), figure numbering and captions, small layout parts.
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import type { Model, Scope, Slice } from './model';
+import type { Study } from './store';
+import { Figure } from './charts';
+
+export interface Ctx {
+  study: Study;
+  model: Model;
+  scope: Scope;
+  slice: Slice;
+}
+export const StudyCtx = createContext<Ctx | null>(null);
+export const useCtx = () => useContext(StudyCtx)!;
+
+// every figure in page order: its number is its place here, so numbers stay
+// the same whatever the data or filter
+export const FIGURES: { id: string; title: string; caption: string }[] = [
+  // Übersicht
+  { id: 'alter', title: 'Alter', caption: 'Altersverteilung der Teilnehmenden.' },
+  { id: 'gruppe', title: 'Testgruppe', caption: 'Verteilung der Teilnehmenden auf die Testreihenfolgen AB und BA.' },
+  { id: 'laufzeit', title: 'Bearbeitungsdauer', caption: 'Bearbeitungsdauer je Teilnehmenden in Minuten.' },
+  { id: 'teil4', title: 'Angaben zur Person', caption: 'Angaben der Teilnehmenden (Umfrage, Teil 4).' },
+  { id: 'kategorien', title: 'Rückmeldungen nach Kategorie', caption: 'Anzahl der Rückmeldungen je Kategorie und Anzahl der Teilnehmenden, die sie äußerten.' },
+  // Quantitative Analyse
+  { id: 'teil1', title: 'Teil 1: Direkter Vergleich', caption: 'Bevorzugte Variante je Frage im direkten Vergleich.' },
+  { id: 'teil2', title: 'Teil 2: Likert-Skala', caption: 'Antwortverteilung der Likert-Items je Variante.' },
+  { id: 'teil3', title: 'Teil 3: UEQ-S', caption: 'UEQ-S-Skalenmittelwerte (−3 bis +3) je Variante mit 95 %-Konfidenzintervall.' },
+  { id: 'teil3items', title: 'Teil 3: UEQ-S-Items', caption: 'Mittelwerte der einzelnen UEQ-S-Items je Variante.' },
+  { id: 'crafts', title: 'Crafting-Vorgänge je Variante', caption: 'Abgeschlossene Crafting-Vorgänge, Überarbeitungen und Ersatzergebnisse je Variante.' },
+  { id: 'votes', title: 'Bewertung der Ergebnisse', caption: 'Bewertungen der erzeugten Ergebnisse je Variante.' },
+  { id: 'spielfragen', title: 'Bewertung im Spiel', caption: 'Mittelwerte der Bewertungsfragen im Spiel (1–5) je Variante mit 95 %-Konfidenzintervall.' },
+  { id: 'praeferenzen', title: 'Präferenzen in Variante B', caption: 'Gewählte Einstellungen in den Präferenzfragen von Variante B.' },
+  // Qualitatives Feedback
+  { id: 'befunde', title: 'Wiederkehrende Befunde', caption: 'Wiederkehrende Befunde nach Anzahl der Teilnehmenden.' },
+];
+// (Teil 4 has one figure per field: 13.1, 13.2, …)
+export const figNumber = (id: string) => FIGURES.findIndex((f) => f.id === id) + 1;
+
+export function Fig({ id, sub, title, children, table }: { id: string; sub?: { n: number; title: string }; title?: string; children: ReactNode; table?: () => string }) {
+  const { study } = useCtx();
+  const f = FIGURES.find((x) => x.id === id)!;
+  const key = sub ? `${id}.${sub.n}` : id;
+  const stored = (study.docs.captions[key] as { caption?: string } | undefined)?.caption;
+  const caption = stored ?? (sub ? `${f.caption.replace(/\.$/, '')}: ${sub.title}.` : f.caption);
+  const n = figNumber(id);
+  return (
+    <Figure
+      n={sub ? `${n}.${sub.n}` : n}
+      title={title ?? (sub ? `${f.title}: ${sub.title}` : f.title)}
+      caption={caption}
+      onCaption={(c) => study.commit([{ coll: 'captions', id: key, data: { caption: c } }])}
+      table={table}
+    >
+      {children}
+    </Figure>
+  );
+}
+
+export function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
+  return (
+    <section className="st-section" id={id}>
+      <h2>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
+  return (
+    <div className="st-stat">
+      <div className="st-stat-label">{label}</div>
+      <div className="st-stat-value">{value}</div>
+      {sub != null && <div className="st-stat-sub">{sub}</div>}
+    </div>
+  );
+}
+
+export const Empty = ({ children }: { children: ReactNode }) => <p className="st-empty">{children}</p>;
+
+export const csv = (rows: (string | number | null | undefined)[][]) =>
+  rows.map((r) => r.map((c) => (c == null ? '' : /[;"\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c))).join(';')).join('\n');
+
+export const fmtDate = (t: number | null | undefined) => (t ? new Date(t).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–');
+export const fmtMin = (m: number | null | undefined) => (m == null ? '–' : `${Math.floor(m)}:${String(Math.round((m % 1) * 60)).padStart(2, '0')} min`);
+
+// a text field saved when it loses focus (not on every key)
+export function LazyInput({ value, onSave, ...rest }: { value: string; onSave: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return <input {...rest} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => draft !== value && onSave(draft)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />;
+}
+
+// the change log (Daten & Validierung): imports and corrections, newest first
+export interface LogEntry {
+  at: number;
+  what: string;
+}
+export function logChange(study: Study, what: string) {
+  const old = ((study.latest().settings.log as { entries?: LogEntry[] } | undefined)?.entries ?? []).slice(0, 299);
+  study.commit([{ coll: 'settings', id: 'log', data: { entries: [{ at: Date.now(), what }, ...old] } }]);
+}

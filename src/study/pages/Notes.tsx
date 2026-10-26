@@ -1,0 +1,597 @@
+// Notizen: the session notes as single statements with tag chips. The AI
+// suggests chips (shown hollow); only chips confirmed here count anywhere.
+// Also: the notes import, the priority view, the tag editor, and the lists
+// of the Übersicht.
+import { useMemo, useState } from 'react';
+import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } from '../types';
+import { CATEGORY, SECTION_LABEL } from '../types';
+import { distinctPersons, itemsWithRole, type Model } from '../model';
+import { linkLabelOf, mergeStatements, parseNotes } from '../notes';
+import { Empty, logChange, Section, useCtx, type Ctx } from '../ui';
+
+// ---- chip logic ----
+const groupOfChip = (tags: TagGroup[], chip: string) => tags.find((g) => g.chips.some((c) => c.id === chip));
+export function toggleChip(item: ItemDoc, g: TagGroup, chip: string): ItemDoc {
+  const inGroup = new Set(g.chips.map((c) => c.id));
+  if (item.chips.includes(chip)) return { ...item, chips: item.chips.filter((c) => c !== chip) };
+  const chips = g.multi ? [...item.chips, chip] : [...item.chips.filter((c) => !inGroup.has(c)), chip];
+  const suggested = g.multi ? item.suggested.filter((c) => c !== chip) : item.suggested.filter((c) => !inGroup.has(c));
+  return { ...item, chips, suggested };
+}
+export function confirmItem(item: ItemDoc, tags: TagGroup[]): ItemDoc {
+  let chips = [...item.chips];
+  for (const s of item.suggested) {
+    const g = groupOfChip(tags, s);
+    if (!g || chips.includes(s)) continue;
+    if (!g.multi && chips.some((c) => g.chips.some((x) => x.id === c))) continue; // a choice already made stays
+    chips.push(s);
+  }
+  chips = chips.filter((c) => groupOfChip(tags, c));
+  return { ...item, chips, suggested: [], finding: item.finding ?? item.suggestedFinding ?? null, suggestedFinding: null, confirmed: true, status: item.status === 'removed' ? 'removed' : undefined };
+}
+
+// ---- AI suggestions ----
+export async function suggestFor(ctx: Ctx, items: ItemDoc[], onProgress?: (done: number, all: number) => void) {
+  const { study, model } = ctx;
+  const groups = model.tags.map((g) => ({ id: g.id, name: g.name, multi: g.multi, chips: g.chips.filter((c) => c.role !== 'rejected').map((c) => ({ id: c.id, label: c.label })) })).filter((g) => g.chips.length);
+  const findings = Object.values(study.docs.findings).map((f) => ({ id: f.id, name: f.name }));
+  const chipIds = new Set(groups.flatMap((g) => g.chips.map((c) => c.id)));
+  const findingIds = new Set(findings.map((f) => f.id));
+  const byId = new Map(items.map((i) => [i.id, i]));
+  let done = 0;
+  for (let i = 0; i < items.length; i += 25) {
+    const batch = items.slice(i, i + 25);
+    const out = (await study.suggest({ items: batch.map((x) => ({ id: x.id, text: x.text, section: SECTION_LABEL[x.section], question: x.question })), groups, findings })) as {
+      id?: string;
+      chips?: Record<string, string[]>;
+      finding?: string | null;
+      newFinding?: string | null;
+    }[];
+    const put: ItemDoc[] = [];
+    for (const s of out) {
+      const it = s.id ? byId.get(s.id) : undefined;
+      if (!it) continue;
+      const sug: string[] = [];
+      for (const g of groups) {
+        const picked = (s.chips?.[g.id] ?? []).filter((c) => chipIds.has(c) && g.chips.some((x) => x.id === c));
+        sug.push(...(g.multi ? picked : picked.slice(0, 1)));
+      }
+      put.push({
+        ...it,
+        suggested: sug.filter((c) => !it.chips.includes(c)),
+        suggestedFinding: s.finding && findingIds.has(s.finding) && s.finding !== it.finding ? s.finding : null,
+        suggestedNewFinding: !s.finding && s.newFinding ? String(s.newFinding).slice(0, 120) : null,
+      });
+    }
+    if (put.length) study.commit(put.map((p) => ({ coll: 'items', id: p.id, data: p })));
+    done += batch.length;
+    onProgress?.(done, items.length);
+  }
+}
+
+// ---- import ----
+export function NotesImport() {
+  const ctx = useCtx();
+  const { study, model } = ctx;
+  const [text, setText] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const notes = study.docs.notes.main;
+
+  async function run(src: string, file?: string) {
+    const parsed = parseNotes(src);
+    if (!parsed.meta.length) return setMsg('Keine Teilnehmenden gefunden (jeder Block beginnt mit der P-ID, z. B. „P001“).');
+    const metas: Record<string, NotesMeta> = { ...((study.docs.settings.notesMeta ?? {}) as Record<string, NotesMeta>) };
+    for (const m of parsed.meta) {
+      const prev = metas[m.id];
+      metas[m.id] = { ...m, link: m.link || prev?.link || '' };
+    }
+    // the header's link names which of a person's links the block is about
+    for (const s of parsed.statements) {
+      const meta = parsed.meta.find((m) => m.id === s.person);
+      if (!s.link && meta) s.link = linkLabelOf(meta, model);
+    }
+    const r = mergeStatements(parsed.statements, Object.values(study.docs.items), new Set(parsed.meta.map((m) => m.id)));
+    study.commit([
+      { coll: 'notes', id: 'main', data: { text: src, importedAt: Date.now(), file } },
+      { coll: 'settings', id: 'notesMeta', data: metas },
+      ...r.put.map((p) => ({ coll: 'items' as const, id: p.id, data: p })),
+    ]);
+    const summary = `${parsed.meta.length} Teilnehmende, ${parsed.statements.length} Aussagen: ${r.kept} unverändert, ${r.changed} geändert, ${r.added} neu, ${r.removed} entfernt`;
+    setMsg(`${summary}.`);
+    logChange(study, `Notizen-Import${file ? ` (${file})` : ''}: ${summary}`);
+    // suggestions for what is new or changed
+    const todo = r.put.filter((p) => (p.status === 'new' || p.status === 'changed' || !p.chips.length) && p.status !== 'removed' && !p.confirmed);
+    if (todo.length) {
+      setBusy(true);
+      try {
+        await suggestFor(ctx, todo, (d, a) => setMsg(`KI-Vorschläge: ${d} von ${a} …`));
+        setMsg((m) => `${m?.startsWith('KI') ? '' : `${m} `}KI-Vorschläge für ${todo.length} Aussagen erstellt. Bitte unter „Notizen“ prüfen.`);
+      } catch (e) {
+        setMsg(`Import fertig; KI-Vorschläge nicht verfügbar (${String((e as Error).message)}).`);
+      } finally {
+        setBusy(false);
+      }
+    }
+  }
+
+  return (
+    <Section title="Import: Notizen">
+      <div className="st-toolbar">
+        <label className="st-file">
+          Datei wählen (.md, .txt)
+          <input
+            type="file"
+            accept=".md,.txt,text/plain,text/markdown"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void f.text().then((t) => run(t, f.name));
+            }}
+          />
+        </label>
+        {notes && <span className="st-muted">{`${notes.file ?? 'eingefügt'} · ${new Date(notes.importedAt).toLocaleString('de-DE')}`}</span>}
+      </div>
+      <textarea className="st-paste" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'P001\nName\nLink\nZeitfenster\nAB\n## During Usertesting\n- …\n## Follow-up\n- Frage?\n  - Antwort …'} />
+      <div className="st-toolbar">
+        <button type="button" disabled={!text.trim() || busy} onClick={() => void run(text)}>
+          Einlesen
+        </button>
+        <TallyFreeText />
+      </div>
+      {msg && <p className="st-note">{msg}</p>}
+    </Section>
+  );
+}
+
+// the Tally free-text answers as statements (section "Umfrage")
+function TallyFreeText() {
+  const { study, model } = useCtx();
+  const cols = model.mapping.map((m, j) => (m.role === 'text' ? { j, label: m.label } : null)).filter((x): x is { j: number; label: string } => !!x);
+  if (!cols.length) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const put: ItemDoc[] = [];
+        for (const r of model.survey) {
+          if (!r.person) continue;
+          for (const c of cols) {
+            const text = r.text[c.label];
+            if (!text) continue;
+            const id = `s-${r.person}-${c.j}`;
+            const old = study.docs.items[id];
+            if (old && old.text === text) continue;
+            put.push(old ? { ...old, text, status: 'changed', confirmed: false } : { id, person: r.person, section: 'survey', question: c.label, text, order: 1000 + c.j, chips: [], suggested: [] });
+          }
+        }
+        study.commit(put.map((p) => ({ coll: 'items', id: p.id, data: p })));
+      }}
+    >
+      Tally-Freitexte übernehmen
+    </button>
+  );
+}
+
+// ---- one statement, Excel-like: text | a cell of chips per tag group | finding ----
+function ChipCell({ item, g, onChange, labelOnly }: { item: ItemDoc; g: TagGroup; onChange: (i: ItemDoc) => void; labelOnly?: boolean }) {
+  const shown = g.multi || g.chips.length > 5 ? g.chips.filter((c) => item.chips.includes(c.id) || item.suggested.includes(c.id)) : g.chips;
+  const rest = g.chips.filter((c) => !shown.includes(c));
+  return (
+    <div className="st-cell" data-group={g.id}>
+      {labelOnly && <span className="st-cell-label">{g.name}</span>}
+      {shown.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          className={`st-chip${item.chips.includes(c.id) ? ' is-on' : item.suggested.includes(c.id) ? ' is-suggested' : ''}`}
+          title={item.suggested.includes(c.id) ? 'Vorschlag: klicken zum Bestätigen' : undefined}
+          onClick={() => onChange(toggleChip(item, g, c.id))}
+        >
+          {c.label}
+        </button>
+      ))}
+      {rest.length > 0 && (
+        <select className="st-chip-add" value="" onChange={(e) => e.target.value && onChange(toggleChip(item, g, e.target.value))} aria-label={`${g.name} hinzufügen`}>
+          <option value="">+</option>
+          {rest.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
+function ItemRow({ item, model, save, remove }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void }) {
+  const { study } = useCtx();
+  const [edit, setEdit] = useState(false);
+  const [draft, setDraft] = useState(item.text);
+  const findings = Object.values(study.docs.findings).sort((a, b) => a.name.localeCompare(b.name));
+  const sf = item.suggestedFinding ? study.docs.findings[item.suggestedFinding] : null;
+  const open = item.suggested.length > 0 || !!item.suggestedFinding;
+  const finishEdit = () => {
+    setEdit(false);
+    const parts = draft
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!parts.length || (parts.length === 1 && parts[0] === item.text)) return;
+    // more lines: the statement is split; the first keeps its tags
+    save({ ...item, text: parts[0] });
+    parts.slice(1).forEach((t, i) => save({ ...item, id: `${item.id}-${Date.now().toString(36)}${i}`, text: t, order: item.order + (i + 1) / 100, chips: [...item.chips], suggested: [], manual: true }));
+  };
+  return (
+    <div className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}`}>
+      <div className="st-item-text">
+        <div className="st-item-meta">
+          <span>{SECTION_LABEL[item.section]}</span>
+          {item.link && <span>{item.link}</span>}
+          {item.status === 'changed' && <span className="st-flag">geändert – prüfen</span>}
+          {item.status === 'new' && <span className="st-flag">neu</span>}
+        </div>
+        {item.question && <div className="st-item-q">{item.question}</div>}
+        {edit ? (
+          <textarea autoFocus value={draft} rows={Math.max(2, Math.ceil(draft.length / 60))} onChange={(e) => setDraft(e.target.value)} onBlur={finishEdit} onKeyDown={(e) => e.key === 'Escape' && setEdit(false)} />
+        ) : (
+          <p onDoubleClick={() => setEdit(true)}>{item.text}</p>
+        )}
+      </div>
+      <div className="st-item-chips">
+        {model.tags.map((g) => (
+          <ChipCell key={g.id} item={item} g={g} onChange={save} labelOnly />
+        ))}
+        <div className="st-cell">
+          <span className="st-cell-label">Befund</span>
+          {sf && (
+            <button type="button" className="st-chip is-suggested" title="Vorschlag: klicken zum Bestätigen" onClick={() => save({ ...item, finding: sf.id, suggestedFinding: null })}>
+              {sf.name}
+            </button>
+          )}
+          {!sf && item.suggestedNewFinding && !item.finding && <span className="st-chip is-suggested is-new" title="neuer Befund vorgeschlagen (unter „Befunde“ anlegen)">{item.suggestedNewFinding}</span>}
+          <select value={item.finding ?? ''} onChange={(e) => save({ ...item, finding: e.target.value || null, suggestedFinding: null })} aria-label="Befund">
+            <option value="">–</option>
+            {findings.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="st-item-actions">
+        <button type="button" className={item.confirmed && !open ? 'is-on' : ''} onClick={() => save(confirmItem(item, model.tags))} title="Vorschläge übernehmen und als geprüft markieren">
+          {item.confirmed && !open ? 'Geprüft' : open ? 'Bestätigen' : 'Geprüft?'}
+        </button>
+        <button type="button" onClick={() => setEdit(true)} title="Bearbeiten (neue Zeile: Aussage teilen)">
+          Bearbeiten
+        </button>
+        <button type="button" onClick={() => confirm('Aussage löschen?') && remove(item)} title="Löschen">
+          Löschen
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---- the page ----
+export default function Notes() {
+  const ctx = useCtx();
+  const { study, model, scope } = ctx;
+  const [filter, setFilter] = useState<'all' | 'open' | 'changed'>('all');
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const metas = (study.docs.settings.notesMeta ?? {}) as Record<string, NotesMeta>;
+  const save = (i: ItemDoc) => study.commit([{ coll: 'items', id: i.id, data: i }]);
+  const remove = (i: ItemDoc) => study.commit([], [{ coll: 'items', id: i.id }]);
+
+  const scoped = useMemo(() => {
+    const ids = scope.kind === 'all' ? null : scope.id;
+    return model.allItems.filter((i) => (!ids || i.person === ids) && (scope.kind !== 'link' || !i.link || i.link === scope.id));
+  }, [model.allItems, scope]);
+  const removed = scoped.filter((i) => i.status === 'removed');
+  const live = scoped.filter((i) => i.status !== 'removed');
+  const shown = live.filter(
+    (i) =>
+      (filter === 'all' || (filter === 'open' ? !i.confirmed || i.suggested.length > 0 : i.status === 'changed' || i.status === 'new')) &&
+      (!q || i.text.toLowerCase().includes(q.toLowerCase())),
+  );
+  const byPerson = [...new Set(shown.map((i) => i.person))].sort();
+  const open = live.filter((i) => !i.confirmed);
+
+  async function suggestOpen() {
+    setBusy('KI-Vorschläge …');
+    try {
+      await suggestFor(ctx, open, (d, a) => setBusy(`KI-Vorschläge: ${d} von ${a} …`));
+      setBusy(null);
+    } catch (e) {
+      setBusy(`KI nicht verfügbar: ${String((e as Error).message)}`);
+    }
+  }
+
+  if (!model.allItems.length) return <Empty>Noch keine Notizen. Unter „Import“ einlesen.</Empty>;
+  return (
+    <>
+      <div className="st-toolbar">
+        <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Anzeige">
+          <option value="all">Alle Aussagen ({live.length})</option>
+          <option value="open">Ungeprüft ({open.length})</option>
+          <option value="changed">Geändert / neu ({live.filter((i) => i.status).length})</option>
+        </select>
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Suchen" />
+        <button type="button" disabled={!open.length || !!busy?.endsWith('…')} onClick={() => void suggestOpen()}>
+          KI-Vorschläge für ungeprüfte
+        </button>
+        {busy && <span className="st-muted">{busy}</span>}
+      </div>
+
+      {removed.length > 0 && (
+        <div className="st-removed">
+          <h3>In der neuen Fassung nicht mehr enthalten ({removed.length})</h3>
+          {removed.map((i) => (
+            <div key={i.id} className="st-removed-row">
+              <span className="st-pid">{i.person}</span> <span>{i.text}</span>
+              <button type="button" onClick={() => remove(i)}>
+                Löschen
+              </button>
+              <button type="button" onClick={() => save({ ...i, status: undefined, manual: true })}>
+                Behalten
+              </button>
+            </div>
+          ))}
+          <button type="button" onClick={() => study.commit([], removed.map((i) => ({ coll: 'items' as const, id: i.id })))}>
+            Alle löschen
+          </button>
+        </div>
+      )}
+
+      {byPerson.map((pid) => {
+        const meta = metas[pid];
+        const mine = shown.filter((i) => i.person === pid).sort((a, b) => sectionRank(a.section) - sectionRank(b.section) || a.order - b.order);
+        const person = model.persons.find((p) => p.id === pid);
+        return (
+          <section key={pid} className="st-section st-notes-person">
+            <header className="st-notes-head">
+              <h2>{pid}</h2>
+              {meta?.name && <span className="st-name">{meta.name}</span>}
+              {meta?.link && <span className="st-muted">{meta.link}</span>}
+              {meta?.slot && <span className="st-muted">{meta.slot}</span>}
+              {meta?.group && <span className="st-muted">Gruppe {meta.group}</span>}
+              {person?.groupMismatch && <span className="st-flag">Tracking: {person.trackedGroup}</span>}
+              {person?.excluded && <span className="st-flag">ausgeschlossen</span>}
+              <button type="button" onClick={() => study.commit(mine.map((i) => ({ coll: 'items' as const, id: i.id, data: confirmItem(i, model.tags) })))}>
+                Alle bestätigen
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = `m-${pid}-${Date.now().toString(36)}`;
+                  save({ id, person: pid, section: 'during', text: 'Neue Aussage', order: 999, chips: [], suggested: [], manual: true });
+                }}
+              >
+                + Aussage
+              </button>
+            </header>
+            {mine.map((i) => (
+              <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} />
+            ))}
+          </section>
+        );
+      })}
+    </>
+  );
+}
+const sectionRank = (s: Sec) => ({ during: 0, followup: 1, survey: 2 })[s];
+
+// ---- Nach Priorität ----
+export function Priority() {
+  const { model, slice } = useCtx();
+  const roles: [ChipRole, string][] = [
+    ['essential', 'Essenziell'],
+    ['tbd', 'Offen (t.b.d.)'],
+    ['nice', 'Nice-to-have'],
+  ];
+  const none = slice.items.filter((i) => !i.chips.some((c) => ['essential', 'tbd', 'nice'].includes(model.chipRole.get(c) ?? '')));
+  return (
+    <div className="st-columns">
+      {roles.map(([role, name]) => {
+        const items = itemsWithRole(slice.items, model, role);
+        return (
+          <section key={role} className="st-section">
+            <h2>
+              {name} <span className="st-muted">{items.length}</span>
+            </h2>
+            <ItemList items={items} model={model} />
+          </section>
+        );
+      })}
+      {none.length > 0 && (
+        <section className="st-section">
+          <h2>
+            Ohne Priorität <span className="st-muted">{none.length}</span>
+          </h2>
+          <ItemList items={none} model={model} />
+        </section>
+      )}
+    </div>
+  );
+}
+
+function ItemList({ items, model }: { items: ItemDoc[]; model: Model }) {
+  const { study } = useCtx();
+  if (!items.length) return <Empty>Keine.</Empty>;
+  return (
+    <ul className="st-list">
+      {items.map((i) => (
+        <li key={i.id}>
+          <span className="st-pid">{i.link ?? i.person}</span> {i.text}
+          <span className="st-tags">
+            {i.chips
+              .filter((c) => !['essential', 'tbd', 'nice'].includes(model.chipRole.get(c) ?? ''))
+              .map((c) => model.chipLabel.get(c))
+              .filter(Boolean)
+              .join(' · ')}
+            {i.finding && study.docs.findings[i.finding] ? ` · ${study.docs.findings[i.finding].name}` : ''}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// ---- Tags: groups and chips, editable ----
+export function Tags() {
+  const { study, model } = useCtx();
+  const saveGroup = (g: TagGroup) => study.commit([{ coll: 'tags', id: g.id, data: g }]);
+  // a deleted chip leaves every statement
+  const dropChips = (ids: string[]) =>
+    model.allItems
+      .filter((i) => i.chips.some((c) => ids.includes(c)) || i.suggested.some((c) => ids.includes(c)))
+      .map((i) => ({ coll: 'items' as const, id: i.id, data: { ...i, chips: i.chips.filter((c) => !ids.includes(c)), suggested: i.suggested.filter((c) => !ids.includes(c)) } }));
+  const uses = (id: string) => model.allItems.filter((i) => i.chips.includes(id)).length;
+  const ROLES: [ChipRole | '', string][] = [
+    ['', '–'],
+    ['game', 'Bereich: Spiel'],
+    ['survey', 'Bereich: Umfrage'],
+    ['process', 'Bereich: Ablauf'],
+    ['problem', 'Art: Problem'],
+    ['positive', 'Art: Positiv'],
+    ['surprise', 'Art: Überraschung'],
+    ['remark', 'Art: Anmerkung'],
+    ['essential', 'Priorität: essenziell'],
+    ['tbd', 'Priorität: offen'],
+    ['nice', 'Priorität: nice-to-have'],
+    ['rejected', 'verworfen (zählt nicht)'],
+  ];
+  const slug = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'tag';
+  return (
+    <>
+      {model.tags.map((g) => (
+        <section key={g.id} className="st-section st-taggroup">
+          <header className="st-notes-head">
+            <input className="st-groupname" defaultValue={g.name} onBlur={(e) => e.target.value !== g.name && saveGroup({ ...g, name: e.target.value })} aria-label="Name der Kategorie" />
+            <label className="st-check">
+              <input type="checkbox" checked={g.multi} onChange={(e) => saveGroup({ ...g, multi: e.target.checked })} />
+              mehrere je Aussage
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirm(`Kategorie „${g.name}“ mit allen Tags löschen? Die Tags werden von allen Aussagen entfernt.`)) return;
+                study.commit(dropChips(g.chips.map((c) => c.id)), [{ coll: 'tags', id: g.id }]);
+              }}
+            >
+              Kategorie löschen
+            </button>
+          </header>
+          <div className="st-chipedit">
+            {g.chips.map((c: Chip) => (
+              <div key={c.id} className="st-chipedit-row">
+                <input defaultValue={c.label} onBlur={(e) => e.target.value !== c.label && saveGroup({ ...g, chips: g.chips.map((x) => (x.id === c.id ? { ...x, label: e.target.value } : x)) })} aria-label="Tag" />
+                <select value={c.role ?? ''} onChange={(e) => saveGroup({ ...g, chips: g.chips.map((x) => (x.id === c.id ? { ...x, role: (e.target.value || undefined) as ChipRole } : x)) })} aria-label="Bedeutung">
+                  {ROLES.map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+                <span className="st-muted">{uses(c.id)}×</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (uses(c.id) && !confirm(`„${c.label}“ von ${uses(c.id)} Aussagen entfernen?`)) return;
+                    study.commit([{ coll: 'tags', id: g.id, data: { ...g, chips: g.chips.filter((x) => x.id !== c.id) } }, ...dropChips([c.id])]);
+                  }}
+                >
+                  Löschen
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                const label = prompt('Neuer Tag');
+                if (!label?.trim()) return;
+                let id = slug(label);
+                while (model.chipLabel.has(id)) id += '-2';
+                saveGroup({ ...g, chips: [...g.chips, { id, label: label.trim() }] });
+              }}
+            >
+              + Tag
+            </button>
+          </div>
+        </section>
+      ))}
+      <button
+        type="button"
+        onClick={() => {
+          const name = prompt('Neue Kategorie');
+          if (!name?.trim()) return;
+          let id = slug(name);
+          while (study.docs.tags[id]) id += '-2';
+          saveGroup({ id, name: name.trim(), multi: true, order: model.tags.length, chips: [] });
+        }}
+      >
+        + Kategorie
+      </button>
+    </>
+  );
+}
+
+// ---- the Übersicht's lists: essential problems, positive, unexpected ----
+export function FeedbackLists() {
+  const { model, slice, study } = useCtx();
+  const total = model.included.length;
+  const block = (role: ChipRole, title: string) => {
+    const items = itemsWithRole(slice.items, model, role);
+    const groups = new Map<string, ItemDoc[]>();
+    for (const i of items) {
+      const k = i.finding && study.docs.findings[i.finding] ? `f:${i.finding}` : `i:${i.id}`;
+      groups.set(k, [...(groups.get(k) ?? []), i]);
+    }
+    const rows = [...groups].map(([k, list]) => ({ k, title: k.startsWith('f:') ? study.docs.findings[k.slice(2)].name : list[0].text, list, persons: distinctPersons(list) })).sort((a, b) => b.persons - a.persons || a.title.localeCompare(b.title));
+    return (
+      <Section key={role} title={`${title} (${items.length})`}>
+        {rows.length ? (
+          <ol className="st-findings">
+            {rows.map((r) => (
+              <li key={r.k}>
+                <div className="st-finding-head">
+                  <span className="st-finding-title">{r.title}</span>
+                  <span className="st-muted">
+                    {r.persons}/{total} · {[...new Set(r.list.map((i) => i.person))].sort().join(', ')}
+                  </span>
+                </div>
+                {r.k.startsWith('f:') && (
+                  <ul className="st-quotes-inline">
+                    {r.list.map((i) => (
+                      <li key={i.id}>
+                        <span className="st-pid">{i.link ?? i.person}</span> {i.text}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <Empty>Keine bestätigten Einträge.</Empty>
+        )}
+      </Section>
+    );
+  };
+  return (
+    <>
+      {block('essential', CATEGORY.essential)}
+      {block('positive', CATEGORY.positive)}
+      {block('surprise', CATEGORY.surprise)}
+    </>
+  );
+}

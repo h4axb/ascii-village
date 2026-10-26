@@ -1,0 +1,390 @@
+// The figures of /feedback: plain SVG, drawn at the width they get (so
+// labels stay readable on a phone), greyscale with one accent. Every figure
+// sits in a <Figure> with its number, an editable caption, and a PNG export
+// (the figure with its caption below, 2400 px wide, white) for Word.
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+
+export const INK = '#1d1d1b';
+export const MUTED = '#6b6b66';
+export const GRID = '#e4e3de';
+export const SERIES = { A: '#4b4b48', B: '#c2571a' } as const; // variant A grey, B the accent
+export const NEUTRAL = '#bdbcb5';
+const FONT = "'IBM Plex Sans', Arial, sans-serif";
+
+function useWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
+  const ref = useRef<T>(null);
+  const [w, setW] = useState(600);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setW(Math.max(260, Math.floor(el.clientWidth))));
+    ro.observe(el);
+    setW(Math.max(260, Math.floor(el.clientWidth)));
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w];
+}
+
+const nf = (x: number, d = 0) => (Number.isFinite(x) ? x.toFixed(d).replace('.', ',') : '–');
+
+// a nice axis maximum and its ticks
+function ticks(max: number, count = 4, integer = false): number[] {
+  if (max <= 0) return [0, 1];
+  const raw = integer ? Math.max(1, max / count) : max / count;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((s) => s * mag).find((s) => s >= raw && (!integer || Number.isInteger(s))) ?? raw;
+  const out: number[] = [];
+  for (let v = 0; v <= max + step * 0.001; v += step) out.push(Math.round(v * 1e6) / 1e6);
+  if (out[out.length - 1] < max) out.push(out[out.length - 1] + step);
+  return out;
+}
+
+// ---- horizontal bars, one or two series (A/B) ----
+export interface BarRow {
+  label: string;
+  values: number[]; // one per series
+  note?: string; // shown after the bar instead of the value
+}
+export function Bars({ rows, series, unit = '', digits = 0, max }: { rows: BarRow[]; series?: { name: string; color: string }[]; unit?: string; digits?: number; max?: number }) {
+  const [ref, w] = useWidth<HTMLDivElement>();
+  const ser = series ?? [{ name: '', color: INK }];
+  const labelW = Math.min(Math.max(...rows.map((r) => r.label.length), 4) * 7 + 12, w * 0.42);
+  const barH = ser.length > 1 ? 11 : 16;
+  const rowH = ser.length * (barH + 2) + 12;
+  const top = ser.length > 1 ? 26 : 6;
+  const h = top + rows.length * rowH + 22;
+  const top_ = max ?? Math.max(digits ? 0.1 : 1, ...rows.flatMap((r) => r.values));
+  const tk = ticks(top_, 4, !digits);
+  const xMax = tk[tk.length - 1];
+  const plotW = w - labelW - 44;
+  const x = (v: number) => labelW + (v / xMax) * plotW;
+  return (
+    <div ref={ref} className="st-chart">
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fontFamily={FONT} role="img">
+        {ser.length > 1 &&
+          ser.map((s, i) => (
+            <g key={s.name} transform={`translate(${labelW + i * 110}, 8)`}>
+              <rect width={10} height={10} rx={2} fill={s.color} />
+              <text x={15} y={9} fontSize={12} fill={INK}>
+                {s.name}
+              </text>
+            </g>
+          ))}
+        {tk.map((t) => (
+          <g key={t}>
+            <line x1={x(t)} x2={x(t)} y1={top - 2} y2={h - 18} stroke={GRID} />
+            <text x={x(t)} y={h - 4} fontSize={11} fill={MUTED} textAnchor="middle">
+              {nf(t, Number.isInteger(t) ? 0 : 1)}
+            </text>
+          </g>
+        ))}
+        {rows.map((r, i) => {
+          const y0 = top + i * rowH + 6;
+          return (
+            <g key={r.label + i}>
+              <text x={labelW - 8} y={y0 + (ser.length * (barH + 2)) / 2 + 4} fontSize={12} fill={INK} textAnchor="end">
+                {r.label.length * 7 > labelW ? r.label.slice(0, Math.floor(labelW / 7) - 1) + '…' : r.label}
+                <title>{r.label}</title>
+              </text>
+              {r.values.map((v, j) => {
+                const y = y0 + j * (barH + 2);
+                const bw = Math.max(0, x(v) - labelW);
+                return (
+                  <g key={j}>
+                    <rect x={labelW} y={y} width={Math.max(bw, v > 0 ? 2 : 0)} height={barH} rx={Math.min(3, bw / 2)} fill={ser[j].color}>
+                      <title>{`${r.label}${ser[j].name ? ` – ${ser[j].name}` : ''}: ${nf(v, digits)}${unit}`}</title>
+                    </rect>
+                    <text x={labelW + bw + 5} y={y + barH / 2 + 4} fontSize={11} fill={MUTED}>
+                      {j === r.values.length - 1 && r.note ? r.note : `${nf(v, digits)}${unit}`}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+// ---- diverging stacked bars (Likert): negative left, neutral centred ----
+export interface LikertRow {
+  label: string;
+  counts: number[]; // per scale point, low → high
+}
+export function Diverging({ rows, scale }: { rows: LikertRow[]; scale: string[] }) {
+  const [ref, w] = useWidth<HTMLDivElement>();
+  const k = scale.length;
+  const mid = (k - 1) / 2;
+  // greyscale for disagreement, accent shades for agreement, neutral grey in the middle
+  // darker towards the ends of the scale
+  const colors = scale.map((_, i) => (i < mid ? ['#a5a49d', '#7a7a74', '#3b3b38'][Math.min(2, Math.ceil(mid - i) - 1)] : i > mid ? ['#e8a77e', '#d77c42', '#a8440f'][Math.min(2, Math.ceil(i - mid) - 1)] : NEUTRAL));
+  const labelW = Math.min(Math.max(...rows.map((r) => r.label.length), 4) * 7 + 12, w * 0.38);
+  const rowH = 26;
+  const top = 34;
+  const h = top + rows.length * rowH + 22;
+  const plotW = w - labelW - 16;
+  const cx = labelW + plotW / 2;
+  const maxN = Math.max(1, ...rows.map((r) => r.counts.reduce((a, b) => a + b, 0)));
+  const unit = plotW / 2 / maxN;
+  return (
+    <div ref={ref} className="st-chart">
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fontFamily={FONT} role="img">
+        {scale.map((s, i) => (
+          <g key={s} transform={`translate(${labelW + (i * plotW) / k}, 6)`}>
+            <rect width={10} height={10} rx={2} fill={colors[i]} />
+            <text x={14} y={9} fontSize={11} fill={INK}>
+              {s}
+            </text>
+          </g>
+        ))}
+        <line x1={cx} x2={cx} y1={top - 6} y2={h - 18} stroke={MUTED} />
+        {[-maxN, -maxN / 2, maxN / 2, maxN].map((t) => (
+          <text key={t} x={cx + t * unit} y={h - 4} fontSize={11} fill={MUTED} textAnchor="middle">
+            {nf(Math.abs(t), Number.isInteger(t) ? 0 : 1)}
+          </text>
+        ))}
+        {rows.map((r, i) => {
+          const y = top + i * rowH;
+          const neutral = k % 2 ? r.counts[Math.floor(mid)] : 0;
+          const neg = r.counts.slice(0, Math.ceil(mid)).reduce((a, b) => a + b, 0);
+          let pos = cx - (neg + neutral / 2) * unit;
+          return (
+            <g key={r.label + i}>
+              <text x={labelW - 8} y={y + 13} fontSize={12} fill={INK} textAnchor="end">
+                {r.label.length * 7 > labelW ? r.label.slice(0, Math.floor(labelW / 7) - 1) + '…' : r.label}
+                <title>{r.label}</title>
+              </text>
+              {r.counts.map((c, j) => {
+                const x0 = pos;
+                pos += c * unit;
+                return c ? (
+                  <rect key={j} x={x0 + 1} y={y + 2} width={Math.max(0, c * unit - 2)} height={16} rx={2} fill={colors[j]}>
+                    <title>{`${r.label} – ${scale[j]}: ${c}`}</title>
+                  </rect>
+                ) : null;
+              })}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+// ---- means with 95 % intervals on a fixed scale ----
+export interface DotRow {
+  label: string;
+  points: { value: number; lo: number; hi: number; series: number }[];
+}
+export function Dots({ rows, series, domain, refLines = [] }: { rows: DotRow[]; series: { name: string; color: string }[]; domain: [number, number]; refLines?: number[] }) {
+  const [ref, w] = useWidth<HTMLDivElement>();
+  const labelW = Math.min(Math.max(...rows.map((r) => r.label.length), 4) * 7 + 12, w * 0.38);
+  const rowH = 18 * series.length + 12;
+  const top = 28;
+  const h = top + rows.length * rowH + 22;
+  const plotW = w - labelW - 16;
+  const x = (v: number) => labelW + ((Math.min(domain[1], Math.max(domain[0], v)) - domain[0]) / (domain[1] - domain[0])) * plotW;
+  const tk: number[] = [];
+  for (let v = domain[0]; v <= domain[1]; v++) tk.push(v);
+  return (
+    <div ref={ref} className="st-chart">
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fontFamily={FONT} role="img">
+        {series.map((s, i) => (
+          <g key={s.name} transform={`translate(${labelW + i * 110}, 6)`}>
+            <circle cx={5} cy={5} r={4.5} fill={s.color} />
+            <text x={15} y={9} fontSize={12} fill={INK}>
+              {s.name}
+            </text>
+          </g>
+        ))}
+        {tk.map((t) => (
+          <g key={t}>
+            <line x1={x(t)} x2={x(t)} y1={top - 4} y2={h - 18} stroke={refLines.includes(t) ? MUTED : GRID} />
+            <text x={x(t)} y={h - 4} fontSize={11} fill={MUTED} textAnchor="middle">
+              {t > 0 && domain[0] < 0 ? `+${t}` : t}
+            </text>
+          </g>
+        ))}
+        {rows.map((r, i) => {
+          const y0 = top + i * rowH + 4;
+          return (
+            <g key={r.label + i}>
+              <text x={labelW - 8} y={y0 + (18 * series.length) / 2 + 2} fontSize={12} fill={INK} textAnchor="end">
+                {r.label}
+              </text>
+              {r.points.map((p, j) => {
+                const y = y0 + p.series * 18 + 7;
+                const s = series[p.series];
+                if (!Number.isFinite(p.value)) return null;
+                return (
+                  <g key={j}>
+                    {Number.isFinite(p.lo) && <line x1={x(p.lo)} x2={x(p.hi)} y1={y} y2={y} stroke={s.color} strokeWidth={2} strokeLinecap="round" />}
+                    <circle cx={x(p.value)} cy={y} r={5} fill={s.color} stroke="#fff" strokeWidth={2}>
+                      <title>{`${r.label} – ${s.name}: ${nf(p.value, 2)}${Number.isFinite(p.lo) ? ` [${nf(p.lo, 2)}; ${nf(p.hi, 2)}]` : ''}`}</title>
+                    </circle>
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+// ---- the figure frame: number, title, caption, PNG ----
+export function Figure({
+  n,
+  title,
+  caption,
+  onCaption,
+  children,
+  table,
+}: {
+  n: number | string;
+  title: string;
+  caption: string;
+  onCaption: (c: string) => void;
+  children: ReactNode;
+  table?: () => string; // CSV of the figure's numbers
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [draft, setDraft] = useState(caption);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => setDraft(caption), [caption]);
+  const full = `Abbildung ${n}: ${draft}`;
+  return (
+    <figure className="st-figure">
+      <figcaption className="st-figtitle">
+        <span className="st-fignum">Abb. {n}</span> {title}
+      </figcaption>
+      <div ref={ref}>{children}</div>
+      <textarea
+        className="st-caption"
+        value={draft}
+        rows={Math.max(1, Math.ceil(draft.length / 48))}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => draft !== caption && onCaption(draft)}
+        aria-label={`Bildunterschrift Abbildung ${n}`}
+      />
+      <div className="st-figtools">
+        <button type="button" onClick={() => void exportPng(ref.current, full, `Abbildung-${n}.png`)}>
+          PNG
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard?.writeText(full).then(() => {
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 1500);
+            });
+          }}
+        >
+          {copied ? 'Kopiert' : 'Text kopieren'}
+        </button>
+        {table && (
+          <button type="button" onClick={() => download(new Blob(['\uFEFF' + table()], { type: 'text/csv;charset=utf-8' }), `Abbildung-${n}.csv`)}>
+            CSV
+          </button>
+        )}
+      </div>
+    </figure>
+  );
+}
+
+export function download(blob: Blob, name: string) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  window.setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+// the font, embedded into the exported SVG (an <img> can't load web fonts)
+let fontCss: Promise<string> | null = null;
+function embeddedFont(): Promise<string> {
+  fontCss ??= fetch('/fonts/ibm-plex-sans-latin.woff2')
+    .then((r) => (r.ok ? r.blob() : Promise.reject()))
+    .then(
+      (b) =>
+        new Promise<string>((res) => {
+          const fr = new FileReader();
+          fr.onload = () => res(`@font-face{font-family:'IBM Plex Sans';font-weight:100 700;src:url(${fr.result}) format('woff2');}`);
+          fr.readAsDataURL(b);
+        }),
+    )
+    .catch(() => '');
+  return fontCss;
+}
+
+function wrap(ctx: CanvasRenderingContext2D, text: string, width: number): string[] {
+  const lines: string[] = [];
+  for (const para of text.split('\n')) {
+    let line = '';
+    for (const word of para.split(/\s+/)) {
+      const t = line ? `${line} ${word}` : word;
+      if (ctx.measureText(t).width > width && line) {
+        lines.push(line);
+        line = word;
+      } else line = t;
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+
+// the figure (every SVG in it, stacked) with its caption below, as a PNG
+export async function exportPng(host: HTMLElement | null, caption: string, name: string) {
+  const svgs = host ? [...host.querySelectorAll('svg')] : [];
+  if (!svgs.length) return;
+  const css = await embeddedFont();
+  const OUT = 2400;
+  const baseW = Math.max(...svgs.map((s) => s.width.baseVal.value));
+  const k = OUT / baseW;
+  const pad = 40;
+  const imgs = await Promise.all(
+    svgs.map(
+      (s) =>
+        new Promise<{ img: HTMLImageElement; h: number }>((res, rej) => {
+          const c = s.cloneNode(true) as SVGSVGElement;
+          c.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+          const st = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+          st.textContent = css;
+          c.prepend(st);
+          const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(c)], { type: 'image/svg+xml' }));
+          const img = new Image();
+          img.onload = () => res({ img, h: s.height.baseVal.value });
+          img.onerror = rej;
+          img.src = url;
+        }),
+    ),
+  );
+  await document.fonts?.load(`${Math.round(13 * k)}px 'IBM Plex Sans'`).catch(() => null);
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!;
+  const fontPx = Math.round(13 * k);
+  ctx.font = `${fontPx}px 'IBM Plex Sans', Arial, sans-serif`;
+  const lines = wrap(ctx, caption, OUT);
+  const figH = imgs.reduce((a, i) => a + i.h * k, 0);
+  canvas.width = OUT + pad * 2;
+  canvas.height = Math.ceil(pad + figH + fontPx * 1.2 + lines.length * fontPx * 1.45 + pad);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let y = pad;
+  for (const { img, h } of imgs) {
+    ctx.drawImage(img, pad, y, OUT, h * k);
+    y += h * k;
+  }
+  ctx.font = `${fontPx}px 'IBM Plex Sans', Arial, sans-serif`;
+  ctx.fillStyle = INK;
+  y += fontPx * 1.2;
+  for (const l of lines) {
+    y += fontPx * 1.2;
+    ctx.fillText(l, pad, y);
+    y += fontPx * 0.25;
+  }
+  canvas.toBlob((b) => b && download(b, name), 'image/png');
+}

@@ -270,7 +270,7 @@ function MatchTable() {
           <tr>
             <th className="num">Abgabe-Nr.</th>
             <th>Zeile</th>
-            <th>Abgabe</th>
+            <th>Abgabe (dt. Zeit)</th>
             <th>AB/BA</th>
             <th>Teilnehmende</th>
             <th className="num">Pos.</th>
@@ -293,7 +293,7 @@ function MatchTable() {
               <tr key={i} className={ignored ? 'is-ignored' : !p || p.tallyConflict ? 'is-open' : ''}>
                 <td className="num">{rank.get(i) ?? '–'}</td>
                 <td className="num">{i + 1}</td>
-                <td>{timeCol >= 0 ? r[timeCol] : '–'}</td>
+                <td title={timeCol >= 0 ? `in der Datei (UTC): ${r[timeCol]}` : undefined}>{timeCol >= 0 ? localTime(r[timeCol] ?? '') : '–'}</td>
                 <td>{orderCol >= 0 ? r[orderCol] || '–' : '–'}</td>
                 <td>{ignored ? <span className="st-muted">ignoriert</span> : p ? p.id : <span className="st-flag">keine</span>}</td>
                 <td className="num">{p && !ignored ? (model.orderPos.get(p.id) ?? '–') : ''}</td>
@@ -316,4 +316,10 @@ function MatchTable() {
       <p className="st-note">Nach Abgabezeit sortiert. „Abgabe-Nr.“ und „Pos.“ (Platz der Person in der gewählten Reihenfolge) sind bei der Zuordnung nach Reihenfolge gleich; weichen sie ab, wurde die Zeile anders zugeordnet (siehe „Zuordnung“). Eine Zeile ignorieren (Testlauf, doppelte Abgabe) ordnet die übrigen neu zu. Einzelne Personen: auf „Teilnehmende &amp; Sessions“ die Tally-Zeile wählen.</p>
     </Section>
   );
+}
+
+// Tally's export is in UTC; shown in German time, as on tally.so
+function localTime(v: string): string {
+  const t = timeOf(v);
+  return t == null ? v || '–' : new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }

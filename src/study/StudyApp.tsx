@@ -157,7 +157,7 @@ export default function StudyApp() {
               <li key={p.id}>
                 <a
                   href={`#${p.id}`}
-                  className={page === p.id && (!sub || p.sub?.find((s) => s.id === sub)?.anchor) ? 'is-current' : ''}
+                  className={page === p.id && !sub ? 'is-current' : ''}
                   onClick={(e) => {
                     e.preventDefault();
                     go(p.id);

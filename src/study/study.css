@@ -16,8 +16,16 @@
   --st-accent-soft: #f6e6dc;
   --st-warn: #9a3b0c;
 }
+/* the game's styles.css locks the page (height 100 %, overflow hidden);
+   this page scrolls */
+html:has(.st-root),
+body:has(.st-root),
+body:has(.st-root) #root {
+  height: auto;
+}
 body:has(.st-root) {
   margin: 0;
+  overflow: auto;
   background: var(--st-bg);
 }
 .st-root {
@@ -142,7 +150,7 @@ body:has(.st-root) {
 .st-nav a.is-current {
   background: var(--st-soft);
   color: var(--st-ink);
-  box-shadow: inset 2px 0 0 var(--st-accent);
+  box-shadow: inset 3px 0 0 var(--st-accent);
 }
 .st-navfoot {
   margin-top: auto;

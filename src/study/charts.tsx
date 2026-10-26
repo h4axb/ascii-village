@@ -39,6 +39,66 @@ function ticks(max: number, count = 4, integer = false): number[] {
   return out;
 }
 
+
+// ---- labels: measured, wrapped onto as many lines as they need, never cut ----
+let measureCtx: CanvasRenderingContext2D | null = null;
+function textW(t: string, size = 12): number {
+  measureCtx ??= document.createElement('canvas').getContext('2d');
+  if (!measureCtx) return t.length * size * 0.56;
+  measureCtx.font = `${size}px ${FONT}`;
+  return measureCtx.measureText(t).width;
+}
+function wrapText(t: string, maxW: number, size = 12): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of t.split(/\s+/)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && textW(next, size) > maxW) {
+      lines.push(line);
+      line = word;
+    } else line = next;
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [''];
+}
+const LINE = 15; // line height of a 12 px label
+// the label column (at most `share` of the width) and every label's lines
+function labelColumn(labels: string[], w: number, share: number) {
+  const natural = Math.max(40, ...labels.map((l) => textW(l))) + 14;
+  const labelW = Math.min(natural, Math.max(90, w * share));
+  return { labelW, lines: labels.map((l) => wrapText(l, labelW - 14)) };
+}
+// a left-aligned label, vertically centred on `cy`
+function Label({ lines, cy, full }: { lines: string[]; cy: number; full: string }) {
+  const y0 = cy - ((lines.length - 1) * LINE) / 2 + 4;
+  return (
+    <text x={0} y={y0} fontSize={12} fill={INK}>
+      {lines.map((l, i) => (
+        <tspan key={i} x={0} dy={i ? LINE : 0}>
+          {l}
+        </tspan>
+      ))}
+      <title>{full}</title>
+    </text>
+  );
+}
+// legend entries flowing onto further lines when they don't fit
+function legendLayout(names: string[], x0: number, w: number, swatch = 15) {
+  let x = x0;
+  let y = 0;
+  const pos = names.map((n) => {
+    const itemW = swatch + textW(n) + 18;
+    if (x > x0 && x + itemW > w) {
+      x = x0;
+      y += 18;
+    }
+    const at = { x, y };
+    x += itemW;
+    return at;
+  });
+  return { pos, height: names.length ? y + 18 : 0 };
+}
+
 // ---- horizontal bars, one or two series (A/B) ----
 export interface BarRow {
   label: string;
@@ -50,28 +110,37 @@ export interface BarRow {
 export function Bars({ rows, series, unit = '', digits = 0, max, title }: { rows: BarRow[]; series?: { name: string; color: string }[]; unit?: string; digits?: number; max?: number; title?: string }) {
   const [ref, w] = useWidth<HTMLDivElement>();
   const ser = series ?? [{ name: '', color: INK }];
-  const labelW = Math.min(Math.max(...rows.map((r) => r.label.length), 4) * 7 + 12, w * 0.42);
+  const { labelW, lines } = labelColumn(rows.map((r) => r.label), w, 0.45);
   const barH = ser.length > 1 ? 11 : 16;
-  const rowH = ser.length * (barH + 2) + 12;
-  const head = title ? 22 : 0;
-  const top = (ser.length > 1 ? 26 : 6) + head;
-  const h = top + rows.length * rowH + 22;
+  const block = ser.length * (barH + 2);
+  const titleLines = title ? wrapText(title, w, 13) : [];
+  const head = titleLines.length ? titleLines.length * 17 + 6 : 0;
+  const legend = ser.length > 1 ? legendLayout(ser.map((s) => s.name), labelW, w) : { pos: [], height: 0 };
+  const top = (ser.length > 1 ? legend.height + 8 : 6) + head;
+  // every row as tall as its label
+  const rowHs = lines.map((l) => Math.max(block, l.length * LINE) + 12);
+  const rowY = rowHs.map((_, i) => top + rowHs.slice(0, i).reduce((a, b) => a + b, 0));
+  const h = top + rowHs.reduce((a, b) => a + b, 0) + 22;
   const top_ = max ?? Math.max(digits ? 0.1 : 1, ...rows.flatMap((r) => r.values));
   const tk = ticks(top_, 4, !digits);
   const xMax = tk[tk.length - 1];
-  const plotW = w - labelW - 44;
+  const plotW = Math.max(40, w - labelW - 44);
   const x = (v: number) => labelW + (v / xMax) * plotW;
   return (
     <div ref={ref} className="st-chart">
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fontFamily={FONT} role="img">
-        {title && (
+        {titleLines.length > 0 && (
           <text x={0} y={14} fontSize={13} fontWeight={500} fill={INK}>
-            {title}
+            {titleLines.map((l, i) => (
+              <tspan key={i} x={0} dy={i ? 17 : 0}>
+                {l}
+              </tspan>
+            ))}
           </text>
         )}
         {ser.length > 1 &&
           ser.map((s, i) => (
-            <g key={s.name} transform={`translate(${labelW + i * 110}, ${8 + head})`}>
+            <g key={s.name} transform={`translate(${legend.pos[i].x}, ${8 + head + legend.pos[i].y})`}>
               <rect width={10} height={10} rx={2} fill={s.color} />
               <text x={15} y={9} fontSize={12} fill={INK}>
                 {s.name}
@@ -87,13 +156,10 @@ export function Bars({ rows, series, unit = '', digits = 0, max, title }: { rows
           </g>
         ))}
         {rows.map((r, i) => {
-          const y0 = top + i * rowH + 6;
+          const y0 = rowY[i] + 6 + (rowHs[i] - 12 - block) / 2;
           return (
             <g key={r.label + i}>
-              <text x={labelW - 8} y={y0 + (ser.length * (barH + 2)) / 2 + 4} fontSize={12} fill={INK} textAnchor="end">
-                {r.label.length * 7 > labelW ? r.label.slice(0, Math.floor(labelW / 7) - 1) + '…' : r.label}
-                <title>{r.label}</title>
-              </text>
+              <Label lines={lines[i]} cy={y0 + block / 2} full={r.label} />
               {r.values.map((v, j) => {
                 const y = y0 + j * (barH + 2);
                 const bw = Math.max(0, x(v) - labelW);
@@ -128,11 +194,13 @@ export function Diverging({ rows, scale }: { rows: LikertRow[]; scale: string[] 
   // greyscale for disagreement, accent shades for agreement, neutral grey in the middle
   // darker towards the ends of the scale
   const colors = scale.map((_, i) => (i < mid ? ['#a5a49d', '#7a7a74', '#3b3b38'][Math.min(2, Math.ceil(mid - i) - 1)] : i > mid ? ['#e8a77e', '#d77c42', '#a8440f'][Math.min(2, Math.ceil(i - mid) - 1)] : NEUTRAL));
-  const labelW = Math.min(Math.max(...rows.map((r) => r.label.length), 4) * 7 + 12, w * 0.38);
-  const rowH = 26;
-  const top = 34;
-  const h = top + rows.length * rowH + 22;
-  const plotW = w - labelW - 16;
+  const { labelW, lines } = labelColumn(rows.map((r) => r.label), w, 0.4);
+  const plotW = Math.max(60, w - labelW - 16);
+  const legend = legendLayout(scale, labelW, w, 14);
+  const top = legend.height + 16;
+  const rowHs = lines.map((l) => Math.max(20, l.length * LINE) + 8);
+  const rowY = rowHs.map((_, i) => top + rowHs.slice(0, i).reduce((a, b) => a + b, 0));
+  const h = top + rowHs.reduce((a, b) => a + b, 0) + 22;
   const cx = labelW + plotW / 2;
   const maxN = Math.max(1, ...rows.map((r) => r.counts.reduce((a, b) => a + b, 0)));
   const unit = plotW / 2 / maxN;
@@ -140,7 +208,7 @@ export function Diverging({ rows, scale }: { rows: LikertRow[]; scale: string[] 
     <div ref={ref} className="st-chart">
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fontFamily={FONT} role="img">
         {scale.map((s, i) => (
-          <g key={s} transform={`translate(${labelW + (i * plotW) / k}, 6)`}>
+          <g key={s} transform={`translate(${legend.pos[i].x}, ${6 + legend.pos[i].y})`}>
             <rect width={10} height={10} rx={2} fill={colors[i]} />
             <text x={14} y={9} fontSize={11} fill={INK}>
               {s}
@@ -154,16 +222,13 @@ export function Diverging({ rows, scale }: { rows: LikertRow[]; scale: string[] 
           </text>
         ))}
         {rows.map((r, i) => {
-          const y = top + i * rowH;
+          const y = rowY[i] + (rowHs[i] - 20) / 2;
           const neutral = k % 2 ? r.counts[Math.floor(mid)] : 0;
           const neg = r.counts.slice(0, Math.ceil(mid)).reduce((a, b) => a + b, 0);
           let pos = cx - (neg + neutral / 2) * unit;
           return (
             <g key={r.label + i}>
-              <text x={labelW - 8} y={y + 13} fontSize={12} fill={INK} textAnchor="end">
-                {r.label.length * 7 > labelW ? r.label.slice(0, Math.floor(labelW / 7) - 1) + '…' : r.label}
-                <title>{r.label}</title>
-              </text>
+              <Label lines={lines[i]} cy={y + 10} full={r.label} />
               {r.counts.map((c, j) => {
                 const x0 = pos;
                 pos += c * unit;
@@ -188,11 +253,14 @@ export interface DotRow {
 }
 export function Dots({ rows, series, domain, refLines = [] }: { rows: DotRow[]; series: { name: string; color: string }[]; domain: [number, number]; refLines?: number[] }) {
   const [ref, w] = useWidth<HTMLDivElement>();
-  const labelW = Math.min(Math.max(...rows.map((r) => r.label.length), 4) * 7 + 12, w * 0.38);
-  const rowH = 18 * series.length + 12;
-  const top = 28;
-  const h = top + rows.length * rowH + 22;
-  const plotW = w - labelW - 16;
+  const { labelW, lines } = labelColumn(rows.map((r) => r.label), w, 0.4);
+  const block = 18 * series.length;
+  const legend = legendLayout(series.map((s) => s.name), labelW, w);
+  const top = legend.height + 10;
+  const rowHs = lines.map((l) => Math.max(block, l.length * LINE) + 12);
+  const rowY = rowHs.map((_, i) => top + rowHs.slice(0, i).reduce((a, b) => a + b, 0));
+  const h = top + rowHs.reduce((a, b) => a + b, 0) + 22;
+  const plotW = Math.max(60, w - labelW - 16);
   const x = (v: number) => labelW + ((Math.min(domain[1], Math.max(domain[0], v)) - domain[0]) / (domain[1] - domain[0])) * plotW;
   const tk: number[] = [];
   for (let v = domain[0]; v <= domain[1]; v++) tk.push(v);
@@ -200,7 +268,7 @@ export function Dots({ rows, series, domain, refLines = [] }: { rows: DotRow[]; 
     <div ref={ref} className="st-chart">
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fontFamily={FONT} role="img">
         {series.map((s, i) => (
-          <g key={s.name} transform={`translate(${labelW + i * 110}, 6)`}>
+          <g key={s.name} transform={`translate(${legend.pos[i].x}, ${6 + legend.pos[i].y})`}>
             <circle cx={5} cy={5} r={4.5} fill={s.color} />
             <text x={15} y={9} fontSize={12} fill={INK}>
               {s.name}
@@ -216,14 +284,12 @@ export function Dots({ rows, series, domain, refLines = [] }: { rows: DotRow[]; 
           </g>
         ))}
         {rows.map((r, i) => {
-          const y0 = top + i * rowH + 4;
+          const y0 = rowY[i] + 6 + (rowHs[i] - 12 - block) / 2;
           return (
             <g key={r.label + i}>
-              <text x={labelW - 8} y={y0 + (18 * series.length) / 2 + 2} fontSize={12} fill={INK} textAnchor="end">
-                {r.label}
-              </text>
+              <Label lines={lines[i]} cy={y0 + block / 2} full={r.label} />
               {r.points.map((p, j) => {
-                const y = y0 + p.series * 18 + 7;
+                const y = y0 + p.series * 18 + 9;
                 const s = series[p.series];
                 if (!Number.isFinite(p.value)) return null;
                 return (

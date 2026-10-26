@@ -221,33 +221,50 @@ export interface P4Field {
   n: number;
 }
 export function part4(rows: SurveyRow[], optionQs: OptionQuestion[] = []): P4Field[] {
-  const labels = [...new Set(rows.flatMap((r) => Object.keys(r.info)))];
+  // every question once, whatever columns it came in: its option columns
+  // ("Question (Option)" = true / false) and plain answer columns with the
+  // same question text are merged into one field
+  const key = (s: string) => s.trim().toLowerCase().replace(/[\s?:.]+$/, '');
+  const fields = new Map<string, { label: string; counts: Map<string, number>; answered: Set<number>; nums: number[]; numericOnly: boolean; options: boolean }>();
+  const fieldOf = (label: string) => {
+    let f = fields.get(key(label));
+    if (!f) fields.set(key(label), (f = { label, counts: new Map(), answered: new Set(), nums: [], numericOnly: true, options: false }));
+    return f;
+  };
   // questions exported as one column per option (not in Teil 2/3): all options, also at 0
-  const fromOptions = optionQs
-    .filter((q) => q.part !== 2 && q.part !== 3)
-    .map((q): P4Field => {
-      const ans = rows.filter((r) => r.multi[q.question]?.length);
-      return {
-        label: q.question,
-        numeric: false,
-        counts: q.options.map((o) => [o, ans.filter((r) => r.multi[q.question].includes(o)).length] as [string, number]),
-        stats: null,
-        n: ans.length,
-      };
+  for (const q of optionQs.filter((x) => x.part !== 2 && x.part !== 3)) {
+    const f = fieldOf(q.question);
+    f.numericOnly = false;
+    f.options = true;
+    for (const o of q.options) if (!f.counts.has(o)) f.counts.set(o, 0);
+    rows.forEach((r, i) => {
+      const ticked = r.multi[q.question] ?? [];
+      if (ticked.length) f.answered.add(i);
+      for (const o of ticked) f.counts.set(o, (f.counts.get(o) ?? 0) + 1);
     });
-  return [...fromOptions, ...labels.map((label) => {
-    const vals = rows.map((r) => r.info[label]).filter((v): v is string => !!v);
-    const nums = vals.map((v) => Number(v.replace(',', '.')));
-    const numeric = vals.length > 0 && nums.every((x) => Number.isFinite(x));
-    const counts = new Map<string, number>();
-    // (a multi-choice answer "a, b" counts for each)
-    for (const v of vals) for (const part of numeric ? [v] : v.split(/\s*,\s*(?=[A-ZÄÖÜ])/)) counts.set(part, (counts.get(part) ?? 0) + 1);
+  }
+  for (const label of new Set(rows.flatMap((r) => Object.keys(r.info)))) {
+    const f = fieldOf(label);
+    rows.forEach((r, i) => {
+      const v = r.info[label];
+      if (!v) return;
+      f.answered.add(i);
+      const num = Number(v.replace(',', '.'));
+      if (Number.isFinite(num)) f.nums.push(num);
+      else f.numericOnly = false;
+      // (a multi-choice answer "a, b" counts for each)
+      for (const part of Number.isFinite(num) ? [v] : v.split(/\s*,\s*(?=[A-ZÄÖÜ])/)) f.counts.set(part, (f.counts.get(part) ?? 0) + 1);
+    });
+  }
+  return [...fields.values()].map((f) => {
+    const numeric = f.numericOnly && f.nums.length > 0;
     return {
-      label,
+      label: f.label,
       numeric,
-      counts: [...counts].sort((a, b) => (numeric ? Number(a[0]) - Number(b[0]) : b[1] - a[1])),
-      stats: numeric ? describe(nums) : null,
-      n: vals.length,
+      // (option questions keep their order; free answers by frequency)
+      counts: numeric ? [...f.counts].sort((a, b) => Number(a[0]) - Number(b[0])) : f.options ? [...f.counts] : [...f.counts].sort((a, b) => b[1] - a[1]),
+      stats: numeric ? describe(f.nums) : null,
+      n: f.answered.size,
     };
-  })];
+  });
 }

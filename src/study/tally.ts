@@ -121,7 +121,8 @@ export function suggestMapping(headers: string[], rows: string[][]): ColumnRole[
     const n = norm(h);
     if (/^(tallyid|test_?id|teilnehmer.?id|participant.?id|p-?id)$/.test(n.replace(/\s/g, '')) || /tallyid|test_id/.test(n)) return { role: 'id' };
     if (/^order$|reihenfolge|test_?order/.test(n)) return { role: 'order' };
-    if (/submission id|respondent id|submitted at|^id$|created at|eingereicht/.test(n)) return { role: 'ignore' };
+    if (/submitted at|eingereicht|zeitstempel|timestamp|created at|^datum$|^date$/.test(n)) return { role: 'time' };
+    if (/submission id|respondent id|^id$/.test(n)) return { role: 'ignore' };
     const ueq = ueqsItemIn(h);
     if (ueq) return { role: 'ueqs', item: ueq.item, design: designIn(h) ?? 'A', reversed: ueq.reversed };
     if (!vals.length) return { role: 'ignore' };

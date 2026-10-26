@@ -11,6 +11,7 @@ const ROLE_NAME: Record<ColumnRole['role'], string> = {
   ignore: 'ignorieren',
   id: 'Teilnehmer-ID',
   order: 'Reihenfolge',
+  time: 'Zeitpunkt',
   p1: 'Teil 1: Vergleich',
   likert: 'Teil 2: Likert',
   ueqs: 'Teil 3: UEQ-S',

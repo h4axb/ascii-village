@@ -89,12 +89,15 @@ export function NotesImport() {
     // the header's link names which of a person's links the block is about
     for (const s of parsed.statements) {
       const meta = parsed.meta.find((m) => m.id === s.person);
-      if (!s.link && meta) s.link = linkLabelOf(meta, model);
+      const raw = s.link ?? meta?.link ?? '';
+      s.link = /^P\d+\.\d$/.test(raw) ? raw : meta ? linkLabelOf({ ...meta, link: raw }, model) : undefined;
     }
     const r = mergeStatements(parsed.statements, Object.values(study.docs.items), new Set(parsed.meta.map((m) => m.id)));
     study.commit([
       { coll: 'notes', id: 'main', data: { text: src, importedAt: Date.now(), file } },
       { coll: 'settings', id: 'notesMeta', data: metas },
+      // the participants in the order of the notes (matching the survey rows: match.ts)
+      { coll: 'settings', id: 'notesOrder', data: { ids: parsed.meta.map((m) => m.id) } },
       ...r.put.map((p) => ({ coll: 'items' as const, id: p.id, data: p })),
     ]);
     const summary = `${parsed.meta.length} Teilnehmende, ${parsed.statements.length} Aussagen: ${r.kept} unverändert, ${r.changed} geändert, ${r.added} neu, ${r.removed} entfernt`;

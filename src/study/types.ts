@@ -11,6 +11,7 @@ export type ColumnRole =
   | { role: 'ignore' }
   | { role: 'id' } // the participant id the game sent (tallyid / test_id)
   | { role: 'order' } // the design order the game sent (AB / BA)
+  | { role: 'time' } // when the answer was submitted (pairs rows with participants: match.ts)
   | { role: 'p1'; question: string; values: Record<string, Design | 'neutral' | null> } // Teil 1: direct comparison
   | { role: 'likert'; item: string; design: Design; values: Record<string, number | null> } // Teil 2
   | { role: 'ueqs'; item: number; design: Design; reversed: boolean } // Teil 3: item 0–7, answers 1–7

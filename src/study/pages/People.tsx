@@ -6,6 +6,7 @@ import type { PersonDoc } from '../types';
 import { personIdOf, type Person } from '../model';
 import { fmtDate, fmtMin, LazyInput, logChange, Section, useCtx } from '../ui';
 
+export const VIA: Record<string, string> = { manuell: 'manuell', id: 'nach ID', zeit: 'nach Zeit', reihenfolge: 'nach Reihenfolge' };
 const CHANGE_NAME: Record<string, string> = { excluded: 'ausgeschlossen', reason: 'Grund', swapP1: 'Teil 1 vertauscht', runtime: 'Dauer aus', mainLink: 'Hauptlink', tallyRow: 'Tally-Zeile', group: 'Testgruppe', age: 'Alter' };
 
 export default function People() {
@@ -27,6 +28,7 @@ export default function People() {
               <header>
                 <h3>{p.id}</h3>
                 <span className="st-muted">{fmtDate(p.date)}</span>
+                {p.tallyConflict && <span className="st-flag">Umfrage-Zeile: andere Gruppe – Zuordnung prüfen</span>}
                 {p.groupMismatch && <span className="st-flag">Notizen: {p.notesGroup}, Tracking: {p.trackedGroup}</span>}
                 {p.excluded && <span className="st-flag">ausgeschlossen</span>}
               </header>
@@ -88,7 +90,7 @@ export default function People() {
                     value={p.doc.tallyRow === undefined ? 'auto' : p.doc.tallyRow === null ? 'none' : String(p.doc.tallyRow)}
                     onChange={(e) => set(p, { tallyRow: e.target.value === 'auto' ? undefined : e.target.value === 'none' ? null : Number(e.target.value) })}
                   >
-                    <option value="auto">automatisch{p.doc.tallyRow === undefined && p.tallyRow != null ? ` (Zeile ${p.tallyRow + 1})` : ''}</option>
+                    <option value="auto">automatisch{p.doc.tallyRow === undefined && p.tallyRow != null ? ` (Zeile ${p.tallyRow + 1} · ${VIA[p.tallyVia ?? 'id']})` : ''}</option>
                     <option value="none">keine</option>
                     {rows.map((r, i) => (
                       <option key={i} value={i} disabled={owner.has(i) && owner.get(i) !== p.id}>

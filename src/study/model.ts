@@ -6,6 +6,7 @@ import { designOf, type FeedbackRecord } from '../feedback/schema';
 import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
 import type { ColumnRole, Design, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
+import { matchRows, timeOf, type MatchVia } from './match';
 
 // ---- the scope filter: everyone, one person, or one of their links ----
 export type Scope = { kind: 'all' } | { kind: 'person'; id: string } | { kind: 'link'; id: string; key: string };
@@ -34,6 +35,9 @@ export interface Person {
   groupMismatch: boolean;
   minutes: number | null; // per the run-time rule
   tallyRow: number | null;
+  tallyVia: MatchVia | null; // how the row was matched
+  tallyConflict: boolean; // the row's AB/BA differs from the person's group
+  surveyAt: number | null; // when the game opened the survey (tracked)
   date: number | null;
 }
 
@@ -55,6 +59,7 @@ export interface Model {
   links: LinkInfo[];
   survey: SurveyRow[]; // rows of included persons (and unmatched rows)
   unmatchedRows: number[];
+  ignoredRows: Set<number>;
   mapping: ColumnRole[];
   headers: string[];
   // the game's records, of included persons, per scope
@@ -84,6 +89,7 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
   const headers = tally?.headers ?? [];
   const idCol = mapping.findIndex((m) => m.role === 'id');
   const orderCol = mapping.findIndex((m) => m.role === 'order');
+  const timeCol = mapping.findIndex((m) => m.role === 'time');
 
   const ids = new Set<string>();
   for (const i of invites) ids.add(i.participant_id!);
@@ -122,24 +128,48 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     const timed = links.filter((l) => l.minutes != null);
     const main = links.find((l) => l.key === doc.mainLink) ?? [...timed].sort((a, b) => (b.minutes ?? 0) - (a.minutes ?? 0))[0];
     const minutes = !timed.length ? null : doc.runtime === 'main' ? (main?.minutes ?? null) : timed.reduce((a, l) => a + (l.minutes ?? 0), 0);
-    const auto = tallyIds.indexOf(id);
-    const row = doc.tallyRow === undefined ? (auto >= 0 ? auto : null) : doc.tallyRow;
-    // (no tracked order: the one the game sent to the survey)
-    const surveyGroup = row != null && orderCol >= 0 ? asOrder((tally?.rows[row]?.[orderCol] ?? '').trim().toUpperCase()) : null;
+    const surveyAt =
+      game.events.filter((e) => e.participant === id && e.type === 'session' && e.data.what === 'survey').map((e) => e.at).sort((a, b) => a - b)[0] ??
+      invites.filter((i) => i.participant_id === id && i.completed).map((i) => i.completed!).sort((a, b) => a - b)[0] ??
+      null;
     return {
       id,
       doc,
       excluded: !!doc.excluded,
       links,
-      group: doc.group ?? trackedGroup ?? surveyGroup,
+      group: doc.group ?? trackedGroup ?? (notesGroup === 'AB' || notesGroup === 'BA' ? notesGroup : null),
       trackedGroup,
       notesGroup,
       groupMismatch: !!notesGroup && !!trackedGroup && notesGroup !== trackedGroup,
       minutes,
-      tallyRow: row,
+      tallyRow: null,
+      tallyVia: null,
+      tallyConflict: false,
+      surveyAt,
       date: links.map((l) => l.started).filter((x): x is number => !!x).sort()[0] ?? null,
     };
   });
+  // the survey rows → participants (match.ts); the notes give the order
+  // rows set aside (a test run, a duplicate): in no pairing and no statistic
+  const ignoredRows = new Set((docs.settings.ignoredRows as { rows?: number[] } | undefined)?.rows ?? []);
+  const notesOrder = ((docs.settings.notesOrder as { ids?: string[] } | undefined)?.ids ?? []).filter((id) => ids.has(id));
+  const ordered = [...notesOrder, ...persons.map((p) => p.id).filter((id) => !notesOrder.includes(id))];
+  const byId = new Map(persons.map((p) => [p.id, p]));
+  const matched = matchRows(
+    (tally?.rows ?? []).map((r, row) => ({ row, id: tallyIds[row], submitted: timeCol >= 0 ? timeOf(r[timeCol] ?? '') : null })).filter((r) => !ignoredRows.has(r.row)),
+    ordered.map((id) => ({ id, manual: byId.get(id)!.doc.tallyRow, surveyAt: byId.get(id)!.surveyAt })),
+  );
+  for (const p of persons) {
+    const m = matched.get(p.id);
+    if (!m) continue;
+    p.tallyRow = m.row;
+    p.tallyVia = m.via;
+    const sent = orderCol >= 0 ? asOrder((tally?.rows[m.row]?.[orderCol] ?? '').trim().toUpperCase()) : null;
+    // (no tracked order: the one the game sent to the survey)
+    if (!p.group) p.group = sent;
+    const known = p.doc.group ?? p.trackedGroup ?? (p.notesGroup === 'AB' || p.notesGroup === 'BA' ? p.notesGroup : null);
+    p.tallyConflict = !!sent && !!known && sent !== known;
+  }
   const included = persons.filter((p) => !p.excluded);
   const incIds = new Set(included.map((p) => p.id));
   const exIds = new Set(persons.filter((p) => p.excluded).map((p) => p.id));
@@ -150,6 +180,7 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
   const survey: SurveyRow[] = [];
   const unmatchedRows: number[] = [];
   (tally?.rows ?? []).forEach((r, row) => {
+    if (ignoredRows.has(row)) return;
     const person = rowOwner.get(row) ?? null;
     if (!person) unmatchedRows.push(row);
     if (person && exIds.has(person)) return;
@@ -196,6 +227,7 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     links: included.flatMap((p) => p.links),
     survey,
     unmatchedRows,
+    ignoredRows,
     mapping,
     headers,
     events: game.events.filter((e) => incIds.has(e.participant)),

@@ -846,3 +846,10 @@ body:has(.st-root) {
 .st-table td input:not([type='checkbox']) {
   width: 100%;
 }
+.st-table tr.is-ignored td {
+  color: var(--st-muted);
+  text-decoration: line-through;
+}
+.st-table tr.is-ignored td:last-child {
+  text-decoration: none;
+}

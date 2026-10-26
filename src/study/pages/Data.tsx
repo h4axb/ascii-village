@@ -3,8 +3,9 @@
 import type { ColumnRole } from '../types';
 import { personIdOf } from '../model';
 import { download } from '../charts';
-import { csv, Section, useCtx, type LogEntry } from '../ui';
+import { csv, logChange, Section, useCtx, type LogEntry } from '../ui';
 import Import from './Import';
+import { VIA } from './People';
 
 interface Check {
   area: string;
@@ -42,16 +43,25 @@ export function useChecks(): Check[] {
   // Tally
   add('Umfrage', 'Tally-Export importiert', !!tally, tally ? `${tally.rows.length} Antworten` : '');
   if (tally) {
-    add('Umfrage', 'ID-Spalte zugeordnet', idCol >= 0, idCol >= 0 ? tally.headers[idCol] : 'Spalte „Teilnehmer-ID“ wählen');
+    const withId = idCol >= 0 ? tally.rows.filter((r) => personIdOf(r[idCol] ?? '')).length : 0;
+    add('Umfrage', 'Teilnehmer-ID in der Umfrage', true, withId ? `${withId} von ${tally.rows.length} Zeilen mit ID` : 'keine IDs – Zuordnung nach Zeit bzw. Reihenfolge der Notizen');
     const ids = idCol >= 0 ? tally.rows.map((r) => personIdOf(r[idCol] ?? '')) : [];
     const dup = [...new Set(ids.filter((x, i) => x && ids.indexOf(x) !== i))];
     add('Umfrage', 'Keine doppelten IDs', !dup.length, dup.length ? `${dup.join(', ')} (Zeile auf „Teilnehmende & Sessions“ wählen)` : '');
     add('Umfrage', 'Alle Antworten zugeordnet', !model.unmatchedRows.length, model.unmatchedRows.map((r) => `Zeile ${r + 1}${idCol >= 0 && tally.rows[r]?.[idCol] ? ` (${tally.rows[r][idCol]})` : ''}`).join(', '));
     const noRow = inc.filter((p) => p.tallyRow == null);
     add('Umfrage', 'Alle Teilnehmenden mit Antworten', !noRow.length, noRow.map((p) => p.id).join(', '));
+    const byOrder = model.persons.filter((p) => p.tallyVia === 'reihenfolge');
+    if (byOrder.length)
+      add(
+        'Umfrage',
+        'Zuordnung nach Reihenfolge: Anzahl Zeilen = Teilnehmende',
+        tally.rows.length - model.ignoredRows.size === model.persons.length,
+        `${tally.rows.length - model.ignoredRows.size} Zeilen${model.ignoredRows.size ? ` (${model.ignoredRows.size} ignoriert)` : ''}, ${model.persons.length} Teilnehmende; ${byOrder.length} nach Reihenfolge zugeordnet${tally.rows.length - model.ignoredRows.size !== model.persons.length ? ' – Verschiebung möglich, Zuordnung prüfen' : ''}`,
+      );
     if (orderCol >= 0) {
-      const conflict = inc.filter((p) => p.tallyRow != null && p.group && tally.rows[p.tallyRow]?.[orderCol] && tally.rows[p.tallyRow][orderCol].toUpperCase().trim() !== p.group);
-      add('Umfrage', 'Reihenfolge Tally = Tracking', !conflict.length, conflict.map((p) => `${p.id}: Tally ${tally.rows[p.tallyRow!][orderCol]}, ${p.group}`).join('; '));
+      const conflict = model.persons.filter((p) => p.tallyConflict);
+      add('Umfrage', 'Reihenfolge in der Umfrage = Testgruppe', !conflict.length, conflict.map((p) => `${p.id}: Umfrage ${tally.rows[p.tallyRow!][orderCol]}, Gruppe ${p.doc.group ?? p.trackedGroup ?? p.notesGroup}`).join('; '));
     }
     const swapped = inc.filter((p) => p.doc.swapP1);
     add('Umfrage', 'Korrekturen Teil 1', true, swapped.length ? `A/B vertauscht: ${swapped.map((p) => p.id).join(', ')}` : 'keine');
@@ -166,9 +176,12 @@ export default function Data() {
         </div>
       </Section>
 
+      {tally && <MatchTable />}
+
       <Section title="Zuordnungsregeln">
         <ul className="st-rules">
-          <li>Teilnehmende: P-ID aus dem persönlichen Link; Tally-Antworten über die Spalte „Teilnehmer-ID“ (tallyid), manuell änderbar.</li>
+          <li>Teilnehmende: P-ID aus dem persönlichen Link bzw. den Notizen.</li>
+          <li>Umfrage-Zeilen ↔ Teilnehmende, in dieser Reihenfolge: 1. manuell gewählt; 2. Teilnehmer-ID (tallyid); 3. Zeit: Abgabe 10 min vor bis 120 min nach dem Öffnen der Umfrage im Spiel, nächste zuerst; 4. Reihenfolge: übrige Teilnehmende in der Reihenfolge der Notizen, übrige Zeilen nach Abgabezeit. Abweichende AB/BA-Angaben werden markiert.</li>
           <li>Mehrere Links einer Person: P009.1, P009.2 … in der Reihenfolge des Starts; Dauer als Summe oder nur Hauptlink.</li>
           <li>Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links.</li>
           <li>Testgruppe: aus dem Link (AB/BA); eine Korrektur überschreibt sie; Abweichungen zu den Notizen werden markiert.</li>
@@ -195,5 +208,64 @@ export default function Data() {
         )}
       </Section>
     </>
+  );
+}
+
+// every survey row and who it was matched to
+function MatchTable() {
+  const { model, study } = useCtx();
+  const tally = study.docs.tally.main!;
+  const timeCol = model.mapping.findIndex((m) => m.role === 'time');
+  const orderCol = model.mapping.findIndex((m) => m.role === 'order');
+  const owner = new Map(model.persons.filter((p) => p.tallyRow != null).map((p) => [p.tallyRow!, p]));
+  const meta = (study.docs.settings.notesMeta ?? {}) as Record<string, { slot?: string; group?: string }>;
+  return (
+    <Section title="Zuordnung Umfrage ↔ Teilnehmende">
+      <table className="st-table">
+        <thead>
+          <tr>
+            <th>Zeile</th>
+            <th>Abgabe</th>
+            <th>AB/BA</th>
+            <th>Teilnehmende</th>
+            <th>Termin (Notizen)</th>
+            <th>Gruppe</th>
+            <th>Zuordnung</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {tally.rows.map((r, i) => {
+            const p = owner.get(i);
+            const ignored = model.ignoredRows.has(i);
+            const toggle = () => {
+              const rows = ignored ? [...model.ignoredRows].filter((x) => x !== i) : [...model.ignoredRows, i];
+              study.commit([{ coll: 'settings', id: 'ignoredRows', data: { rows } }]);
+              logChange(study, `Umfrage-Zeile ${i + 1} ${ignored ? 'wieder gewertet' : 'ignoriert'}`);
+            };
+            return (
+              <tr key={i} className={ignored ? 'is-ignored' : !p || p.tallyConflict ? 'is-open' : ''}>
+                <td className="num">{i + 1}</td>
+                <td>{timeCol >= 0 ? r[timeCol] : '–'}</td>
+                <td>{orderCol >= 0 ? r[orderCol] || '–' : '–'}</td>
+                <td>{ignored ? <span className="st-muted">ignoriert</span> : p ? p.id : <span className="st-flag">keine</span>}</td>
+                <td>{p ? (meta[p.id]?.slot ?? '–') : ''}</td>
+                <td>
+                  {p ? (p.doc.group ?? p.trackedGroup ?? p.notesGroup ?? '–') : ''}
+                  {p?.tallyConflict && <span className="st-flag"> abweichend</span>}
+                </td>
+                <td>{p?.tallyVia ? VIA[p.tallyVia] : ''}</td>
+                <td>
+                  <button type="button" onClick={toggle} title={ignored ? 'Zeile wieder werten' : 'z. B. Testlauf oder doppelte Abgabe: nicht zuordnen und nicht auswerten'}>
+                    {ignored ? 'Werten' : 'Ignorieren'}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="st-note">Eine Zeile ignorieren (Testlauf, doppelte Abgabe) ordnet die übrigen neu zu. Einzelne Personen: auf „Teilnehmende &amp; Sessions“ die Tally-Zeile wählen.</p>
+    </Section>
   );
 }

@@ -407,6 +407,7 @@ const EN: Record<string, string> = {
   'Neue Aussage': 'New statement',
   'Neue Aussage …': 'New statement …',
   'Frage bearbeiten': 'Edit question',
+  'Notizen nur zu gespielten Testlinks': 'Notes only for played test links',
   'Klicken: Frage bearbeiten': 'Click: edit the question',
   'Frage im Nachgespräch …': 'Follow-up question …',
   'Frage im Nachgespräch bearbeiten (gilt für alle Antworten darunter)': 'Edit the follow-up question (applies to all answers under it)',
@@ -713,6 +714,7 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^(.+): kein gespielter Testlink – nicht gezählt$/, '$1: no played test link – not counted'],
   [/^Abbildung (\S+): /, 'Figure $1: '],
   [/^Bildunterschrift (.+)$/, 'Caption $1'],
   [/^(.+) hinzufügen$/, 'Add $1'],

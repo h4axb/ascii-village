@@ -118,7 +118,8 @@ export function personIdOf(v: string): string | null {
 const asOrder = (v: unknown): 'AB' | 'BA' | null => (v === 'AB' || v === 'BA' ? v : null);
 
 export function buildModel(docs: StudyDocs, game: GameData): Model {
-  const invites = game.invites.filter((i) => i.participant_id && P_ID.test(i.participant_id));
+  // (the user-testing links only: /intro/1 and /intro/2)
+  const invites = game.invites.filter((i) => i.participant_id && P_ID.test(i.participant_id) && /^\/intro\/[12]$/.test(i.link));
   const labels = linkLabels(invites);
   const tally = docs.tally.main;
   const mapping = tally?.mapping ?? [];
@@ -127,13 +128,11 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
   const orderCol = mapping.findIndex((m) => m.role === 'order');
   const timeCol = mapping.findIndex((m) => m.role === 'time');
 
+  // a participant is whoever played a test link (a started personal link);
+  // the survey, the notes and play on other game versions add nobody
   const ids = new Set<string>();
-  for (const i of invites) ids.add(i.participant_id!);
-  for (const e of game.events) if (P_ID.test(e.participant)) ids.add(e.participant);
-  for (const id of Object.keys(docs.people)) if (P_ID.test(id)) ids.add(id);
+  for (const i of invites) if (i.started) ids.add(i.participant_id!);
   const tallyIds = (tally?.rows ?? []).map((r) => (idCol >= 0 ? personIdOf(r[idCol] ?? '') : null));
-  for (const t of tallyIds) if (t) ids.add(t);
-  for (const it of Object.values(docs.items)) if (P_ID.test(it.person)) ids.add(it.person);
 
   const notesMeta = (docs.settings.notesMeta ?? {}) as Record<string, { group?: string; slot?: string }>;
   const durationBy = ((docs.settings.durationBy as { by?: DurationBy } | undefined)?.by ?? 'auto') as DurationBy;
@@ -174,13 +173,24 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     };
   };
 
+  // the game's records of a test link: by its key, or (older records without
+  // one) under its participant while the link ran; play elsewhere is not counted
+  const runKeys = new Set(invites.filter((i) => i.started).map((i) => i.key));
+  const inRun = (r: { participant?: string | null; at: number; key?: string }) =>
+    r.key
+      ? runKeys.has(r.key)
+      : invites.some((i) => {
+          const e = endOf(i);
+          return !!i.started && i.participant_id === r.participant && r.at >= i.started - 60000 && (!e || r.at <= e.at + 60000);
+        });
+
   const persons: Person[] = [...ids].sort().map((id) => {
     const doc: PersonDoc = docs.people[id] ?? { id };
     const links = invites
       .filter((i) => i.participant_id === id)
       .map(linkInfo)
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
-    const trackedGroup = links.find((l) => l.order)?.order ?? asOrder(game.events.find((e) => e.participant === id)?.order) ?? asOrder(game.feedback.find((r) => r.participant === id)?.order);
+    const trackedGroup = links.find((l) => l.order)?.order ?? asOrder(game.events.find((e) => e.participant === id && inRun(e))?.order) ?? asOrder(game.feedback.find((r) => r.participant === id && inRun(r))?.order);
     const notesGroup = notesMeta[id]?.group?.toUpperCase().replace(/[^AB]/g, '') || null;
     // several links: their times added up, or the main link's only
     const main = links.find((l) => l.key === doc.mainLink) ?? [...links].sort((a, b) => (b.linkMinutes ?? 0) - (a.linkMinutes ?? 0))[0];
@@ -333,8 +343,8 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     parts: tally?.parts,
     optionQuestions: optionQuestionsOf(mapping, tally?.parts),
     headers,
-    events: game.events.filter((e) => incIds.has(e.participant)),
-    feedback: game.feedback.filter((r) => !!r.participant && incIds.has(r.participant)),
+    events: game.events.filter((e) => incIds.has(e.participant) && inRun(e)),
+    feedback: game.feedback.filter((r) => !!r.participant && incIds.has(r.participant) && inRun(r)),
     items,
     allItems,
     tags,

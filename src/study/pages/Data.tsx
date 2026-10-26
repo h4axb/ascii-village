@@ -32,6 +32,10 @@ export function useChecks(): Check[] {
   const noGroup = inc.filter((p) => !p.group);
   add('Stichprobe', 'Testgruppe bekannt', !noGroup.length, noGroup.map((p) => p.id).join(', '));
   const excluded = model.persons.filter((p) => p.excluded);
+  // notes under a P-ID without a played test link: not counted, so they show here
+  const known = new Set(model.persons.map((p) => p.id));
+  const strayNotes = [...new Set(model.allItems.map((i) => i.person).filter((id) => !known.has(id)))];
+  add('Stichprobe', 'Notizen nur zu gespielten Testlinks', !strayNotes.length, strayNotes.length ? `${strayNotes.join(', ')}: kein gespielter Testlink – nicht gezählt` : '');
   add('Stichprobe', 'Ausschlüsse begründet', excluded.every((p) => p.doc.reason?.trim()), excluded.map((p) => `${p.id}${p.doc.reason ? `: ${p.doc.reason}` : ' (ohne Grund)'}`).join('; '));
 
   // sessions

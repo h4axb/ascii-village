@@ -8,6 +8,7 @@ import { describe, fmt } from '../stats';
 import { CATEGORY } from '../types';
 import { csv, Empty, Fig, fmtDate, Section, Stat, useCtx } from '../ui';
 import { SurveySummary, TrackingSummary } from './Survey';
+import { CraftLog, GameFlow } from './Flow';
 import { FeedbackLists } from './Notes';
 
 export function ageOf(info: Record<string, string>): number | null {
@@ -42,6 +43,7 @@ export default function Overview() {
     { label: CATEGORY.essential, items: itemsWithRole(slice.items, model, 'essential') },
     { label: CATEGORY.positive, items: itemsWithRole(slice.items, model, 'positive') },
     { label: CATEGORY.surprise, items: itemsWithRole(slice.items, model, 'surprise') },
+    { label: CATEGORY.intervention, items: itemsWithRole(slice.items, model, 'intervention') },
     { label: CATEGORY.recurring, items: slice.items.filter((i) => i.finding) },
   ];
 
@@ -111,6 +113,8 @@ export default function Overview() {
 
       <SurveySummary />
       <TrackingSummary />
+      <CraftLog />
+      <GameFlow />
       <FeedbackLists />
     </>
   );

@@ -49,7 +49,8 @@ function mount(font: FontLoad) {
 // and glyph atlas uses it. If it fails: say so and offer a retry, or play
 // with the emergency fallback (styles.css "Game Fallback …").
 async function start() {
-  if (STUDY) return mount('ok');
+  // (the crafted sprites on /feedback are drawn in the game font)
+  if (STUDY) return mount(await loadGameFont());
   if (DASHBOARD) return mount(await loadGameFont());
   rootEl.innerHTML = '<div class="font-gate"><p>loading…</p></div>';
   const r = await loadGameFont();

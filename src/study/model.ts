@@ -5,7 +5,7 @@
 import { designOf, type FeedbackRecord } from '../feedback/schema';
 import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
-import type { ColumnRole, Design, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
+import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
 import { matchRows, timeOf, type MatchVia } from './match';
 
 // ---- the scope filter: everyone, one person, or one of their links ----
@@ -46,9 +46,11 @@ export interface SurveyRow {
   row: number;
   person: string | null;
   swapped: boolean;
+  group: 'AB' | 'BA' | null; // resolves "1st / 2nd run" to A / B
   p1: Record<string, Design | 'neutral' | null>; // question → answer (swap applied)
   likert: Record<string, Partial<Record<Design, number | null>>>; // item → design → 1..7
-  ueqs: Record<Design, (number | null)[]>; // 8 raw answers 1..7 (reversal applied)
+  likertSingle: Record<string, number | null>; // statements about both designs
+  ueqs: Record<Design | 'O', (number | null)[]>; // 8 raw answers 1..7 (reversal applied); O: one UEQ-S for the whole game
   info: Record<string, string>;
   text: Record<string, string>;
 }
@@ -185,18 +187,27 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     if (!person) unmatchedRows.push(row);
     if (person && exIds.has(person)) return;
     const swapped = !!(person && docs.people[person]?.swapP1);
-    const out: SurveyRow = { row, person, swapped, p1: {}, likert: {}, ueqs: { A: Array(8).fill(null), B: Array(8).fill(null) }, info: {}, text: {} };
+    const group = (person ? byId.get(person)?.group : null) ?? (orderCol >= 0 ? asOrder((r[orderCol] ?? '').trim().toUpperCase()) : null);
+    // the 1st / 2nd run → A / B by the person's group
+    const resolve = (x: Side | 'neutral' | null): Design | 'neutral' | null => (x === '1' || x === '2' ? (group ? (group[Number(x) - 1] as Design) : null) : x);
+    const out: SurveyRow = { row, person, swapped, group, p1: {}, likert: {}, likertSingle: {}, ueqs: { A: Array(8).fill(null), B: Array(8).fill(null), O: Array(8).fill(null) }, info: {}, text: {} };
     mapping.forEach((m, j) => {
       const v = (r[j] ?? '').trim();
       if (m.role === 'p1') {
-        let c = v ? (m.values[v] ?? null) : null;
+        let c = resolve(v ? (m.values[v] ?? null) : null);
         if (swapped && (c === 'A' || c === 'B')) c = c === 'A' ? 'B' : 'A';
         out.p1[m.question] = c;
       } else if (m.role === 'likert') {
-        (out.likert[m.item] ??= {})[m.design] = v ? (m.values[v] ?? null) : null;
+        const x = v ? (m.values[v] ?? null) : null;
+        if (m.design == null) out.likertSingle[m.item] = x;
+        else {
+          const d = resolve(m.design);
+          if (d === 'A' || d === 'B') (out.likert[m.item] ??= {})[d] = x;
+        }
       } else if (m.role === 'ueqs') {
         const n = Number(/\d/.exec(v)?.[0]);
-        out.ueqs[m.design][m.item] = n >= 1 && n <= 7 ? (m.reversed ? 8 - n : n) : null;
+        const d = m.design == null ? 'O' : resolve(m.design);
+        if (d === 'A' || d === 'B' || d === 'O') out.ueqs[d][m.item] = n >= 1 && n <= 7 ? (m.reversed ? 8 - n : n) : null;
       } else if (m.role === 'info') {
         if (v) out.info[m.label] = v;
       } else if (m.role === 'text') {

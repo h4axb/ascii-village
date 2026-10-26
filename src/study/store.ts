@@ -63,13 +63,26 @@ export function useStudy() {
       // the first visit stores the default tag sets
       if (!Object.keys(d.tags).length) {
         d.tags = Object.fromEntries(DEFAULT_TAGS.map((g) => [g.id, g]));
+        d.settings = { ...d.settings, tagsAdded: { ids: DEFAULT_TAGS.map((g) => g.id) } };
         void fetch('/api/study/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...auth(p) },
-          body: JSON.stringify({ put: DEFAULT_TAGS.map((g) => ({ coll: 'tags', id: g.id, data: g })) }),
+          body: JSON.stringify({ put: [...DEFAULT_TAGS.map((g) => ({ coll: 'tags', id: g.id, data: g })), { coll: 'settings', id: 'tagsAdded', data: d.settings.tagsAdded }] }),
         });
       }
       docsRef.current = d;
+      // tag sets added after the first visit, once each (deleting one keeps it deleted)
+      const added = ((d.settings.tagsAdded as { ids?: string[] } | undefined)?.ids ?? []);
+      const missing = DEFAULT_TAGS.filter((g) => g.id === 'moderation' && !added.includes(g.id) && !Object.values(d.tags).some((t) => t.chips.some((c) => c.role === 'intervention')));
+      if (missing.length) {
+        d.tags = { ...d.tags, ...Object.fromEntries(missing.map((g) => [g.id, { ...g, order: Object.keys(d.tags).length }])) };
+        d.settings = { ...d.settings, tagsAdded: { ids: [...added, ...missing.map((g) => g.id)] } };
+        void fetch('/api/study/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...auth(p) },
+          body: JSON.stringify({ put: [...missing.map((g) => ({ coll: 'tags', id: g.id, data: d.tags[g.id] })), { coll: 'settings', id: 'tagsAdded', data: d.settings.tagsAdded }] }),
+        });
+      }
       setDocs(d);
       setGame({ feedback: Array.isArray(feedback) ? feedback : [], events: Array.isArray(events) ? events : [], invites: Array.isArray(invites) ? invites : [] });
       setState('ready');

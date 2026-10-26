@@ -3,7 +3,7 @@
 // Wilson interval), Teil 2 Likert (Wilcoxon, r), Teil 3 UEQ-S (scale means,
 // intervals, benchmark, α), Teil 4 the participants' details.
 import { Bars, Diverging, Dots, NEUTRAL, SERIES } from '../charts';
-import { part1, part2, part3 } from '../analysis';
+import { part1, part2, part2Single, part3, type P2Single, type P3Result } from '../analysis';
 import { craftStats, gameRatings, prefChoices, PREF_LABEL, RATING_LABEL, SCOPE_LABEL } from '../model';
 import { describe, fmt, fmtP, meanCI, pct, UEQS_ITEMS } from '../stats';
 import { csv, Empty, Fig, Section, useCtx } from '../ui';
@@ -32,6 +32,7 @@ export default function Survey() {
     );
   const p1 = part1(rows);
   const p2 = part2(rows);
+  const p2s = part2Single(rows);
   const p3 = part3(rows);
   return (
     <>
@@ -143,9 +144,10 @@ export default function Survey() {
             </table>
             <p className="st-note">Exakter Wilcoxon-Vorzeichen-Rang-Test (zweiseitig, B − A, Nulldifferenzen ausgeschlossen); r = Rang-biseriale Korrelation (positiv: B höher).</p>
           </>
-        ) : (
+        ) : !p2s.length ? (
           <Empty>Keine Spalte als „Teil 2“ zugeordnet.</Empty>
-        )}
+        ) : null}
+        {p2s.length > 0 && <Part2Single items={p2s} />}
       </Section>
 
       <Section title="Teil 3: UEQ-S" id="teil3">
@@ -237,9 +239,10 @@ export default function Survey() {
               />
             </Fig>
           </>
-        ) : (
+        ) : !p3.overall ? (
           <Empty>Keine Spalte als „Teil 3“ zugeordnet.</Empty>
-        )}
+        ) : null}
+        {p3.overall && <Part3Overall p3={p3} />}
       </Section>
 
       <Telemetry />
@@ -304,6 +307,24 @@ export function SurveySummary() {
                 Mdn A {fmt(r.A.median, 1)}, B {fmt(r.B.median, 1)}; r = {fmt(r.test.r)}
               </td>
               <td className="num">{fmtP(r.test.p)}</td>
+            </tr>
+          ))}
+          {part2Single(slice.survey).map((r) => (
+            <tr key={`2s${r.item}`}>
+              <td>Teil 2: {r.item}</td>
+              <td>
+                Mdn {fmt(r.stats.median, 1)} (IQR {fmt(r.stats.q1, 1)}–{fmt(r.stats.q3, 1)}), M = {fmt(r.stats.mean)}
+              </td>
+              <td className="num">–</td>
+            </tr>
+          ))}
+          {p3.overall?.map((o) => (
+            <tr key={`3o${o.scale}`}>
+              <td>Teil 3: {SCALE_NAME[o.scale]} (gesamtes Spiel)</td>
+              <td>
+                M {fmt(o.v.mean)} ({o.v.bench})
+              </td>
+              <td className="num">–</td>
             </tr>
           ))}
           {p3.answered &&
@@ -457,5 +478,87 @@ export function TrackingSummary() {
         </tbody>
       </table>
     </Section>
+  );
+}
+
+// Teil 2 statements about both designs: distribution and median
+function Part2Single({ items }: { items: P2Single[] }) {
+  const scale = items[0].scale === 7 ? LIKERT7 : LIKERT5;
+  return (
+    <>
+      <Fig id="teil2single" table={() => csv([['Aussage', ...scale, 'Median', 'Q1', 'Q3', 'M', 'SD', 'n'], ...items.map((r) => [r.item, ...r.counts, fmt(r.stats.median, 1), fmt(r.stats.q1, 1), fmt(r.stats.q3, 1), fmt(r.stats.mean), fmt(r.stats.sd), r.stats.n])])}>
+        <Diverging scale={scale} rows={items.map((r) => ({ label: r.item, counts: r.counts }))} />
+      </Fig>
+      <table className="st-table">
+        <thead>
+          <tr>
+            <th>Aussage</th>
+            <th>Mdn (IQR)</th>
+            <th>M (SD)</th>
+            <th>n</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((r) => (
+            <tr key={r.item}>
+              <td>{r.item}</td>
+              <td>
+                {fmt(r.stats.median, 1)} ({fmt(r.stats.q1, 1)}–{fmt(r.stats.q3, 1)})
+              </td>
+              <td>
+                {fmt(r.stats.mean)} ({fmt(r.stats.sd)})
+              </td>
+              <td className="num">{r.stats.n}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+// one UEQ-S for the whole game (not per design)
+function Part3Overall({ p3 }: { p3: P3Result }) {
+  const o = p3.overall!;
+  return (
+    <>
+      <Fig id="teil3gesamt" table={() => csv([['Skala', 'M', 'KI unten', 'KI oben', 'SD', 'α', 'Benchmark', 'n'], ...o.map((x) => [SCALE_NAME[x.scale], fmt(x.v.mean), fmt(x.v.ci[0]), fmt(x.v.ci[1]), fmt(x.v.sd), fmt(x.v.alpha), x.v.bench, x.v.n])])}>
+        <Dots
+          series={[{ name: 'Gesamtes Spiel', color: SERIES.B }]}
+          domain={[-3, 3]}
+          refLines={[0]}
+          rows={[
+            ...o.map((x) => ({ label: SCALE_NAME[x.scale], points: [{ value: x.v.mean, lo: x.v.ci[0], hi: x.v.ci[1], series: 0 }] })),
+            ...p3.overallItems.map((m, i) => ({ label: UEQS_ITEMS[i].join(' – '), points: [{ value: m, lo: NaN, hi: NaN, series: 0 }] })),
+          ]}
+        />
+      </Fig>
+      <table className="st-table">
+        <thead>
+          <tr>
+            <th>Skala</th>
+            <th>M [95 %-KI]</th>
+            <th>SD</th>
+            <th>α</th>
+            <th>Benchmark</th>
+            <th>n</th>
+          </tr>
+        </thead>
+        <tbody>
+          {o.map((x) => (
+            <tr key={x.scale}>
+              <td>{SCALE_NAME[x.scale]}</td>
+              <td>
+                {fmt(x.v.mean)} [{fmt(x.v.ci[0])}; {fmt(x.v.ci[1])}]
+              </td>
+              <td className="num">{fmt(x.v.sd)}</td>
+              <td className="num">{fmt(x.v.alpha)}</td>
+              <td>{x.v.bench}</td>
+              <td className="num">{x.v.n}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }

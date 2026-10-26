@@ -5,6 +5,9 @@ import type { RunEvent } from '../quest/runlog';
 import type { ExportInvite } from '../feedback/studyExport';
 
 export type Design = 'A' | 'B';
+// a survey column's design: A or B by name, or the 1st / 2nd run of the
+// test (A or B depending on the participant's group AB / BA)
+export type Side = Design | '1' | '2';
 
 // ---- Tally ----
 export type ColumnRole =
@@ -12,9 +15,11 @@ export type ColumnRole =
   | { role: 'id' } // the participant id the game sent (tallyid / test_id)
   | { role: 'order' } // the design order the game sent (AB / BA)
   | { role: 'time' } // when the answer was submitted (pairs rows with participants: match.ts)
-  | { role: 'p1'; question: string; values: Record<string, Design | 'neutral' | null> } // Teil 1: direct comparison
-  | { role: 'likert'; item: string; design: Design; values: Record<string, number | null> } // Teil 2
-  | { role: 'ueqs'; item: number; design: Design; reversed: boolean } // Teil 3: item 0–7, answers 1–7
+  | { role: 'p1'; question: string; values: Record<string, Side | 'neutral' | null> } // Teil 1: direct comparison
+  // Teil 2; design null: a statement about both (no pair, described only)
+  | { role: 'likert'; item: string; design: Side | null; values: Record<string, number | null> }
+  // Teil 3: item 0–7, answers 1–7; design null: one UEQ-S for the whole game
+  | { role: 'ueqs'; item: number; design: Side | null; reversed: boolean }
   | { role: 'info'; label: string; numeric: boolean } // Teil 4
   | { role: 'text'; label: string }; // free text
 export interface TallyDoc {
@@ -23,6 +28,7 @@ export interface TallyDoc {
   headers: string[];
   rows: string[][];
   mapping: ColumnRole[];
+  parts?: (number | null)[]; // the first column of Teil 1–4 (the roles inside follow it)
 }
 
 // ---- participants: corrections that apply everywhere ----
@@ -73,7 +79,7 @@ export interface ItemDoc {
   manual?: boolean; // added by hand (kept on re-import)
 }
 
-export type ChipRole = 'game' | 'survey' | 'process' | 'problem' | 'positive' | 'surprise' | 'remark' | 'essential' | 'tbd' | 'nice' | 'rejected';
+export type ChipRole = 'game' | 'survey' | 'process' | 'problem' | 'positive' | 'surprise' | 'remark' | 'intervention' | 'essential' | 'tbd' | 'nice' | 'rejected';
 export interface Chip {
   id: string;
   label: string;
@@ -183,11 +189,19 @@ export const DEFAULT_TAGS: TagGroup[] = [
       { id: 'technik', label: 'Technik' },
     ],
   },
+  // the moderator had to step in (combinable with any "Art")
+  {
+    id: 'moderation',
+    name: 'Moderation',
+    multi: false,
+    order: 4,
+    chips: [{ id: 'eingriff', label: 'Eingriff', role: 'intervention' }],
+  },
   {
     id: 'gueltigkeit',
     name: 'Gültigkeit',
     multi: false,
-    order: 4,
+    order: 5,
     chips: [{ id: 'verworfen', label: 'Verworfen', role: 'rejected' }],
   },
 ];
@@ -197,5 +211,6 @@ export const CATEGORY = {
   essential: 'Kritische Usability-Probleme',
   positive: 'Positive Rückmeldungen',
   surprise: 'Unerwartete Beobachtungen',
+  intervention: 'Moderationseingriffe',
   recurring: 'Wiederkehrende Befunde',
 } as const;

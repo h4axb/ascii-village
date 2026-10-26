@@ -1,8 +1,8 @@
 // Import: the Tally export (CSV) with a role for each column, and the notes
 // file. Re-importing keeps the column roles (by header) and every tag.
 import { useState } from 'react';
-import type { ColumnRole, Design, TallyDoc } from '../types';
-import { carryMapping, choiceOf, designIn, likertOf, parseCsv, suggestMapping, ueqsItemIn } from '../tally';
+import type { ColumnRole, Side, TallyDoc } from '../types';
+import { carryMapping, choiceOf, conditionIn, designIn, likertOf, parseCsv, reassignParts, suggestMapping, ueqsItemIn } from '../tally';
 import { UEQS_ITEMS } from '../stats';
 import { LazyInput, logChange, Section, useCtx } from '../ui';
 import { NotesImport } from './Notes';
@@ -25,10 +25,10 @@ function roleFor(role: ColumnRole['role'], header: string, vals: string[]): Colu
     case 'p1':
       return { role, question: header, values: Object.fromEntries(distinct.map((v) => [v, choiceOf(v)])) };
     case 'likert':
-      return { role, item: header, design: designIn(header) ?? 'A', values: Object.fromEntries(distinct.map((v) => [v, likertOf(v)])) };
+      return { role, item: header, design: designIn(header) ?? conditionIn(header) ?? null, values: Object.fromEntries(distinct.map((v) => [v, likertOf(v)])) };
     case 'ueqs': {
       const u = ueqsItemIn(header);
-      return { role, item: u?.item ?? 0, design: designIn(header) ?? 'A', reversed: u?.reversed ?? false };
+      return { role, item: u?.item ?? 0, design: designIn(header) ?? conditionIn(header) ?? null, reversed: u?.reversed ?? false };
     }
     case 'info':
       return { role, label: header, numeric: vals.every((v) => /^-?\d+([.,]\d+)?$/.test(v)) };
@@ -51,8 +51,8 @@ export default function Import() {
     if (all.length < 2) return setMsg('Die Datei enthält keine Antworten.');
     const [headers, ...rows] = all;
     const suggested = suggestMapping(headers, rows);
-    const mapping = tally ? carryMapping(tally.headers, tally.mapping, headers, suggested) : suggested;
-    const doc: TallyDoc = { file: f.name, importedAt: Date.now(), headers, rows: rows.map((r) => headers.map((_, j) => r[j] ?? '')), mapping };
+    const mapping = tally ? carryMapping(tally.headers, tally.mapping, headers, suggested.mapping) : suggested.mapping;
+    const doc: TallyDoc = { file: f.name, importedAt: Date.now(), headers, rows: rows.map((r) => headers.map((_, j) => r[j] ?? '')), mapping, parts: suggested.parts };
     study.commit([{ coll: 'tally', id: 'main', data: doc }]);
     setMsg(`${rows.length} Antworten, ${headers.length} Spalten importiert${tally ? ' (Zuordnung übernommen)' : ''}.`);
     logChange(study, `Tally-Import: ${f.name}, ${rows.length} Antworten, ${headers.length} Spalten`);
@@ -82,8 +82,8 @@ export default function Import() {
             <button
               type="button"
               onClick={() => {
-                const mapping = suggestMapping(tally.headers, tally.rows);
-                study.commit([{ coll: 'tally', id: 'main', data: { ...tally, mapping } }]);
+                const { mapping, parts } = suggestMapping(tally.headers, tally.rows);
+                study.commit([{ coll: 'tally', id: 'main', data: { ...tally, mapping, parts } }]);
               }}
             >
               Zuordnung neu vorschlagen
@@ -97,6 +97,7 @@ export default function Import() {
           )}
         </div>
         {msg && <p className="st-note">{msg}</p>}
+        {tally && <PartRanges tally={tally} />}
         {tally && (
           <div className="st-mapping">
             {tally.headers.map((h, j) => {
@@ -106,7 +107,10 @@ export default function Import() {
               return (
                 <div key={j} className={`st-col${m.role === 'ignore' ? ' is-ignored' : ''}`}>
                   <div className="st-col-head">
-                    <div className="st-col-name">{h || `Spalte ${j + 1}`}</div>
+                    <div className="st-col-name">
+                      <span className="st-muted">{j + 1}. </span>
+                      {h || `Spalte ${j + 1}`}
+                    </div>
                     <div className="st-col-sample">{[...new Set(vals)].slice(0, 4).join(' · ') || '(leer)'}</div>
                   </div>
                   <div className="st-col-role">
@@ -130,12 +134,48 @@ export default function Import() {
   );
 }
 
-function DesignSelect({ value, onChange }: { value: Design; onChange: (d: Design) => void }) {
+// A / B by name, or the 1st / 2nd run (A or B by the person's group);
+// none: about both designs (Teil 2) or the whole game (Teil 3)
+function DesignSelect({ value, onChange }: { value: Side | null; onChange: (d: Side | null) => void }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value as Design)} aria-label="Variante">
+    <select value={value ?? ''} onChange={(e) => onChange((e.target.value || null) as Side | null)} aria-label="Variante">
       <option value="A">Variante A</option>
       <option value="B">Variante B</option>
+      <option value="1">1. Durchgang</option>
+      <option value="2">2. Durchgang</option>
+      <option value="">beide / gesamt</option>
     </select>
+  );
+}
+
+// where Teil 1–4 start; the roles of columns that move to another part are suggested anew
+function PartRanges({ tally }: { tally: TallyDoc }) {
+  const { study } = useCtx();
+  const parts = tally.parts ?? [null, null, null, null];
+  const NAMES = ['Teil 1: Vergleich', 'Teil 2: Likert', 'Teil 3: UEQ-S', 'Teil 4: Angaben'];
+  const set = (i: number, v: number | null) => {
+    const next = [...parts];
+    next[i] = v;
+    const mapping = reassignParts(tally.headers, tally.rows, tally.mapping, parts, next);
+    study.commit([{ coll: 'tally', id: 'main', data: { ...tally, parts: next, mapping } }]);
+    logChange(study, `Tally: ${NAMES[i]} ab ${v == null ? '–' : `Spalte ${v + 1}`}`);
+  };
+  return (
+    <div className="st-parts">
+      {NAMES.map((n, i) => (
+        <label key={n}>
+          {n} ab
+          <select value={parts[i] ?? ''} onChange={(e) => set(i, e.target.value === '' ? null : Number(e.target.value))}>
+            <option value="">–</option>
+            {tally.headers.map((h, j) => (
+              <option key={j} value={j}>
+                {j + 1}. {h.length > 60 ? `${h.slice(0, 58)}…` : h}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+    </div>
   );
 }
 
@@ -148,10 +188,12 @@ function RoleDetail({ m, onChange }: { m: ColumnRole; onChange: (r: ColumnRole) 
           {Object.entries(m.values).map(([v, c]) => (
             <label key={v}>
               <span className="st-val">{v}</span>
-              <select value={c ?? ''} onChange={(e) => onChange({ ...m, values: { ...m.values, [v]: (e.target.value || null) as Design | 'neutral' | null } })}>
+              <select value={c ?? ''} onChange={(e) => onChange({ ...m, values: { ...m.values, [v]: (e.target.value || null) as Side | 'neutral' | null } })}>
                 <option value="">ungültig</option>
                 <option value="A">A</option>
                 <option value="B">B</option>
+                <option value="1">1. Durchgang</option>
+                <option value="2">2. Durchgang</option>
                 <option value="neutral">keine Präferenz</option>
               </select>
             </label>

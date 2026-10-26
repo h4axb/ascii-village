@@ -80,14 +80,41 @@ export function part2(rows: SurveyRow[]): P2Result[] {
   });
 }
 
+// Teil 2 statements about both designs (asked once): described only
+export interface P2Single {
+  item: string;
+  scale: number;
+  stats: Describe;
+  counts: number[];
+}
+export function part2Single(rows: SurveyRow[]): P2Single[] {
+  const items = [...new Set(rows.flatMap((r) => Object.keys(r.likertSingle)))];
+  const maxV = Math.max(5, ...rows.flatMap((r) => Object.values(r.likertSingle).map((v) => v ?? 0)));
+  const scale = maxV > 5 ? 7 : 5;
+  return items.map((item) => {
+    const xs = rows.map((r) => r.likertSingle[item]).filter((v): v is number => v != null);
+    return { item, scale, stats: describe(xs), counts: Array.from({ length: scale }, (_, i) => xs.filter((v) => v === i + 1).length) };
+  });
+}
+
 export interface UeqScaleResult {
   scale: UeqScale;
   A: { mean: number; ci: [number, number]; sd: number; n: number; alpha: number; bench: string };
   B: { mean: number; ci: [number, number]; sd: number; n: number; alpha: number; bench: string };
   test: Wilcoxon; // B − A, per person scale scores
 }
+export interface UeqSide {
+  mean: number;
+  ci: [number, number];
+  sd: number;
+  n: number;
+  alpha: number;
+  bench: string;
+}
 export interface P3Result {
-  answered: boolean;
+  answered: boolean; // per design (A and B)
+  overall: { scale: UeqScale; v: UeqSide }[] | null; // one UEQ-S for the whole game
+  overallItems: number[];
   scales: UeqScaleResult[];
   items: { item: number; A: number; B: number }[];
 }
@@ -95,14 +122,14 @@ export interface P3Result {
 const score = (v: number | null) => (v == null ? null : v - 4);
 export function part3(rows: SurveyRow[]): P3Result {
   const answered = rows.some((r) => [...r.ueqs.A, ...r.ueqs.B].some((v) => v != null));
-  const per = (d: Design, idx: number[]) =>
+  const per = (d: Design | 'O', idx: number[]) =>
     rows.map((r) => {
       const v = idx.map((i) => score(r.ueqs[d][i])).filter((x): x is number => x != null);
       return v.length === idx.length ? mean(v) : null; // complete scales only
     });
   const scales = (Object.keys(UEQS_SCALE_ITEMS) as UeqScale[]).map((scale) => {
     const idx = UEQS_SCALE_ITEMS[scale];
-    const side = (d: Design) => {
+    const side = (d: Design | 'O'): UeqSide => {
       const xs = per(d, idx).filter((x): x is number => x != null);
       const m = mean(xs);
       return {
@@ -132,7 +159,17 @@ export function part3(rows: SurveyRow[]): P3Result {
     A: mean(rows.map((r) => score(r.ueqs.A[item])).filter((x): x is number => x != null)),
     B: mean(rows.map((r) => score(r.ueqs.B[item])).filter((x): x is number => x != null)),
   }));
-  return { answered, scales, items };
+  const hasO = rows.some((r) => r.ueqs.O.some((v) => v != null));
+  const overall = hasO
+    ? (Object.keys(UEQS_SCALE_ITEMS) as UeqScale[]).map((scale) => {
+        const idx = UEQS_SCALE_ITEMS[scale];
+        const xs = per('O', idx).filter((x): x is number => x != null);
+        const m = mean(xs);
+        return { scale, v: { mean: m, ci: meanCI(xs), sd: describe(xs).sd, n: xs.length, alpha: cronbachAlpha(rows.map((r) => idx.map((i) => score(r.ueqs.O[i]) ?? NaN))), bench: ueqsBenchmark(scale, m) } };
+      })
+    : null;
+  const overallItems = Array.from({ length: 8 }, (_, item) => mean(rows.map((r) => score(r.ueqs.O[item])).filter((x): x is number => x != null)));
+  return { answered, scales, items, overall, overallItems };
 }
 
 export interface P4Field {

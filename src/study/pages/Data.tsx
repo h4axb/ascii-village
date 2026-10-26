@@ -73,12 +73,20 @@ export function useChecks(): Check[] {
     add('Umfrage', 'Keine fehlenden Werte', !missing.length, missing.map((x) => `${tally.headers[x.j]}: ${x.n}`).join('; '));
     // Teil 2 pairs and Teil 3 completeness
     const likert = model.mapping.filter((m): m is Extract<ColumnRole, { role: 'likert' }> => m.role === 'likert');
-    const unpaired = [...new Set(likert.map((m) => m.item))].filter((it) => !(likert.some((m) => m.item === it && m.design === 'A') && likert.some((m) => m.item === it && m.design === 'B')));
-    add('Umfrage', 'Teil 2: Items paarweise (A und B)', !unpaired.length, unpaired.join(', '));
+    const paired = likert.filter((m) => m.design != null);
+    const unpaired = [...new Set(paired.map((m) => m.item))].filter((it) => new Set(paired.filter((m) => m.item === it).map((m) => (m.design === '1' || m.design === '2' ? `r${m.design}` : m.design))).size !== 2);
+    const single = new Set(likert.filter((m) => m.design == null).map((m) => m.item)).size;
+    add('Umfrage', 'Teil 2: Items paarweise (A und B)', !unpaired.length, `${new Set(paired.map((m) => m.item)).size - unpaired.length} Paare${single ? `, ${single} Aussagen zu beiden` : ''}${unpaired.length ? `; ohne Gegenstück: ${unpaired.join(', ')}` : ''}`);
     const ueq = model.mapping.filter((m): m is Extract<ColumnRole, { role: 'ueqs' }> => m.role === 'ueqs');
     if (ueq.length) {
-      const per = (d: 'A' | 'B') => new Set(ueq.filter((m) => m.design === d).map((m) => m.item)).size;
-      add('Umfrage', 'Teil 3: 8 UEQ-S-Items je Variante', per('A') === 8 && per('B') === 8, `A ${per('A')}, B ${per('B')}; gedreht: ${ueq.filter((m) => m.reversed).length}`);
+      const per = (d: string | null) => new Set(ueq.filter((m) => (m.design ?? null) === d).map((m) => m.item)).size;
+      const sets = ([['A', 'A'], ['B', 'B'], ['1', '1. Durchgang'], ['2', '2. Durchgang'], [null, 'gesamt']] as const).filter(([d]) => per(d));
+      add('Umfrage', 'Teil 3: je 8 UEQ-S-Items', sets.every(([d]) => per(d) === 8), `${sets.map(([d, l]) => `${l} ${per(d)}`).join(', ')}; gedreht: ${ueq.filter((m) => m.reversed).length}`);
+    }
+    const byRun = model.mapping.some((m) => (m.role === 'likert' || m.role === 'ueqs') && (m.design === '1' || m.design === '2'));
+    if (byRun) {
+      const noGroup = rows.filter((r) => !r.group);
+      add('Umfrage', '1./2. Durchgang auflösbar (Testgruppe bekannt)', !noGroup.length, noGroup.map((r) => r.person ?? `Zeile ${r.row + 1}`).join(', '));
     }
     const p1Invalid = model.mapping
       .map((m, j) => (m.role === 'p1' ? rows.filter((r) => (tally.rows[r.row]?.[j] ?? '').trim() && m.values[(tally.rows[r.row][j] ?? '').trim()] == null).length : 0))

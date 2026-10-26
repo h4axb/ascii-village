@@ -462,6 +462,7 @@ export function Tags() {
     ['positive', 'Art: Positiv'],
     ['surprise', 'Art: Überraschung'],
     ['remark', 'Art: Anmerkung'],
+    ['intervention', 'Moderation: Eingriff'],
     ['essential', 'Priorität: essenziell'],
     ['tbd', 'Priorität: offen'],
     ['nice', 'Priorität: nice-to-have'],
@@ -595,6 +596,7 @@ export function FeedbackLists() {
       {block('essential', CATEGORY.essential)}
       {block('positive', CATEGORY.positive)}
       {block('surprise', CATEGORY.surprise)}
+      {block('intervention', CATEGORY.intervention)}
     </>
   );
 }

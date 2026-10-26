@@ -2,7 +2,7 @@
 // suggests chips (shown hollow); only chips confirmed here count anywhere.
 // Also: the notes import, the priority view, the tag editor, and the lists
 // of the Übersicht.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } from '../types';
 import { CATEGORY, SECTION_LABEL } from '../types';
 import { distinctPersons, itemsWithRole, type Model } from '../model';
@@ -219,11 +219,20 @@ function ChipCell({ item, g, onChange, labelOnly }: { item: ItemDoc; g: TagGroup
   );
 }
 
-function ItemRow({ item, model, save, remove }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void }) {
+function ItemRow({ item, model, save, remove, fresh }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void; fresh?: boolean }) {
   const { study } = useCtx();
   const view = useContentView();
   const [editDe, setEditDe] = useState(false);
-  const [editOrig, setEditOrig] = useState(false);
+  // a statement just added: open for typing and scrolled into view
+  const [editOrig, setEditOrig] = useState(!!fresh);
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (fresh) rowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [fresh]);
+  // a new statement left without text goes again
+  useEffect(() => {
+    if (!editOrig && !item.text && item.manual) remove(item);
+  }, [editOrig]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showInt, setShowInt] = useState(!!item.interpretation);
   const [showAdd, setShowAdd] = useState(!!item.addition);
   const findings = Object.values(study.docs.findings).sort((a, b) => a.name.localeCompare(b.name));
@@ -232,6 +241,12 @@ function ItemRow({ item, model, save, remove }: { item: ItemDoc; model: Model; s
   const d = designOfItem(item);
   // the original: corrections are logged with before and after; new lines split the statement
   const saveOriginal = (draft: string) => {
+    // a new statement: its first wording (not a correction); left empty, it goes again
+    if (!item.text) {
+      const t = draft.trim();
+      if (!t) return remove(item);
+      return save({ ...item, text: t, original: t });
+    }
     const parts = draft
       .split('\n')
       .map((x) => x.trim())
@@ -269,11 +284,11 @@ function ItemRow({ item, model, save, remove }: { item: ItemDoc; model: Model; s
   const origBlock = (
     <div className={view === 'both' ? 'st-orig is-secondary' : 'st-orig'}>
       {view === 'both' && <span className="st-cell-label">Original</span>}
-      {editOrig ? <LazyArea value={item.text} onSave={saveOriginal} autoFocus onDone={() => setEditOrig(false)} /> : <p data-notr>{item.text}</p>}
+      {editOrig ? <LazyArea value={item.text} onSave={saveOriginal} autoFocus onDone={() => setEditOrig(false)} placeholder="Neue Aussage …" /> : <p data-notr>{item.text}</p>}
     </div>
   );
   return (
-    <div className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}`}>
+    <div ref={rowRef} className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}${fresh ? ' is-fresh' : ''}`}>
       <div className="st-item-text">
         <div className="st-item-meta">
           <span className="st-pid">
@@ -386,6 +401,7 @@ export default function Notes() {
   const { study, model, scope } = ctx;
   const [filter, setFilter] = useState<'all' | 'open' | 'changed'>('all');
   const [q, setQ] = useState('');
+  const [fresh, setFresh] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const metas = (study.docs.settings.notesMeta ?? {}) as Record<string, NotesMeta>;
   const save = (i: ItemDoc) => study.commit([{ coll: 'items', id: i.id, data: i }]);
@@ -472,14 +488,18 @@ export default function Notes() {
                 type="button"
                 onClick={() => {
                   const id = `m-${pid}-${Date.now().toString(36)}`;
-                  save({ id, person: pid, section: 'during', text: 'Neue Aussage', order: 999, chips: [], suggested: [], manual: true });
+                  // (shown at once, opened for typing; filters that would hide it are reset)
+                  setFilter('all');
+                  setQ('');
+                  setFresh(id);
+                  save({ id, person: pid, section: 'during', text: '', order: Math.max(0, ...mine.map((x) => x.order)) + 1, chips: [], suggested: [], manual: true });
                 }}
               >
                 + Aussage
               </button>
             </header>
             {mine.map((i) => (
-              <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} />
+              <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} fresh={i.id === fresh} />
             ))}
           </section>
         );

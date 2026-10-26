@@ -405,6 +405,7 @@ const EN: Record<string, string> = {
   ausgeschlossen: 'excluded',
   'Alle bestätigen': 'Confirm all',
   'Neue Aussage': 'New statement',
+  'Neue Aussage …': 'New statement …',
   '+ Aussage': '+ Statement',
   Essenziell: 'Essential',
   'Offen (t.b.d.)': 'Open (t.b.d.)',

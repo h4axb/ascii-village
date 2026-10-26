@@ -1159,3 +1159,6 @@ body:has(.st-root) {
   max-width: 100%;
   min-width: 0;
 }
+.st-item.is-fresh {
+  box-shadow: inset 3px 0 0 var(--st-accent);
+}

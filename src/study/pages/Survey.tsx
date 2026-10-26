@@ -3,7 +3,7 @@
 // Wilson interval), Teil 2 Likert (Wilcoxon, r), Teil 3 UEQ-S (scale means,
 // intervals, benchmark, α), Teil 4 the participants' details.
 import { Bars, Diverging, Dots, NEUTRAL, SERIES } from '../charts';
-import { part1, part2, part2Single, part3, type P1Result, type P2Single, type P3Result } from '../analysis';
+import { choices, part1, part2, part2Single, part3, type ChoiceResult, type P1Result, type P2Single, type P3Result } from '../analysis';
 import { craftStats, gameRatings, partOfKey, prefChoices, PREF_LABEL, RATING_LABEL, SCOPE_LABEL } from '../model';
 import { describe, fmt, fmtP, meanCI, pct, UEQS_ITEMS } from '../stats';
 import { csv, Empty, Fig, Section, useCtx } from '../ui';
@@ -38,6 +38,8 @@ export default function Survey() {
   const p3 = part3(rows);
   // choice questions go to the part they sit in (Daten & Validierung), not all to Teil 1
   const parts = study.docs.tally.main?.parts;
+  const ch = choices(rows);
+  const chIn = (k: number) => ch.filter((c) => Math.max(2, Math.min(3, partOfKey(model, parts, c.question) || 2)) === k);
   const p1In = (k: number) => p1.filter((r) => Math.max(1, Math.min(3, partOfKey(model, parts, r.question) || 1)) === k);
   return (
     <>
@@ -109,7 +111,10 @@ export default function Survey() {
           <Empty>Keine Spalte als „Teil 2“ zugeordnet.</Empty>
         ) : null}
         {p2s.length > 0 && <Part2Single items={p2s} />}
-        {p1In(2).length > 0 && <ChoiceBlock results={p1In(2)} figId="teil2wahl" />}
+        {p1In(2).length > 0 && <ChoiceBlock results={p1In(2)} figId="teil2vergleich" />}
+        {chIn(2).map((c, i) => (
+          <SingleChoice key={c.question} c={c} figId="teil2wahl" n={i + 1} />
+        ))}
       </Section>
 
       <Section title="Teil 3: UEQ-S" id="teil3">
@@ -205,7 +210,10 @@ export default function Survey() {
           <Empty>Keine Spalte als „Teil 3“ zugeordnet.</Empty>
         ) : null}
         {p3.overall && <Part3Overall p3={p3} />}
-        {p1In(3).length > 0 && <ChoiceBlock results={p1In(3)} figId="teil3wahl" />}
+        {p1In(3).length > 0 && <ChoiceBlock results={p1In(3)} figId="teil3vergleich" />}
+        {chIn(3).map((c, i) => (
+          <SingleChoice key={c.question} c={c} figId="teil3wahl" n={i + 1} />
+        ))}
       </Section>
 
       <Telemetry />
@@ -282,6 +290,19 @@ export function SurveySummary() {
               <td>Teil 2: {T(r.item)}</td>
               <td>
                 Mdn {fmt(r.stats.median, 1)} (IQR {fmt(r.stats.q1, 1)}–{fmt(r.stats.q3, 1)}), M = {fmt(r.stats.mean)}
+              </td>
+              <td className="num">–</td>
+            </tr>
+          ))}
+          {choices(slice.survey).map((c) => (
+            <tr key={`c${c.question}`}>
+              <td>
+                Teil {Math.max(2, partOfKey(model, study.docs.tally.main?.parts, c.question) || 2)}: {T(c.question)}
+              </td>
+              <td>
+                {c.options
+                  .map((o) => `${T(o.option)} ${o.k}/${c.n}`)
+                  .join(' · ')}
               </td>
               <td className="num">–</td>
             </tr>
@@ -583,6 +604,47 @@ function ChoiceBlock({ results, figId }: { results: P1Result[]; figId: string })
               </tbody>
             </table>
             <p className="st-note">Exakter Vorzeichentest (zweiseitig) über die Urteile mit Präferenz; „keine Präferenz“ ausgeschlossen. Wilson-Intervall für den Anteil der Mehrheit.</p>
+    </>
+  );
+}
+
+// a single-choice question with several options: one bar per option, share and interval
+function SingleChoice({ c, figId, n }: { c: ChoiceResult; figId: string; n: number }) {
+  const { study, slice } = useCtx();
+  const T = useSurveyText(study);
+  const missing = slice.persons.length - c.n;
+  return (
+    <>
+      <Fig id={figId} sub={{ n, title: T(c.question) }} table={() => csv([['Antwort', 'n', 'Anteil', 'KI unten', 'KI oben', 'Teilnehmende'], ...c.options.map((o) => [o.option, o.k, fmt(o.share), fmt(o.ci[0]), fmt(o.ci[1]), o.persons.join(' ')])])}>
+        <Bars rows={[...c.options.map((o) => ({ label: T(o.option), values: [o.k], note: `${o.k} (${pct(o.share)})` })), ...(missing > 0 ? [{ label: 'keine Angabe', values: [missing], color: NEUTRAL }] : [])]} />
+      </Fig>
+      <table className="st-table">
+        <thead>
+          <tr>
+            <th>Antwort</th>
+            <th className="num">n</th>
+            <th className="num">Anteil</th>
+            <th>95 %-KI</th>
+            <th>Teilnehmende</th>
+          </tr>
+        </thead>
+        <tbody>
+          {c.options.map((o) => (
+            <tr key={o.option}>
+              <td>{T(o.option)}</td>
+              <td className="num">{o.k}</td>
+              <td className="num">{pct(o.share)}</td>
+              <td>
+                {pct(o.ci[0])}–{pct(o.ci[1])}
+              </td>
+              <td className="st-muted">{o.persons.join(', ')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="st-note">
+        Einfachauswahl, n = {c.n} von {slice.persons.length}; Anteile der Antwortenden mit Wilson-Intervall (95 %). Jede Option wird einzeln gezählt, nicht als A/B-Vergleich.
+      </p>
     </>
   );
 }

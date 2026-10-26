@@ -3,7 +3,7 @@
 // statements linked to it. The rule is shown next to every rating.
 import type { Model, Slice } from './model';
 import { craftStats, distinctPersons, gameRatings, partOfKey, RATING_LABEL } from './model';
-import { part1, part2, part3 } from './analysis';
+import { choices, part1, part2, part3 } from './analysis';
 import { describe, fmt, fmtP, pct, wilcoxon } from './stats';
 import { getLang, tr } from './i18n';
 import type { Design, FindingDoc } from './types';
@@ -44,6 +44,23 @@ export function buildClaims(m: Model, s: Slice, findings: Record<string, Finding
       p: r.decided ? r.p : null,
       large: r.share >= 0.75,
       n: r.decided,
+    });
+  }
+  // single-choice questions: descriptive, the most chosen option
+  for (const c of choices(rows)) {
+    if (!c.n) continue;
+    const top = c.options[0];
+    const list = c.options.map((o) => `${o.option} ${o.k}/${c.n}`).join(', ');
+    out.push({
+      id: `ch:${c.question}`,
+      method: (['Teil 1', 'Teil 2', 'Teil 3'] as const)[Math.max(1, Math.min(3, partOfKey(m, m.parts, c.question) || 2)) - 1],
+      text: en
+        ? `${lead(c.question)}: most often "${top.option}" (${top.k} of ${c.n}, ${pct(top.share)}, 95% CI ${pct(top.ci[0])}–${pct(top.ci[1])}); all answers: ${list}; descriptive.`
+        : `${lead(c.question)}: am häufigsten „${top.option}“ (${top.k} von ${c.n}, ${pct(top.share)}, 95 %-KI ${pct(top.ci[0])}–${pct(top.ci[1])}); alle Antworten: ${list}; deskriptiv.`,
+      direction: null,
+      p: null,
+      large: top.share >= 0.5,
+      n: c.n,
     });
   }
   for (const r of part2(rows)) {

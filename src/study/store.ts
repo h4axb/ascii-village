@@ -3,6 +3,7 @@
 // browser memory of it, as /2/feedback). Changes show at once and are saved
 // in the background; a failed save says so.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { partOf } from './tally';
 import { DEFAULT_TAGS, type Coll, type GameData, type StudyDocs, type TagGroup } from './types';
 
 const PASS_KEY = 'asciia-feedback-pass';
@@ -85,6 +86,19 @@ export function useStudy() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...auth(p) },
           body: JSON.stringify({ put: [...missing.map((g) => ({ coll: 'tags', id: g.id, data: d.tags[g.id] })), { coll: 'settings', id: 'tagsAdded', data: d.settings.tagsAdded }] }),
+        });
+      }
+      // (once: choice questions in Teil 2/3 were counted as A/B comparisons; now single choice)
+      const t = d.tally.main;
+      if (t?.parts && !d.settings.choiceMigrated) {
+        const mapping = t.mapping.map((m, j) => (m.role === 'p1' && partOf(j, t.parts!) >= 2 ? { role: 'choice' as const, question: m.question } : m));
+        d.settings = { ...d.settings, choiceMigrated: { at: Date.now() } };
+        const changed = mapping.some((m, j) => m !== t.mapping[j]);
+        if (changed) d.tally = { ...d.tally, main: { ...t, mapping } };
+        void fetch('/api/study/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...auth(p) },
+          body: JSON.stringify({ put: [...(changed ? [{ coll: 'tally', id: 'main', data: d.tally.main }] : []), { coll: 'settings', id: 'choiceMigrated', data: d.settings.choiceMigrated }] }),
         });
       }
       setDocs(d);

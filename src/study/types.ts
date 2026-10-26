@@ -20,6 +20,7 @@ export type ColumnRole =
   | { role: 'likert'; item: string; design: Side | null; values: Record<string, number | null> }
   // Teil 3: item 0–7, answers 1–7; design null: one UEQ-S for the whole game
   | { role: 'ueqs'; item: number; design: Side | null; reversed: boolean }
+  | { role: 'choice'; question: string } // one answer out of several options (evaluated per option)
   | { role: 'info'; label: string; numeric: boolean } // Teil 4
   | { role: 'text'; label: string }; // free text
 // German versions of the survey's English texts (questions, answer options,

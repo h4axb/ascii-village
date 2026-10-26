@@ -45,6 +45,31 @@ export function part1(rows: SurveyRow[]): P1Result[] {
   });
 }
 
+// a single-choice question with several options: count, share and Wilson
+// interval per option (of those who answered)
+export interface ChoiceResult {
+  question: string;
+  n: number; // answered
+  options: { option: string; k: number; share: number; ci: [number, number]; persons: string[] }[];
+}
+export function choices(rows: SurveyRow[]): ChoiceResult[] {
+  const qs = [...new Set(rows.flatMap((r) => Object.keys(r.choice)))];
+  return qs.map((question) => {
+    const ans = rows.filter((r) => r.choice[question]);
+    const opts = [...new Set(ans.map((r) => r.choice[question]))];
+    return {
+      question,
+      n: ans.length,
+      options: opts
+        .map((option) => {
+          const who = ans.filter((r) => r.choice[question] === option);
+          return { option, k: who.length, share: who.length / ans.length, ci: wilson(who.length, ans.length), persons: who.map((r) => r.person ?? `#${r.row + 1}`) };
+        })
+        .sort((a, b) => b.k - a.k || a.option.localeCompare(b.option)),
+    };
+  });
+}
+
 export interface P2Result {
   item: string;
   scale: number; // points (5 or 7)

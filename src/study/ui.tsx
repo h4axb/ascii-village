@@ -29,10 +29,12 @@ export const FIGURES: { id: string; title: string; caption: string }[] = [
   { id: 'teil1', title: 'Teil 1: Direkter Vergleich', caption: 'Bevorzugte Variante je Frage im direkten Vergleich.' },
   { id: 'teil2', title: 'Teil 2: Likert-Skala', caption: 'Antwortverteilung der Likert-Items je Variante.' },
   { id: 'teil2single', title: 'Teil 2: Aussagen zu beiden Varianten', caption: 'Antwortverteilung der Aussagen, die sich auf beide Varianten beziehen.' },
-  { id: 'teil2wahl', title: 'Teil 2: Auswahlfragen', caption: 'Gewählte Antwort je Auswahlfrage in Teil 2.' },
+  { id: 'teil2vergleich', title: 'Teil 2: Vergleichsfragen', caption: 'Bevorzugte Variante je Vergleichsfrage in Teil 2.' },
+  { id: 'teil2wahl', title: 'Teil 2: Auswahlfrage', caption: 'Verteilung der Antworten (Einfachauswahl).' },
   { id: 'teil3', title: 'Teil 3: UEQ-S', caption: 'UEQ-S-Skalenmittelwerte (−3 bis +3) je Variante mit 95 %-Konfidenzintervall.' },
   { id: 'teil3gesamt', title: 'Teil 3: UEQ-S (gesamtes Spiel)', caption: 'UEQ-S-Skalen- und Itemmittelwerte (−3 bis +3) für das gesamte Spiel mit 95 %-Konfidenzintervall.' },
-  { id: 'teil3wahl', title: 'Teil 3: Auswahlfragen', caption: 'Gewählte Antwort je Auswahlfrage in Teil 3.' },
+  { id: 'teil3vergleich', title: 'Teil 3: Vergleichsfragen', caption: 'Bevorzugte Variante je Vergleichsfrage in Teil 3.' },
+  { id: 'teil3wahl', title: 'Teil 3: Auswahlfrage', caption: 'Verteilung der Antworten (Einfachauswahl).' },
   { id: 'teil3items', title: 'Teil 3: UEQ-S-Items', caption: 'Mittelwerte der einzelnen UEQ-S-Items je Variante.' },
   { id: 'crafts', title: 'Crafting-Vorgänge je Variante', caption: 'Abgeschlossene Crafting-Vorgänge, Überarbeitungen und Ersatzergebnisse je Variante.' },
   { id: 'votes', title: 'Bewertung der Ergebnisse', caption: 'Bewertungen der erzeugten Ergebnisse je Variante.' },
@@ -52,7 +54,7 @@ export function Fig({ id, sub, title, children, table }: { id: string; sub?: { n
   const key = (sub ? `${id}.${sub.n}` : id) + (en ? '.en' : '');
   const stored = (study.docs.captions[key] as { caption?: string } | undefined)?.caption;
   const base = en ? tr(f.caption) : f.caption;
-  const caption = stored ?? (sub ? `${base.replace(/\.$/, '')}: ${sub.title}.` : base);
+  const caption = stored ?? (sub ? `${base.replace(/\.$/, '')}: ${sub.title}${/[.?!]$/.test(sub.title) ? '' : '.'}` : base);
   const n = figNumber(id);
   return (
     <Figure

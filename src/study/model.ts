@@ -60,6 +60,7 @@ export interface SurveyRow {
   swapped: boolean;
   group: 'AB' | 'BA' | null; // resolves "1st / 2nd run" to A / B
   p1: Record<string, Design | 'neutral' | null>; // question → answer (swap applied)
+  choice: Record<string, string>; // single-choice question → the option chosen
   likert: Record<string, Partial<Record<Design, number | null>>>; // item → design → 1..7
   likertSingle: Record<string, number | null>; // statements about both designs
   ueqs: Record<Design | 'O', (number | null)[]>; // 8 raw answers 1..7 (reversal applied); O: one UEQ-S for the whole game
@@ -91,7 +92,7 @@ export interface Model {
 const P_ID = /^P\d{3,}$/;
 // the part (Teil 1–4) a survey column sits in, by its position (Daten & Validierung)
 export function partOfKey(m: { mapping: ColumnRole[] }, parts: (number | null)[] | undefined, key: string): number {
-  const j = m.mapping.findIndex((c) => (c.role === 'p1' && c.question === key) || (c.role === 'likert' && c.item === key) || ((c.role === 'info' || c.role === 'text') && c.label === key));
+  const j = m.mapping.findIndex((c) => ((c.role === 'p1' || c.role === 'choice') && c.question === key) || (c.role === 'likert' && c.item === key) || ((c.role === 'info' || c.role === 'text') && c.label === key));
   return j < 0 || !parts ? 0 : partOf(j, parts);
 }
 // the duration measure for "Bearbeitungsdauer"; auto = Spiel-Uhr where recorded, else Link-Dauer
@@ -272,7 +273,7 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     const group = (person ? byId.get(person)?.group : null) ?? (orderCol >= 0 ? asOrder((r[orderCol] ?? '').trim().toUpperCase()) : null);
     // the 1st / 2nd run → A / B by the person's group
     const resolve = (x: Side | 'neutral' | null): Design | 'neutral' | null => (x === '1' || x === '2' ? (group ? (group[Number(x) - 1] as Design) : null) : x);
-    const out: SurveyRow = { row, person, swapped, group, p1: {}, likert: {}, likertSingle: {}, ueqs: { A: Array(8).fill(null), B: Array(8).fill(null), O: Array(8).fill(null) }, info: {}, text: {} };
+    const out: SurveyRow = { row, person, swapped, group, p1: {}, likert: {}, likertSingle: {}, ueqs: { A: Array(8).fill(null), B: Array(8).fill(null), O: Array(8).fill(null) }, choice: {}, info: {}, text: {} };
     mapping.forEach((m, j) => {
       const v = (r[j] ?? '').trim();
       if (m.role === 'p1') {
@@ -290,6 +291,8 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
         const n = Number(/\d/.exec(v)?.[0]);
         const d = m.design == null ? 'O' : resolve(m.design);
         if (d === 'A' || d === 'B' || d === 'O') out.ueqs[d][m.item] = n >= 1 && n <= 7 ? (m.reversed ? 8 - n : n) : null;
+      } else if (m.role === 'choice') {
+        if (v) out.choice[m.question] = v;
       } else if (m.role === 'info') {
         if (v) out.info[m.label] = v;
       } else if (m.role === 'text') {

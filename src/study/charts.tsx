@@ -126,7 +126,9 @@ export function Bars({ rows, series, unit = '', digits = 0, max, title }: { rows
   const top_ = max ?? Math.max(digits ? 0.1 : 1, ...rows.flatMap((r) => r.values));
   const tk = ticks(top_, 4, !digits);
   const xMax = tk[tk.length - 1];
-  const plotW = Math.max(40, w - labelW - 44);
+  // room on the right for the longest value text
+  const right = Math.max(44, ...rows.flatMap((r) => r.values.map((v, j) => textW(j === r.values.length - 1 && r.note ? r.note : `${nf(v, digits)}${unit}`, 11) + 14)));
+  const plotW = Math.max(40, w - labelW - right);
   const x = (v: number) => labelW + (v / xMax) * plotW;
   return (
     <div ref={ref} className="st-chart">

@@ -233,7 +233,9 @@ export function suggestMapping(headers: string[], rows: string[][], partsIn?: (n
       return { role: 'ueqs', item: u.item, design: designIn(h) ?? conditionIn(h), reversed: u.reversed };
     }
     if (part === 2 && likertSide.has(j)) return { role: 'likert', item: stripSide(h) || base(h), design: likertSide.get(j)!, values: values(j, likertOf) };
-    if (k === 'p1' && (part === 1 || part === 0 || part === 2)) return { role: 'p1', question: base(h), values: values(j, choiceOf) };
+    // a choice outside Teil 1 is its own single-choice question (every option counted)
+    if (k === 'p1' && (part === 2 || part === 3)) return { role: 'choice', question: base(h) };
+    if (k === 'p1' && (part === 1 || part === 0)) return { role: 'p1', question: base(h), values: values(j, choiceOf) };
     if (k === 'age') return { role: 'info', label: 'Alter', numeric: true };
     if (k === 'text') return { role: 'text', label: base(h) };
     if (k === 'likert' && part === 1) return { role: 'likert', item: base(h), design: null, values: values(j, likertOf) };

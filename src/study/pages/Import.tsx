@@ -14,6 +14,7 @@ const ROLE_NAME: Record<ColumnRole['role'], string> = {
   order: 'Reihenfolge',
   time: 'Zeitpunkt',
   p1: 'Teil 1: Vergleich',
+  choice: 'Auswahl (eine Antwort)',
   likert: 'Teil 2: Likert',
   ueqs: 'Teil 3: UEQ-S',
   info: 'Teil 4: Angabe',
@@ -31,6 +32,8 @@ function roleFor(role: ColumnRole['role'], header: string, vals: string[]): Colu
       const u = ueqsItemIn(header);
       return { role, item: u?.item ?? 0, design: designIn(header) ?? conditionIn(header) ?? null, reversed: u?.reversed ?? false };
     }
+    case 'choice':
+      return { role, question: header };
     case 'info':
       return { role, label: header, numeric: vals.every((v) => /^-?\d+([.,]\d+)?$/.test(v)) };
     case 'text':
@@ -237,6 +240,13 @@ function RoleDetail({ m, onChange }: { m: ColumnRole; onChange: (r: ColumnRole) 
             <input type="checkbox" checked={m.reversed} onChange={(e) => onChange({ ...m, reversed: e.target.checked })} />
             Pole vertauscht (positiv links)
           </label>
+        </div>
+      );
+    case 'choice':
+      return (
+        <div className="st-role-detail">
+          <LazyInput value={m.question} onSave={(question) => onChange({ ...m, question })} aria-label="Frage (Kurzname)" />
+          <span className="st-muted">jede Antwortoption einzeln ausgewertet</span>
         </div>
       );
     case 'info':

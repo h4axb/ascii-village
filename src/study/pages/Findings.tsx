@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import type { FindingDoc, ItemDoc } from '../types';
 import { Bars } from '../charts';
-import { distinctPersons } from '../model';
+import { distinctPersons, type Slice } from '../model';
 import { csv, Empty, Fig, Section, useCtx } from '../ui';
 import { itemText, useContentView } from '../translations';
 
@@ -20,6 +20,8 @@ export default function Findings() {
   const members = (f: FindingDoc) => slice.items.filter((i) => i.finding === f.id);
   const proposed = (f: FindingDoc) => live.filter((i) => i.suggestedFinding === f.id && i.finding !== f.id);
   const rows = findings.map((f) => ({ f, items: members(f), persons: distinctPersons(members(f)) })).sort((a, b) => b.persons - a.persons || a.f.name.localeCompare(b.f.name));
+  // (the figure's own slice: the participants left out there are not counted)
+  const rowsOf = (s: Slice) => rows.map((r) => ({ ...r, items: r.items.filter((i) => s.persons.some((p) => p.id === i.person)) })).map((r) => ({ ...r, persons: distinctPersons(r.items) }));
   const save = (put: ItemDoc[]) => study.commit(put.map((p) => ({ coll: 'items' as const, id: p.id, data: p })));
 
   // the AI's proposed new findings, grouped by name
@@ -63,8 +65,8 @@ export default function Findings() {
       )}
 
       {rows.some((r) => r.persons) && (
-        <Fig id="befunde" table={() => csv([['Befund', 'Teilnehmende', 'Aussagen'], ...rows.map((r) => [r.f.name, r.persons, r.items.length])])}>
-          <Bars rows={rows.filter((r) => r.persons).map((r) => ({ label: r.f.name, values: [r.persons], note: `${r.persons}/${total}` }))} max={total} />
+        <Fig id="befunde" table={(s) => csv([['Befund', 'Teilnehmende', 'Aussagen'], ...rowsOf(s).map((r) => [r.f.name, r.persons, r.items.length])])}>
+          {(s) => <Bars rows={rowsOf(s).filter((r) => r.persons).map((r) => ({ label: r.f.name, values: [r.persons], note: `${r.persons}/${s.persons.length}` }))} max={s.persons.length} />}
         </Fig>
       )}
 

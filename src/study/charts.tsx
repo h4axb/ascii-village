@@ -336,6 +336,9 @@ export function Figure({
   onCaption,
   children,
   table,
+  people,
+  omitted = [],
+  onOmit,
 }: {
   n: number | string;
   title: string;
@@ -343,18 +346,26 @@ export function Figure({
   onCaption: (c: string) => void;
   children: ReactNode;
   table?: () => string; // CSV of the figure's numbers
+  people?: string[]; // the participants it can leave out (none: no filter)
+  omitted?: string[];
+  onOmit?: (ids: string[]) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(caption);
   const [copied, setCopied] = useState(false);
+  const [picking, setPicking] = useState(false);
   useEffect(() => setDraft(caption), [caption]);
-  const full = `${getLang() === 'en' ? 'Figure' : 'Abbildung'} ${n}: ${draft}`;
+  const without = omitted.length && people ? `${tr('ohne')} ${omitted.join(', ')} (n = ${people.length - omitted.length})` : '';
+  const full = `${getLang() === 'en' ? 'Figure' : 'Abbildung'} ${n}: ${draft}${without ? ` (${without})` : ''}`;
   return (
     <figure className="st-figure">
       <figcaption className="st-figtitle">
         <span className="st-fignum">Abb. {n}</span> {title}
       </figcaption>
-      <div ref={ref}>{children}</div>
+      <div ref={ref}>
+        {children}
+        {without && <p className="st-note">{without}</p>}
+      </div>
       <textarea
         className="st-caption"
         value={draft}
@@ -363,7 +374,25 @@ export function Figure({
         onBlur={() => draft !== caption && onCaption(draft)}
         aria-label={`Bildunterschrift Abbildung ${n}`}
       />
+      {picking && people && onOmit && (
+        <div className="st-figpick">
+          {people.map((id) => (
+            <label key={id}>
+              <input type="checkbox" checked={!omitted.includes(id)} onChange={(e) => onOmit(e.target.checked ? omitted.filter((x) => x !== id) : [...omitted, id])} />
+              {id}
+            </label>
+          ))}
+          <button type="button" className="st-linkbtn" onClick={() => onOmit([])} disabled={!omitted.length}>
+            alle
+          </button>
+        </div>
+      )}
       <div className="st-figtools">
+        {people && onOmit && (
+          <button type="button" className={omitted.length ? 'is-on' : ''} onClick={() => setPicking((x) => !x)} title="Einzelne Teilnehmende in dieser Abbildung weglassen" aria-expanded={picking}>
+            Teilnehmende {people.length - omitted.length}/{people.length}
+          </button>
+        )}
         <button type="button" onClick={() => void exportPng(ref.current, full, `${tr('Abbildung')}-${n}.png`)}>
           PNG
         </button>

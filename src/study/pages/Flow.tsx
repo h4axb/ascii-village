@@ -9,7 +9,7 @@ import { FitSprite } from '../../ui';
 import { Bars } from '../charts';
 import { describe, fmt } from '../stats';
 import { csv, Empty, Fig, Section, useCtx } from '../ui';
-import { GAP_MIN } from '../model';
+import { GAP_MIN, type Slice } from '../model';
 
 const PART_LABEL: Record<string, string> = {
   q1: 'Quest 1',
@@ -361,12 +361,15 @@ export function GameFlow() {
       </Section>
     );
   // per participant (or link): time per part
-  const runs = new Map<string, RunEvent[]>();
-  for (const e of slice.events) {
-    const k = scope.kind === 'all' ? e.participant : label(e);
-    runs.set(k, [...(runs.get(k) ?? []), e]);
-  }
-  const perRun = [...runs].sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([k, evs]) => ({ k, t: partTimes(evs) }));
+  const perRunOf = (s: Slice) => {
+    const runs = new Map<string, RunEvent[]>();
+    for (const e of s.events) {
+      const k = scope.kind === 'all' ? e.participant : label(e);
+      runs.set(k, [...(runs.get(k) ?? []), e]);
+    }
+    return [...runs].sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([k, evs]) => ({ k, t: partTimes(evs) }));
+  };
+  const perRun = perRunOf(slice);
   const parts = [...new Set(perRun.flatMap((r) => Object.keys(r.t)))].sort((a, b) => Object.keys(PART_LABEL).indexOf(a) - Object.keys(PART_LABEL).indexOf(b));
   const total = (t: Record<string, number>) => Object.values(t).reduce((a, b) => a + b, 0);
   const single = scope.kind !== 'all';
@@ -376,9 +379,16 @@ export function GameFlow() {
 
   return (
     <Section title="Spielablauf" id="ablauf">
-      <Fig id="ablauf" table={() => csv([['Teilnehmende', ...parts.map((p) => PART_LABEL[p] ?? p), 'Summe'], ...perRun.map((r) => [r.k, ...parts.map((p) => (r.t[p] ? fmt(r.t[p] / 60000, 1) : '')), fmt(total(r.t) / 60000, 1)])])}>
-        <Bars rows={parts.map((p) => ({ label: PART_LABEL[p] ?? p, values: [describe(perRun.map((r) => (r.t[p] ?? 0) / 60000).filter((x) => x > 0)).median || 0] }))} digits={1} unit=" min" />
-        <p className="st-note">{single ? 'Dauer je Abschnitt in Minuten.' : `Median der Dauer je Abschnitt in Minuten (n = ${perRun.length}).`}</p>
+      <Fig id="ablauf" table={(s) => csv([['Teilnehmende', ...parts.map((p) => PART_LABEL[p] ?? p), 'Summe'], ...perRunOf(s).map((r) => [r.k, ...parts.map((p) => (r.t[p] ? fmt(r.t[p] / 60000, 1) : '')), fmt(total(r.t) / 60000, 1)])])}>
+        {(s) => {
+          const runs = perRunOf(s);
+          return (
+            <>
+              <Bars rows={parts.map((p) => ({ label: PART_LABEL[p] ?? p, values: [describe(runs.map((r) => (r.t[p] ?? 0) / 60000).filter((x) => x > 0)).median || 0] }))} digits={1} unit=" min" />
+              <p className="st-note">{single ? 'Dauer je Abschnitt in Minuten.' : `Median der Dauer je Abschnitt in Minuten (n = ${runs.length}).`}</p>
+            </>
+          );
+        }}
       </Fig>
       {!single && (
         <table className="st-table">

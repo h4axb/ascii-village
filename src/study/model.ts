@@ -381,6 +381,20 @@ export function slice(m: Model, s: Scope): Slice {
   };
 }
 
+// a slice without some participants (a figure's own filter)
+export function omit(s: Slice, ids: string[]): Slice {
+  if (!ids.length) return s;
+  const out = new Set(ids);
+  return {
+    persons: s.persons.filter((p) => !out.has(p.id)),
+    links: s.links.filter((l) => !out.has(l.person)),
+    survey: s.survey.filter((r) => !r.person || !out.has(r.person)),
+    events: s.events.filter((e) => !out.has(e.participant)),
+    feedback: s.feedback.filter((r) => !r.participant || !out.has(r.participant)),
+    items: s.items.filter((i) => !out.has(i.person)),
+  };
+}
+
 // ---- figures from the game's tracking ----
 export const PREF_LABEL: Record<string, { name: string; values: Record<string, string> }> = {
   detail: { name: 'Detailgrad', values: { '-1': 'weniger', '0': 'normal', '1': 'mehr' } },

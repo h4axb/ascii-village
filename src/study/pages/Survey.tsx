@@ -4,7 +4,7 @@
 // intervals, benchmark, α), Teil 4 the participants' details.
 import { Bars, Diverging, Dots, NEUTRAL, SERIES } from '../charts';
 import { choices, part1, part2, part2Single, part3, type ChoiceResult, type P1Result, type P2Single, type P3Result } from '../analysis';
-import { craftStats, gameRatings, partOfKey, prefChoices, PREF_LABEL, RATING_LABEL, SCOPE_LABEL } from '../model';
+import { craftStats, gameRatings, partOfKey, prefChoices, PREF_LABEL, RATING_LABEL, SCOPE_LABEL, type Slice } from '../model';
 import { describe, fmt, fmtP, meanCI, pct, UEQS_ITEMS } from '../stats';
 import { csv, Empty, Fig, Section, useCtx } from '../ui';
 import { useSurveyText } from '../translations';
@@ -52,23 +52,25 @@ export default function Survey() {
           <>
             <Fig
               id="teil2"
-              table={() =>
+              table={(s) =>
                 csv([
                   ['Item', 'Variante', ...(p2[0].scale === 7 ? LIKERT7 : LIKERT5), 'Median', 'Q1', 'Q3'],
-                  ...p2.flatMap((r) => [
+                  ...part2(s.survey).flatMap((r) => [
                     [r.item, 'A', ...r.countsA, fmt(r.A.median, 1), fmt(r.A.q1, 1), fmt(r.A.q3, 1)],
                     [r.item, 'B', ...r.countsB, fmt(r.B.median, 1), fmt(r.B.q1, 1), fmt(r.B.q3, 1)],
                   ]),
                 ])
               }
             >
-              <Diverging
-                scale={p2[0].scale === 7 ? LIKERT7 : LIKERT5}
-                rows={p2.flatMap((r) => [
-                  { label: `${T(r.item)} – A`, counts: r.countsA },
-                  { label: `${T(r.item)} – B`, counts: r.countsB },
-                ])}
-              />
+              {(s) => (
+                <Diverging
+                  scale={p2[0].scale === 7 ? LIKERT7 : LIKERT5}
+                  rows={part2(s.survey).flatMap((r) => [
+                    { label: `${T(r.item)} – A`, counts: r.countsA },
+                    { label: `${T(r.item)} – B`, counts: r.countsB },
+                  ])}
+                />
+              )}
             </Fig>
             <table className="st-table">
               <thead>
@@ -122,10 +124,10 @@ export default function Survey() {
           <>
             <Fig
               id="teil3"
-              table={() =>
+              table={(sl) =>
                 csv([
                   ['Skala', 'M A', 'KI A', 'SD A', 'α A', 'Benchmark A', 'M B', 'KI B', 'SD B', 'α B', 'Benchmark B', 'p (Wilcoxon)', 'r'],
-                  ...p3.scales.map((s) => [
+                  ...part3(sl.survey).scales.map((s) => [
                     SCALE_NAME[s.scale],
                     fmt(s.A.mean),
                     `${fmt(s.A.ci[0])}–${fmt(s.A.ci[1])}`,
@@ -143,18 +145,20 @@ export default function Survey() {
                 ])
               }
             >
-              <Dots
-                series={AB}
-                domain={[-3, 3]}
-                refLines={[0]}
-                rows={p3.scales.map((s) => ({
-                  label: SCALE_NAME[s.scale],
-                  points: [
-                    { value: s.A.mean, lo: s.A.ci[0], hi: s.A.ci[1], series: 0 },
-                    { value: s.B.mean, lo: s.B.ci[0], hi: s.B.ci[1], series: 1 },
-                  ],
-                }))}
-              />
+              {(sl) => (
+                <Dots
+                  series={AB}
+                  domain={[-3, 3]}
+                  refLines={[0]}
+                  rows={part3(sl.survey).scales.map((s) => ({
+                    label: SCALE_NAME[s.scale],
+                    points: [
+                      { value: s.A.mean, lo: s.A.ci[0], hi: s.A.ci[1], series: 0 },
+                      { value: s.B.mean, lo: s.B.ci[0], hi: s.B.ci[1], series: 1 },
+                    ],
+                  }))}
+                />
+              )}
             </Fig>
             <table className="st-table">
               <thead>
@@ -191,19 +195,21 @@ export default function Survey() {
               </tbody>
             </table>
             <p className="st-note">Skalenwerte −3 bis +3 (Schrepp, Hinderks &amp; Thomaschewski, 2017); nur vollständige Skalen. Benchmark-Grenzen vor der Verwendung mit der aktuellen UEQ-S-Handreichung abgleichen.</p>
-            <Fig id="teil3items" table={() => csv([['Item', 'M A', 'M B'], ...p3.items.map((i) => [UEQS_ITEMS[i.item].join(' – '), fmt(i.A), fmt(i.B)])])}>
-              <Dots
-                series={AB}
-                domain={[-3, 3]}
-                refLines={[0]}
-                rows={p3.items.map((i) => ({
-                  label: UEQS_ITEMS[i.item].join(' – '),
-                  points: [
-                    { value: i.A, lo: NaN, hi: NaN, series: 0 },
-                    { value: i.B, lo: NaN, hi: NaN, series: 1 },
-                  ],
-                }))}
-              />
+            <Fig id="teil3items" table={(sl) => csv([['Item', 'M A', 'M B'], ...part3(sl.survey).items.map((i) => [UEQS_ITEMS[i.item].join(' – '), fmt(i.A), fmt(i.B)])])}>
+              {(sl) => (
+                <Dots
+                  series={AB}
+                  domain={[-3, 3]}
+                  refLines={[0]}
+                  rows={part3(sl.survey).items.map((i) => ({
+                    label: UEQS_ITEMS[i.item].join(' – '),
+                    points: [
+                      { value: i.A, lo: NaN, hi: NaN, series: 0 },
+                      { value: i.B, lo: NaN, hi: NaN, series: 1 },
+                    ],
+                  }))}
+                />
+              )}
             </Fig>
           </>
         ) : !p3.overall ? (
@@ -333,92 +339,120 @@ export function SurveySummary() {
 }
 
 // in-game ratings and telemetry (the game's own tracking)
+const csOf = (s: Slice) => craftStats(s.events, s.feedback);
 function Telemetry() {
-  const { slice } = useCtx();
-  const cs = craftStats(slice.events, slice.feedback);
-  const ratings = gameRatings(slice.feedback);
-  const { prefs, scopes } = prefChoices(slice.feedback);
   return (
       <Section title="In-Game-Ratings und Telemetrie" id="spiel">
         <div className="st-grid">
-          <Fig id="crafts" table={() => csv([['Kennzahl', 'A', 'B'], ['Crafts', cs.A.crafts, cs.B.crafts], ['Überarbeitungen', cs.A.reworks, cs.B.reworks], ['Ersatzergebnisse', cs.A.fallbacks, cs.B.fallbacks], ['Minuten im Crafting', fmt(cs.A.minutes, 1), fmt(cs.B.minutes, 1)]])}>
-            <Bars
-              rows={[
-                { label: 'Crafts', values: [cs.A.crafts, cs.B.crafts] },
-                { label: 'Überarbeitungen', values: [cs.A.reworks, cs.B.reworks] },
-                { label: 'Ersatzergebnisse', values: [cs.A.fallbacks, cs.B.fallbacks] },
-              ]}
-              series={AB}
-            />
-            <p className="st-note">
-              Zeit im Crafting: A {fmt(cs.A.minutes, 1)} min, B {fmt(cs.B.minutes, 1)} min
-            </p>
+          <Fig
+            id="crafts"
+            table={(s) => {
+              const cs = csOf(s);
+              return csv([['Kennzahl', 'A', 'B'], ['Crafts', cs.A.crafts, cs.B.crafts], ['Überarbeitungen', cs.A.reworks, cs.B.reworks], ['Ersatzergebnisse', cs.A.fallbacks, cs.B.fallbacks], ['Minuten im Crafting', fmt(cs.A.minutes, 1), fmt(cs.B.minutes, 1)]]);
+            }}
+          >
+            {(s) => {
+              const cs = csOf(s);
+              return (
+                <>
+                  <Bars
+                    rows={[
+                      { label: 'Crafts', values: [cs.A.crafts, cs.B.crafts] },
+                      { label: 'Überarbeitungen', values: [cs.A.reworks, cs.B.reworks] },
+                      { label: 'Ersatzergebnisse', values: [cs.A.fallbacks, cs.B.fallbacks] },
+                    ]}
+                    series={AB}
+                  />
+                  <p className="st-note">
+                    Zeit im Crafting: A {fmt(cs.A.minutes, 1)} min, B {fmt(cs.B.minutes, 1)} min
+                  </p>
+                </>
+              );
+            }}
           </Fig>
-          <Fig id="votes" table={() => csv([['Bewertung', 'A', 'B'], ['Passt', cs.A.up, cs.B.up], ['Nicht ganz', cs.A.down, cs.B.down]])}>
-            <Bars
-              rows={[
-                { label: 'Passt', values: [cs.A.up, cs.B.up] },
-                { label: 'Nicht ganz', values: [cs.A.down, cs.B.down] },
-              ]}
-              series={AB}
-            />
-            {(() => {
+          <Fig
+            id="votes"
+            table={(s) => {
+              const cs = csOf(s);
+              return csv([['Bewertung', 'A', 'B'], ['Passt', cs.A.up, cs.B.up], ['Nicht ganz', cs.A.down, cs.B.down]]);
+            }}
+          >
+            {(s) => {
+              const cs = csOf(s);
               const a = cs.A.up + cs.A.down;
               const b = cs.B.up + cs.B.down;
-              return a + b ? (
-                <p className="st-note">
-                  Anteil „Passt“: A {a ? Math.round((cs.A.up / a) * 100) : '–'} %, B {b ? Math.round((cs.B.up / b) * 100) : '–'} %
-                </p>
-              ) : null;
-            })()}
+              return (
+                <>
+                  <Bars
+                    rows={[
+                      { label: 'Passt', values: [cs.A.up, cs.B.up] },
+                      { label: 'Nicht ganz', values: [cs.A.down, cs.B.down] },
+                    ]}
+                    series={AB}
+                  />
+                  {a + b > 0 && (
+                    <p className="st-note">
+                      Anteil „Passt“: A {a ? Math.round((cs.A.up / a) * 100) : '–'} %, B {b ? Math.round((cs.B.up / b) * 100) : '–'} %
+                    </p>
+                  )}
+                </>
+              );
+            }}
           </Fig>
           <Fig
             id="spielfragen"
-            table={() =>
+            table={(s) =>
               csv([
                 ['Frage', 'M A', 'SD A', 'n A', 'M B', 'SD B', 'n B'],
-                ...Object.entries(ratings).map(([q, v]) => [RATING_LABEL[q] ?? q, fmt(describe(v.A).mean), fmt(describe(v.A).sd), v.A.length, fmt(describe(v.B).mean), fmt(describe(v.B).sd), v.B.length]),
+                ...Object.entries(gameRatings(s.feedback)).map(([q, v]) => [RATING_LABEL[q] ?? q, fmt(describe(v.A).mean), fmt(describe(v.A).sd), v.A.length, fmt(describe(v.B).mean), fmt(describe(v.B).sd), v.B.length]),
               ])
             }
           >
-            {Object.keys(ratings).length ? (
-              <Dots
-                series={AB}
-                domain={[1, 5]}
-                rows={Object.entries(ratings).map(([q, v]) => ({
-                  label: RATING_LABEL[q] ?? q,
-                  points: (['A', 'B'] as const).map((d, i) => {
-                    const [lo, hi] = meanCI(v[d]);
-                    return { value: describe(v[d]).mean, lo, hi, series: i };
-                  }),
-                }))}
-              />
-            ) : (
-              <Empty>Keine Bewertungen im Spiel.</Empty>
-            )}
+            {(s) => {
+              const ratings = gameRatings(s.feedback);
+              return Object.keys(ratings).length ? (
+                <Dots
+                  series={AB}
+                  domain={[1, 5]}
+                  rows={Object.entries(ratings).map(([q, v]) => ({
+                    label: RATING_LABEL[q] ?? q,
+                    points: (['A', 'B'] as const).map((d, i) => {
+                      const [lo, hi] = meanCI(v[d]);
+                      return { value: describe(v[d]).mean, lo, hi, series: i };
+                    }),
+                  }))}
+                />
+              ) : (
+                <Empty>Keine Bewertungen im Spiel.</Empty>
+              );
+            }}
           </Fig>
           <Fig
             id="praeferenzen"
-            table={() =>
-              csv([
+            table={(sl) => {
+              const { prefs, scopes } = prefChoices(sl.feedback);
+              return csv([
                 ['Einstellung', 'Wert', 'Anzahl'],
                 ...Object.entries(prefs).flatMap(([k, vs]) => Object.entries(vs).map(([v, c]) => [PREF_LABEL[k]?.name ?? k, PREF_LABEL[k]?.values[v] ?? v, c])),
                 ...Object.entries(scopes).map(([s, c]) => ['Gültigkeit', SCOPE_LABEL[s] ?? s, c]),
-              ])
-            }
+              ]);
+            }}
           >
-            {Object.keys(prefs).length ? (
-              <>
-                <Bars rows={Object.entries(prefs).flatMap(([k, vs]) => Object.entries(vs).map(([v, c]) => ({ label: `${PREF_LABEL[k]?.name ?? k}: ${PREF_LABEL[k]?.values[v] ?? v}`, values: [c] })))} />
-                {Object.keys(scopes).length > 0 && (
-                  <p className="st-note">
-                    Gültigkeit: {Object.entries(scopes).map(([s, c]) => `${SCOPE_LABEL[s] ?? s} ${c}`).join(', ')}
-                  </p>
-                )}
-              </>
-            ) : (
-              <Empty>Keine Präferenzen gewählt.</Empty>
-            )}
+            {(sl) => {
+              const { prefs, scopes } = prefChoices(sl.feedback);
+              return Object.keys(prefs).length ? (
+                <>
+                  <Bars rows={Object.entries(prefs).flatMap(([k, vs]) => Object.entries(vs).map(([v, c]) => ({ label: `${PREF_LABEL[k]?.name ?? k}: ${PREF_LABEL[k]?.values[v] ?? v}`, values: [c] })))} />
+                  {Object.keys(scopes).length > 0 && (
+                    <p className="st-note">
+                      Gültigkeit: {Object.entries(scopes).map(([s, c]) => `${SCOPE_LABEL[s] ?? s} ${c}`).join(', ')}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <Empty>Keine Präferenzen gewählt.</Empty>
+              );
+            }}
           </Fig>
         </div>
       </Section>
@@ -477,8 +511,8 @@ function Part2Single({ items }: { items: P2Single[] }) {
   const scale = items[0].scale === 7 ? LIKERT7 : LIKERT5;
   return (
     <>
-      <Fig id="teil2single" table={() => csv([['Aussage', ...scale, 'Median', 'Q1', 'Q3', 'M', 'SD', 'n'], ...items.map((r) => [r.item, ...r.counts, fmt(r.stats.median, 1), fmt(r.stats.q1, 1), fmt(r.stats.q3, 1), fmt(r.stats.mean), fmt(r.stats.sd), r.stats.n])])}>
-        <Diverging scale={scale} rows={items.map((r) => ({ label: T(r.item), counts: r.counts }))} />
+      <Fig id="teil2single" table={(s) => csv([['Aussage', ...scale, 'Median', 'Q1', 'Q3', 'M', 'SD', 'n'], ...part2Single(s.survey).map((r) => [r.item, ...r.counts, fmt(r.stats.median, 1), fmt(r.stats.q1, 1), fmt(r.stats.q3, 1), fmt(r.stats.mean), fmt(r.stats.sd), r.stats.n])])}>
+        {(s) => <Diverging scale={scale} rows={part2Single(s.survey).map((r) => ({ label: T(r.item), counts: r.counts }))} />}
       </Fig>
       <table className="st-table">
         <thead>
@@ -513,16 +547,21 @@ function Part3Overall({ p3 }: { p3: P3Result }) {
   const o = p3.overall!;
   return (
     <>
-      <Fig id="teil3gesamt" table={() => csv([['Skala', 'M', 'KI unten', 'KI oben', 'SD', 'α', 'Benchmark', 'n'], ...o.map((x) => [SCALE_NAME[x.scale], fmt(x.v.mean), fmt(x.v.ci[0]), fmt(x.v.ci[1]), fmt(x.v.sd), fmt(x.v.alpha), x.v.bench, x.v.n])])}>
-        <Dots
-          series={[{ name: 'Gesamtes Spiel', color: SERIES.B }]}
-          domain={[-3, 3]}
-          refLines={[0]}
-          rows={[
-            ...o.map((x) => ({ label: SCALE_NAME[x.scale], points: [{ value: x.v.mean, lo: x.v.ci[0], hi: x.v.ci[1], series: 0 }] })),
-            ...p3.overallItems.map((m, i) => ({ label: UEQS_ITEMS[i].join(' – '), points: [{ value: m, lo: NaN, hi: NaN, series: 0 }] })),
-          ]}
-        />
+      <Fig id="teil3gesamt" table={(s) => csv([['Skala', 'M', 'KI unten', 'KI oben', 'SD', 'α', 'Benchmark', 'n'], ...(part3(s.survey).overall ?? []).map((x) => [SCALE_NAME[x.scale], fmt(x.v.mean), fmt(x.v.ci[0]), fmt(x.v.ci[1]), fmt(x.v.sd), fmt(x.v.alpha), x.v.bench, x.v.n])])}>
+        {(s) => {
+          const f = part3(s.survey);
+          return (
+            <Dots
+              series={[{ name: 'Gesamtes Spiel', color: SERIES.B }]}
+              domain={[-3, 3]}
+              refLines={[0]}
+              rows={[
+                ...(f.overall ?? []).map((x) => ({ label: SCALE_NAME[x.scale], points: [{ value: x.v.mean, lo: x.v.ci[0], hi: x.v.ci[1], series: 0 }] })),
+                ...f.overallItems.map((m, i) => ({ label: UEQS_ITEMS[i].join(' – '), points: [{ value: m, lo: NaN, hi: NaN, series: 0 }] })),
+              ]}
+            />
+          );
+        }}
       </Fig>
       <table className="st-table">
         <thead>
@@ -563,16 +602,23 @@ function ChoiceBlock({ results, figId }: { results: P1Result[]; figId: string })
   const { study } = useCtx();
   const T = useSurveyText(study);
   const p1 = results;
+  // (the figure's own slice: the same questions, counted without the ones left out)
+  const of = (s: Slice) => {
+    const all = part1(s.survey);
+    return p1.map((r) => all.find((x) => x.question === r.question) ?? { ...r, A: 0, B: 0, neutral: 0, n: 0 });
+  };
   return (
     <>
             <Fig
               id={figId}
-              table={() => csv([['Frage', 'A', 'B', 'Keine Präferenz', 'n', 'Anteil Mehrheit', 'KI unten', 'KI oben', 'p (Vorzeichentest)'], ...p1.map((r) => [r.question, r.A, r.B, r.neutral, r.n, fmt(r.share), fmt(r.ci[0]), fmt(r.ci[1]), fmtP(r.p)])])}
+              table={(s) => csv([['Frage', 'A', 'B', 'Keine Präferenz', 'n', 'Anteil Mehrheit', 'KI unten', 'KI oben', 'p (Vorzeichentest)'], ...of(s).map((r) => [r.question, r.A, r.B, r.neutral, r.n, fmt(r.share), fmt(r.ci[0]), fmt(r.ci[1]), fmtP(r.p)])])}
             >
-              <Bars
-                rows={p1.map((r) => ({ label: T(r.question), values: [r.A, r.B, r.neutral] }))}
-                series={[...AB, { name: 'Keine Präferenz', color: NEUTRAL }]}
-              />
+              {(s) => (
+                <Bars
+                  rows={of(s).map((r) => ({ label: T(r.question), values: [r.A, r.B, r.neutral] }))}
+                  series={[...AB, { name: 'Keine Präferenz', color: NEUTRAL }]}
+                />
+              )}
             </Fig>
             <table className="st-table">
               <thead>
@@ -612,11 +658,17 @@ function ChoiceBlock({ results, figId }: { results: P1Result[]; figId: string })
 function SingleChoice({ c, figId, n }: { c: ChoiceResult; figId: string; n: number }) {
   const { study, slice } = useCtx();
   const T = useSurveyText(study);
-  const missing = slice.persons.length - c.n;
+  const { model } = useCtx();
+  // (the figure's own slice: the same options, counted without the ones left out)
+  const of = (s: Slice): ChoiceResult => choices(s.survey, model.optionQuestions).find((x) => x.question === c.question) ?? { ...c, n: 0, options: c.options.map((o) => ({ ...o, k: 0, share: 0, persons: [] })) };
   return (
     <>
-      <Fig id={figId} sub={{ n, title: T(c.question) }} table={() => csv([['Antwort', 'n', 'Anteil', 'KI unten', 'KI oben', 'Teilnehmende'], ...c.options.map((o) => [o.option, o.k, fmt(o.share), fmt(o.ci[0]), fmt(o.ci[1]), o.persons.join(' ')])])}>
-        <Bars rows={[...c.options.map((o) => ({ label: T(o.option), values: [o.k], note: `${o.k} (${pct(o.share)})` })), ...(missing > 0 ? [{ label: 'keine Angabe', values: [missing], color: NEUTRAL }] : [])]} />
+      <Fig id={figId} sub={{ n, title: T(c.question) }} table={(s) => csv([['Antwort', 'n', 'Anteil', 'KI unten', 'KI oben', 'Teilnehmende'], ...of(s).options.map((o) => [o.option, o.k, fmt(o.share), fmt(o.ci[0]), fmt(o.ci[1]), o.persons.join(' ')])])}>
+        {(s) => {
+          const cc = of(s);
+          const missing = s.persons.length - cc.n;
+          return <Bars rows={[...cc.options.map((o) => ({ label: T(o.option), values: [o.k], note: `${o.k} (${pct(o.share)})` })), ...(missing > 0 ? [{ label: 'keine Angabe', values: [missing], color: NEUTRAL }] : [])]} />;
+        }}
       </Fig>
       <table className="st-table">
         <thead>

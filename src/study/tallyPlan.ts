@@ -216,3 +216,24 @@ export function planPairing(
   }
   return out;
 }
+
+// give a participant a survey row by hand; a row another participant has is
+// swapped: they get this participant's row (or none). Every other participant
+// whose answers would move is asked as usual.
+export function planAssign(docs: StudyDocs, game: GameData, pid: string, row: number | null | undefined): Change[] {
+  const m = buildModel(docs, game);
+  const mine = m.persons.find((p) => p.id === pid)?.tallyRow ?? null;
+  const other = row != null ? m.persons.find((p) => p.id !== pid && p.tallyRow === row) : undefined;
+  const name = (r: number | null | undefined) => (r === undefined ? 'automatisch' : r === null ? 'keine' : `Zeile ${r + 1}`);
+  const fields: [string, string][] = [[pid, `${name(mine)} → ${name(row)}`]];
+  if (other) fields.push([other.id, `${name(row)} → ${name(mine)}`]);
+  return planPairing(docs, game, {
+    label: other ? `${pid} ↔ ${other.id}: Umfrage-Antworten tauschen` : `${pid}: Tally-Zeile ${name(row)}`,
+    fields,
+    patch: (w) => {
+      w.people[pid] = { ...(w.people[pid] ?? { id: pid }), id: pid, tallyRow: row };
+      if (other) w.people[other.id] = { ...(w.people[other.id] ?? { id: other.id }), id: other.id, tallyRow: mine };
+    },
+    skip: other ? [pid, other.id] : [pid],
+  });
+}

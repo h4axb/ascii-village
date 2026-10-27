@@ -6,7 +6,7 @@ import type { PersonDoc } from '../types';
 import { personIdOf, type Person } from '../model';
 import { fmtDate, fmtMin, LazyInput, logChange, Section, useCtx } from '../ui';
 import { useState } from 'react';
-import { planPairing } from '../tallyPlan';
+import { planAssign } from '../tallyPlan';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
 
@@ -26,14 +26,10 @@ export default function People() {
   const [ask, setAsk] = useState<{ changes: Change[]; reason: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const setRow = (p: Person, tallyRow: number | null | undefined) => {
-    const name = tallyRow === undefined ? 'automatisch' : tallyRow === null ? 'keine' : `Zeile ${tallyRow + 1}`;
-    const changes = planPairing(study.latest(), study.game, {
-      label: `${p.id}: Tally-Zeile ${name}`,
-      fields: [['Tally-Zeile', name]],
-      patch: (w) => void (w.people[p.id] = { ...(w.people[p.id] ?? { id: p.id }), id: p.id, tallyRow }),
-      skip: [p.id],
-    });
-    if (changes.length > 1) setAsk({ changes, reason: `${p.id}: Tally-Zeile → ${name}` });
+    const changes = planAssign(study.latest(), study.game, p.id, tallyRow);
+    // (a swap, or others' answers moving: asked first; else stored at once)
+    const swap = tallyRow != null && owner.has(tallyRow) && owner.get(tallyRow) !== p.id;
+    if (swap || changes.length > 1) setAsk({ changes, reason: changes[0].label });
     else set(p, { tallyRow });
   };
 
@@ -44,7 +40,7 @@ export default function People() {
           title={ask.changes[0].label}
           changes={ask.changes}
           names={['Aktuell', 'Danach']}
-          intro="Diese Wahl ändert auch die Antworten anderer Teilnehmender. Für jede Person entscheiden: „Aktuell behalten“ hält ihre bisherige Zeile fest. Der jetzige Stand wird vorher gesichert."
+          intro="Diese Wahl ändert Umfrage-Antworten (bei einem Tausch die beider Personen). Weitere betroffene Personen einzeln entscheiden: „Aktuell behalten“ hält ihre bisherige Zeile fest. Der jetzige Stand wird vorher gesichert."
           busy={busy}
           onCancel={() => setAsk(null)}
           onApply={(choices) => {
@@ -109,9 +105,8 @@ export default function People() {
                     <option value="auto">automatisch{p.doc.tallyRow === undefined && p.tallyRow != null ? ` (Zeile ${p.tallyRow + 1} · ${VIA[p.tallyVia ?? 'id']})` : ''}</option>
                     <option value="none">keine</option>
                     {rows.map((r, i) => (
-                      <option key={i} value={i} disabled={owner.has(i) && owner.get(i) !== p.id}>
-                        Zeile {i + 1}
-                        {idCol >= 0 && r[idCol] ? ` (${personIdOf(r[idCol]) ?? r[idCol]})` : ''}
+                      <option key={i} value={i}>
+                        {`Zeile ${i + 1}${idCol >= 0 && r[idCol] ? ` (Test-ID ${personIdOf(r[idCol]) ?? r[idCol]})` : ''}${owner.has(i) && owner.get(i) !== p.id ? ` – hat ${owner.get(i)}, wird getauscht` : ''}`}
                       </option>
                     ))}
                   </select>

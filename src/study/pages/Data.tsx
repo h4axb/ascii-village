@@ -3,7 +3,9 @@
 import type { ColumnRole, StudyDocs } from '../types';
 import { GAP_MIN, MATCH_ORDER_LABEL, personIdOf, type MatchOrder } from '../model';
 import { fmtBerlin, ZONE_LABEL, type TallyZone } from '../match';
-import { planPairing, planRematch } from '../tallyPlan';
+import { planAssign, planPairing, planRematch } from '../tallyPlan';
+
+const SWAP_INTRO = 'Diese Zuordnung ändert Umfrage-Antworten (bei einem Tausch die beider Personen). Weitere betroffene Personen einzeln entscheiden: „Aktuell behalten“ hält ihre bisherige Zeile fest. Der jetzige Stand wird vorher gesichert.';
 import { download } from '../charts';
 import { useEffect, useState } from 'react';
 import type { Version } from '../store';
@@ -399,6 +401,7 @@ function MatchTable() {
     .map((r, i) => ({ r, i, t: model.submitted[i] ?? null }))
     .sort((a, b) => (a.t != null && b.t != null ? a.t - b.t : a.i - b.i));
   const zone = model.tallyZone;
+  const idColM = model.mapping.findIndex((m) => m.role === 'id');
   // a change that moves answers between participants is asked first (no one's answers change unasked)
   const [rematch, setRematch] = useState<{ changes: Change[]; title: string; reason: string; intro: string } | null>(null);
   const ask = (label: string, fields: [string, string][], patch: (w: StudyDocs) => void, reason: string) => {
@@ -503,6 +506,7 @@ function MatchTable() {
           <tr>
             <th className="num">Abgabe-Nr.</th>
             <th>Zeile</th>
+            <th>Test-ID (Datei)</th>
             <th>Abgabe (dt. Zeit)</th>
             <th>AB/BA</th>
             <th>Teilnehmende</th>
@@ -525,9 +529,40 @@ function MatchTable() {
               <tr key={i} className={ignored ? 'is-ignored' : !p || p.tallyConflict ? 'is-open' : ''}>
                 <td className="num">{rank.get(i) ?? '–'}</td>
                 <td className="num">{i + 1}</td>
+                <td>
+                  {idColM >= 0 && r[idColM] ? (personIdOf(r[idColM]) ?? r[idColM]) : <span className="st-muted">–</span>}
+                  {p && idColM >= 0 && personIdOf(r[idColM] ?? '') && personIdOf(r[idColM] ?? '') !== p.id && <span className="st-flag"> · von Hand anders zugeordnet</span>}
+                </td>
                 <td title={timeCol >= 0 ? `in der Datei (${ZONE_LABEL[zone.zone]}): ${r[timeCol]}` : undefined}>{model.submitted[i] != null ? fmtBerlin(model.submitted[i]!) : timeCol >= 0 ? r[timeCol] || '–' : '–'}</td>
                 <td>{orderCol >= 0 ? r[orderCol] || '–' : '–'}</td>
-                <td>{ignored ? <span className="st-muted">ignoriert</span> : p ? p.id : <span className="st-flag">keine</span>}</td>
+                <td>
+                  {ignored ? (
+                    <span className="st-muted">ignoriert</span>
+                  ) : (
+                    // (another participant: a row they have is swapped, after asking)
+                    <select
+                      value={p?.id ?? ''}
+                      disabled={!!study.viewing}
+                      aria-label={`Zeile ${i + 1} zuordnen an`}
+                      onChange={(e) => {
+                        const to = e.target.value;
+                        if (!to) {
+                          if (p) setRematch({ changes: planAssign(study.latest(), study.game, p.id, null), title: `${p.id}: keine Umfrage-Antworten`, reason: `${p.id}: Tally-Zeile → keine`, intro: SWAP_INTRO });
+                          return;
+                        }
+                        const changes = planAssign(study.latest(), study.game, to, i);
+                        setRematch({ changes, title: changes[0].label, reason: changes[0].label, intro: SWAP_INTRO });
+                      }}
+                    >
+                      <option value="">{p ? 'keine' : '– keine –'}</option>
+                      {model.included.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.id}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </td>
                 <td className="num">{p && !ignored ? (model.orderPos.get(p.id) ?? '–') : ''}</td>
                 <td>{p ? (meta[p.id]?.slot ?? '–') : ''}</td>
                 <td>

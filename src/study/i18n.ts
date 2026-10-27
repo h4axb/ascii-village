@@ -407,6 +407,9 @@ const EN: Record<string, string> = {
   'Neue Aussage': 'New statement',
   'Neue Aussage …': 'New statement …',
   'Frage bearbeiten': 'Edit question',
+  'Test-ID (Datei)': 'Test ID (file)',
+  ' · von Hand anders zugeordnet': ' · assigned differently by hand',
+  '– keine –': '– none –',
   Unverändert: 'Unchanged',
   Zurück: 'Back',
   'Jetzt übernehmen': 'Apply now',
@@ -779,6 +782,7 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^(P\d+) ↔ (P\d+): Umfrage-Antworten tauschen$/, '$1 ↔ $2: swap survey answers'],
   [/^Wird übernommen \((\d+)\)$/, 'Will be applied ($1)'],
   [/^Bleibt wie bisher \((\d+)\)$/, 'Stays as it is ($1)'],
   [/^Unverändert \((\d+)\)$/, 'Unchanged ($1)'],

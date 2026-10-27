@@ -216,7 +216,7 @@ export default function Data() {
       <Section title="Zuordnungsregeln">
         <ul className="st-rules">
           <li>Teilnehmende: P-ID aus dem persönlichen Link bzw. den Notizen.</li>
-          <li>Umfrage-Zeilen ↔ Teilnehmende: wie oben unter „Einstellungen“ ({['von Hand', ...matchOptions(study.docs).steps!.map((x) => STEP_LABEL[x])].join(' → ')}). Abweichende AB/BA-Angaben werden markiert.</li>
+          <li>Umfrage-Zeilen ↔ Teilnehmende: wie oben unter „Einstellungen“ ({matchOptions(study.docs).steps!.map((x) => STEP_LABEL[x]).join(' → ')}). Abweichende AB/BA-Angaben werden markiert.</li>
           <li>Mehrere Links einer Person: P009.1, P009.2 … in der Reihenfolge des Starts; Dauer als Summe oder nur Hauptlink.</li>
           <li>Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links. Unterbrechung: mehr als 10 min ohne Ereignis im Spiel-Tracking.</li>
           <li>Testgruppe: aus dem Link (AB/BA); eine Korrektur überschreibt sie; Abweichungen zu den Notizen werden markiert.</li>
@@ -430,8 +430,8 @@ function Settings() {
   const zone = model.tallyZone;
   const viewing = !!study.viewing;
   const stepName = (s: MatchStep) => STEP_LABEL[s] + (s === 'zeit' && !o.useTime ? ' – aus' : '');
-  const rules = (st: MatchStep[] = steps): [string, string][] => [['Reihenfolge der Regeln', ['von Hand', ...st.map(stepName)].join(' → ')], ['Teilnehmende in der Reihenfolge', MATCH_ORDER_LABEL[order]], ['Zeitzone der Datei', ZONE_LABEL[zone.zone]]];
-  const setSteps = (n: MatchStep[]) => ask('Reihenfolge der Regeln ändern', [['Vorher', ['von Hand', ...steps.map(stepName)].join(' → ')], ['Danach', ['von Hand', ...n.map(stepName)].join(' → ')]], (w) => void (w.settings.matchSteps = { order: n }), `Regeln: ${n.map((x) => STEP_LABEL[x]).join(' → ')}`);
+  const rules = (st: MatchStep[] = steps): [string, string][] => [['Reihenfolge der Regeln', st.map(stepName).join(' → ')], ['Teilnehmende in der Reihenfolge', MATCH_ORDER_LABEL[order]], ['Zeitzone der Datei', ZONE_LABEL[zone.zone]]];
+  const setSteps = (n: MatchStep[]) => ask('Reihenfolge der Regeln ändern', [['Vorher', steps.map(stepName).join(' → ')], ['Danach', n.map(stepName).join(' → ')]], (w) => void (w.settings.matchSteps = { order: n }), `Regeln: ${n.map((x) => STEP_LABEL[x]).join(' → ')}`);
   const move = (k: number, d: -1 | 1) => {
     const n = [...steps];
     [n[k], n[k + d]] = [n[k + d], n[k]];
@@ -451,10 +451,6 @@ function Settings() {
         <fieldset disabled={viewing}>
           <legend>Umfrage ↔ Teilnehmende: Reihenfolge der Regeln</legend>
           <ol className="st-steps">
-            <li className="is-fixed">
-              <span>Von Hand gewählt (Teilnehmende &amp; Sessions, Zuordnungstabelle)</span>
-              <span className="st-muted">immer zuerst</span>
-            </li>
             {steps.map((st, k) => (
               <li key={st}>
                 <span>{STEP_LABEL[st]}</span>
@@ -483,14 +479,19 @@ function Settings() {
             ))}
           </ol>
           <div className="st-toolbar">
+            <button type="button" disabled={steps[steps.length - 1] === 'hand'} onClick={() => setSteps([...steps.filter((x) => x !== 'hand'), 'hand'])}>
+              Von Hand ans Ende
+            </button>
             <button type="button" disabled={steps[steps.length - 1] === 'id'} onClick={() => setSteps([...steps.filter((x) => x !== 'id'), 'id'])}>
               Test-ID ans Ende
             </button>
             <button type="button" disabled={steps.join() === MATCH_STEPS.join()} onClick={() => setSteps(MATCH_STEPS)}>
-              Standard (Test-ID, Zeit, Reihenfolge)
+              Standard (von Hand, Test-ID, Zeit, Reihenfolge)
             </button>
           </div>
-          <p className="st-note">Kommt die Test-ID später, ordnen Zeit und Reihenfolge auch Antworten mit Test-ID zu; die Test-ID entscheidet dann nur noch, was übrig ist.</p>
+          <p className="st-note">
+            Jede Regel ordnet nur zu, was die Regeln davor offen gelassen haben. Steht „Von Hand“ weiter unten, gilt eine Wahl von Hand nur noch für Antworten, die keine Regel davor vergeben hat. Kommt die Test-ID später, ordnen Zeit und Reihenfolge auch Antworten mit Test-ID zu. „keine Antworten“ von Hand gilt immer.
+          </p>
         </fieldset>
 
         <fieldset disabled={viewing}>
@@ -548,33 +549,91 @@ function Settings() {
           </p>
         </fieldset>
 
-        <fieldset disabled={viewing}>
-          <legend>Von Hand festgehaltene Zuordnungen</legend>
+        <fieldset disabled={viewing} className="is-wide">
+          <legend>Zuordnung von Hand (bearbeitbar)</legend>
           {(() => {
-            const pinned = model.included.filter((p) => p.tallyVia === 'manuell' && p.tallyRow != null);
             const idCol = model.mapping.findIndex((m) => m.role === 'id');
             const rowsT = study.docs.tally.main?.rows ?? [];
-            return pinned.length ? (
+            const owner = new Map(model.included.filter((x) => x.tallyRow != null).map((x) => [x.tallyRow!, x.id]));
+            const tidOf = (row: number) => (idCol >= 0 ? personIdOf(rowsT[row]?.[idCol] ?? '') : null);
+            const rowLabel = (row: number) => {
+              const at = model.submitted[row];
+              const tid = tidOf(row);
+              return `Zeile ${row + 1}${tid ? ` · Test-ID ${tid}` : ''}${at != null ? ` · ${fmtBerlin(at)}` : ''}`;
+            };
+            // a row by hand, "keine", or back to the rules; a row someone else has is swapped (asked first)
+            const assign = (pid: string, row: number | null | undefined) => {
+              const changes = planAssign(study.latest(), study.game, pid, row);
+              const swap = row != null && owner.has(row) && owner.get(row) !== pid;
+              if (swap || changes.length > 1) return open(changes, changes[0].label, changes[0].label, SWAP_INTRO);
+              const { put, del } = resolve(changes, study.latest(), {});
+              study.commit(put, del);
+              logChange(study, changes[0].label);
+            };
+            const pinned = model.included.filter((x) => x.tallyVia === 'manuell');
+            if (!study.docs.tally.main) return <p className="st-note">Noch keine Umfrage importiert.</p>;
+            return (
               <>
-                <ul className="st-pins">
-                  {pinned.map((p) => {
-                    const tid = idCol >= 0 ? personIdOf(rowsT[p.tallyRow!]?.[idCol] ?? '') : null;
-                    return (
-                      <li key={p.id}>
-                        <strong>{p.id}</strong> → Zeile {p.tallyRow! + 1}
-                        {tid ? ` (Test-ID ${tid})` : ''}
-                        {tid && tid !== p.id && <span className="st-flag"> passt nicht zur Test-ID</span>}
-                      </li>
-                    );
-                  })}
-                </ul>
-                <p className="st-note">Diese Zuordnungen gelten vor allen Regeln – auch ein erneuter Upload ändert sie nicht. Sie entstehen durch eine Wahl von Hand oder durch „Aktuell behalten“ in einer Rückfrage.</p>
-                <button type="button" onClick={() => open(planRematch(study.latest(), study.game, rules()), 'Festgehaltene Zuordnungen prüfen', 'Festgehaltene Zuordnungen geprüft', 'Für jede Person, bei der die Regeln eine andere Zeile ergeben: „Danach übernehmen“ hebt das Festhalten auf, „Aktuell behalten“ lässt es. Der jetzige Stand wird vorher gesichert.')}>
-                  Prüfen und aufheben …
-                </button>
+                <p className="st-note">
+                  „automatisch“ folgt den Regeln oben; eine gewählte Zeile gilt vor allen Regeln (auch nach einem neuen Upload). Eine Zeile, die jemand anderes hat, wird getauscht.
+                  {pinned.length ? ` Von Hand festgehalten: ${pinned.map((x) => x.id).join(', ')}.` : ' Zurzeit ist nichts von Hand festgehalten.'}
+                </p>
+                <table className="st-table st-handpick">
+                  <thead>
+                    <tr>
+                      <th>Teilnehmende</th>
+                      <th>Umfrage-Antworten</th>
+                      <th>Hinweis</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {model.included.map((p) => {
+                      const v = p.doc.tallyRow === undefined ? 'auto' : p.doc.tallyRow === null ? 'none' : String(p.doc.tallyRow);
+                      const tid = p.tallyRow != null ? tidOf(p.tallyRow) : null;
+                      return (
+                        <tr key={p.id} className={p.tallyVia === 'manuell' ? 'is-picked' : ''}>
+                          <td>
+                            <span className="st-pid">{p.id}</span>
+                          </td>
+                          <td>
+                            <select
+                              value={v}
+                              aria-label={`Umfrage-Antworten von ${p.id}`}
+                              onChange={(e) => assign(p.id, e.target.value === 'auto' ? undefined : e.target.value === 'none' ? null : Number(e.target.value))}
+                            >
+                              <option value="auto">{`automatisch${p.doc.tallyRow === undefined && p.tallyRow != null ? `: ${rowLabel(p.tallyRow)} (${VIA[p.tallyVia ?? ''] ?? ''})` : p.doc.tallyRow === undefined ? ': keine passende Zeile' : ''}`}</option>
+                              <option value="none">keine Antworten</option>
+                              {rowsT.map((_, i) => (
+                                <option key={i} value={i}>
+                                  {`von Hand: ${rowLabel(i)}${owner.has(i) && owner.get(i) !== p.id ? ` – hat ${owner.get(i)}, wird getauscht` : ''}`}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            {typeof p.doc.tallyRow === 'number' && p.tallyVia !== 'manuell' ? (
+                              <span className="st-muted">{`Wahl von Hand greift nicht: eine Regel davor hat ${p.tallyRow != null ? `Zeile ${p.tallyRow + 1} (${VIA[p.tallyVia ?? ''] ?? ''})` : 'keine Zeile'} ergeben`}</span>
+                            ) : p.tallyVia === 'manuell' && tid && tid !== p.id ? (
+                              <span className="st-flag">Test-ID der Zeile: {tid}</span>
+                            ) : p.tallyVia === 'manuell' ? (
+                              <span className="st-muted">von Hand</span>
+                            ) : (
+                              ''
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {pinned.length > 0 && (
+                  <div className="st-toolbar">
+                    <button type="button" onClick={() => open(planRematch(study.latest(), study.game, rules()), 'Von Hand festgehaltene Zuordnungen prüfen', 'Festgehaltene Zuordnungen geprüft', 'Für jede Person, bei der die Regeln eine andere Zeile ergeben: „Danach übernehmen“ hebt das Festhalten auf, „Aktuell behalten“ lässt es. Der jetzige Stand wird vorher gesichert.')}>
+                      Alle von Hand festgehaltenen prüfen und aufheben …
+                    </button>
+                  </div>
+                )}
               </>
-            ) : (
-              <p className="st-note">Keine: alle Antworten werden nach den Regeln oben zugeordnet.</p>
             );
           })()}
         </fieldset>

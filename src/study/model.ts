@@ -6,7 +6,7 @@ import { designOf, type FeedbackRecord } from '../feedback/schema';
 import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
 import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
-import { detectZone, MATCH_STEPS, matchRows, parseTallyTime, SUBMIT_AFTER, SUBMIT_BEFORE, type MatchOptions, type MatchStep, type MatchVia, type TallyZone, type ZoneGuess } from './match';
+import { detectZone, matchRows, withHand, parseTallyTime, SUBMIT_AFTER, SUBMIT_BEFORE, type MatchOptions, type MatchStep, type MatchVia, type TallyZone, type ZoneGuess } from './match';
 import { optionChosen, partOf } from './tally';
 
 // ---- the scope filter: everyone, one person, or one of their links ----
@@ -125,7 +125,7 @@ const asOrder = (v: unknown): 'AB' | 'BA' | null => (v === 'AB' || v === 'BA' ? 
 export const matchOptions = (docs: StudyDocs): MatchOptions => {
   const w = (docs.settings.matchWindow ?? {}) as { before?: number; after?: number };
   return {
-    steps: ((docs.settings.matchSteps as { order?: MatchStep[] } | undefined)?.order ?? MATCH_STEPS) as MatchStep[],
+    steps: withHand((docs.settings.matchSteps as { order?: MatchStep[] } | undefined)?.order),
     useTime: !!(docs.settings.matchTime as { on?: boolean } | undefined)?.on,
     before: (w.before ?? SUBMIT_BEFORE / 60000) * 60000,
     after: (w.after ?? SUBMIT_AFTER / 60000) * 60000,

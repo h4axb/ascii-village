@@ -1644,3 +1644,10 @@ body:has(.st-root) {
   color: var(--st-muted);
   margin-top: 4px;
 }
+.st-settings fieldset.is-wide {
+  grid-column: 1 / -1;
+}
+.st-handpick select {
+  max-width: 100%;
+  min-width: 0;
+}

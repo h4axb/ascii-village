@@ -110,12 +110,18 @@ export function detectZone(pairs: { raw: string; surveyAt: number }[]): ZoneGues
   return Math.abs(mb) < Math.abs(mu) ? { zone: 'Europe/Berlin', n: b.length, gapMin: mb, sure: false } : { zone: 'UTC', n: u.length, gapMin: mu, sure: false };
 }
 
-// the pairing rules after "by hand", in the order they run (settings, editable)
-export type MatchStep = 'id' | 'zeit' | 'reihenfolge';
-export const MATCH_STEPS: MatchStep[] = ['id', 'zeit', 'reihenfolge'];
-export const STEP_LABEL: Record<MatchStep, string> = { id: 'Test-ID aus der Umfrage', zeit: 'Zeitabgleich (Abgabe ↔ Öffnen der Umfrage im Spiel)', reihenfolge: 'Reihenfolge (Abgabezeit ↔ Teilnehmende)' };
+// the pairing rules in the order they run (settings, editable; "by hand" too)
+export type MatchStep = 'hand' | 'id' | 'zeit' | 'reihenfolge';
+export const MATCH_STEPS: MatchStep[] = ['hand', 'id', 'zeit', 'reihenfolge'];
+export const STEP_LABEL: Record<MatchStep, string> = { hand: 'Von Hand gewählt (Zuordnung von Hand unten)', id: 'Test-ID aus der Umfrage', zeit: 'Zeitabgleich (Abgabe ↔ Öffnen der Umfrage im Spiel)', reihenfolge: 'Reihenfolge (Abgabezeit ↔ Teilnehmende)' };
+// a stored order as it runs: known steps once each; one saved before "by hand"
+// could move gets it first (as it always was)
+export function withHand(order?: MatchStep[]): MatchStep[] {
+  const st = (order?.length ? order : MATCH_STEPS).filter((s, i, a) => MATCH_STEPS.includes(s) && a.indexOf(s) === i);
+  return st.includes('hand') ? st : ['hand', ...st];
+}
 export interface MatchOptions {
-  steps?: MatchStep[]; // default: test id, time, order
+  steps?: MatchStep[]; // default: by hand, test id, time, order
   useTime?: boolean; // the time step runs only when on
   before?: number; // time window around the tracked survey start (ms)
   after?: number;
@@ -123,7 +129,7 @@ export interface MatchOptions {
 
 export function matchRows(rows: MatchRow[], persons: MatchPerson[], opt: MatchOptions | boolean = {}): Map<string, { row: number; via: MatchVia }> {
   const o: MatchOptions = typeof opt === 'boolean' ? { useTime: opt } : opt;
-  const steps = (o.steps?.length ? o.steps : MATCH_STEPS).filter((s, i, a) => MATCH_STEPS.includes(s) && a.indexOf(s) === i);
+  const steps = withHand(o.steps);
   const before = o.before ?? SUBMIT_BEFORE;
   const after = o.after ?? SUBMIT_AFTER;
   const out = new Map<string, { row: number; via: MatchVia }>();
@@ -132,16 +138,19 @@ export function matchRows(rows: MatchRow[], persons: MatchPerson[], opt: MatchOp
     out.set(p, { row, via });
     taken.add(row);
   };
-  // 1. by hand (null = "no row"), always first
-  for (const p of persons) if (p.manual !== undefined && p.manual !== null && rows.some((r) => r.row === p.manual)) set(p.id, p.manual, 'manuell');
-  const open = () => persons.filter((p) => p.manual === undefined && !out.has(p.id));
+  // (a participant set to "keine" stays without answers whatever the order; one
+  // with a row by hand takes part in the rules before the hand step like anyone)
+  const open = () => persons.filter((p) => p.manual !== null && !out.has(p.id));
   // rows with a test id: when the test id step ran before, time and order leave
   // them alone (an id naming nobody here is no answer to hand out by order);
   // when it comes later or not at all, they take any row
   const takesIdRows = (k: number) => !steps.includes('id') || steps.indexOf('id') > k;
   steps.forEach((step, k) => {
     const free = (r: MatchRow) => !taken.has(r.row) && (!r.id || takesIdRows(k));
-    if (step === 'id') {
+    if (step === 'hand') {
+      // the row chosen by hand, if no rule before has given it away
+      for (const p of persons) if (p.manual != null && !out.has(p.id) && !taken.has(p.manual) && rows.some((r) => r.row === p.manual)) set(p.id, p.manual, 'manuell');
+    } else if (step === 'id') {
       for (const p of open()) {
         const r = rows.find((x) => x.id === p.id && !taken.has(x.row));
         if (r) set(p.id, r.row, 'id');

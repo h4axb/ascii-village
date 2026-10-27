@@ -525,6 +525,32 @@ body:has(.st-root) {
 .st-name {
   font-weight: 500;
 }
+.st-item.is-selected {
+  box-shadow: inset 3px 0 0 var(--st-accent);
+  background: var(--st-accent-soft);
+}
+.st-item-sel {
+  margin: 0 2px 0 0;
+}
+/* the selection bar: stays at the bottom while statements are selected */
+.st-selbar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 10px 12px;
+  background: var(--st-paper);
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+.st-selbar-gap {
+  flex: 1;
+}
 .st-item {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.5fr) auto;

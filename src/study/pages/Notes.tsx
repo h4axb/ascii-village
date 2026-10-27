@@ -20,6 +20,11 @@ export function toggleChip(item: ItemDoc, g: TagGroup, chip: string): ItemDoc {
   const suggested = g.multi ? item.suggested.filter((c) => c !== chip) : item.suggested.filter((c) => !inGroup.has(c));
   return { ...item, chips, suggested };
 }
+// add a tag (several statements at once): never takes one off; in a
+// single-choice group it replaces the group's other tag
+export function setChip(item: ItemDoc, g: TagGroup, chip: string): ItemDoc {
+  return item.chips.includes(chip) ? item : toggleChip(item, g, chip);
+}
 export function confirmItem(item: ItemDoc, tags: TagGroup[]): ItemDoc {
   let chips = [...item.chips];
   for (const s of item.suggested) {
@@ -219,7 +224,7 @@ function ChipCell({ item, g, onChange, labelOnly }: { item: ItemDoc; g: TagGroup
   );
 }
 
-function ItemRow({ item, model, save, remove, fresh }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void; fresh?: boolean }) {
+function ItemRow({ item, model, save, remove, fresh, selected, onSelect }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void; fresh?: boolean; selected?: boolean; onSelect?: (shift: boolean) => void }) {
   const { study } = useCtx();
   const view = useContentView();
   const [editDe, setEditDe] = useState(false);
@@ -304,9 +309,10 @@ function ItemRow({ item, model, save, remove, fresh }: { item: ItemDoc; model: M
     </div>
   );
   return (
-    <div ref={rowRef} className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}${fresh ? ' is-fresh' : ''}`}>
+    <div ref={rowRef} className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}${fresh ? ' is-fresh' : ''}${selected ? ' is-selected' : ''}`}>
       <div className="st-item-text">
         <div className="st-item-meta">
+          {onSelect && <input type="checkbox" className="st-item-sel" checked={!!selected} onChange={() => undefined} onClick={(e) => onSelect(e.shiftKey)} aria-label="Auswählen (Umschalt: Bereich)" title="Auswählen (Umschalt: Bereich)" />}
           <span className="st-pid">
             {item.link ?? item.person}
             {d ? ` · ${d}` : ''}
@@ -450,6 +456,43 @@ export default function Notes() {
   );
   const byPerson = [...new Set(shown.map((i) => i.person))].sort();
   const open = live.filter((i) => !i.confirmed);
+  const mineOf = (pid: string) => shown.filter((i) => i.person === pid).sort((a, b) => sectionRank(a.section) - sectionRank(b.section) || a.order - b.order);
+
+  // several statements at once: select (Umschalt: a range, in the order shown), then set or remove a tag
+  const [sel, setSel] = useState<Set<string>>(() => new Set());
+  const [pickTag, setPickTag] = useState('');
+  const lastClicked = useRef<string | null>(null);
+  const ordered = byPerson.flatMap(mineOf);
+  const selShown = ordered.filter((i) => sel.has(i.id));
+  const select = (id: string, shift: boolean) => {
+    const from = shift ? lastClicked.current : null; // (read now: the update below runs later)
+    setSel((cur) => {
+      const n = new Set(cur);
+      const to = !cur.has(id);
+      const a = from ? ordered.findIndex((i) => i.id === from) : -1;
+      const b = ordered.findIndex((i) => i.id === id);
+      for (const i of a >= 0 && b >= 0 ? ordered.slice(Math.min(a, b), Math.max(a, b) + 1) : ordered.slice(b, b + 1)) {
+        if (to) n.add(i.id);
+        else n.delete(i.id);
+      }
+      return n;
+    });
+    lastClicked.current = id;
+  };
+  const selectAll = (items: ItemDoc[]) => setSel((cur) => new Set([...cur, ...items.map((i) => i.id)]));
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !(e.target instanceof HTMLElement && e.target.closest('input:not([type=checkbox]), textarea, select'))) setSel(new Set());
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  const applyTag = (add: boolean) => {
+    const g = model.tags.find((x) => x.chips.some((c) => c.id === pickTag));
+    if (!g) return;
+    const put = selShown.map((i) => (add ? setChip(i, g, pickTag) : { ...i, chips: i.chips.filter((c) => c !== pickTag) })).filter((n, k) => n.chips.join() !== selShown[k].chips.join());
+    if (put.length) study.commit(put.map((p) => ({ coll: 'items' as const, id: p.id, data: p })));
+  };
 
   async function suggestOpen() {
     setBusy('KI-Vorschläge …');
@@ -499,7 +542,7 @@ export default function Notes() {
 
       {byPerson.map((pid) => {
         const meta = metas[pid];
-        const mine = shown.filter((i) => i.person === pid).sort((a, b) => sectionRank(a.section) - sectionRank(b.section) || a.order - b.order);
+        const mine = mineOf(pid);
         const person = model.persons.find((p) => p.id === pid);
         return (
           <section key={pid} className="st-section st-notes-person">
@@ -513,6 +556,9 @@ export default function Notes() {
               {person?.excluded && <span className="st-flag">ausgeschlossen</span>}
               <button type="button" onClick={() => study.commit(mine.map((i) => ({ coll: 'items' as const, id: i.id, data: confirmItem(i, model.tags) })))}>
                 Alle bestätigen
+              </button>
+              <button type="button" onClick={() => selectAll(mine)}>
+                Alle auswählen
               </button>
               <button
                 type="button"
@@ -529,11 +575,44 @@ export default function Notes() {
               </button>
             </header>
             {mine.map((i) => (
-              <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} fresh={i.id === fresh} />
+              <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} fresh={i.id === fresh} selected={sel.has(i.id)} onSelect={(shift) => select(i.id, shift)} />
             ))}
           </section>
         );
       })}
+
+      {selShown.length > 0 && (
+        <div className="st-selbar" role="region" aria-label="Auswahl">
+          <strong>{selShown.length} ausgewählt</strong>
+          <select value={pickTag} onChange={(e) => setPickTag(e.target.value)} aria-label="Tag">
+            <option value="">Tag wählen …</option>
+            {model.tags.map((g) => (
+              <optgroup key={g.id} label={g.name}>
+                {g.chips
+                  .filter((c) => c.role !== 'rejected')
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+              </optgroup>
+            ))}
+          </select>
+          <button type="button" disabled={!pickTag} onClick={() => applyTag(true)}>
+            Tag setzen
+          </button>
+          <button type="button" disabled={!pickTag} onClick={() => applyTag(false)}>
+            Tag entfernen
+          </button>
+          <span className="st-selbar-gap" />
+          <button type="button" className="st-linkbtn" onClick={() => selectAll(shown)}>
+            Alle sichtbaren auswählen
+          </button>
+          <button type="button" className="st-linkbtn" onClick={() => setSel(new Set())}>
+            Auswahl aufheben
+          </button>
+        </div>
+      )}
     </>
   );
 }

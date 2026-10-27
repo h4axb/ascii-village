@@ -407,6 +407,15 @@ const EN: Record<string, string> = {
   'Neue Aussage': 'New statement',
   'Neue Aussage …': 'New statement …',
   'Frage bearbeiten': 'Edit question',
+  'Alle auswählen': 'Select all',
+  'Tag wählen …': 'Choose a tag …',
+  'Tag setzen': 'Add tag',
+  'Tag entfernen': 'Remove tag',
+  'Alle sichtbaren auswählen': 'Select all shown',
+  'Auswahl aufheben': 'Clear selection',
+  'Auswahl (Umschalt: Bereich)': 'Select (Shift: range)',
+  'Auswählen (Umschalt: Bereich)': 'Select (Shift: range)',
+  Auswahl: 'Selection',
   ohne: 'without',
   'Einzelne Teilnehmende in dieser Abbildung weglassen': 'Leave out single participants in this figure',
   'Notizen nur zu gespielten Testlinks': 'Notes only for played test links',
@@ -716,6 +725,7 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^(\d+) ausgewählt$/, '$1 selected'],
   [/^Teilnehmende (\d+\/\d+)$/, 'Participants $1'],
   [/^(.+): kein gespielter Testlink – nicht gezählt$/, '$1: no played test link – not counted'],
   [/^Abbildung (\S+): /, 'Figure $1: '],

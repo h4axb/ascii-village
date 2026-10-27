@@ -77,6 +77,8 @@ function Panes({ c, choice, names }: { c: Change; choice: Choice | undefined; na
     );
   };
   if (c.kind === 'neu' && !c.incoming) return null;
+  // (unchanged: only what is there)
+  if (c.kind === 'gleich') return <div className="st-panes is-same">{pane('alt', c.current, text.left.map((p) => ({ ...p, op: 'same' as const })))}</div>;
   return (
     <div className="st-panes">
       {c.kind === 'konflikt' && pane('alt', c.current, text.left)}
@@ -103,32 +105,58 @@ export function ChangeModal({
   intro?: string;
 }) {
   // new things start ticked; conflicts start undecided: each one is asked
-  const [choices, setChoices] = useState<Record<string, Choice | undefined>>(() => Object.fromEntries(changes.map((c) => [c.id, c.kind === 'konflikt' ? undefined : c.choice])));
+  const [choices, setChoices] = useState<Record<string, Choice | undefined>>(() => Object.fromEntries(changes.map((c) => [c.id, c.kind === 'konflikt' ? undefined : c.kind === 'gleich' ? 'alt' : c.choice])));
+  // the last step: what will be applied, what stays, what was already so, before anything is stored
+  const [review, setReview] = useState(false);
   const set = (id: string, v: Choice) => setChoices((x) => ({ ...x, [id]: v }));
-  const groups = useMemo(() => {
+  const byGroup = (cs: Change[]) => {
     const m = new Map<string, Change[]>();
-    for (const c of changes) m.set(c.group, [...(m.get(c.group) ?? []), c]);
+    for (const c of cs) m.set(c.group, [...(m.get(c.group) ?? []), c]);
     return [...m].sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
-  }, [changes]);
+  };
+  const groups = useMemo(() => byGroup(changes), [changes]);
   const conflicts = changes.filter((c) => c.kind === 'konflikt');
   const fresh = changes.filter((c) => c.kind === 'neu');
+  const same = changes.filter((c) => c.kind === 'gleich');
+  const actionable = changes.length - same.length;
   const open = conflicts.filter((c) => !choices[c.id]).length;
-  const taken = changes.filter((c) => choices[c.id] != null && choices[c.id] !== 'alt').length;
+  const applied = changes.filter((c) => c.kind !== 'gleich' && choices[c.id] != null && choices[c.id] !== 'alt');
+  const stays = changes.filter((c) => c.kind !== 'gleich' && choices[c.id] === 'alt');
   const all = (v: Choice) => setChoices((x) => ({ ...x, ...Object.fromEntries(conflicts.map((c) => [c.id, v])) }));
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !busy && onCancel();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || busy) return;
+      if (review) setReview(false);
+      else onCancel();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onCancel]);
+  }, [busy, onCancel, review]);
+  const what = (c: Change) => (c.kind === 'konflikt' ? (choices[c.id] === 'beide' ? 'beide behalten' : choices[c.id] === 'neu' ? `${names[1]} übernehmen` : `${names[0]} behalten`) : choices[c.id] === 'neu' ? 'neu' : 'nicht übernommen');
+  const list = (cs: Change[], cls: string) =>
+    byGroup(cs).map(([g, items]) => (
+      <li key={g} className={cls}>
+        <strong data-notr>{g}</strong>
+        <ul>
+          {items.map((c) => (
+            <li key={c.id}>
+              {c.label} <span className="st-muted">({what(c)})</span>
+            </li>
+          ))}
+        </ul>
+      </li>
+    ));
   return (
     <div className="st-modal-back" role="presentation">
       <div className="st-modal" role="dialog" aria-modal="true" aria-label={title}>
         <header className="st-modal-head">
-          <h2>{title}</h2>
+          <h2>{review ? `Bestätigen: ${title}` : title}</h2>
           <p className="st-muted">
-            {fresh.length} neu · {conflicts.length} {conflicts.length === 1 ? 'Konflikt' : 'Konflikte'}. {intro}
+            {review
+              ? 'Zum Schluss: so wird es übernommen. „Zurück“ ändert die Auswahl; erst „Jetzt übernehmen“ speichert (der jetzige Stand wird vorher gesichert).'
+              : `${fresh.length} neu · ${conflicts.length} ${conflicts.length === 1 ? 'Konflikt' : 'Konflikte'} · ${same.length} unverändert. ${intro}`}
           </p>
-          {conflicts.length > 1 && (
+          {!review && conflicts.length > 1 && (
             <div className="st-modal-all">
               <span className="st-muted">Alle Konflikte:</span>
               <button type="button" onClick={() => all('alt')}>
@@ -141,56 +169,116 @@ export function ChangeModal({
           )}
         </header>
         <div className="st-modal-body">
-          {!changes.length && <p>Keine Änderungen: alles ist schon so gespeichert.</p>}
-          {groups.map(([g, cs]) => (
-            <section key={g} className="st-modal-group">
-              <h3 data-notr>{g}</h3>
-              {cs.map((c) => {
-                const ch = choices[c.id];
+          {review ? (
+            <div className="st-review">
+              <section>
+                <h3 className="is-applied">Wird übernommen ({applied.length})</h3>
+                {applied.length ? <ul className="st-review-list">{list(applied, 'is-applied')}</ul> : <p className="st-muted">nichts</p>}
+              </section>
+              <section>
+                <h3 className="is-stays">Bleibt wie bisher ({stays.length})</h3>
+                {stays.length ? <ul className="st-review-list">{list(stays, 'is-stays')}</ul> : <p className="st-muted">nichts</p>}
+              </section>
+              <section>
+                <h3 className="is-same">Unverändert ({same.length})</h3>
+                {same.length ? (
+                  <ul className="st-review-list">
+                    {byGroup(same).map(([g, items]) => (
+                      <li key={g} className="is-same">
+                        <strong data-notr>{g}</strong> <span className="st-muted">{items.map((c) => c.label).join(' · ')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="st-muted">nichts</p>
+                )}
+              </section>
+            </div>
+          ) : (
+            <>
+              {!actionable && <p>Keine Änderungen: alles ist schon so gespeichert.</p>}
+              {groups.map(([g, cs]) => {
+                const todo = cs.filter((c) => c.kind !== 'gleich');
+                const kept = cs.filter((c) => c.kind === 'gleich');
                 return (
-                  <div key={c.id} className={`st-change is-${c.kind}${c.kind === 'konflikt' && !ch ? ' is-open' : ''}`}>
-                    <div className="st-change-head">
-                      <span className={`st-badge${c.kind === 'konflikt' ? ' is-conflict' : ''}`}>{c.kind === 'konflikt' ? 'Konflikt' : 'Neu'}</span>
-                      <span className="st-change-label">{c.label}</span>
-                      <span className="st-change-pick">
-                        {c.kind === 'konflikt' ? (
-                          <>
-                            <button type="button" className={ch === 'alt' ? 'is-on' : ''} onClick={() => set(c.id, 'alt')}>
-                              {`${names[0]} behalten`}
-                            </button>
-                            <button type="button" className={ch === 'neu' ? 'is-on' : ''} onClick={() => set(c.id, 'neu')}>
-                              {`${names[1]} übernehmen`}
-                            </button>
-                            {c.both && (
-                              <button type="button" className={ch === 'beide' ? 'is-on' : ''} onClick={() => set(c.id, 'beide')}>
-                                Beide behalten
-                              </button>
-                            )}
-                          </>
-                        ) : (
-                          <label className="st-check">
-                            <input type="checkbox" checked={ch === 'neu'} onChange={(e) => set(c.id, e.target.checked ? 'neu' : 'alt')} /> übernehmen
-                          </label>
-                        )}
-                      </span>
-                    </div>
-                    <Panes c={c} choice={ch} names={names} />
-                  </div>
+                  <section key={g} className="st-modal-group">
+                    <h3 data-notr>{g}</h3>
+                    {todo.map((c) => {
+                      const ch = choices[c.id];
+                      return (
+                        <div key={c.id} className={`st-change is-${c.kind}${c.kind === 'konflikt' && !ch ? ' is-open' : ''}`}>
+                          <div className="st-change-head">
+                            <span className={`st-badge${c.kind === 'konflikt' ? ' is-conflict' : ''}`}>{c.kind === 'konflikt' ? 'Konflikt' : 'Neu'}</span>
+                            <span className="st-change-label">{c.label}</span>
+                            <span className="st-change-pick">
+                              {c.kind === 'konflikt' ? (
+                                <>
+                                  <button type="button" className={ch === 'alt' ? 'is-on' : ''} onClick={() => set(c.id, 'alt')}>
+                                    {`${names[0]} behalten`}
+                                  </button>
+                                  <button type="button" className={ch === 'neu' ? 'is-on' : ''} onClick={() => set(c.id, 'neu')}>
+                                    {`${names[1]} übernehmen`}
+                                  </button>
+                                  {c.both && (
+                                    <button type="button" className={ch === 'beide' ? 'is-on' : ''} onClick={() => set(c.id, 'beide')}>
+                                      Beide behalten
+                                    </button>
+                                  )}
+                                </>
+                              ) : (
+                                <label className="st-check">
+                                  <input type="checkbox" checked={ch === 'neu'} onChange={(e) => set(c.id, e.target.checked ? 'neu' : 'alt')} /> übernehmen
+                                </label>
+                              )}
+                            </span>
+                          </div>
+                          <Panes c={c} choice={ch} names={names} />
+                        </div>
+                      );
+                    })}
+                    {kept.length > 0 && (
+                      <details className="st-same">
+                        <summary>{`Unverändert (${kept.length})`}</summary>
+                        {kept.map((c) => (
+                          <div key={c.id} className="st-change is-gleich">
+                            <div className="st-change-head">
+                              <span className="st-badge is-same">Unverändert</span>
+                              <span className="st-change-label">{c.label}</span>
+                            </div>
+                            <Panes c={c} choice={undefined} names={names} />
+                          </div>
+                        ))}
+                      </details>
+                    )}
+                  </section>
                 );
               })}
-            </section>
-          ))}
+            </>
+          )}
         </div>
         <footer className="st-modal-foot">
           {busy && <span className="st-muted">{busy}</span>}
           <span className="st-selbar-gap" />
-          <button type="button" onClick={onCancel} disabled={!!busy}>
-            Abbrechen
-          </button>
-          {open > 0 && <span className="st-flag">{open === 1 ? 'Noch 1 Konflikt zu entscheiden' : `Noch ${open} Konflikte zu entscheiden`}</span>}
-          <button type="button" className="is-primary" onClick={() => onApply(choices as Record<string, Choice>)} disabled={!!busy || !changes.length || open > 0}>
-            {taken} Änderungen übernehmen
-          </button>
+          {review ? (
+            <>
+              <button type="button" onClick={() => setReview(false)} disabled={!!busy}>
+                Zurück
+              </button>
+              <button type="button" className="is-primary" onClick={() => onApply(choices as Record<string, Choice>)} disabled={!!busy || !applied.length}>
+                Jetzt übernehmen
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={onCancel} disabled={!!busy}>
+                Abbrechen
+              </button>
+              {open > 0 && <span className="st-flag">{open === 1 ? 'Noch 1 Konflikt zu entscheiden' : `Noch ${open} Konflikte zu entscheiden`}</span>}
+              <button type="button" className="is-primary" onClick={() => setReview(true)} disabled={!!busy || !actionable || open > 0}>
+                {`${applied.length} Änderungen übernehmen …`}
+              </button>
+            </>
+          )}
         </footer>
       </div>
     </div>

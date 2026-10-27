@@ -252,11 +252,16 @@ export function planNotes(parsed: Parsed, docs: StudyDocs, tags: (id: string) =>
   };
   const pending: Parsed['statements'] = [];
   // 1. the same wording, the same person: nothing to do
+  const unchanged = new Map<string, string[]>();
   for (const st of parsed.statements) {
     const hit = pool.find((i) => !used.has(i.id) && i.person === st.person && i.section === st.section && same(i, st.text));
-    if (hit) used.add(hit.id);
-    else pending.push(st);
+    if (hit) {
+      used.add(hit.id);
+      unchanged.set(st.person, [...(unchanged.get(st.person) ?? []), hit.text]);
+    } else pending.push(st);
   }
+  // (what is already there, shown so the check says what is new and what is not)
+  for (const [person, texts] of unchanged) out.push({ id: `same:${person}`, kind: 'gleich', group: person, label: `${texts.length} ${texts.length === 1 ? 'Aussage' : 'Aussagen'} unverändert`, current: { text: texts.join('\n') }, choice: 'alt', apply: () => undefined });
   const rest: Parsed['statements'] = [];
   for (const st of pending) {
     // 2. the same wording under another participant: move it?

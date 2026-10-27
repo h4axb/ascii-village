@@ -75,7 +75,10 @@ export function planTally(docs: StudyDocs, game: GameData, next: TallyDoc): Chan
       if (nRow != null) out.push({ id: `tally:${p.id}`, kind: 'neu', group: p.id, label: `Umfrage-Antworten zugeordnet (${VIA[p.tallyVia ?? ''] ?? ''})`, incoming: { fields: newFields }, choice: 'neu', apply: () => undefined });
       continue;
     }
-    if (same) continue;
+    if (same) {
+      out.push({ id: `tally-same:${p.id}`, kind: 'gleich', group: p.id, label: 'Antworten unverändert', current: { fields: curFields.slice(0, 2) }, choice: 'alt', apply: () => undefined });
+      continue;
+    }
     const oldRow = old.rows[oRow];
     out.push({
       id: `tally:${p.id}`,

@@ -407,6 +407,13 @@ const EN: Record<string, string> = {
   'Neue Aussage': 'New statement',
   'Neue Aussage …': 'New statement …',
   'Frage bearbeiten': 'Edit question',
+  Unverändert: 'Unchanged',
+  Zurück: 'Back',
+  'Jetzt übernehmen': 'Apply now',
+  'Antworten unverändert': 'Answers unchanged',
+  'nicht übernommen': 'not applied',
+  'beide behalten': 'keep both',
+  'Zum Schluss: so wird es übernommen. „Zurück“ ändert die Auswahl; erst „Jetzt übernehmen“ speichert (der jetzige Stand wird vorher gesichert).': 'Last step: this is what will be applied. "Back" changes the choices; only "Apply now" saves (the current state is saved first).',
   'Neue Spieldaten prüfen': 'Check new game data',
   Prüfen: 'Check',
   Übernommen: 'Accepted',
@@ -772,6 +779,13 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^Wird übernommen \((\d+)\)$/, 'Will be applied ($1)'],
+  [/^Bleibt wie bisher \((\d+)\)$/, 'Stays as it is ($1)'],
+  [/^Unverändert \((\d+)\)$/, 'Unchanged ($1)'],
+  [/^(\d+) Änderungen übernehmen …$/, 'Apply $1 changes …'],
+  [/^Bestätigen: (.+)$/, 'Confirm: $1'],
+  [/^(\d+) neu · (\d+) Konflikte? · (\d+) unverändert\. (.*)$/, '$1 new · $2 conflicts · $3 unchanged. $4'],
+  [/^(\d+) Aussagen? unverändert$/, '$1 statements unchanged'],
   [/^Neue Spieldaten seit (.+): (\d+) neu(?: · (\d+) geändert oder entfernt)? – noch nicht übernommen\.$/, 'New game data since $1: $2 new · $3 changed or removed – not yet accepted.'],
   [/^(\d+) neue Ereignisse$/, '$1 new events'],
   [/^(\d+) neue Bewertungen$/, '$1 new ratings'],

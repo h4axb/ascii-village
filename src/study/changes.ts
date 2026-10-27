@@ -15,7 +15,7 @@ export interface DiffSide {
 }
 export interface Change {
   id: string;
-  kind: 'neu' | 'konflikt';
+  kind: 'neu' | 'konflikt' | 'gleich'; // gleich: already so, only shown
   group: string; // the participant (or area) it belongs to
   label: string;
   current?: DiffSide;

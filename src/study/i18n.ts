@@ -407,6 +407,9 @@ const EN: Record<string, string> = {
   'Neue Aussage': 'New statement',
   'Neue Aussage …': 'New statement …',
   'Frage bearbeiten': 'Edit question',
+  'nur diese': 'only this one',
+  nur: 'only',
+  'nur dieser Link': 'only this link',
   Aktuell: 'Current',
   Neu: 'Incoming',
   'Gespeicherter Stand': 'Saved state',
@@ -753,6 +756,9 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^(\d+) von (\d+) ▾$/, '$1 of $2 ▾'],
+  [/^Alle \((\d+)\) ▾$/, 'All ($1) ▾'],
+  [/^ohne (.+) \(Auswahl oben\)$/, 'without $1 (selection above)'],
   [/^(\d+) Änderungen übernehmen$/, 'Apply $1 changes'],
   [/^(\d+) neu · (\d+) Konflikte?\. (.*)$/, '$1 new · $2 conflicts. $3'],
   [/^(\d+) ausgewählt$/, '$1 selected'],

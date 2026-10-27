@@ -338,6 +338,7 @@ export function Figure({
   table,
   people,
   omitted = [],
+  alsoOmitted = [],
   onOmit,
 }: {
   n: number | string;
@@ -348,6 +349,7 @@ export function Figure({
   table?: () => string; // CSV of the figure's numbers
   people?: string[]; // the participants it can leave out (none: no filter)
   omitted?: string[];
+  alsoOmitted?: string[]; // left out everywhere (the participants menu)
   onOmit?: (ids: string[]) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -355,7 +357,8 @@ export function Figure({
   const [copied, setCopied] = useState(false);
   const [picking, setPicking] = useState(false);
   useEffect(() => setDraft(caption), [caption]);
-  const without = omitted.length && people ? `${tr('ohne')} ${omitted.join(', ')} (n = ${people.length - omitted.length})` : '';
+  const gone = [...alsoOmitted, ...omitted];
+  const without = gone.length ? `${tr('ohne')} ${gone.join(', ')}${people ? ` (n = ${people.length - omitted.length})` : ''}` : '';
   const full = `${getLang() === 'en' ? 'Figure' : 'Abbildung'} ${n}: ${draft}${without ? ` (${without})` : ''}`;
   return (
     <figure className="st-figure">
@@ -377,10 +380,15 @@ export function Figure({
       {picking && people && onOmit && (
         <div className="st-figpick">
           {people.map((id) => (
-            <label key={id}>
-              <input type="checkbox" checked={!omitted.includes(id)} onChange={(e) => onOmit(e.target.checked ? omitted.filter((x) => x !== id) : [...omitted, id])} />
-              {id}
-            </label>
+            <span key={id} className="st-figpick-one">
+              <label>
+                <input type="checkbox" checked={!omitted.includes(id)} onChange={(e) => onOmit(e.target.checked ? omitted.filter((x) => x !== id) : [...omitted, id])} />
+                {id}
+              </label>
+              <button type="button" className="st-linkbtn" onClick={() => onOmit(people.filter((x) => x !== id))} title={`Nur ${id} in dieser Abbildung`}>
+                nur
+              </button>
+            </span>
           ))}
           <button type="button" className="st-linkbtn" onClick={() => onOmit([])} disabled={!omitted.length}>
             alle

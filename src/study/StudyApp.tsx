@@ -3,7 +3,7 @@
 // one model (model.ts) recomputed on every change.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { setLang, useLang, useTranslator } from './i18n';
-import { buildModel, slice as sliceOf, type Scope } from './model';
+import { buildModel, omit, slice as sliceOf, type Scope } from './model';
 import { useStudy } from './store';
 import { StudyCtx } from './ui';
 import Overview from './pages/Overview';
@@ -55,6 +55,16 @@ function readHash(): [string, string] {
 }
 
 const SCOPE_KEY = 'asciia-study-scope';
+// participants left out of "Alle" (ticked off in the participants menu)
+const OMIT_KEY = 'asciia-study-omit';
+function readOmit(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(OMIT_KEY) ?? '[]') as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 function readScope(): string {
   try {
     return localStorage.getItem(SCOPE_KEY) ?? 'all';
@@ -80,6 +90,7 @@ export default function StudyApp() {
   const study = useStudy();
   const [[page, sub], setRoute] = useState(readHash);
   const [scopeKey, setScopeKey] = useState(readScope);
+  const [omitIds, setOmitIds] = useState(readOmit);
   const [drawer, setDrawer] = useState(false);
   const [typed, setTyped] = useState('');
   const lang = useLang();
@@ -157,7 +168,17 @@ export default function StudyApp() {
     if (model.included.some((p) => p.id === scopeKey)) return { kind: 'person', id: scopeKey };
     return { kind: 'all' };
   }, [scopeKey, model]);
-  const slice = useMemo(() => sliceOf(model, scope), [model, scope]);
+  // (only ids still among the participants; a single person or link shows in full)
+  const omitted = useMemo(() => (scope.kind === 'all' ? omitIds.filter((id) => model.included.some((p) => p.id === id)) : []), [omitIds, model, scope]);
+  const slice = useMemo(() => omit(sliceOf(model, scope), omitted), [model, scope, omitted]);
+  const setOmit = (ids: string[]) => {
+    setOmitIds(ids);
+    try {
+      localStorage.setItem(OMIT_KEY, JSON.stringify(ids));
+    } catch {
+      // (not remembered)
+    }
+  };
   const setScope = (k: string) => {
     setScopeKey(k);
     try {
@@ -211,7 +232,7 @@ export default function StudyApp() {
   const subTitle = current.sub?.find((s) => s.id === sub && !s.anchor)?.title ?? (page === 'qualitativ' ? SUB_TITLE[''] : null);
 
   return (
-    <StudyCtx.Provider value={{ study, model, scope, slice }}>
+    <StudyCtx.Provider value={{ study, model, scope, slice, omitted }}>
       {/* (a language change rebuilds the page, so the translator starts from the German text) */}
       <div key={lang} ref={rootRef} className={`st-root st-app${drawer ? ' has-drawer' : ''}`} lang={lang}>
         {study.viewing && (
@@ -292,29 +313,73 @@ export default function StudyApp() {
             </h1>
             <div className="st-pagetools">
             <ContentSwitch />
-            <label className="st-scope">
-              <span>Teilnehmende</span>
-              <select value={scope.kind === 'all' ? 'all' : scope.kind === 'link' ? scope.key : scope.id} onChange={(e) => setScope(e.target.value)}>
-                <option value="all">Alle ({model.included.length})</option>
-                {model.included.map((p) => [
-                  <option key={p.id} value={p.id}>
-                    {p.id}
-                  </option>,
-                  ...(p.links.length > 1
-                    ? p.links.map((l) => (
-                        <option key={l.key} value={l.key}>
-                          {`  ${l.label}`}
-                        </option>
-                      ))
-                    : []),
-                ])}
-              </select>
-            </label>
+            <ScopePicker model={model} scope={scope} omitted={omitted} onScope={setScope} onOmit={setOmit} />
             </div>
           </div>
           {body}
         </main>
       </div>
     </StudyCtx.Provider>
+  );
+}
+
+// the participants menu: all (each with a checkbox to leave them out), or
+// one person or one of their links alone
+function ScopePicker({ model, scope, omitted, onScope, onOmit }: { model: ReturnType<typeof buildModel>; scope: Scope; omitted: string[]; onScope: (k: string) => void; onOmit: (ids: string[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener('mousedown', close);
+    window.addEventListener('keydown', close);
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('keydown', close);
+    };
+  }, [open]);
+  const n = model.included.length;
+  const label = scope.kind !== 'all' ? scope.id : omitted.length ? `${n - omitted.length} von ${n}` : `Alle (${n})`;
+  const toggle = (id: string, on: boolean) => {
+    if (scope.kind !== 'all') onScope('all');
+    onOmit(on ? omitted.filter((x) => x !== id) : [...omitted, id]);
+  };
+  return (
+    <div className="st-scope" ref={ref}>
+      <span>Teilnehmende</span>
+      <button type="button" className={`st-scope-btn${omitted.length || scope.kind !== 'all' ? ' is-on' : ''}`} aria-expanded={open} onClick={() => setOpen((x) => !x)}>
+        {label} ▾
+      </button>
+      {open && (
+        <div className="st-scope-menu" role="dialog" aria-label="Teilnehmende">
+          <label className="st-scope-row is-all">
+            <input type="checkbox" checked={scope.kind === 'all' && !omitted.length} ref={(el) => el && (el.indeterminate = scope.kind === 'all' && omitted.length > 0 && omitted.length < n)} onChange={(e) => (onScope('all'), onOmit(e.target.checked ? [] : model.included.map((p) => p.id)))} />
+            Alle ({n})
+          </label>
+          {model.included.map((p) => (
+            <div key={p.id}>
+              <div className={`st-scope-row${scope.kind === 'person' && scope.id === p.id ? ' is-current' : ''}`}>
+                <input type="checkbox" checked={scope.kind === 'all' ? !omitted.includes(p.id) : scope.kind === 'person' ? scope.id === p.id : false} onChange={(e) => toggle(p.id, e.target.checked)} aria-label={`${p.id} einbeziehen`} />
+                <span className="st-pid">{p.id}</span>
+                <button type="button" className="st-linkbtn" onClick={() => (onScope(p.id), setOpen(false))}>
+                  nur diese
+                </button>
+              </div>
+              {p.links.length > 1 &&
+                p.links.map((l) => (
+                  <div key={l.key} className={`st-scope-row is-link${scope.kind === 'link' && scope.key === l.key ? ' is-current' : ''}`}>
+                    <span className="st-muted">{l.label}</span>
+                    <button type="button" className="st-linkbtn" onClick={() => (onScope(l.key), setOpen(false))}>
+                      nur dieser Link
+                    </button>
+                  </div>
+                ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

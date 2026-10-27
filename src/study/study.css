@@ -277,6 +277,15 @@ body:has(.st-root) {
   padding: 6px 0;
   border-top: 1px solid var(--st-line);
 }
+.st-figpick-one {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.st-figpick-one .st-linkbtn {
+  font-size: 11.5px;
+  color: var(--st-muted);
+}
 .st-figpick label {
   display: inline-flex;
   gap: 4px;
@@ -1389,4 +1398,54 @@ body:has(.st-root) {
 .st-viewbar a,
 .st-viewbar button.st-linkbtn {
   color: #fff;
+}
+
+/* the participants menu: a checkbox per participant, or one alone */
+.st-scope {
+  position: relative;
+}
+.st-scope-btn {
+  min-width: 96px;
+  text-align: left;
+}
+.st-scope-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  background: var(--st-paper);
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  padding: 6px 0;
+  min-width: 220px;
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  color: var(--st-ink);
+}
+.st-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 14px;
+}
+.st-scope-row:hover {
+  background: var(--st-soft);
+}
+.st-scope-row.is-all {
+  border-bottom: 1px solid var(--st-line);
+  padding-bottom: 7px;
+  margin-bottom: 3px;
+  font-weight: 600;
+}
+.st-scope-row.is-link {
+  padding-left: 36px;
+}
+.st-scope-row.is-current {
+  background: var(--st-accent-soft);
+}
+.st-scope-row .st-linkbtn {
+  margin-left: auto;
+  font-size: 12.5px;
 }

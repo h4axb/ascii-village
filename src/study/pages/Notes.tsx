@@ -474,7 +474,7 @@ export function ContentSwitch() {
 // ---- the page ----
 export default function Notes() {
   const ctx = useCtx();
-  const { study, model, scope } = ctx;
+  const { study, model, scope, omitted } = ctx;
   const [filter, setFilter] = useState<'all' | 'open' | 'changed'>('all');
   const [q, setQ] = useState('');
   const [fresh, setFresh] = useState<string | null>(null);
@@ -485,8 +485,8 @@ export default function Notes() {
 
   const scoped = useMemo(() => {
     const ids = scope.kind === 'all' ? null : scope.kind === 'link' ? (model.links.find((l) => l.key === scope.key)?.person ?? scope.id) : scope.id;
-    return model.allItems.filter((i) => (!ids || i.person === ids) && (scope.kind !== 'link' || !i.link || i.link === scope.id));
-  }, [model.allItems, model.links, scope]);
+    return model.allItems.filter((i) => (!ids || i.person === ids) && !omitted.includes(i.person) && (scope.kind !== 'link' || !i.link || i.link === scope.id));
+  }, [model.allItems, model.links, scope, omitted]);
   const removed = scoped.filter((i) => i.status === 'removed');
   const live = scoped.filter((i) => i.status !== 'removed');
   const shown = live.filter(

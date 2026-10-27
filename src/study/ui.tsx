@@ -11,6 +11,7 @@ export interface Ctx {
   model: Model;
   scope: Scope;
   slice: Slice;
+  omitted: string[]; // ticked off in the participants menu (left out of every view)
 }
 export const StudyCtx = createContext<Ctx | null>(null);
 export const useCtx = () => useContext(StudyCtx)!;
@@ -72,6 +73,7 @@ export function Fig({ id, sub, title, children, table }: { id: string; sub?: { n
       table={table && (() => table(s))}
       people={slice.persons.length > 1 ? slice.persons.map((p) => p.id) : undefined}
       omitted={stored}
+      alsoOmitted={ctx.omitted}
       onOmit={(ids) => study.commit([{ coll: 'settings', id: omitKey, data: { ids } }])}
     >
       {/* (components inside read the figure's slice from the context too) */}

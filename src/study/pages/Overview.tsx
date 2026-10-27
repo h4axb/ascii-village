@@ -42,7 +42,7 @@ const catsOf = (s: Slice, model: Model) => [
 ];
 
 export default function Overview() {
-  const { model, slice, scope } = useCtx();
+  const { model, slice, scope, omitted } = useCtx();
   const all = scope.kind === 'all';
   const n = slice.persons.length;
   const nAll = model.included.length;
@@ -57,7 +57,11 @@ export default function Overview() {
   return (
     <>
       <div className="st-stats">
-        <Stat label="Teilnehmende" value={n} sub={all && model.persons.length > nAll ? `${model.persons.length - nAll} ausgeschlossen` : undefined} />
+        <Stat
+          label="Teilnehmende"
+          value={n}
+          sub={all && (model.persons.length > nAll || omitted.length) ? [model.persons.length > nAll ? `${model.persons.length - nAll} ausgeschlossen` : '', omitted.length ? `ohne ${omitted.join(', ')} (Auswahl oben)` : ''].filter(Boolean).join(' · ') : undefined}
+        />
         <Stat label="Testgruppen" value={`${groups.AB} AB · ${groups.BA} BA`} />
         <Stat label="Zeitraum" value={dates.length ? `${fmtDate(Math.min(...dates))}${dates.length > 1 && fmtDate(Math.min(...dates)) !== fmtDate(Math.max(...dates)) ? ` – ${fmtDate(Math.max(...dates))}` : ''}` : '–'} />
         <Stat

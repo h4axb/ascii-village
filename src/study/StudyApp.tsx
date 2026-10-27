@@ -63,6 +63,19 @@ function readScope(): string {
   }
 }
 
+// the scroll position of this tab, so a reload comes back to it (the page
+// loads its data first, too late for the browser's own restoring)
+const SCROLL_KEY = 'asciia-study-scroll';
+function readScroll(): { route: string; y: number } | null {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(SCROLL_KEY) ?? 'null') as { route?: unknown; y?: unknown } | null;
+    return v && typeof v.route === 'string' && typeof v.y === 'number' ? { route: v.route, y: v.y } : null;
+  } catch {
+    return null;
+  }
+}
+const savedScroll = readScroll();
+
 export default function StudyApp() {
   const study = useStudy();
   const [[page, sub], setRoute] = useState(readHash);
@@ -79,12 +92,62 @@ export default function StudyApp() {
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, [lang]);
-  // a sub-page that is a section: scroll to it
+  // a sub-page that is a section: scroll to it (not on a reload that restores its place)
+  const restoring = useRef(!!savedScroll && savedScroll.route === window.location.hash && savedScroll.y > 0);
   useEffect(() => {
+    if (restoring.current) return;
     const p = PAGES.find((x) => x.id === page);
     if (sub && p?.sub?.find((s) => s.id === sub)?.anchor) window.setTimeout(() => document.getElementById(sub)?.scrollIntoView({ block: 'start' }), 50);
     else window.scrollTo(0, 0);
   }, [page, sub]);
+
+  // remember the place (from when the page is shown, so the loading screen's 0 never counts)
+  const ready = study.state === 'ready';
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      history.scrollRestoration = 'manual';
+    } catch {
+      // (the browser's own)
+    }
+    let frame = 0;
+    const save = () => {
+      if (restoring.current) return;
+      try {
+        sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ route: window.location.hash, y: Math.round(window.scrollY) }));
+      } catch {
+        // (not remembered)
+      }
+    };
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(save);
+    };
+    // back to the saved place: the figures grow after the first paint, so try until it fits
+    if (restoring.current && savedScroll) {
+      const target = savedScroll.y;
+      const until = Date.now() + 1500;
+      const stop = () => {
+        restoring.current = false;
+        for (const t of ['wheel', 'touchstart', 'keydown']) window.removeEventListener(t, stop);
+      };
+      for (const t of ['wheel', 'touchstart', 'keydown']) window.addEventListener(t, stop, { passive: true });
+      const step = () => {
+        if (!restoring.current) return;
+        window.scrollTo(0, target);
+        if (Math.abs(window.scrollY - target) < 2 || Date.now() > until) stop();
+        else requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('pagehide', save);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('pagehide', save);
+    };
+  }, [ready]);
 
   const model = useMemo(() => buildModel(study.docs, study.game), [study.docs, study.game]);
   const scope: Scope = useMemo(() => {

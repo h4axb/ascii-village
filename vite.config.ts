@@ -1,4 +1,5 @@
 import { defineConfig, type Connect, type Plugin } from 'vite';
+import { execSync } from 'node:child_process';
 import react from '@vitejs/plugin-react';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -322,7 +323,21 @@ function workerApiDevPlugin(): Plugin {
   };
 }
 
+// which build this is (shown in /feedback's sidebar, to see whether a fix is live):
+// the commit Cloudflare builds, else the local checkout's, and the build time
+function buildStamp(): string {
+  let sha = process.env.WORKERS_CI_COMMIT_SHA || process.env.CF_PAGES_COMMIT_SHA || '';
+  if (!sha)
+    try {
+      sha = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    } catch {
+      sha = '';
+    }
+  return `${sha.slice(0, 7) || 'lokal'} · ${new Date().toISOString()}`;
+}
+
 export default defineConfig({
+  define: { __STUDY_BUILD__: JSON.stringify(buildStamp()) },
   plugins: [react(), worldEditorSavePlugin(), startTitleUploadPlugin(), introNarrationSavePlugin(), themeSavePlugin(), groundSavePlugin(), shipSeatsSavePlugin(), seatsSavePlugin(), workerApiDevPlugin()],
   server: {
     // Pinned so a dev server never silently drifts onto a different port

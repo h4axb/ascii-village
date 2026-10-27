@@ -548,6 +548,37 @@ function Settings() {
           </p>
         </fieldset>
 
+        <fieldset disabled={viewing}>
+          <legend>Von Hand festgehaltene Zuordnungen</legend>
+          {(() => {
+            const pinned = model.included.filter((p) => p.tallyVia === 'manuell' && p.tallyRow != null);
+            const idCol = model.mapping.findIndex((m) => m.role === 'id');
+            const rowsT = study.docs.tally.main?.rows ?? [];
+            return pinned.length ? (
+              <>
+                <ul className="st-pins">
+                  {pinned.map((p) => {
+                    const tid = idCol >= 0 ? personIdOf(rowsT[p.tallyRow!]?.[idCol] ?? '') : null;
+                    return (
+                      <li key={p.id}>
+                        <strong>{p.id}</strong> → Zeile {p.tallyRow! + 1}
+                        {tid ? ` (Test-ID ${tid})` : ''}
+                        {tid && tid !== p.id && <span className="st-flag"> passt nicht zur Test-ID</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="st-note">Diese Zuordnungen gelten vor allen Regeln – auch ein erneuter Upload ändert sie nicht. Sie entstehen durch eine Wahl von Hand oder durch „Aktuell behalten“ in einer Rückfrage.</p>
+                <button type="button" onClick={() => open(planRematch(study.latest(), study.game, rules()), 'Festgehaltene Zuordnungen prüfen', 'Festgehaltene Zuordnungen geprüft', 'Für jede Person, bei der die Regeln eine andere Zeile ergeben: „Danach übernehmen“ hebt das Festhalten auf, „Aktuell behalten“ lässt es. Der jetzige Stand wird vorher gesichert.')}>
+                  Prüfen und aufheben …
+                </button>
+              </>
+            ) : (
+              <p className="st-note">Keine: alle Antworten werden nach den Regeln oben zugeordnet.</p>
+            );
+          })()}
+        </fieldset>
+
         <fieldset>
           <legend>Bearbeitungsdauer</legend>
           <DurationSelect />

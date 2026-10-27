@@ -104,6 +104,34 @@ export function planTally(docs: StudyDocs, game: GameData, next: TallyDoc): Chan
       },
     });
   }
+  // rows held by hand (also by an earlier "Aktuell behalten") that the rules
+  // would give someone else: asked, or a re-upload could never correct them
+  const rules = buildModel(after, game, { ignoreManual: true });
+  const idCol = next.mapping.findIndex((m) => m.role === 'id');
+  const rowSide = (row: number | null): [string, string][] =>
+    row == null ? [['Zeile', 'keine Antworten']] : [['Zeile', String(row + 1)], ['Test-ID in der Zeile', idCol >= 0 ? next.rows[row]?.[idCol] || '–' : '–'], ['Abgegeben (dt. Zeit)', submittedIn(mNew, row)], ...answers(next, row).filter(([h]) => next.headers.indexOf(h) !== idCol).slice(0, 3)];
+  for (const p of mNew.included) {
+    if (p.tallyVia !== 'manuell') continue;
+    const r = rules.persons.find((x) => x.id === p.id);
+    const ruleRow = r?.tallyRow ?? null;
+    if (ruleRow === p.tallyRow) continue;
+    out.push({
+      id: `pin:${p.id}`,
+      kind: 'konflikt',
+      group: p.id,
+      label: `Von Hand festgehalten (Zeile ${p.tallyRow! + 1}) – nach den Regeln wäre es ${ruleRow == null ? 'keine Zeile' : `Zeile ${ruleRow + 1} (${VIA[r?.tallyVia ?? ''] ?? ''})`}`,
+      current: { fields: rowSide(p.tallyRow) },
+      incoming: { fields: rowSide(ruleRow) },
+      choice: 'alt',
+      // take the rules: the hand pairing goes (the rules decide from now on)
+      apply: (c, w) => {
+        if (c !== 'neu') return;
+        const doc = { ...(w.people[p.id] ?? { id: p.id }) };
+        delete doc.tallyRow;
+        w.people[p.id] = doc;
+      },
+    });
+  }
   // rows of the old file that the new one no longer has
   if (old)
     old.rows.forEach((r, i) => {

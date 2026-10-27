@@ -293,6 +293,12 @@ export default function StudyApp() {
           </ul>
           <div className="st-navfoot">
             <span>{study.saving ? 'Speichern …' : study.saveError ? '' : 'Gespeichert'}</span>
+            <span className="st-build" title="Version des Dashboards (Commit · Bauzeit, deutsche Zeit)" data-notr>
+              Version {__STUDY_BUILD__.split(' · ')[0]} · {(() => {
+                const t = Date.parse(__STUDY_BUILD__.split(' · ')[1] ?? '');
+                return Number.isFinite(t) ? new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+              })()}
+            </span>
             {study.saveError && <span className="st-flag">{study.saveError}</span>}
             <div className="st-seg st-lang" role="group" aria-label="Sprache / Language">
               <button type="button" className={lang === 'de' ? 'is-on' : ''} onClick={() => setLang('de')}>

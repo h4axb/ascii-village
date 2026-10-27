@@ -4,3 +4,6 @@
 // assets fine before this only because everything was JSON (covered by
 // tsconfig's resolveJsonModule); the HUD's icon SVGs are the first real asset
 // imports.
+
+// the build stamp from vite.config.ts (commit · build time)
+declare const __STUDY_BUILD__: string;

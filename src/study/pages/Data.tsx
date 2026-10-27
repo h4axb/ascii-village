@@ -45,9 +45,17 @@ export function useChecks(): Check[] {
   add('Stichprobe', 'Notizen nur zu gespielten Testlinks', !strayNotes.length, strayNotes.length ? `${strayNotes.join(', ')}: kein gespielter Testlink – nicht gezählt` : '');
   add('Stichprobe', 'Ausschlüsse begründet', excluded.every((p) => p.doc.reason?.trim()), excluded.map((p) => `${p.id}${p.doc.reason ? `: ${p.doc.reason}` : ' (ohne Grund)'}`).join('; '));
 
+  // durations: links are attempts of one participant
+  const multiOpen = inc.filter((p) => p.timing.attemptCount > 1 && p.timing.attempts.some((a) => !a.outcome.manual));
+  add('Zeiten', 'Mehrere Links: Ausgang je Versuch geprüft', !multiOpen.length, multiOpen.map((p) => `${p.id} (${p.timing.attemptCount} Versuche)`).join(', ') + (multiOpen.length ? ' – unter Teilnehmende & Sessions → Versuche & Zeiten' : ''));
+  const est = inc.filter((p) => p.timing.activeEstimated);
+  add('Zeiten', 'Geschätzte Zeiten gekennzeichnet', true, est.length ? `${est.map((p) => p.id).join(', ')}: aktive Zeit geschätzt (in Abbildungen und Export markiert)` : 'alle exakt gemessen');
+  const elig = inc.filter((p) => p.timing.eligible.value && p.timing.clean.value != null);
+  add('Zeiten', 'Saubere Durchlaufzeit: gültige Erstdurchläufe', elig.length > 0, `n = ${elig.length}/${inc.length}${inc.length - elig.length ? `; ohne: ${inc.filter((p) => !elig.includes(p)).map((p) => `${p.id}${p.timing.exclusionReason.value ? ` (${p.timing.exclusionReason.value})` : ''}`).join(', ')}` : ''}`);
+
   // sessions
   const multi = inc.filter((p) => p.links.length > 1);
-  add('Sessions', 'Mehrere Links je Person', true, multi.map((p) => `${p.id}: ${p.links.length} Links, Dauer ${p.doc.runtime === 'main' ? 'Hauptlink' : 'Summe'}`).join('; ') || 'keine');
+  add('Sessions', 'Mehrere Links je Person', true, multi.map((p) => `${p.id}: ${p.links.length} Links = ${p.timing.attemptCount} Versuche, ${p.timing.restartCount} Neustarts`).join('; ') || 'keine');
   const open = inc.flatMap((p) => p.links).filter((l) => l.endedBy === 'läuft' || l.endedBy === 'nicht geöffnet');
   add('Sessions', 'Alle Links beendet', !open.length, open.map((l) => `${l.label} (${l.endedBy})`).join(', '));
   const noTime = inc.filter((p) => p.minutes == null);
@@ -221,7 +229,7 @@ export default function Data() {
         <ul className="st-rules">
           <li>Teilnehmende: P-ID aus dem persönlichen Link bzw. den Notizen.</li>
           <li>Umfrage-Zeilen ↔ Teilnehmende: wie oben unter „Einstellungen“ ({matchOptions(study.docs).steps!.map((x) => STEP_LABEL[x]).join(' → ')}). Abweichende AB/BA-Angaben werden markiert.</li>
-          <li>Mehrere Links einer Person: P009.1, P009.2 … in der Reihenfolge des Starts; Dauer als Summe oder nur Hauptlink.</li>
+          <li>Mehrere Links einer Person: P009.1, P009.2 … sind Versuche derselben Person (nie eigene Teilnehmende). Je Person drei Zeiten: verstrichen (erster Start bis letztes Ende), aktiv (Summe der Versuche; geschätzt markiert) und saubere Erstdurchlaufzeit (nur ein ununterbrochener, exakt gemessener Durchlauf, sonst kein Wert statt 0). Mittelwert und SD je Person, Stichprobe n/N angegeben. Alles unter Teilnehmende &amp; Sessions → Versuche &amp; Zeiten von Hand änderbar.</li>
           <li>Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links. Unterbrechung: mehr als 10 min ohne Ereignis im Spiel-Tracking.</li>
           <li>Testgruppe: aus dem Link (AB/BA); eine Korrektur überschreibt sie; Abweichungen zu den Notizen werden markiert.</li>
           <li>Teil 1: „vertauscht“ kehrt A und B der betreffenden Person um; „keine Präferenz“ zählt nicht im Vorzeichentest.</li>
@@ -647,9 +655,9 @@ function Settings() {
         </fieldset>
 
         <fieldset>
-          <legend>Bearbeitungsdauer</legend>
+          <legend>Spieldauer: aktive Zeit je Versuch</legend>
           <DurationSelect />
-          <p className="st-note">Spiel-Uhr: erster Quest-Schritt bis Öffnen der Umfrage. Link-Dauer: Öffnen des Links bis Abschluss bzw. letzter Kontakt. Mehrere Links: Summe oder Hauptlink (Teilnehmende &amp; Sessions).</p>
+          <p className="st-note">Spiel-Uhr: erster Quest-Schritt bis Öffnen der Umfrage (exakt). Sonst die Quest-Schritte bzw. erstes bis letztes Ereignis ohne Pausen (ungefähr). Die Link-Dauer (Öffnen bis Schließen des Links) ist keine Spielzeit und dient nur der Diagnose. Mehrere Links sind Versuche: je Versuch und je Person unter Teilnehmende &amp; Sessions → Versuche &amp; Zeiten von Hand änderbar.</p>
         </fieldset>
       </div>
       <div className="st-toolbar">

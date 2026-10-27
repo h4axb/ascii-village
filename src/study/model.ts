@@ -3,6 +3,7 @@
 // every change. Views read only from here, so a correction (A/B swapped,
 // a participant excluded, the run-time rule) reaches every figure at once.
 import { designOf, type FeedbackRecord } from '../feedback/schema';
+import { timingOf, type Timing } from './timing';
 import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
 import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
@@ -40,7 +41,8 @@ export interface Person {
   trackedGroup: 'AB' | 'BA' | null;
   notesGroup: string | null; // from the notes header
   groupMismatch: boolean;
-  minutes: number | null; // per the run-time rule and the chosen measure
+  minutes: number | null; // the active playtime (timing.active), what the figures use
+  timing: Timing; // attempts (one per link) and the three durations (timing.ts)
   linkMinutes: number | null;
   clockMinutes: number | null;
   stepMinutes: number | null;
@@ -105,9 +107,9 @@ export function partOfKey(m: { mapping: ColumnRole[] }, parts: (number | null)[]
 export type Duration = 'link' | 'clock' | 'steps' | 'manual';
 export type DurationBy = Exclude<Duration, 'manual'> | 'auto';
 export const DURATION_LABEL: Record<DurationBy, string> = {
-  auto: 'Spiel-Uhr (sonst Link-Dauer)',
+  auto: 'Spiel-Uhr (sonst Quest-Schritte, sonst Ereignisse ohne Pausen)',
   clock: 'Spiel-Uhr: erster Quest-Schritt bis Umfrage',
-  link: 'Link-Dauer: Öffnen des Links bis Ende',
+  link: 'Link-Dauer (nur technische Diagnose, keine Spielzeit)',
   steps: 'Summe der Quest-Schritte',
 };
 export const GAP_MIN = 10; // minutes without any event that count as an interruption
@@ -218,9 +220,11 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
     const linkMinutes = agg((l) => l.linkMinutes);
     const clockMinutes = agg((l) => l.clockMinutes);
     const stepMinutes = agg((l) => l.stepMinutes);
-    // a duration set by hand wins over every measured one
-    const picked = doc.minutes != null ? { minutes: doc.minutes, used: 'manual' as Duration } : pickDuration(durationBy, linkMinutes, clockMinutes, stepMinutes);
-    const minutes = picked.minutes;
+    // (the links' own measures, for the technical table)
+    const picked = pickDuration(durationBy, linkMinutes, clockMinutes, stepMinutes);
+    // the participant's durations: links as attempts, by hand where set
+    const timing = timingOf(doc, links, durationBy);
+    const minutes = timing.active.value;
     const gaps = (doc.runtime === 'main' && main ? [main] : links).reduce((a, l) => ({ count: a.count + l.gaps.count, minutes: a.minutes + l.gaps.minutes }), { count: 0, minutes: 0 });
     const surveyAt =
       game.events.filter((e) => e.participant === id && e.type === 'session' && e.data.what === 'survey').map((e) => e.at).sort((a, b) => a - b)[0] ??
@@ -239,7 +243,8 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
       linkMinutes,
       clockMinutes,
       stepMinutes,
-      durationUsed: picked.used,
+      durationUsed: timing.active.manual ? 'manual' : picked.used,
+      timing,
       gaps,
       tallyRow: null,
       tallyVia: null,

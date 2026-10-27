@@ -22,7 +22,7 @@ export const FIGURES: { id: string; title: string; caption: string }[] = [
   // Übersicht
   { id: 'alter', title: 'Alter', caption: 'Altersverteilung der Teilnehmenden.' },
   { id: 'gruppe', title: 'Testgruppe', caption: 'Verteilung der Teilnehmenden auf die Testreihenfolgen AB und BA.' },
-  { id: 'laufzeit', title: 'Bearbeitungsdauer', caption: 'Bearbeitungsdauer je Teilnehmenden in Minuten.' },
+  { id: 'laufzeit', title: 'Spieldauer', caption: 'Spieldauer je Teilnehmenden in Minuten (aktiv, Segmente = Versuche).' },
   { id: 'teil4', title: 'Angaben zur Person', caption: 'Angaben der Teilnehmenden (Umfrage, Teil 4).' },
   { id: 'ablauf', title: 'Dauer je Spielabschnitt', caption: 'Dauer je Spielabschnitt in Minuten (Median über die Teilnehmenden).' },
   { id: 'kategorien', title: 'Rückmeldungen nach Kategorie', caption: 'Anzahl der Rückmeldungen je Kategorie und Anzahl der Teilnehmenden, die sie äußerten.' },
@@ -133,7 +133,7 @@ export function DurationSelect() {
   const by = ((study.docs.settings.durationBy as { by?: DurationBy } | undefined)?.by ?? 'auto') as DurationBy;
   return (
     <label className="st-scope">
-      <span>Bearbeitungsdauer =</span>
+      <span>Aktive Zeit je Versuch aus</span>
       <select
         value={by}
         onChange={(e) => {

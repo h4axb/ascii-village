@@ -1651,3 +1651,172 @@ body:has(.st-root) {
   max-width: 100%;
   min-width: 0;
 }
+
+/* Teilnehmende & Sessions → Versuche & Zeiten */
+.st-attempts,
+.st-linkdiag {
+  margin: 8px 0;
+  font-size: 14px;
+}
+.st-attempts > summary,
+.st-linkdiag > summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.st-linkdiag > summary {
+  color: var(--st-muted);
+  font-size: 13px;
+}
+.st-attempt-table input,
+.st-attempt-table select {
+  width: 100%;
+  min-width: 64px;
+  font-size: 13px;
+}
+.st-attempt-table td {
+  vertical-align: top;
+}
+.st-timing-fields {
+  margin-top: 8px;
+}
+.st-inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.st-inline input {
+  flex: 1;
+  min-width: 0;
+}
+.st-reset {
+  font-size: 14px;
+  text-decoration: none;
+}
+/* Versuche & Zeiten: the four durations at a glance, the table as cards on phones */
+.st-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.st-kpis > div {
+  /* (as wide as its label, so the tiles wrap instead of clipping) */
+  flex: 1 0 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+}
+.st-kpis > div.is-manual {
+  border-style: dashed;
+}
+.st-kpis dt {
+  font-size: 11.5px;
+  color: var(--st-muted);
+}
+.st-kpis dd {
+  margin: 0;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.st-attempt-table tfoot td {
+  font-weight: 600;
+  border-top: 1px solid var(--st-line);
+}
+.st-attempt-table td:first-child input {
+  max-width: 56px;
+}
+.st-timing-more {
+  margin-top: 8px;
+}
+.st-timing-more > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--st-muted);
+  padding: 4px 0;
+}
+/* (sized by the panel, not the screen: the participant card can be narrow on desktop too) */
+.st-attempts {
+  container-type: inline-size;
+}
+@container (min-width: 760px) {
+  .st-attempts > .st-timing-fields {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.st-excl {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--st-muted);
+  display: grid;
+  gap: 2px;
+}
+@container (max-width: 699px) {
+  .st-attempt-wrap {
+    overflow: visible;
+  }
+  .st-attempt-table,
+  .st-attempt-table tbody,
+  .st-attempt-table tfoot {
+    display: block;
+  }
+  .st-attempt-table thead {
+    display: none;
+  }
+  .st-attempt-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 10px;
+    padding: 10px;
+    margin-bottom: 8px;
+    border: 1px solid var(--st-line);
+    border-radius: 8px;
+  }
+  .st-attempt-table td {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  .st-attempt-table td::before {
+    content: attr(data-label);
+    font-size: 11.5px;
+    color: var(--st-muted);
+  }
+  .st-attempt-table td[data-label='Notiz'] {
+    grid-column: 1 / -1;
+  }
+  .st-attempt-table td:first-child input {
+    max-width: none;
+  }
+  .st-attempt-table tfoot tr {
+    display: flex;
+    justify-content: space-between;
+  }
+  .st-attempt-table tfoot td[colspan='4']:last-child {
+    display: none;
+  }
+  .st-attempt-table tfoot tr {
+    padding: 0 10px;
+  }
+  .st-attempt-table tfoot td::before {
+    content: none;
+  }
+}
+/* (wide enough: four small fields a row, so a card stays short) */
+@container (min-width: 420px) and (max-width: 699px) {
+  .st-attempt-table tbody tr {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .st-attempt-table td[data-label='Ausgang'] {
+    grid-column: span 3;
+  }
+  .st-attempt-table td[data-label='Quelle'],
+  .st-attempt-table td[data-label='Genauigkeit'] {
+    grid-column: span 2;
+  }
+}

@@ -7,6 +7,7 @@ import { personIdOf, type Person } from '../model';
 import { fmtDate, fmtMin, LazyInput, logChange, Section, useCtx } from '../ui';
 import { useState } from 'react';
 import { planAssign } from '../tallyPlan';
+import { AttemptsEditor } from './Attempts';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
 
@@ -63,31 +64,13 @@ export default function People() {
                 {p.excluded && <span className="st-flag">ausgeschlossen</span>}
               </header>
 
-              <Durations p={p} />
+              <AttemptsEditor p={p} />
+              <details className="st-linkdiag">
+                <summary>Link-Dauer (technisch, nicht die Spielzeit)</summary>
+                <Durations p={p} />
+              </details>
 
               <div className="st-fields">
-                {p.links.length > 1 && (
-                  <label>
-                    Dauer aus
-                    <select value={p.doc.runtime ?? 'sum'} onChange={(e) => set(p, { runtime: e.target.value as 'sum' | 'main' })}>
-                      <option value="sum">Summe aller Links</option>
-                      <option value="main">nur Hauptlink</option>
-                    </select>
-                  </label>
-                )}
-                {p.links.length > 1 && p.doc.runtime === 'main' && (
-                  <label>
-                    Hauptlink
-                    <select value={p.doc.mainLink ?? ''} onChange={(e) => set(p, { mainLink: e.target.value || undefined })}>
-                      <option value="">längster</option>
-                      {p.links.map((l) => (
-                        <option key={l.key} value={l.key}>
-                          {l.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
                 <label>
                   Testgruppe
                   <select value={p.doc.group ?? ''} onChange={(e) => set(p, { group: (e.target.value || undefined) as PersonDoc['group'] })}>
@@ -110,17 +93,6 @@ export default function People() {
                       </option>
                     ))}
                   </select>
-                </label>
-                <label>
-                  Dauer manuell (min)
-                  <LazyInput
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    value={p.doc.minutes == null ? '' : String(p.doc.minutes)}
-                    placeholder={p.minutes != null && p.durationUsed !== 'manual' ? `gemessen: ${Math.round(p.minutes)}` : 'gemessen'}
-                    onSave={(v) => set(p, { minutes: v.trim() === '' ? null : Number(v.replace(',', '.')) })}
-                  />
                 </label>
                 <label>
                   Alter
@@ -253,7 +225,7 @@ function Durations({ p }: { p: Person }) {
             ))}
             <tr className="st-total">
               <td colSpan={2}>
-                Dauer{p.links.length > 1 ? (p.doc.runtime === 'main' ? ' (Hauptlink)' : ' (Summe)') : ''}: <strong>{fmtMin(p.minutes)}</strong>
+                Aktive Spieldauer (Versuche & Zeiten): <strong>{fmtMin(p.minutes)}</strong>
                 {u && <span className="st-muted"> · {USED[u]}</span>}
               </td>
               {cell(p.clockMinutes, u === 'clock')}

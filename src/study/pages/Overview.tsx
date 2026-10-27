@@ -1,13 +1,15 @@
 // Übersicht: the participants' profile, the core quantitative results, and
 // the most frequent UX problems, positive and unexpected observations (from
 // the confirmed tags). Opens on the whole sample.
-import { Bars, SERIES, INK } from '../charts';
+import { Bars, SERIES, INK, Segments } from '../charts';
+import { PRECISION_LABEL, SOURCE_LABEL, timingSummary, type TimingStat } from '../timing';
+import { fmtBerlin } from '../match';
 import { distinctPersons, itemsWithRole, type Model, type Slice } from '../model';
 import { part4, type P4Field } from '../analysis';
 import { useState } from 'react';
 import { describe, fmt } from '../stats';
 import { CATEGORY } from '../types';
-import { csv, DurationSelect, Empty, Fig, fmtDate, Section, Stat, useCtx } from '../ui';
+import { csv, Empty, Fig, fmtDate, Section, Stat, useCtx } from '../ui';
 import { SurveySummary, TrackingSummary } from './Survey';
 import { useSurveyText } from '../translations';
 import { CraftLog, GameFlow } from './Flow';
@@ -47,9 +49,11 @@ export default function Overview() {
   const n = slice.persons.length;
   const nAll = model.included.length;
   const groups = groupsOf(slice);
-  const times = slice.persons.map((p) => p.minutes).filter((m): m is number => m != null);
   const dates = slice.persons.map((p) => p.date).filter((d): d is number => !!d);
-  const t = describe(times);
+  // durations per participant (links are attempts, never extra participants)
+  const ts = timingSummary(slice.persons.map((p) => p.timing));
+  const pm = (x: TimingStat) => (x.n ? `${fmt(x.mean, 1)}${x.n > 1 ? ` ± ${fmt(x.sd, 1)}` : ''} min` : '–');
+  const [measure, setMeasure] = useState<'aktiv' | 'verstrichen' | 'sauber'>('aktiv');
 
   // Teil 4 (age has its own figure)
   const p4 = part4(slice.survey, model.optionQuestions).filter((f) => !/^alter$|^age$/i.test(f.label));
@@ -65,15 +69,17 @@ export default function Overview() {
         <Stat label="Testgruppen" value={`${groups.AB} AB · ${groups.BA} BA`} />
         <Stat label="Zeitraum" value={dates.length ? `${fmtDate(Math.min(...dates))}${dates.length > 1 && fmtDate(Math.min(...dates)) !== fmtDate(Math.max(...dates)) ? ` – ${fmtDate(Math.max(...dates))}` : ''}` : '–'} />
         <Stat
-          label="Bearbeitungsdauer"
-          value={times.length ? `${Math.round(t.median)} min` : '–'}
+          label="Aktive Spieldauer (M ± SD)"
+          value={pm(ts.active)}
           sub={
             <>
-              {times.length > 1 ? `Median, IQR ${Math.round(t.q1)}–${Math.round(t.q3)} min · ` : ''}
+              {`n = ${ts.active.n}/${ts.active.N}${ts.estimated ? ` · ${ts.estimated} geschätzt` : ''} · verstrichen ${pm(ts.elapsed)} · `}
               <a href="#teilnehmende">bearbeiten</a>
             </>
           }
         />
+        <Stat label="Saubere Durchlaufzeit (M ± SD)" value={pm(ts.clean)} sub={`n = ${ts.clean.n}/${ts.clean.N} (nur gültige, ununterbrochene Erstdurchläufe)`} />
+        <Stat label="Mit Neustart" value={`${ts.withRestart}/${ts.N}`} sub={`Ø ${fmt(ts.attemptsMean, 1)} Versuche je Person · technische Unterbrechung ${ts.technical}/${ts.N}`} />
       </div>
 
       <Section title="Teilnehmerprofil">
@@ -108,26 +114,69 @@ export default function Overview() {
             id="laufzeit"
             table={(s) =>
               csv([
-                ['Teilnehmende', 'Link', 'Bearbeitungsdauer (min)', 'Spiel-Uhr (min)', 'Link-Dauer (min)', 'Schritte (min)', 'Unterbrechungen', 'Unterbrechungen (min)'],
-                ...s.links.map((l) => [l.person, l.label, m1(l.minutes), m1(l.clockMinutes), m1(l.linkMinutes), m1(l.stepMinutes), l.gaps.count, m1(l.gaps.minutes)]),
+                ['Teilnehmende', 'Versuch', 'Link', 'Start (dt. Zeit)', 'Ende (dt. Zeit)', 'Aktiv (min)', 'Ausgang', 'Quelle', 'Genauigkeit', 'Verstrichen (min)', 'Aktiv gesamt (min)', 'Aktiv geschätzt', 'Unterbrechung (min)', 'Saubere Erstdurchlaufzeit (min)', 'In sauberer Statistik', 'Ausschlussgrund'],
+                ...s.persons.flatMap((p) => {
+                  const t = p.timing;
+                  const per = [p.id, '', '', '', '', '', '', SOURCE_LABEL[t.source.value], PRECISION_LABEL[t.precision.value], m1(t.elapsed.value), m1(t.active.value), t.activeEstimated ? 'ja' : 'nein', m1(t.interruption.value), m1(t.clean.value), t.eligible.value ? 'ja' : 'nein', t.exclusionReason.value];
+                  return [per, ...t.attempts.map((a) => [p.id, a.n.value, a.label, a.start.value ? fmtBerlin(a.start.value) : '', a.end.value ? fmtBerlin(a.end.value) : '', m1(a.active.value), a.outcome.value, SOURCE_LABEL[a.source.value], PRECISION_LABEL[a.precision.value], '', '', '', '', '', '', ''])];
+                }),
               ])
             }
           >
             {(s) => {
-              const ft = describe(s.persons.map((p) => p.minutes).filter((m): m is number => m != null));
+              const st = timingSummary(s.persons.map((p) => p.timing));
+              const maxAttempts = Math.max(1, ...s.persons.map((p) => p.timing.attemptCount));
+              const flags = (p: (typeof s.persons)[number]) =>
+                [p.timing.activeEstimated ? 'geschätzt' : '', p.timing.attemptCount > 1 ? `${p.timing.attemptCount} Versuche` : '', (p.timing.interruption.value ?? 0) > 10 || p.timing.technical.value ? 'unterbrochen' : ''].filter(Boolean);
+              const rows = s.persons.map((p) => {
+                const t = p.timing;
+                const v = measure === 'aktiv' ? t.active.value : measure === 'verstrichen' ? t.elapsed.value : t.eligible.value ? t.clean.value : null;
+                const segments =
+                  measure === 'aktiv' && t.attempts.length > 1
+                    ? t.attempts.map((a) => ({ value: a.active.value ?? 0, name: `Versuch ${a.n.value} (${a.label})` }))
+                    : v != null
+                      ? [{ value: v, name: measure === 'aktiv' ? 'aktiv' : measure }]
+                      : [];
+                // (why someone has no clean value is listed below the chart, so the bars keep their width)
+                const fl = measure === 'sauber' ? [] : flags(p);
+                return { label: p.id, segments, note: `${v != null ? `${fmt(v, 1)} min` : '–'}${fl.length ? ` · ${fl.join(', ')}` : ''}` };
+              });
+              const stat = measure === 'aktiv' ? st.active : measure === 'verstrichen' ? st.elapsed : st.clean;
               return (
                 <>
-                  <DurationSelect />
-                  {ft.n ? (
-                    <>
-                      <Bars rows={s.persons.filter((p) => p.minutes != null).map((p) => ({ label: p.id, values: [p.minutes!], note: p.links.length > 1 ? `${fmt(p.minutes!, 1)} (${p.links.length} Links)` : undefined }))} digits={1} />
-                      <p className="st-note">
-                        M = {fmt(ft.mean, 1)} min, SD = {fmt(ft.sd, 1)}, Median {fmt(ft.median, 1)}
-                      </p>
-                    </>
+                  <div className="st-seg" role="group" aria-label="Maß">
+                    {(
+                      [
+                        ['aktiv', 'Aktiv'],
+                        ['verstrichen', 'Verstrichen'],
+                        ['sauber', 'Sauber'],
+                      ] as const
+                    ).map(([k, l]) => (
+                      <button key={k} type="button" className={measure === k ? 'is-on' : ''} onClick={() => setMeasure(k)}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  {rows.some((r) => r.segments.length) ? (
+                    <Segments rows={rows} digits={1} unit=" min" legend={measure === 'aktiv' && maxAttempts > 1 ? Array.from({ length: maxAttempts }, (_, i) => `Versuch ${i + 1}`) : undefined} />
                   ) : (
-                    <Empty>Keine abgeschlossenen Durchläufe.</Empty>
+                    <Empty>{measure === 'sauber' ? 'Noch kein gültiger Erstdurchlauf.' : 'Keine Zeiten.'}</Empty>
                   )}
+                  {measure === 'sauber' && s.persons.some((p) => !p.timing.eligible.value) && (
+                    <ul className="st-excl">
+                      {s.persons
+                        .filter((p) => !p.timing.eligible.value)
+                        .map((p) => (
+                          <li key={p.id}>
+                            <span className="st-pid">{p.id}</span> {p.timing.exclusionReason.value || 'kein gültiger Wert'}
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                  <p className="st-note">
+                    {measure === 'aktiv' ? 'Aktive Spielzeit je Teilnehmenden, Segmente = Versuche (Links); wiederholte Abschnitte eingeschlossen.' : measure === 'verstrichen' ? 'Verstrichene Zeit vom ersten Start bis zum letzten Ende, Pausen eingeschlossen.' : 'Gültige, ununterbrochene Erstdurchläufe; übrige ohne Wert (nicht 0).'}{' '}
+                    {stat.n ? `M = ${fmt(stat.mean, 1)} min, SD = ${fmt(stat.sd, 1)}, Median ${fmt(stat.median, 1)}, n = ${stat.n}/${stat.N}.` : `n = 0/${stat.N}.`} Je Person ein Wert, mehrere Links zählen nicht mehrfach.
+                  </p>
                 </>
               );
             }}

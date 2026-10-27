@@ -206,6 +206,79 @@ export interface LikertRow {
   label: string;
   counts: number[]; // per scale point, low → high
 }
+// one bar per row made of segments (e.g. a participant's attempts), in a fixed
+// grey order with a 2 px gap between them; the note after the bar names the
+// total and its flags (geschätzt, unterbrochen …)
+export interface SegRow {
+  label: string;
+  segments: { value: number; name: string }[];
+  note?: string;
+}
+const SEG_COLORS = ['#3f3f3c', '#7d7c77', '#aeada6', '#cfcec8', '#e2e1dc'];
+export function Segments({ rows, unit = '', digits = 0, legend }: { rows: SegRow[]; unit?: string; digits?: number; legend?: string[] }) {
+  const [ref, w] = useWidth<HTMLDivElement>();
+  const col = labelColumn(rows.map((r) => r.label), w, 0.3);
+  const labelW = col.labelW;
+  const names = legend ?? [];
+  const lg = names.length > 1 ? legendLayout(names, labelW, w) : { pos: [], height: 0 };
+  const top = names.length > 1 ? lg.height + 8 : 6;
+  const barH = 16;
+  const rowHs = rows.map((_, i) => Math.max(barH, col.lines[i].length * LINE) + 12);
+  const rowY = rowHs.map((_, i) => top + rowHs.slice(0, i).reduce((a, b) => a + b, 0));
+  const h = top + rowHs.reduce((a, b) => a + b, 0) + 22;
+  const total = (r: SegRow) => r.segments.reduce((a, s) => a + s.value, 0);
+  const tk = ticks(Math.max(digits ? 0.1 : 1, ...rows.map(total)), 4, !digits);
+  const xMax = tk[tk.length - 1];
+  const right = Math.max(44, ...rows.map((r) => textW(r.note ?? `${nf(total(r), digits)}${unit}`, 11) + 14));
+  const plotW = Math.max(40, w - labelW - right);
+  const x = (v: number) => labelW + (v / xMax) * plotW;
+  return (
+    <div ref={ref} className="st-chart">
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fontFamily={FONT} role="img">
+        {names.length > 1 &&
+          names.map((n, i) => (
+            <g key={n} transform={`translate(${lg.pos[i].x}, ${8 + lg.pos[i].y})`}>
+              <rect width={10} height={10} rx={2} fill={SEG_COLORS[Math.min(i, SEG_COLORS.length - 1)]} />
+              <text x={15} y={9} fontSize={12} fill={INK}>
+                {n}
+              </text>
+            </g>
+          ))}
+        {tk.map((t) => (
+          <g key={t}>
+            <line x1={x(t)} x2={x(t)} y1={top - 2} y2={h - 18} stroke={GRID} />
+            <text x={x(t)} y={h - 4} fontSize={11} fill={MUTED} textAnchor="middle">
+              {nf(t, Number.isInteger(t) ? 0 : 1)}
+            </text>
+          </g>
+        ))}
+        {rows.map((r, i) => {
+          const y = rowY[i] + 6 + (rowHs[i] - 12 - barH) / 2;
+          let at = 0;
+          return (
+            <g key={r.label + i}>
+              <Label lines={col.lines[i]} cy={y + barH / 2} full={r.label} />
+              {r.segments.map((sg, j) => {
+                const x0 = x(at) + (j ? 1 : 0);
+                at += sg.value;
+                const bw = Math.max(sg.value > 0 ? 2 : 0, x(at) - x0 - (j < r.segments.length - 1 ? 1 : 0));
+                return (
+                  <rect key={j} x={x0} y={y} width={bw} height={barH} rx={Math.min(3, bw / 2)} fill={SEG_COLORS[Math.min(j, SEG_COLORS.length - 1)]}>
+                    <title>{`${r.label} – ${sg.name}: ${nf(sg.value, digits)}${unit}`}</title>
+                  </rect>
+                );
+              })}
+              <text x={x(total(r)) + 5} y={y + barH / 2 + 4} fontSize={11} fill={MUTED}>
+                {r.note ?? `${nf(total(r), digits)}${unit}`}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 export function Diverging({ rows, scale }: { rows: LikertRow[]; scale: string[] }) {
   const [ref, w] = useWidth<HTMLDivElement>();
   const k = scale.length;

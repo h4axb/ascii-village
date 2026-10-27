@@ -110,7 +110,18 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
     [
       'Teilnehmende',
       'Gruppe',
-      'Bearbeitungsdauer (min)',
+      'Aktive Spieldauer (min)',
+      'Aktiv geschätzt',
+      'Verstrichen (min)',
+      'Unterbrechung (min)',
+      'Versuche',
+      'Neustarts',
+      'Technische Unterbrechung',
+      'Saubere Erstdurchlaufzeit (min)',
+      'In sauberer Statistik',
+      'Ausschlussgrund',
+      'Quelle',
+      'Genauigkeit',
       'Umfrage abgegeben (dt. Zeit)',
       'Umfrage abgegeben (UTC)',
       'Umfrage zugeordnet über',
@@ -127,7 +138,18 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
       return [
         p.id,
         p.group ?? '',
-        n2(p.minutes),
+        n2(p.timing.active.value),
+        p.timing.activeEstimated ? 'ja' : 'nein',
+        n2(p.timing.elapsed.value),
+        n2(p.timing.interruption.value),
+        String(p.timing.attemptCount),
+        String(p.timing.restartCount),
+        p.timing.technical.value ? 'ja' : 'nein',
+        n2(p.timing.clean.value),
+        p.timing.eligible.value ? 'ja' : 'nein',
+        p.timing.exclusionReason.value,
+        p.timing.source.value,
+        p.timing.precision.value,
         ...(() => {
           const t = r ? model.submitted[r.row] : null;
           return [t != null ? fmtBerlin(t, true) : '', t != null ? new Date(t).toISOString().replace('T', ' ').slice(0, 19) : '', p.tallyVia ?? ''];
@@ -143,8 +165,36 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
     }),
   ]);
   return zip([
-    { name: 'LIESMICH.txt', text: 'Analysedaten der Nutzerstudie.\naussagen-analyse.csv – Aussagen mit deutscher Fassung, Interpretation, Ergänzung, Codes, Befund\nteilnehmende-messwerte.csv – je Teilnehmer die quantitativen Werte je Variante (Teil 1–3, Bewertungen im Spiel)\nNur bestätigte Tags; ausgeschlossene Teilnehmende sind in den Messwerten nicht enthalten.\n' },
+    { name: 'LIESMICH.txt', text: 'Analysedaten der Nutzerstudie.\naussagen-analyse.csv – Aussagen mit deutscher Fassung, Interpretation, Ergänzung, Codes, Befund\nteilnehmende-messwerte.csv – je Teilnehmer die quantitativen Werte je Variante (Teil 1–3, Bewertungen im Spiel) und die Zeiten (aktiv, verstrichen, sauber; leer = kein gültiger Wert)\nversuche.csv – je Versuch (Testlink) Start, Ende, aktive Minuten, Ausgang, Quelle, Genauigkeit\nNur bestätigte Tags; ausgeschlossene Teilnehmende sind in den Messwerten nicht enthalten.\n' },
     { name: 'aussagen-analyse.csv', text: '﻿' + statements },
     { name: 'teilnehmende-messwerte.csv', text: '﻿' + quant },
+    // one row per attempt (a test link of a participant); raw times in UTC and German time
+    {
+      name: 'versuche.csv',
+      text:
+        '﻿' +
+        csv([
+          ['Teilnehmende', 'Versuch', 'Link', 'Link-Schlüssel', 'Start (UTC)', 'Ende (UTC)', 'Start (dt. Zeit)', 'Ende (dt. Zeit)', 'Aktiv (min)', 'Ausgang', 'Quelle', 'Genauigkeit', 'von Hand', 'Notiz', 'Link-Dauer (min, technisch)'],
+          ...model.included.flatMap((p) =>
+            p.timing.attempts.map((a) => [
+              p.id,
+              String(a.n.value),
+              a.label,
+              a.key,
+              a.start.value ? new Date(a.start.value).toISOString() : '',
+              a.end.value ? new Date(a.end.value).toISOString() : '',
+              a.start.value ? fmtBerlin(a.start.value, true) : '',
+              a.end.value ? fmtBerlin(a.end.value, true) : '',
+              n2(a.active.value),
+              a.outcome.value,
+              a.source.value,
+              a.precision.value,
+              [a.start, a.end, a.active, a.outcome, a.source, a.precision].some((v) => v.manual) ? 'ja' : 'nein',
+              a.note,
+              n2(a.link.linkMinutes),
+            ]),
+          ),
+        ]),
+    },
   ]);
 }

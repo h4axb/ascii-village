@@ -52,7 +52,39 @@ export interface PersonDoc {
   tallyRow?: number | null; // the Tally row (index), null = none; undefined = matched automatically
   group?: 'AB' | 'BA'; // test group, when it differs from what was tracked
   age?: number | null; // overrides the Tally answer
-  minutes?: number | null; // the duration set by hand (overrides every measured one)
+  minutes?: number | null; // (older: the active time set by hand; read as timing.activeMin)
+  // several links = several attempts of one participant: per link (invite key)
+  // what was checked by hand; anything unset is taken from the tracking
+  attempts?: Record<string, AttemptDoc>;
+  timing?: TimingDoc;
+}
+
+// how a duration was found, and how exact it is
+export type TimingSource = 'event_log' | 'observation' | 'estimate';
+export type TimingPrecision = 'exact' | 'approximate' | 'unavailable';
+export type AttemptOutcome = 'abgeschlossen' | 'unterbrochen' | 'neu gestartet' | 'technisch abgebrochen' | 'abgebrochen';
+// one attempt (one test link) as corrected by hand; null = "no valid value"
+export interface AttemptDoc {
+  n?: number; // the attempt's number (1, 2, 3 …), when the start order is not it
+  start?: number | null; // ms
+  end?: number | null;
+  activeMin?: number | null;
+  outcome?: AttemptOutcome;
+  source?: TimingSource;
+  precision?: TimingPrecision;
+  note?: string;
+}
+// the participant's times as corrected by hand (unset = from the attempts)
+export interface TimingDoc {
+  elapsedMin?: number | null; // first start → last end
+  activeMin?: number | null; // all attempts' active play together
+  interruptionMin?: number | null;
+  technical?: boolean; // a technical interruption happened
+  cleanMin?: number | null; // a valid uninterrupted first-time completion (null: none)
+  eligible?: boolean; // used in the clean-completion statistic
+  exclusionReason?: string;
+  source?: TimingSource;
+  precision?: TimingPrecision;
 }
 
 // ---- notes ----

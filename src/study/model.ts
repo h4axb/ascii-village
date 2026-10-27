@@ -364,8 +364,10 @@ export interface Slice {
 }
 export function slice(m: Model, s: Scope): Slice {
   if (s.kind === 'all') return { persons: m.included, links: m.links, survey: m.survey.filter((r) => r.person), events: m.events, feedback: m.feedback, items: m.items };
-  const persons = m.included.filter((p) => p.id === s.id);
   const link = s.kind === 'link' ? m.links.find((l) => l.key === s.key) : null;
+  // (a link's scope is named by its label, P005.1; its records are under the person, P005)
+  const pid = link ? link.person : s.id;
+  const persons = m.included.filter((p) => p.id === pid);
   const inLink = (r: { participant?: string; at: number; key?: string }) => {
     if (!link) return true;
     if (r.key) return r.key === link.key;
@@ -373,11 +375,11 @@ export function slice(m: Model, s: Scope): Slice {
   };
   return {
     persons,
-    links: link ? [link] : m.links.filter((l) => l.person === s.id),
-    survey: m.survey.filter((r) => r.person === s.id),
-    events: m.events.filter((e) => e.participant === s.id && inLink(e)),
-    feedback: m.feedback.filter((r) => r.participant === s.id && inLink(r)),
-    items: m.items.filter((i) => i.person === s.id && (!link || !i.link || i.link === link.label)),
+    links: link ? [link] : m.links.filter((l) => l.person === pid),
+    survey: m.survey.filter((r) => r.person === pid),
+    events: m.events.filter((e) => e.participant === pid && inLink(e)),
+    feedback: m.feedback.filter((r) => r.participant === pid && inLink(r)),
+    items: m.items.filter((i) => i.person === pid && (!link || !i.link || i.link === link.label)),
   };
 }
 

@@ -444,9 +444,9 @@ export default function Notes() {
   const remove = (i: ItemDoc) => study.commit([], [{ coll: 'items', id: i.id }]);
 
   const scoped = useMemo(() => {
-    const ids = scope.kind === 'all' ? null : scope.id;
+    const ids = scope.kind === 'all' ? null : scope.kind === 'link' ? (model.links.find((l) => l.key === scope.key)?.person ?? scope.id) : scope.id;
     return model.allItems.filter((i) => (!ids || i.person === ids) && (scope.kind !== 'link' || !i.link || i.link === scope.id));
-  }, [model.allItems, scope]);
+  }, [model.allItems, model.links, scope]);
   const removed = scoped.filter((i) => i.status === 'removed');
   const live = scoped.filter((i) => i.status !== 'removed');
   const shown = live.filter(

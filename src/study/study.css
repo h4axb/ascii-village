@@ -199,11 +199,15 @@ body:has(.st-root) {
 }
 .st-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* (as many tiles per row as fit: four on a desktop, two on a phone) */
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
   gap: 12px;
   margin-bottom: 30px;
 }
 .st-stat {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
   background: var(--st-paper);
   border: 1px solid var(--st-line);
   border-radius: 8px;
@@ -215,7 +219,7 @@ body:has(.st-root) {
   color: var(--st-muted);
 }
 .st-stat-value {
-  font-size: 22px;
+  font-size: clamp(17px, 4.6vw, 22px);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -265,6 +269,7 @@ body:has(.st-root) {
 }
 .st-figtools {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
 }
@@ -389,7 +394,7 @@ body:has(.st-root) {
 /* ---- participants ---- */
 .st-people {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
   gap: 14px;
 }
 .st-person {
@@ -428,8 +433,19 @@ body:has(.st-root) {
 }
 .st-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 12px;
+}
+/* (a long option or value never widens the card past the screen) */
+.st-fields select,
+.st-fields input:not([type='checkbox']):not([type='radio']) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.st-fields .st-check {
+  flex-wrap: wrap;
+  min-width: 0;
 }
 .st-fields label:not(.st-check),
 .st-wide {
@@ -723,7 +739,7 @@ body:has(.st-root) {
 }
 .st-groupname {
   font-weight: 500;
-  min-width: 220px;
+  min-width: min(220px, 100%);
   flex: 1;
 }
 .st-chipedit {
@@ -907,7 +923,7 @@ body:has(.st-root) {
 }
 .st-parts {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 8px 14px;
   margin: 0 0 14px;
   font-size: 13px;
@@ -1198,6 +1214,13 @@ body:has(.st-root) {
   .st-codes {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* (tables wider than a tablet scroll inside themselves, not the page) */
+  .st-table,
+  .st-durations {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
 }
 .st-item-actions {
   flex-wrap: wrap;
@@ -1248,6 +1271,7 @@ body:has(.st-root) {
 }
 .st-modal-all {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   margin-top: 8px;
@@ -1263,6 +1287,7 @@ body:has(.st-root) {
 }
 .st-modal-foot {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   padding: 12px 20px;
@@ -1307,7 +1332,7 @@ body:has(.st-root) {
 }
 .st-panes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 8px;
 }
 .st-pane {
@@ -1347,6 +1372,11 @@ body:has(.st-root) {
 }
 .st-pane-text {
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.st-pane-fields td,
+.st-pane-note {
+  overflow-wrap: anywhere;
 }
 .st-pane-note {
   font-size: 12.5px;
@@ -1383,6 +1413,7 @@ body:has(.st-root) {
 }
 /* a saved state opened by link */
 .st-viewbar {
+  grid-column: 1 / -1; /* (above sidebar and page, not in the sidebar's column) */
   position: sticky;
   top: 0;
   z-index: 20;
@@ -1448,4 +1479,12 @@ body:has(.st-root) {
 .st-scope-row .st-linkbtn {
   margin-left: auto;
   font-size: 12.5px;
+}
+@media (max-width: 700px) {
+  /* (the menu opens from the button's left edge and stays on screen) */
+  .st-scope-menu {
+    left: 0;
+    right: auto;
+    max-width: calc(100vw - 32px);
+  }
 }

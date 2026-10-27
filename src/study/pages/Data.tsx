@@ -283,6 +283,11 @@ function Versions() {
       });
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // (a new version comes with every import or restore, each logged: the list follows the log)
+  const logged = ((study.docs.settings.log as { entries?: LogEntry[] } | undefined)?.entries ?? [])[0]?.at;
+  useEffect(() => {
+    if (list) void reload();
+  }, [logged]); // eslint-disable-line react-hooks/exhaustive-deps
   const viewing = !!study.viewing;
   return (
     <Section title="Versionen">

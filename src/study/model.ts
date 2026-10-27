@@ -61,7 +61,9 @@ export interface SurveyRow {
   person: string | null;
   swapped: boolean;
   group: 'AB' | 'BA' | null; // resolves "1st / 2nd run" to A / B
-  p1: Record<string, Design | 'neutral' | null>; // question → answer (swap applied)
+  p1: Record<string, Design | 'neutral' | null>; // question → answer (swap applied, then the hand-set answers)
+  p1Tally: Record<string, Design | 'neutral' | null>; // the answer from Tally (swap applied), before any set by hand
+  p1Manual: string[]; // questions answered by hand on Teilnehmende & Sessions
   choice: Record<string, string>; // single-choice question → the option chosen
   multi: Record<string, string[]>; // a question exported as one column per option → the options ticked
   likert: Record<string, Partial<Record<Design, number | null>>>; // item → design → 1..7
@@ -317,12 +319,13 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
     const group = (person ? byId.get(person)?.group : null) ?? (orderCol >= 0 ? asOrder((r[orderCol] ?? '').trim().toUpperCase()) : null);
     // the 1st / 2nd run → A / B by the person's group
     const resolve = (x: Side | 'neutral' | null): Design | 'neutral' | null => (x === '1' || x === '2' ? (group ? (group[Number(x) - 1] as Design) : null) : x);
-    const out: SurveyRow = { row, person, swapped, group, p1: {}, likert: {}, likertSingle: {}, ueqs: { A: Array(8).fill(null), B: Array(8).fill(null), O: Array(8).fill(null) }, choice: {}, multi: {}, info: {}, text: {} };
+    const out: SurveyRow = { row, person, swapped, group, p1: {}, p1Tally: {}, p1Manual: [], likert: {}, likertSingle: {}, ueqs: { A: Array(8).fill(null), B: Array(8).fill(null), O: Array(8).fill(null) }, choice: {}, multi: {}, info: {}, text: {} };
     mapping.forEach((m, j) => {
       const v = (r[j] ?? '').trim();
       if (m.role === 'p1') {
         let c = resolve(v ? (m.values[v] ?? null) : null);
         if (swapped && (c === 'A' || c === 'B')) c = c === 'A' ? 'B' : 'A';
+        out.p1Tally[m.question] = c;
         out.p1[m.question] = c;
       } else if (m.role === 'likert') {
         const x = v ? (m.values[v] ?? null) : null;
@@ -345,12 +348,22 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
         if (v) out.text[m.label] = v;
       }
     });
+    if (person) handP1(out, docs.people[person]?.p1);
     if (person) {
       const age = docs.people[person]?.age;
       if (age != null) out.info.Alter = String(age);
     }
     survey.push(out);
   });
+
+  // participants without a Tally row: their Teil 1 answers set by hand still count
+  const withRow = new Set(survey.map((r) => r.person));
+  for (const p of included) {
+    if (withRow.has(p.id) || !p.doc.p1 || !Object.keys(p.doc.p1).length) continue;
+    const out: SurveyRow = { row: -1, person: p.id, swapped: false, group: p.group ?? null, p1: {}, p1Tally: {}, p1Manual: [], likert: {}, likertSingle: {}, ueqs: { A: Array(8).fill(null), B: Array(8).fill(null), O: Array(8).fill(null) }, choice: {}, multi: {}, info: {}, text: {} };
+    handP1(out, p.doc.p1);
+    survey.push(out);
+  }
 
   const tags = Object.values(docs.tags).sort((a, b) => a.order - b.order);
   const chipRole = new Map<string, ChipRole | undefined>();
@@ -396,6 +409,15 @@ export interface Slice {
   feedback: FeedbackRecord[];
   items: ItemDoc[];
 }
+// Teil 1 answers set by hand replace the Tally ones (never swapped)
+function handP1(out: SurveyRow, hand: PersonDoc['p1']) {
+  for (const [q, v] of Object.entries(hand ?? {})) {
+    if (v === undefined) continue;
+    out.p1[q] = v;
+    out.p1Manual.push(q);
+  }
+}
+
 export function slice(m: Model, s: Scope): Slice {
   if (s.kind === 'all') return { persons: m.included, links: m.links, survey: m.survey.filter((r) => r.person), events: m.events, feedback: m.feedback, items: m.items };
   const link = s.kind === 'link' ? m.links.find((l) => l.key === s.key) : null;

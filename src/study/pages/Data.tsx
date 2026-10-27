@@ -101,9 +101,10 @@ export function useChecks(): Check[] {
       add('Umfrage', 'Reihenfolge in der Umfrage = Testgruppe', !conflict.length, conflict.map((p) => `${p.id}: Umfrage ${tally.rows[p.tallyRow!][orderCol]}, Gruppe ${p.doc.group ?? p.trackedGroup ?? p.notesGroup}`).join('; '));
     }
     const swapped = inc.filter((p) => p.doc.swapP1);
-    add('Umfrage', 'Korrekturen Teil 1', true, swapped.length ? `A/B vertauscht: ${swapped.map((p) => p.id).join(', ')}` : 'keine');
+    const byHand = inc.filter((p) => Object.keys(p.doc.p1 ?? {}).length);
+    add('Umfrage', 'Korrekturen Teil 1', true, [swapped.length ? `A/B vertauscht: ${swapped.map((p) => p.id).join(', ')}` : '', byHand.length ? `von Hand: ${byHand.map((p) => `${p.id} (${Object.keys(p.doc.p1!).length})`).join(', ')}` : ''].filter(Boolean).join(' · ') || 'keine');
     // missing values among the matched rows
-    const rows = model.survey.filter((r) => r.person);
+    const rows = model.survey.filter((r) => r.person && r.row >= 0);
     const missing = model.mapping
       .map((m, j) => ({ m, j, n: ['p1', 'likert', 'ueqs', 'info'].includes(m.role) ? rows.filter((r) => !(tally.rows[r.row]?.[j] ?? '').trim()).length : 0 }))
       .filter((x) => x.n);

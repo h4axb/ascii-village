@@ -240,8 +240,8 @@ export default function Results() {
             onClick={() =>
               dl(
                 [
-                  ['Teilnehmende', 'Gruppe', 'Datum', 'Dauer (min)', 'Links', 'ausgeschlossen', 'Grund', 'Teil 1 vertauscht'],
-                  ...model.persons.map((p) => [p.id, p.group ?? '', p.date ? new Date(p.date).toISOString().slice(0, 10) : '', p.minutes == null ? '' : fmt(p.minutes, 1), p.links.map((l) => l.label).join(' '), p.excluded ? 'ja' : '', p.doc.reason ?? '', p.doc.swapP1 ? 'ja' : '']),
+                  ['Teilnehmende', 'Gruppe', 'Datum', 'Dauer (min)', 'Links', 'ausgeschlossen', 'Grund', 'Teil 1 vertauscht', 'Teil 1 von Hand'],
+                  ...model.persons.map((p) => [p.id, p.group ?? '', p.date ? new Date(p.date).toISOString().slice(0, 10) : '', p.minutes == null ? '' : fmt(p.minutes, 1), p.links.map((l) => l.label).join(' '), p.excluded ? 'ja' : '', p.doc.reason ?? '', p.doc.swapP1 ? 'ja' : '', Object.keys(p.doc.p1 ?? {}).join('; ')]),
                 ],
                 'Teilnehmende.csv',
               )

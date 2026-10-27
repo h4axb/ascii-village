@@ -410,6 +410,11 @@ const EN: Record<string, string> = {
   'Aktive Spieldauer (M ± SD)': 'Active playtime (M ± SD)',
   'Saubere Durchlaufzeit (M ± SD)': 'Clean completion time (M ± SD)',
   'Mit Neustart': 'With restart',
+  'Teil 1: direkter Vergleich': 'Part 1: direct comparison',
+  'kein Unterschied': 'no difference',
+  'zurück zur Tally-Antwort': 'back to the Tally answer',
+  'Alle Tally-Antworten A ↔ B tauschen (Person hat A und B verwechselt)': 'Swap all Tally answers A ↔ B (the person mixed up A and B)',
+  'Teil 1 von Hand': 'Part 1 by hand',
   Versuch: 'Attempt',
   'Verstrichen = Aktiv + Unterbrechung, solange Zeiten von Hand eingetragen sind; sonst aus dem Tracking (erster Start bis letztes Ende). Leeres Feld / „auto“ = gemessen, eigener Wert mit ↺ zurücksetzen. „Aktiv“ ist die Summe der Versuche; „kein Wert“ heißt ungültig, nicht 0.': 'Elapsed = active + interruption while times are entered by hand; otherwise from the tracking (first start to last end). Empty field / “auto” = measured; reset your own value with ↺. “Active” is the sum of the attempts; “kein Wert” means invalid, not 0.',
   'alle zeigen': 'show all',
@@ -851,6 +856,12 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^aus Tally: (.+?) \((\d)\. Durchlauf\)$/, 'from Tally: $1 (run $2)'],
+  [/^aus Tally: (.+)$/, 'from Tally: $1'],
+  [/^Tally: (.+?) \((\d)\. Durchlauf\)$/, 'Tally: $1 (run $2)'],
+  [/^Teil 1: direkter Vergleich(.*)$/, 'Part 1: direct comparison$1'],
+  [/^ · (\d+) von Hand$/, ' · $1 by hand'],
+  [/^A \/ B = Design\. „1\. \/ 2\. Durchlauf“ aus Tally wird über die Testgruppe \((.+)\) umgerechnet\. Von Hand gesetzte Antworten werden nicht getauscht und bei einem neuen Tally-Upload nicht überschrieben\.$/, 'A / B = design. “1st / 2nd run” from Tally is converted via the test group ($1). Answers set by hand are not swapped and are never replaced by a new Tally upload.'],
   [/^(\d+) von (\d+) Profilen \(Auswahl oben\) ·$/, '$1 of $2 profiles (selection at the top) ·'],
   [/^(\d+) von (\d+)$/, '$1 of $2'],
   [/^Nur (\S+) \(Versuch (\d+) von (\d+)\)\.$/, 'Only $1 (attempt $2 of $3).'],

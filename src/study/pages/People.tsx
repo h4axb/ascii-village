@@ -8,6 +8,7 @@ import { fmtDate, fmtMin, LazyInput, logChange, Section, useCtx } from '../ui';
 import { useState } from 'react';
 import { planAssign } from '../tallyPlan';
 import { AttemptsEditor } from './Attempts';
+import { Part1Editor } from './Part1';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
 
@@ -109,10 +110,6 @@ export default function People() {
                   <LazyInput type="number" min={0} max={120} value={p.doc.age == null ? '' : String(p.doc.age)} placeholder="aus Tally" onSave={(v) => set(p, { age: v === '' ? null : Number(v) })} />
                 </label>
                 <label className="st-check">
-                  <input type="checkbox" checked={!!p.doc.swapP1} onChange={(e) => set(p, { swapP1: e.target.checked })} />
-                  Teil 1: A und B vertauscht
-                </label>
-                <label className="st-check">
                   <input type="checkbox" checked={p.excluded} onChange={(e) => set(p, { excluded: e.target.checked })} />
                   Von der Auswertung ausschließen
                 </label>
@@ -123,6 +120,7 @@ export default function People() {
                   </label>
                 )}
               </div>
+              <Part1Editor p={p} />
               <PersonDetails p={p} />
             </article>
           ))}

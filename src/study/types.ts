@@ -46,7 +46,9 @@ export interface PersonDoc {
   id: string; // P007
   excluded?: boolean;
   reason?: string;
-  swapP1?: boolean; // mixed up A and B in Teil 1
+  swapP1?: boolean; // mixed up A and B in Teil 1: every Tally answer A ↔ B
+  // Teil 1 answers set by hand, per question (the design, not the run); null = no answer
+  p1?: Record<string, 'A' | 'B' | 'neutral' | null>;
   runtime?: 'sum' | 'main'; // several links: their times added, or the main link only
   mainLink?: string; // the invite key of the main link
   tallyRow?: number | null; // the Tally row (index), null = none; undefined = matched automatically

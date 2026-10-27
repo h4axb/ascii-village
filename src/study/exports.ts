@@ -126,6 +126,7 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
       'Umfrage abgegeben (UTC)',
       'Umfrage zugeordnet über',
       ...p1q.map((q) => `Teil 1: ${q}`),
+      'Teil 1 von Hand',
       ...lik.flatMap((q) => [`Teil 2 A: ${q}`, `Teil 2 B: ${q}`]),
       ...lik1.map((q) => `Teil 2: ${q}`),
       ...chq.map((q) => `Auswahl: ${q}`),
@@ -155,6 +156,7 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
           return [t != null ? fmtBerlin(t, true) : '', t != null ? new Date(t).toISOString().replace('T', ' ').slice(0, 19) : '', p.tallyVia ?? ''];
         })(),
         ...p1q.map((q) => (r?.p1[q] === 'neutral' ? 'keine Präferenz' : (r?.p1[q] ?? ''))),
+        (r?.p1Manual ?? []).join('; '),
         ...lik.flatMap((q) => [n2(r?.likert[q]?.A), n2(r?.likert[q]?.B)]),
         ...lik1.map((q) => n2(r?.likertSingle[q])),
         ...chq.map((q) => r?.choice[q] ?? ''),

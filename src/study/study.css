@@ -1862,3 +1862,54 @@ body:has(.st-root) {
     grid-column: span 2;
   }
 }
+/* Teil 1 per participant: one question a row, the answer beside it (below it when narrow) */
+.st-part1 {
+  margin: 8px 0;
+  font-size: 14px;
+  container-type: inline-size;
+}
+.st-part1 > summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.st-part1-list {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.st-part1-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+  gap: 2px 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+}
+.st-part1-list li.is-manual {
+  border-color: var(--st-accent);
+  background: var(--st-accent-soft);
+}
+.st-part1-list select {
+  width: 100%;
+  min-width: 0;
+}
+.st-part1-q {
+  font-size: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.st-part1-tally {
+  grid-column: 2;
+  font-size: 12px;
+}
+@container (max-width: 459px) {
+  .st-part1-list li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .st-part1-tally {
+    grid-column: 1;
+  }
+}

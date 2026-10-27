@@ -22,14 +22,29 @@ export interface MatchRow {
 export const SUBMIT_BEFORE = 10 * 60000;
 export const SUBMIT_AFTER = 120 * 60000;
 
-// "2026-10-26 10:41:03" (UTC), ISO, or "26.10.2026 10:41" (local)
+// a wall-clock time in Germany (summer and winter time) as a moment
+export function berlinTime(y: number, mo: number, d: number, h = 0, mi = 0, sec = 0): number {
+  const guess = Date.UTC(y, mo, d, h, mi, sec);
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      .formatToParts(new Date(guess))
+      .map((p) => [p.type, Number(p.value)]),
+  );
+  const shown = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return guess - (shown - guess);
+}
+// a moment shown in German time (whatever the browser's zone)
+export const fmtBerlin = (t: number, withSeconds = false) =>
+  new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', ...(withSeconds ? { second: '2-digit' as const } : {}) });
+
+// "2026-10-26 10:41:03" (Tally: UTC), ISO, or "26.10.2026 10:41" (German time)
 export function timeOf(v: string): number | null {
   const s = v.trim();
   if (!s) return null;
   const de = /^(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?:,?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(s);
   if (de) {
     const y = Number(de[3]) < 100 ? 2000 + Number(de[3]) : Number(de[3]);
-    return new Date(y, Number(de[2]) - 1, Number(de[1]), Number(de[4] ?? 0), Number(de[5] ?? 0), Number(de[6] ?? 0)).getTime();
+    return berlinTime(y, Number(de[2]) - 1, Number(de[1]), Number(de[4] ?? 0), Number(de[5] ?? 0), Number(de[6] ?? 0));
   }
   // Tally's "2026-10-26 10:41:03" has no zone: it is UTC
   const t = Date.parse(/^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}(:\d{2})?$/.test(s) ? `${s.replace(' ', 'T')}Z` : s);

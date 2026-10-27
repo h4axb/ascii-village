@@ -35,7 +35,7 @@ const STEP_LABEL: Record<string, string> = {
   report: 'Berichten',
 };
 const SESSION_LABEL: Record<string, string> = { start: 'Start', resume: 'Fortgesetzt (neu geladen)', survey: 'Umfrage geöffnet', close: 'Spiel geschlossen', 'extra-token': 'Zusatz-Token', 'budget-refused': 'KI-Budget erschöpft' };
-const clock = (t: number) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const clock = (t: number) => new Date(t).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const minOf = (m: number | null | undefined) => (m == null || !Number.isFinite(m) ? '–' : mins(m * 60000));
 const mins = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.round((ms % 60000) / 1000)).padStart(2, '0')}`;
 

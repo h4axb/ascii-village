@@ -237,7 +237,7 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
   const ignoredRows = new Set((docs.settings.ignoredRows as { rows?: number[] } | undefined)?.rows ?? []);
   // the participants' order for the pairing by order: the notes (default),
   // the P-IDs, or when their first tracked link started
-  const matchOrder = ((docs.settings.matchOrder as { by?: MatchOrder } | undefined)?.by ?? 'notes') as MatchOrder;
+  const matchOrder = ((docs.settings.matchOrder as { by?: MatchOrder } | undefined)?.by ?? 'pid') as MatchOrder;
   const byPid = persons.map((p) => p.id);
   let orderPos = new Map<string, number>();
   const notesOrder = ((docs.settings.notesOrder as { ids?: string[] } | undefined)?.ids ?? []).filter((id) => ids.has(id));

@@ -6,7 +6,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } from '../types';
 import { CATEGORY, SECTION_LABEL } from '../types';
 import { distinctPersons, itemsWithRole, type Model } from '../model';
-import { linkLabelOf, mergeStatements, parseNotes } from '../notes';
+import { linkLabelOf, parseNotes, planNotes } from '../notes';
+import type { Change } from '../changes';
+import { applyChanges, ChangeModal } from '../ChangeModal';
 import { designOfItem } from './Codes';
 import { itemText, setContentView, translateNotes, useContentView, type ContentView } from '../translations';
 import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
@@ -85,33 +87,26 @@ export function NotesImport() {
   const [busy, setBusy] = useState(false);
   const notes = study.docs.notes.main;
 
-  async function run(src: string, file?: string) {
+  const [plan, setPlan] = useState<{ title: string; changes: Change[]; reason: string } | null>(null);
+  const tagLabel = (id: string) => model.chipLabel.get(id) ?? '';
+
+  // read the file and show what it would change; nothing is stored yet
+  function run(src: string, file?: string) {
     const parsed = parseNotes(src);
     if (!parsed.meta.length) return setMsg('Keine Teilnehmenden gefunden (jeder Block beginnt mit der P-ID, z. B. „P001“).');
-    const metas: Record<string, NotesMeta> = { ...((study.docs.settings.notesMeta ?? {}) as Record<string, NotesMeta>) };
-    for (const m of parsed.meta) {
-      const prev = metas[m.id];
-      metas[m.id] = { ...m, link: m.link || prev?.link || '' };
-    }
     // the header's link names which of a person's links the block is about
     for (const s of parsed.statements) {
       const meta = parsed.meta.find((m) => m.id === s.person);
       const raw = s.link ?? meta?.link ?? '';
       s.link = /^P\d+\.\d$/.test(raw) ? raw : meta ? linkLabelOf({ ...meta, link: raw }, model) : undefined;
     }
-    const r = mergeStatements(parsed.statements, Object.values(study.docs.items), new Set(parsed.meta.map((m) => m.id)));
-    study.commit([
-      { coll: 'notes', id: 'main', data: { text: src, importedAt: Date.now(), file } },
-      { coll: 'settings', id: 'notesMeta', data: metas },
-      // the participants in the order of the notes (matching the survey rows: match.ts)
-      { coll: 'settings', id: 'notesOrder', data: { ids: parsed.meta.map((m) => m.id) } },
-      ...r.put.map((p) => ({ coll: 'items' as const, id: p.id, data: p })),
-    ]);
-    const summary = `${parsed.meta.length} Teilnehmende, ${parsed.statements.length} Aussagen: ${r.kept} unverändert, ${r.changed} geändert, ${r.added} neu, ${r.removed} entfernt`;
+    setMsg(null);
+    setPlan({ title: `Notizen-Import${file ? `: ${file}` : ''} (${parsed.meta.map((m) => m.id).join(', ')})`, changes: planNotes(parsed, study.latest(), tagLabel, file, src), reason: `Notizen-Import${file ? ` (${file})` : ''}` });
+  }
+
+  // after "Übernehmen": German drafts and AI suggestions for what came in new or changed
+  async function after(summary: string) {
     setMsg(`${summary}.`);
-    logChange(study, `Notizen-Import${file ? ` (${file})` : ''}: ${summary}`);
-    // suggestions for what is new or changed
-    // German versions first (the AI suggestions then read them)
     setBusy(true);
     try {
       const n = await translateNotes(study, undefined, (d, a) => setMsg(`Deutsche Fassungen: ${d} von ${a} …`));
@@ -121,7 +116,7 @@ export function NotesImport() {
     } finally {
       setBusy(false);
     }
-    const todo = r.put.filter((p) => (p.status === 'new' || p.status === 'changed' || !p.chips.length) && p.status !== 'removed' && !p.confirmed);
+    const todo = Object.values(study.latest().items).filter((p) => (p.status === 'new' || p.status === 'changed') && !p.confirmed && !p.chips.length);
     if (todo.length) {
       setBusy(true);
       try {
@@ -134,6 +129,7 @@ export function NotesImport() {
       }
     }
   }
+  const [applying, setApplying] = useState<string | null>(null);
 
   return (
     <Section title="Import: Notizen">
@@ -145,20 +141,42 @@ export function NotesImport() {
             accept=".md,.txt,text/plain,text/markdown"
             onChange={(e) => {
               const f = e.target.files?.[0];
+              e.target.value = ''; // (the same file again opens the check again)
               if (f) void f.text().then((t) => run(t, f.name));
             }}
           />
         </label>
-        {notes && <span className="st-muted">{`${notes.file ?? 'eingefügt'} · ${new Date(notes.importedAt).toLocaleString('de-DE')}`}</span>}
+        {notes && <span className="st-muted">{`${notes.file ?? 'eingefügt'} · ${new Date(notes.importedAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}`}</span>}
       </div>
       <textarea className="st-paste" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'P001\nName\nLink\nZeitfenster\nAB\n## During Usertesting\n- …\n## Follow-up\n- Frage?\n  - Antwort …'} />
       <div className="st-toolbar">
-        <button type="button" disabled={!text.trim() || busy} onClick={() => void run(text)}>
+        <button type="button" disabled={!text.trim() || busy} onClick={() => run(text)}>
           Einlesen
         </button>
         <TallyFreeText />
       </div>
       {msg && <p className="st-note">{msg}</p>}
+      {plan && (
+        <ChangeModal
+          title={plan.title}
+          changes={plan.changes}
+          busy={applying}
+          onCancel={() => {
+            setPlan(null);
+            setMsg('Abgebrochen: nichts übernommen.');
+          }}
+          onApply={(choices) => {
+            setApplying('Stand wird gesichert, Änderungen werden übernommen …');
+            void applyChanges(study, plan.changes, choices, plan.reason)
+              .then((summary) => {
+                setPlan(null);
+                return after(summary);
+              })
+              .catch((e) => setMsg(`Nicht übernommen: ${String((e as Error).message)}`))
+              .finally(() => setApplying(null));
+          }}
+        />
+      )}
     </Section>
   );
 }
@@ -166,29 +184,51 @@ export function NotesImport() {
 // the Tally free-text answers as statements (section "Umfrage")
 function TallyFreeText() {
   const { study, model } = useCtx();
+  const [plan, setPlan] = useState<Change[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const cols = model.mapping.map((m, j) => (m.role === 'text' ? { j, label: m.label } : null)).filter((x): x is { j: number; label: string } => !!x);
   if (!cols.length) return null;
+  // (shown as changes first: an answer that differs from the stored statement is a conflict)
+  const build = (): Change[] => {
+    const out: Change[] = [];
+    for (const r of model.survey) {
+      if (!r.person) continue;
+      const person = r.person;
+      for (const c of cols) {
+        const text = r.text[c.label];
+        if (!text) continue;
+        const id = `s-${person}-${c.j}`;
+        const old = study.docs.items[id];
+        if (old && old.text === text) continue;
+        out.push(
+          old
+            ? { id, kind: 'konflikt', group: person, label: `Umfrage-Freitext „${c.label}“ geändert`, current: { text: old.text }, incoming: { text }, choice: 'alt', apply: (ch, w) => void (ch === 'neu' && (w.items[id] = { ...w.items[id], text, status: 'changed', confirmed: false, deStale: !!old.de })) }
+            : { id, kind: 'neu', group: person, label: `Umfrage-Freitext „${c.label}“`, incoming: { text }, choice: 'neu', apply: (ch, w) => void (ch === 'neu' && (w.items[id] = { id, person, section: 'survey', question: c.label, text, order: 1000 + c.j, chips: [], suggested: [] })) },
+        );
+      }
+    }
+    return out;
+  };
   return (
-    <button
-      type="button"
-      onClick={() => {
-        const put: ItemDoc[] = [];
-        for (const r of model.survey) {
-          if (!r.person) continue;
-          for (const c of cols) {
-            const text = r.text[c.label];
-            if (!text) continue;
-            const id = `s-${r.person}-${c.j}`;
-            const old = study.docs.items[id];
-            if (old && old.text === text) continue;
-            put.push(old ? { ...old, text, status: 'changed', confirmed: false } : { id, person: r.person, section: 'survey', question: c.label, text, order: 1000 + c.j, chips: [], suggested: [] });
-          }
-        }
-        study.commit(put.map((p) => ({ coll: 'items', id: p.id, data: p })));
-      }}
-    >
-      Tally-Freitexte übernehmen
-    </button>
+    <>
+      <button type="button" onClick={() => setPlan(build())}>
+        Tally-Freitexte übernehmen
+      </button>
+      {plan && (
+        <ChangeModal
+          title="Tally-Freitexte als Aussagen"
+          changes={plan}
+          busy={busy}
+          onCancel={() => setPlan(null)}
+          onApply={(choices) => {
+            setBusy('Wird übernommen …');
+            void applyChanges(study, plan, choices, 'Tally-Freitexte')
+              .then(() => setPlan(null))
+              .finally(() => setBusy(null));
+          }}
+        />
+      )}
+    </>
   );
 }
 

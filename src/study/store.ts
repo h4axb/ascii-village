@@ -20,6 +20,14 @@ export interface Del {
   coll: Coll;
   id: string;
 }
+export interface Version {
+  id: string;
+  at: number;
+  reason: string;
+  size: number;
+}
+// a saved state opened by link (/feedback?stand=<id>): shown, never changed
+const VIEW_ID = new URLSearchParams(window.location.search).get('stand');
 
 export function useStudy() {
   const [pass, setPass] = useState(() => sessionStorage.getItem(PASS_KEY) ?? '');
@@ -29,6 +37,7 @@ export function useStudy() {
   const [game, setGame] = useState<GameData>({ invites: [], events: [], feedback: [] });
   const [saving, setSaving] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<Version | null>(null);
   const docsRef = useRef(docs);
   const passRef = useRef(pass);
   passRef.current = pass;
@@ -39,7 +48,7 @@ export function useStudy() {
     setState('loading');
     setError(null);
     try {
-      const res = await fetch('/api/study', { headers: auth(p) });
+      const res = await fetch(VIEW_ID ? `/api/study/versions/${encodeURIComponent(VIEW_ID)}` : '/api/study', { headers: auth(p) });
       if (res.status === 401) {
         sessionStorage.removeItem(PASS_KEY);
         setPass('');
@@ -61,6 +70,16 @@ export function useStudy() {
           .catch(() => []);
       const [feedback, events, invites] = await Promise.all([get('/api/feedback'), get('/api/events'), get('/api/admin/invites')]);
       const d = { ...empty(), ...(body as StudyDocs) };
+      if (VIEW_ID) {
+        // (a saved state: shown as it was, no migrations, nothing stored)
+        const list = (await fetch('/api/study/versions', { headers: auth(p) }).then((r) => (r.ok ? r.json() : [])).catch(() => [])) as Version[];
+        setViewing(list.find((v) => v.id === VIEW_ID) ?? { id: VIEW_ID, at: 0, reason: '', size: 0 });
+        docsRef.current = d;
+        setDocs(d);
+        setGame({ feedback: Array.isArray(feedback) ? feedback : [], events: Array.isArray(events) ? events : [], invites: Array.isArray(invites) ? invites : [] });
+        setState('ready');
+        return;
+      }
       // the first visit stores the default tag sets
       if (!Object.keys(d.tags).length) {
         d.tags = Object.fromEntries(DEFAULT_TAGS.map((g) => [g.id, g]));
@@ -133,6 +152,10 @@ export function useStudy() {
 
   // store and remove documents: shown at once, saved in the background
   const commit = useCallback((put: Put[], del: Del[] = []) => {
+    if (VIEW_ID) {
+      setSaveError('Ein gespeicherter Stand wird nur angesehen: Änderungen werden nicht gespeichert.');
+      return;
+    }
     const n = { ...docsRef.current } as unknown as Record<Coll, Record<string, unknown>>;
     for (const p of put) n[p.coll] = { ...n[p.coll], [p.id]: p.data };
     for (const x of del) {
@@ -193,8 +216,26 @@ export function useStudy() {
     return out;
   }, []);
 
+  // saved states of all documents (before every import and restore, or by hand)
+  const versions = useCallback(async (): Promise<Version[]> => {
+    const res = await fetch('/api/study/versions', { headers: auth() });
+    if (!res.ok) throw new Error(String(res.status));
+    return (await res.json()) as Version[];
+  }, []);
+  const saveVersion = useCallback(async (reason: string): Promise<string> => {
+    const res = await fetch('/api/study/versions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify({ reason }) });
+    const d = (await res.json().catch(() => null)) as { id?: string; error?: string } | null;
+    if (!res.ok || !d?.id) throw new Error(d?.error ?? String(res.status));
+    return d.id;
+  }, []);
+  const loadVersion = useCallback(async (id: string): Promise<StudyDocs> => {
+    const res = await fetch(`/api/study/versions/${encodeURIComponent(id)}`, { headers: auth() });
+    if (!res.ok) throw new Error(String(res.status));
+    return { ...empty(), ...((await res.json()) as StudyDocs) };
+  }, []);
+
   // (the newest documents, for changes that build on the one just made)
   const latest = useCallback(() => docsRef.current, []);
-  return { state, error, docs, game, saving, saveError, load, commit, suggest, translate, pass, latest };
+  return { state, error, docs, game, saving, saveError, load, commit, suggest, translate, pass, latest, viewing, versions, saveVersion, loadVersion };
 }
 export type Study = ReturnType<typeof useStudy>;

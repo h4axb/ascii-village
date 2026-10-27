@@ -7,6 +7,9 @@ import { UEQS_ITEMS } from '../stats';
 import { LazyInput, logChange, Section, useCtx } from '../ui';
 import { translateTally } from '../translations';
 import { NotesImport } from './Notes';
+import { planTally } from '../tallyPlan';
+import type { Change } from '../changes';
+import { applyChanges, ChangeModal } from '../ChangeModal';
 
 const ROLE_NAME: Record<ColumnRole['role'], string> = {
   ignore: 'ignorieren',
@@ -54,6 +57,10 @@ export default function Import() {
   const [msg, setMsg] = useState<string | null>(null);
   const [onlyMapped, setOnlyMapped] = useState(false);
 
+  const [plan, setPlan] = useState<{ changes: Change[]; file: string; rows: number; cols: number } | null>(null);
+  const [applying, setApplying] = useState<string | null>(null);
+
+  // read the export and show what it would change; nothing is stored yet
   async function readFile(f: File) {
     const text = await f.text();
     const all = parseCsv(text);
@@ -61,15 +68,18 @@ export default function Import() {
     const [headers, ...rows] = all;
     const suggested = suggestMapping(headers, rows);
     const mapping = tally ? carryMapping(tally.headers, tally.mapping, headers, suggested.mapping) : suggested.mapping;
-    const doc: TallyDoc = { file: f.name, importedAt: Date.now(), headers, rows: rows.map((r) => headers.map((_, j) => r[j] ?? '')), mapping, parts: suggested.parts };
-    study.commit([{ coll: 'tally', id: 'main', data: doc }]);
-    setMsg(`${rows.length} Antworten, ${headers.length} Spalten importiert${tally ? ' (Zuordnung übernommen)' : ''}.`);
-    logChange(study, `Tally-Import: ${f.name}, ${rows.length} Antworten, ${headers.length} Spalten`);
+    const doc: TallyDoc = { file: f.name, importedAt: Date.now(), headers, rows: rows.map((r) => headers.map((_, j) => r[j] ?? '')), mapping, parts: tally?.parts && tally.headers.join() === headers.join() ? tally.parts : suggested.parts };
+    setMsg(null);
+    setPlan({ changes: planTally(study.latest(), study.game, doc), file: f.name, rows: rows.length, cols: headers.length });
+  }
+
+  async function translate(summary: string) {
+    setMsg(`${summary}.`);
     try {
       const n = await translateTally(study, (d, a) => setMsg(`Deutsche Fassungen der Umfragetexte: ${d} von ${a} …`));
-      setMsg(`${rows.length} Antworten, ${headers.length} Spalten importiert${tally ? ' (Zuordnung übernommen)' : ''}${n ? `; ${n} Texte automatisch übersetzt (unter „Übersetzungen“ prüfen)` : ''}.`);
+      setMsg(`${summary}${n ? `; ${n} Texte automatisch übersetzt (unter „Übersetzungen“ prüfen)` : ''}.`);
     } catch (e) {
-      setMsg(`${rows.length} Antworten importiert; Übersetzung nicht verfügbar (${String((e as Error).message)}).`);
+      setMsg(`${summary}; Übersetzung nicht verfügbar (${String((e as Error).message)}).`);
     }
   }
 
@@ -86,11 +96,19 @@ export default function Import() {
         <div className="st-toolbar">
           <label className="st-file">
             CSV-Datei wählen
-            <input type="file" accept=".csv,text/csv" onChange={(e) => e.target.files?.[0] && void readFile(e.target.files[0])} />
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (f) void readFile(f);
+              }}
+            />
           </label>
           {tally && (
             <span className="st-muted">
-              {tally.file} · {tally.rows.length} Antworten · {new Date(tally.importedAt).toLocaleString('de-DE')}
+              {tally.file} · {tally.rows.length} Antworten · {new Date(tally.importedAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}
             </span>
           )}
           {tally && (
@@ -112,6 +130,27 @@ export default function Import() {
           )}
         </div>
         {msg && <p className="st-note">{msg}</p>}
+        {plan && (
+          <ChangeModal
+            title={`Tally-Import: ${plan.file} (${plan.rows} Antworten, ${plan.cols} Spalten)`}
+            changes={plan.changes}
+            busy={applying}
+            onCancel={() => {
+              setPlan(null);
+              setMsg('Abgebrochen: nichts übernommen.');
+            }}
+            onApply={(choices) => {
+              setApplying('Stand wird gesichert, Änderungen werden übernommen …');
+              void applyChanges(study, plan.changes, choices, `Tally-Import (${plan.file})`)
+                .then((summary) => {
+                  setPlan(null);
+                  return translate(summary);
+                })
+                .catch((e) => setMsg(`Nicht übernommen: ${String((e as Error).message)}`))
+                .finally(() => setApplying(null));
+            }}
+          />
+        )}
         {tally && <PartRanges tally={tally} />}
         {tally && (
           <div className="st-mapping">

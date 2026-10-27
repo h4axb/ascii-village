@@ -127,7 +127,7 @@ export default function People() {
 }
 
 const TYPE_LABEL: Record<string, string> = { craft: 'Crafting', hint: 'Hinweis', step: 'Quest-Schritt', error: 'Fehler', session: 'Sitzung' };
-const time = (t: number) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const time = (t: number) => new Date(t).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 // the raw Tally answers and the game's events of one person
 function PersonDetails({ p }: { p: Person }) {
@@ -187,7 +187,7 @@ function PersonDetails({ p }: { p: Person }) {
   );
 }
 
-const clockT = (t: number | null) => (t ? new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '–');
+const clockT = (t: number | null) => (t ? new Date(t).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' }) : '–');
 const USED: Record<string, string> = { link: 'Link-Dauer', clock: 'Spiel-Uhr', steps: 'Schritte', manual: 'manuell gesetzt' };
 
 // the three duration measures per link and in total, the one used marked

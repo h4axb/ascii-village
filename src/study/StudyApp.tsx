@@ -214,6 +214,18 @@ export default function StudyApp() {
     <StudyCtx.Provider value={{ study, model, scope, slice }}>
       {/* (a language change rebuilds the page, so the translator starts from the German text) */}
       <div key={lang} ref={rootRef} className={`st-root st-app${drawer ? ' has-drawer' : ''}`} lang={lang}>
+        {study.viewing && (
+          <div className="st-viewbar" role="status">
+            <strong>
+              Gespeicherter Stand{study.viewing.at ? ` vom ${new Date(study.viewing.at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
+            </strong>
+            {study.viewing.reason && <span data-notr>{study.viewing.reason}</span>}
+            <span>nur ansehen</span>
+            <span className="st-selbar-gap" />
+            <a href={`/feedback?restore=${encodeURIComponent(study.viewing.id)}#daten`}>Wiederherstellen …</a>
+            <a href={`/feedback${window.location.hash}`}>Zum aktuellen Stand</a>
+          </div>
+        )}
         <header className="st-topbar">
           <button type="button" className="st-menu" onClick={() => setDrawer((d) => !d)} aria-expanded={drawer} aria-controls="st-nav">
             Menü

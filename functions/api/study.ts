@@ -11,6 +11,9 @@
 //                                    the dashboard shows them as suggestions to confirm)
 //   POST   /api/study/translate       AI translations of notes and survey texts (the
 //                                    dashboard stores them as editable drafts)
+//   GET    /api/study/versions        the saved states of all documents (id, time, reason)
+//   POST   /api/study/versions        save the current state {reason} → {id}
+//   GET    /api/study/versions/<id>   one saved state: every document as it was
 import { dbOf, isAdmin, json, type D1Database, type SessionEnv } from './session';
 
 export const STUDY_COLLS = ['tally', 'notes', 'items', 'findings', 'tags', 'people', 'captions', 'hypotheses', 'claims', 'settings'] as const;
@@ -37,6 +40,68 @@ function ensure(db: D1Database) {
   return ready;
 }
 
+// ---- saved states: every document at one moment, gzipped, in parts under the row limit ----
+let versionsReady: Promise<unknown> | null = null;
+function ensureVersions(db: D1Database) {
+  versionsReady ??= db
+    .prepare('CREATE TABLE IF NOT EXISTS study_versions (id TEXT NOT NULL, part INTEGER NOT NULL, at INTEGER NOT NULL, reason TEXT NOT NULL, size INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (id, part))')
+    .run()
+    .catch((e) => {
+      versionsReady = null;
+      throw e;
+    });
+  return versionsReady;
+}
+const PART = 800_000;
+async function gzip(text: string): Promise<string> {
+  const buf = new Uint8Array(await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+async function gunzip(b64: string): Promise<string> {
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
+async function allDocs(db: D1Database) {
+  const { results } = await db.prepare('SELECT coll, id, data FROM study').all<{ coll: string; id: string; data: string }>();
+  const out: Record<string, Record<string, unknown>> = Object.fromEntries(STUDY_COLLS.map((c) => [c, {}]));
+  for (const r of results) {
+    try {
+      (out[r.coll] ??= {})[r.id] = JSON.parse(r.data);
+    } catch {
+      // a broken row: skipped
+    }
+  }
+  return out;
+}
+async function versions(request: Request, db: D1Database, id?: string): Promise<Response> {
+  await ensureVersions(db);
+  if (request.method === 'GET' && !id) {
+    const { results } = await db.prepare('SELECT id, at, reason, size FROM study_versions WHERE part = 0 ORDER BY at DESC LIMIT 500').all<{ id: string; at: number; reason: string; size: number }>();
+    return json(200, results);
+  }
+  if (request.method === 'GET' && id) {
+    const { results } = await db.prepare('SELECT data FROM study_versions WHERE id = ?1 ORDER BY part').bind(id).all<{ data: string }>();
+    if (!results.length) return json(404, { error: 'unknown version' });
+    return new Response(await gunzip(results.map((r) => r.data).join('')), { headers: { 'Content-Type': 'application/json' } });
+  }
+  if (request.method === 'POST' && !id) {
+    const body = (await request.json().catch(() => null)) as { reason?: unknown } | null;
+    const reason = String(body?.reason ?? 'gesichert').slice(0, 200);
+    const text = JSON.stringify(await allDocs(db));
+    const packed = await gzip(text);
+    const vid = `v-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const at = Date.now();
+    for (let k = 0; k * PART < packed.length || k === 0; k++)
+      await db.prepare('INSERT INTO study_versions (id, part, at, reason, size, data) VALUES (?1, ?2, ?3, ?4, ?5, ?6)').bind(vid, k, at, reason, text.length, packed.slice(k * PART, (k + 1) * PART)).run();
+    return json(200, { id: vid, at });
+  }
+  return json(405, { error: 'method not allowed' });
+}
+
 const isColl = (c: string): c is Coll => (STUDY_COLLS as readonly string[]).includes(c);
 
 async function put(db: D1Database, coll: string, id: string, data: unknown) {
@@ -55,18 +120,8 @@ export async function handleStudy(request: Request, env: StudyEnv): Promise<Resp
   await ensure(db);
   const parts = new URL(request.url).pathname.split('/').filter(Boolean).slice(2); // after /api/study
 
-  if (request.method === 'GET' && parts.length === 0) {
-    const { results } = await db.prepare('SELECT coll, id, data, updated FROM study').all<{ coll: string; id: string; data: string; updated: number }>();
-    const out: Record<string, Record<string, unknown>> = Object.fromEntries(STUDY_COLLS.map((c) => [c, {}]));
-    for (const r of results) {
-      try {
-        (out[r.coll] ??= {})[r.id] = JSON.parse(r.data);
-      } catch {
-        // a broken row: skipped
-      }
-    }
-    return json(200, out);
-  }
+  if (request.method === 'GET' && parts.length === 0) return json(200, await allDocs(db));
+  if (parts[0] === 'versions') return versions(request, db, parts[1]);
 
   if (request.method === 'POST' && parts[0] === 'batch') {
     const body = (await request.json().catch(() => null)) as { put?: { coll: string; id: string; data: unknown }[]; del?: { coll: string; id: string }[] } | null;

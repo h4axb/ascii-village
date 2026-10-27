@@ -105,7 +105,7 @@ export const Empty = ({ children }: { children: ReactNode }) => <p className="st
 export const csv = (rows: (string | number | null | undefined)[][]) =>
   rows.map((r, i) => (i ? r : r.map((c) => (typeof c === 'string' ? tr(c) : c)))).map((r) => r.map((c) => (c == null ? '' : /[;"\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c))).join(';')).join('\n');
 
-export const fmtDate = (t: number | null | undefined) => (t ? new Date(t).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–');
+export const fmtDate = (t: number | null | undefined) => (t ? new Date(t).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric' }) : '–');
 export const fmtMin = (m: number | null | undefined) => (m == null ? '–' : `${Math.floor(m)}:${String(Math.round((m % 1) * 60)).padStart(2, '0')} min`);
 
 // a text field saved when it loses focus (not on every key)

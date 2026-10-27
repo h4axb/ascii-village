@@ -11,9 +11,11 @@
 //   - statement …
 //   ## Follow-up              the questions asked afterwards and the answers
 //   - Question?               (a line ending in "?", or "F:"/"Q:"/"Frage:")
-//     - answer …              its answers keep the question as context
+//     - answer …              a question and all its answers are one point
+// (headings with any number of #; "Follow Up", "Follow-up – Fragen", … all count)
 // The same id twice (one block per link) is one participant.
-import type { ItemDoc, NotesMeta, Section } from './types';
+import type { ItemDoc, NotesMeta, Section, StudyDocs } from './types';
+import type { Change } from './changes';
 import type { Model } from './model';
 
 export interface Parsed {
@@ -38,7 +40,7 @@ const clean = (raw: string) => raw.replace(/^\s*#{0,6}\s*/, '').replace(/^\*+|\*
 function sectionOf(title: string): Section | null {
   const t = title.toLowerCase();
   if (/during|währ|waehr|beobacht|usertest|test\b|observ/.test(t)) return 'during';
-  if (/follow|nachgespr|nachfrag|interview|fragen|questions|debrief/.test(t)) return 'followup';
+  if (/follow|nachgespr|nachfrag|interview|fragen|questions|debrief/.test(t.replace(/[\s_-]+/g, ''))) return 'followup';
   return null;
 }
 
@@ -85,6 +87,7 @@ export function parseNotes(text: string): Parsed {
   let section: Section | null = null;
   let question: string | undefined;
   let last: Parsed['statements'][number] | null = null;
+  let qPoint: Parsed['statements'][number] | null = null; // the current follow-up question's point
   let lastIndent = 0;
   let order = 0;
 
@@ -107,6 +110,7 @@ export function parseNotes(text: string): Parsed {
       section = null;
       question = undefined;
       last = null;
+      qPoint = null;
       continue;
     }
     if (!cur) continue;
@@ -117,6 +121,7 @@ export function parseNotes(text: string): Parsed {
         section = s;
         question = undefined;
         last = null;
+        qPoint = null;
         continue;
       }
     }
@@ -133,6 +138,7 @@ export function parseNotes(text: string): Parsed {
     if (h && section === 'followup') {
       question = h[1].replace(QUESTION_PREFIX, '').trim();
       last = null;
+      qPoint = null;
       continue;
     }
     const b = BULLET.exec(raw);
@@ -142,9 +148,22 @@ export function parseNotes(text: string): Parsed {
     if (section === 'followup' && (QUESTION_PREFIX.test(body) || (/\?\s*$/.test(body) && !ANSWER_PREFIX.test(body)))) {
       question = body.replace(QUESTION_PREFIX, '').trim();
       last = null;
+      qPoint = null;
       continue;
     }
     body = body.replace(ANSWER_PREFIX, '').trim();
+    // an answer to the current follow-up question: part of its one point
+    if (section === 'followup' && question && body) {
+      if (qPoint) {
+        qPoint.text += !b && indent > lastIndent ? ` ${body}` : ` · ${body}`;
+        continue;
+      }
+      qPoint = { person: cur.meta.id, section, question, text: body, order: order++ };
+      last = qPoint;
+      lastIndent = indent;
+      cur.statements.push(qPoint);
+      continue;
+    }
     // a continuation line of the statement before
     if (!b && last && indent > lastIndent) {
       last.text += ` ${body}`;
@@ -207,61 +226,228 @@ function hash(s: string): string {
   return (h >>> 0).toString(36);
 }
 
-export interface MergeResult {
-  put: ItemDoc[];
-  kept: number;
-  changed: number;
-  added: number;
-  removed: number;
-}
-// a newer notes file against the stored statements: unchanged ones keep
-// everything, edited ones keep their tags (marked "geändert"), new ones
-// come in empty, missing ones are marked "entfernt" (deleted on confirm)
-export function mergeStatements(parsed: Parsed['statements'], existing: ItemDoc[], persons: Set<string>): MergeResult {
-  const pool = existing.filter((i) => !i.manual && i.section !== 'survey' && persons.has(i.person));
+// A notes file against what is stored, as changes to check (changes.ts):
+// nothing already there is changed without asking. Only the participants in
+// the file are looked at.
+//   same wording (or the wording before an "Original korrigieren")  nothing
+//   new statement                                                    neu
+//   similar wording (≥ 50 % of the words)                            konflikt: keep / take the new / both
+//   the same wording under another P-ID                              konflikt: keep / move it (all edits kept)
+//   single follow-up answers that the file now has as one point      konflikt: keep / combine them
+//   a stored statement no longer in the file                         konflikt: keep (default) / delete
+//   other header fields (name, link, slot, group)                    konflikt
+//   a new order of all participants                                  konflikt (a partial file keeps the order)
+export function planNotes(parsed: Parsed, docs: StudyDocs, tags: (id: string) => string, file?: string, src = ''): Change[] {
+  const out: Change[] = [];
+  const persons = new Set(parsed.meta.map((m) => m.id));
+  const all = Object.values(docs.items).filter((i) => i.section !== 'survey');
+  const pool = all.filter((i) => !i.manual && persons.has(i.person));
   const used = new Set<string>();
-  const put: ItemDoc[] = [];
-  let kept = 0;
-  let changed = 0;
-  let added = 0;
-  const firstImport = !pool.length;
+  const firstImport = !all.some((i) => !i.manual);
+  const same = (i: ItemDoc, text: string) => norm(i.text) === norm(text) || (!!i.original && norm(i.original) === norm(text));
+  const note = (i: ItemDoc) => [i.chips.map(tags).filter(Boolean).join(', '), i.de ? `DE: ${i.de}` : '', i.finding ? 'mit Befund' : ''].filter(Boolean).join(' · ') || undefined;
+  const freshItem = (st: Parsed['statements'][number]): ItemDoc => ({ ...st, id: `n-${st.person}-${hash(`${st.section}|${norm(st.text)}|${st.order}|${Date.now()}|${Math.random()}`)}`, original: st.text, chips: [], suggested: [], status: firstImport ? undefined : 'new' });
+  const put = (w: StudyDocs, i: ItemDoc) => {
+    w.items[i.id] = i;
+  };
   const pending: Parsed['statements'] = [];
-  // exact matches first, so a moved line never steals an edited one's tags
-  for (const s of parsed) {
-    const hit = pool.find((i) => !used.has(i.id) && i.person === s.person && i.section === s.section && norm(i.text) === norm(s.text));
-    if (hit) {
-      used.add(hit.id);
-      kept++;
-      put.push({ ...hit, order: s.order, question: hit.questionOwn ? hit.question : s.question, link: s.link ?? hit.link, status: hit.status === 'removed' || hit.status === 'new' ? undefined : hit.status });
-    } else pending.push(s);
+  // 1. the same wording, the same person: nothing to do
+  for (const st of parsed.statements) {
+    const hit = pool.find((i) => !used.has(i.id) && i.person === st.person && i.section === st.section && same(i, st.text));
+    if (hit) used.add(hit.id);
+    else pending.push(st);
   }
-  for (const s of pending) {
+  const rest: Parsed['statements'] = [];
+  for (const st of pending) {
+    // 2. the same wording under another participant: move it?
+    const moved = all.find((i) => !used.has(i.id) && !i.manual && i.person !== st.person && i.section === st.section && same(i, st.text));
+    if (moved) {
+      used.add(moved.id);
+      out.push({
+        id: `move:${moved.id}`,
+        kind: 'konflikt',
+        group: st.person,
+        label: `Aussage steht bei ${moved.person}, in der Datei bei ${st.person}: verschieben?`,
+        current: { text: moved.text, fields: [['Teilnehmende', moved.person]], note: note(moved) },
+        incoming: { text: st.text, fields: [['Teilnehmende', st.person]], note: 'Tags, deutsche Fassung und Bearbeitungen bleiben' },
+        choice: 'alt',
+        apply: (c, w) => {
+          if (c === 'neu') put(w, { ...w.items[moved.id], person: st.person, link: st.link, question: moved.questionOwn ? moved.question : st.question });
+        },
+      });
+      continue;
+    }
+    // 3. a follow-up question's single answers, now one point
+    if (st.section === 'followup' && st.question) {
+      const singles = pool.filter((i) => !used.has(i.id) && i.person === st.person && i.section === 'followup' && i.question && norm(i.question) === norm(st.question!) && norm(st.text).includes(norm(i.text)));
+      if (singles.length > 1 || (singles.length === 1 && norm(singles[0].text) !== norm(st.text))) {
+        singles.forEach((i) => used.add(i.id));
+        const [first, ...others] = singles.sort((a, b) => a.order - b.order);
+        out.push({
+          id: `combine:${first.id}`,
+          kind: 'konflikt',
+          group: st.person,
+          label: `Nachgespräch „${st.question}“: ${singles.length} einzelne Antworten → ein Punkt`,
+          current: { text: singles.map((i) => i.text).join('\n'), note: singles.map(note).filter(Boolean).join(' | ') || undefined },
+          incoming: { text: st.text, note: 'Tags vereint, deutsche Fassungen zusammengeführt (zu prüfen)' },
+          choice: 'alt',
+          apply: (c, w) => {
+            if (c !== 'neu') return;
+            const cur = singles.map((i) => w.items[i.id] ?? i);
+            const de = cur.map((i) => i.de).filter(Boolean).join(' · ');
+            put(w, {
+              ...cur[0],
+              text: st.text,
+              original: st.text,
+              chips: [...new Set(cur.flatMap((i) => i.chips))],
+              suggested: [...new Set(cur.flatMap((i) => i.suggested))],
+              de: de || undefined,
+              deStale: !!de,
+              interpretation: cur.map((i) => i.interpretation).filter(Boolean).join(' · ') || undefined,
+              addition: cur.map((i) => i.addition).filter(Boolean).join(' · ') || undefined,
+              finding: cur.find((i) => i.finding)?.finding ?? null,
+              confirmed: false,
+              status: 'changed',
+            });
+            for (const o of others) delete w.items[o.id];
+          },
+        });
+        continue;
+      }
+    }
+    rest.push(st);
+  }
+  for (const st of rest) {
+    // 4. similar wording: the stored text or the new one?
     let best: ItemDoc | null = null;
     let score = 0.5;
     for (const i of pool) {
-      if (used.has(i.id) || i.person !== s.person || i.section !== s.section) continue;
-      const v = similarity(i.text, s.text);
+      if (used.has(i.id) || i.person !== st.person || i.section !== st.section) continue;
+      const v = similarity(i.text, st.text);
       if (v > score) {
         score = v;
         best = i;
       }
     }
     if (best) {
-      used.add(best.id);
-      changed++;
-      // (its German version, interpretation and addition stay; the German one is marked to check)
-      put.push({ ...best, text: s.text, order: s.order, question: best.questionOwn ? best.question : s.question, link: s.link ?? best.link, status: 'changed', confirmed: false, deStale: !!best.de });
-    } else {
-      added++;
-      const id = `n-${s.person}-${hash(`${s.section}|${norm(s.text)}|${s.order}|${Date.now()}`)}`;
-      put.push({ ...s, id, original: s.text, chips: [], suggested: [], status: firstImport ? undefined : 'new' });
+      const b = best;
+      used.add(b.id);
+      out.push({
+        id: `edit:${b.id}`,
+        kind: 'konflikt',
+        group: st.person,
+        label: `Geänderter Wortlaut${st.question ? ` („${st.question}“)` : ''}`,
+        current: { text: b.text, note: note(b) },
+        incoming: { text: st.text, note: 'Tags und Bearbeitungen bleiben; die deutsche Fassung wird zur Prüfung markiert' },
+        both: true,
+        choice: 'alt',
+        apply: (c, w) => {
+          if (c === 'neu') put(w, { ...w.items[b.id], text: st.text, status: 'changed', confirmed: false, deStale: !!b.de });
+          if (c === 'beide') put(w, freshItem(st));
+        },
+      });
+      continue;
     }
+    // 5. new
+    out.push({
+      id: `new:${st.person}:${st.order}`,
+      kind: 'neu',
+      group: st.person,
+      label: `Neue Aussage (${st.section === 'followup' ? 'Nachgespräch' : 'Beobachtung'})${st.question ? `: „${st.question}“` : ''}`,
+      incoming: { text: st.text },
+      choice: 'neu',
+      apply: (c, w) => {
+        if (c === 'neu') put(w, freshItem(st));
+      },
+    });
   }
-  let removed = 0;
+  // 6. stored statements the file no longer has
   for (const i of pool)
-    if (!used.has(i.id) && i.status !== 'removed') {
-      removed++;
-      put.push({ ...i, status: 'removed' });
+    if (!used.has(i.id))
+      out.push({
+        id: `gone:${i.id}`,
+        kind: 'konflikt',
+        group: i.person,
+        label: 'Nicht mehr in der Datei',
+        current: { text: i.text, note: note(i) },
+        choice: 'alt',
+        apply: (c, w) => {
+          if (c === 'neu') delete w.items[i.id];
+        },
+      });
+  // 7. the participants' header fields
+  const metas = (docs.settings.notesMeta ?? {}) as Record<string, NotesMeta>;
+  const FIELDS: [keyof NotesMeta, string][] = [
+    ['name', 'Name'],
+    ['link', 'Link'],
+    ['slot', 'Termin'],
+    ['group', 'Gruppe'],
+  ];
+  for (const m of parsed.meta) {
+    const old = metas[m.id];
+    const take = (w: StudyDocs, v: NotesMeta) => {
+      w.settings.notesMeta = { ...((w.settings.notesMeta ?? {}) as Record<string, NotesMeta>), [m.id]: v };
+    };
+    if (!old) {
+      out.push({ id: `meta:${m.id}`, kind: 'neu', group: m.id, label: 'Neues Profil', incoming: { fields: FIELDS.map(([k, l]) => [l, String(m[k] ?? '')]) }, choice: 'neu', apply: (c, w) => c === 'neu' && take(w, m) });
+      continue;
     }
-  return { put, kept, changed, added, removed };
+    const diff = FIELDS.filter(([k]) => (m[k] ?? '') && (m[k] ?? '') !== (old[k] ?? ''));
+    if (diff.length)
+      out.push({
+        id: `meta:${m.id}`,
+        kind: 'konflikt',
+        group: m.id,
+        label: `Profil: ${diff.map(([, l]) => l).join(', ')} geändert`,
+        current: { fields: FIELDS.map(([k, l]) => [l, String(old[k] ?? '')]) },
+        incoming: { fields: FIELDS.map(([k, l]) => [l, String((m[k] || old[k]) ?? '')]) },
+        choice: 'alt',
+        apply: (c, w) => c === 'neu' && take(w, { ...old, ...Object.fromEntries(diff.map(([k]) => [k, m[k]])) }),
+      });
+  }
+  // 8. the order of the participants (pairs the survey rows without an id)
+  const stored = ((docs.settings.notesOrder as { ids?: string[] } | undefined)?.ids ?? []) as string[];
+  const fileOrder = parsed.meta.map((m) => m.id);
+  const appended = [...stored, ...fileOrder.filter((id) => !stored.includes(id))];
+  const full = stored.length > 0 && stored.every((id) => persons.has(id));
+  if (full && fileOrder.join() !== stored.join())
+    out.push({
+      id: 'order',
+      kind: 'konflikt',
+      group: 'Reihenfolge',
+      label: 'Reihenfolge der Teilnehmenden in der Datei ist anders',
+      current: { text: stored.join(', ') },
+      incoming: { text: fileOrder.join(', ') },
+      choice: 'alt',
+      apply: (c, w) => {
+        if (c === 'neu') w.settings.notesOrder = { ids: fileOrder };
+      },
+    });
+  else if (appended.join() !== stored.join())
+    out.push({
+      id: 'order',
+      kind: 'neu',
+      group: 'Reihenfolge',
+      label: 'Neue Teilnehmende ans Ende der Reihenfolge',
+      current: { text: stored.join(', ') },
+      incoming: { text: appended.join(', ') },
+      choice: 'neu',
+      apply: (c, w) => {
+        if (c === 'neu') w.settings.notesOrder = { ids: appended };
+      },
+    });
+  // 9. the file itself (the source shown on the import page)
+  out.push({
+    id: 'file',
+    kind: 'neu',
+    group: 'Datei',
+    label: `Notizendatei${file ? ` „${file}“` : ''} als Quelle speichern`,
+    current: docs.notes.main ? { fields: [['Datei', docs.notes.main.file ?? 'eingefügt'], ['Eingelesen', new Date(docs.notes.main.importedAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })]] } : undefined,
+    incoming: { fields: [['Datei', file ?? 'eingefügt'], ['Teilnehmende', parsed.meta.map((m) => m.id).join(', ')], ['Punkte', String(parsed.statements.length)]] },
+    choice: 'neu',
+    apply: (c, w) => {
+      if (c === 'neu') w.notes.main = { text: src, importedAt: Date.now(), file };
+    },
+  });
+  return out;
 }

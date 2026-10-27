@@ -4,6 +4,10 @@ import type { ColumnRole } from '../types';
 import { GAP_MIN, MATCH_ORDER_LABEL, personIdOf, type MatchOrder } from '../model';
 import { timeOf } from '../match';
 import { download } from '../charts';
+import { useEffect, useState } from 'react';
+import type { Version } from '../store';
+import { restoreChanges, type Change } from '../changes';
+import { applyChanges, ChangeModal } from '../ChangeModal';
 import { csv, DurationSelect, fmtMin, logChange, Section, useCtx, type LogEntry } from '../ui';
 import Import from './Import';
 import Translations from './Translations';
@@ -154,14 +158,14 @@ export default function Data() {
             <tr>
               <td>Tally-Umfrage</td>
               <td>{tally ? `${tally.rows.length} Antworten, ${tally.headers.length} Spalten (${tally.mapping.filter((m) => m.role !== 'ignore').length} zugeordnet)` : '–'}</td>
-              <td>{tally ? `${tally.file}, ${new Date(tally.importedAt).toLocaleString('de-DE')}` : 'nicht importiert'}</td>
+              <td>{tally ? `${tally.file}, ${new Date(tally.importedAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}` : 'nicht importiert'}</td>
             </tr>
             <tr>
               <td>Testnotizen</td>
               <td>
                 {Object.keys(study.docs.settings.notesMeta ?? {}).length} Teilnehmende, {model.allItems.length} Aussagen
               </td>
-              <td>{notes ? `${notes.file ?? 'eingefügt'}, ${new Date(notes.importedAt).toLocaleString('de-DE')}` : 'nicht importiert'}</td>
+              <td>{notes ? `${notes.file ?? 'eingefügt'}, ${new Date(notes.importedAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}` : 'nicht importiert'}</td>
             </tr>
           </tbody>
         </table>
@@ -223,12 +227,14 @@ export default function Data() {
 
       <Translations />
 
+      <Versions />
+
       <Section title="Änderungen">
         {log.length ? (
           <ol className="st-log" data-notr>
             {log.slice(0, 100).map((e, i) => (
               <li key={i}>
-                <span className="st-muted">{new Date(e.at).toLocaleString('de-DE')}</span> {e.what}
+                <span className="st-muted">{berlin(e.at)}</span> {e.what}
               </li>
             ))}
           </ol>
@@ -240,6 +246,131 @@ export default function Data() {
   );
 }
 
+const berlin = (t: number) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+// the saved states: opened by link (only to look), restored after a check of
+// every difference, saved by hand; one is saved before every import
+function Versions() {
+  const { study } = useCtx();
+  const [list, setList] = useState<Version[] | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [restore, setRestore] = useState<{ v: Version; changes: Change[] } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const reload = () =>
+    study
+      .versions()
+      .then(setList)
+      .catch((e) => setMsg(`Versionen nicht verfügbar (${String((e as Error).message)}).`));
+  const openRestore = async (v: Version) => {
+    setMsg('Stand wird geladen …');
+    try {
+      const saved = await study.loadVersion(v.id);
+      setRestore({ v, changes: restoreChanges(study.latest(), saved) });
+      setMsg(null);
+    } catch (e) {
+      setMsg(`Laden fehlgeschlagen (${String((e as Error).message)}).`);
+    }
+  };
+  useEffect(() => {
+    void reload().then(() => {
+      // (from a saved state's banner: /feedback?restore=<id>)
+      const id = new URLSearchParams(window.location.search).get('restore');
+      if (!id) return;
+      history.replaceState(null, '', `/feedback${window.location.hash}`);
+      void study.versions().then((vs) => {
+        const v = vs.find((x) => x.id === id);
+        if (v) void openRestore(v);
+      });
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const viewing = !!study.viewing;
+  return (
+    <Section title="Versionen">
+      <p className="st-note">Vor jedem Import und jeder Wiederherstellung wird der ganze Stand gesichert. „Ansehen“ öffnet ihn als Link (nur lesen), „Wiederherstellen“ zeigt zuerst jede Abweichung.</p>
+      <div className="st-toolbar">
+        <button
+          type="button"
+          disabled={viewing}
+          onClick={() => {
+            const reason = prompt('Name für diesen Stand (optional):', 'von Hand gesichert');
+            if (reason === null) return;
+            void study
+              .saveVersion(reason || 'von Hand gesichert')
+              .then(() => reload())
+              .then(() => setMsg('Stand gesichert.'))
+              .catch((e) => setMsg(`Sichern fehlgeschlagen (${String((e as Error).message)}).`));
+          }}
+        >
+          Stand jetzt sichern
+        </button>
+        {msg && <span className="st-muted">{msg}</span>}
+      </div>
+      {list && !list.length && <p className="st-empty">Noch keine gesicherten Stände.</p>}
+      {list && list.length > 0 && (
+        <div className="st-table-wrap">
+          <table className="st-table">
+            <thead>
+              <tr>
+                <th>Zeit</th>
+                <th>Anlass</th>
+                <th className="num">Größe</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((v) => (
+                <tr key={v.id} className={study.viewing?.id === v.id ? 'is-picked' : ''}>
+                  <td>{berlin(v.at)}</td>
+                  <td data-notr>{v.reason}</td>
+                  <td className="num">{Math.round(v.size / 1024)} KB</td>
+                  <td className="st-actions">
+                    <a href={`/feedback?stand=${encodeURIComponent(v.id)}#uebersicht`} target="_blank" rel="noopener">
+                      Ansehen
+                    </a>{' '}
+                    <button type="button" className="st-linkbtn" disabled={viewing} onClick={() => void openRestore(v)}>
+                      Wiederherstellen
+                    </button>{' '}
+                    <button
+                      type="button"
+                      className="st-linkbtn"
+                      onClick={() =>
+                        void study.loadVersion(v.id).then((d) => download(new Blob([JSON.stringify(d, null, 1)], { type: 'application/json' }), `feedback-stand-${v.id}.json`))
+                      }
+                    >
+                      JSON
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {restore && (
+        <ChangeModal
+          title={`Stand vom ${berlin(restore.v.at)} wiederherstellen`}
+          changes={restore.changes}
+          names={['Aktuell', 'Gespeicherter Stand']}
+          intro="Jede Abweichung zum gespeicherten Stand; übernommen wird der gespeicherte Stand, außer wo „Aktuell behalten“ gewählt ist. Der jetzige Stand wird vorher gesichert."
+          busy={busy}
+          onCancel={() => setRestore(null)}
+          onApply={(choices) => {
+            setBusy('Wird gesichert und übernommen …');
+            void applyChanges(study, restore.changes, choices, `Wiederherstellung (${berlin(restore.v.at)})`)
+              .then((summary) => {
+                setMsg(summary);
+                setRestore(null);
+                return reload();
+              })
+              .catch((e) => setMsg(`Nicht übernommen: ${String((e as Error).message)}`))
+              .finally(() => setBusy(null));
+          }}
+        />
+      )}
+    </Section>
+  );
+}
+
 // every survey row and who it was matched to
 function MatchTable() {
   const { model, study } = useCtx();
@@ -248,7 +379,7 @@ function MatchTable() {
   const orderCol = model.mapping.findIndex((m) => m.role === 'order');
   const owner = new Map(model.persons.filter((p) => p.tallyRow != null).map((p) => [p.tallyRow!, p]));
   const meta = (study.docs.settings.notesMeta ?? {}) as Record<string, { slot?: string; group?: string }>;
-  const order = ((study.docs.settings.matchOrder as { by?: MatchOrder } | undefined)?.by ?? 'notes') as MatchOrder;
+  const order = ((study.docs.settings.matchOrder as { by?: MatchOrder } | undefined)?.by ?? 'pid') as MatchOrder;
   const useTime = !!(study.docs.settings.matchTime as { on?: boolean } | undefined)?.on;
   // the rows in the order they were submitted (file order without a time), with their place
   const sorted = tally.rows

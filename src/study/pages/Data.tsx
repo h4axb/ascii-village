@@ -1,8 +1,8 @@
 // Daten & Validierung: the imports, the data sources, the checks (missing
 // values, conflicts, open work), the matching rules, and the change log.
 import type { ColumnRole, StudyDocs } from '../types';
-import { GAP_MIN, MATCH_ORDER_LABEL, personIdOf, type MatchOrder } from '../model';
-import { fmtBerlin, ZONE_LABEL, type TallyZone } from '../match';
+import { GAP_MIN, MATCH_ORDER_LABEL, matchOptions, personIdOf, type MatchOrder } from '../model';
+import { fmtBerlin, MATCH_STEPS, STEP_LABEL, ZONE_LABEL, type MatchStep, type TallyZone } from '../match';
 import { planAssign, planPairing, planRematch } from '../tallyPlan';
 
 const SWAP_INTRO = 'Diese Zuordnung ändert Umfrage-Antworten (bei einem Tausch die beider Personen). Weitere betroffene Personen einzeln entscheiden: „Aktuell behalten“ hält ihre bisherige Zeile fest. Der jetzige Stand wird vorher gesichert.';
@@ -148,6 +148,8 @@ export default function Data() {
   const failed = checks.filter((c) => !c.ok).length;
   return (
     <>
+      <Settings />
+
       <Section title="Datenquellen">
         <table className="st-table">
           <thead>
@@ -211,18 +213,10 @@ export default function Data() {
 
       {tally && <MatchTable />}
 
-      <Section title="Bearbeitungsdauer">
-        <DurationSelect />
-        <p className="st-note">
-          Spiel-Uhr: vom ersten Quest-Schritt bis zum Öffnen der Umfrage (die Uhr des Spiels, über Neuladen hinweg). Link-Dauer: vom Öffnen des Links (inkl. Einwilligung und Intro) bis zum Abschluss der Umfrage bzw. dem letzten Kontakt. Summe der Schritte: die gemessenen
-          Dauern der Quest-Schritte. Mehrere Links: Summe oder Hauptlink (Teilnehmende &amp; Sessions).
-        </p>
-      </Section>
-
       <Section title="Zuordnungsregeln">
         <ul className="st-rules">
           <li>Teilnehmende: P-ID aus dem persönlichen Link bzw. den Notizen.</li>
-          <li>Umfrage-Zeilen ↔ Teilnehmende, in dieser Reihenfolge: 1. manuell gewählt; 2. Teilnehmer-ID (tallyid); 3. Zeit (nur wenn eingeschaltet): Abgabe 10 min vor bis 120 min nach dem Öffnen der Umfrage im Spiel, nächste zuerst; 4. Reihenfolge: übrige Teilnehmende in der gewählten Reihenfolge (Notizen, P-ID oder Sessionstart), übrige Zeilen nach Abgabezeit. Abweichende AB/BA-Angaben werden markiert.</li>
+          <li>Umfrage-Zeilen ↔ Teilnehmende: wie oben unter „Einstellungen“ ({['von Hand', ...matchOptions(study.docs).steps!.map((x) => STEP_LABEL[x])].join(' → ')}). Abweichende AB/BA-Angaben werden markiert.</li>
           <li>Mehrere Links einer Person: P009.1, P009.2 … in der Reihenfolge des Starts; Dauer als Summe oder nur Hauptlink.</li>
           <li>Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links. Unterbrechung: mehr als 10 min ohne Ereignis im Spiel-Tracking.</li>
           <li>Testgruppe: aus dem Link (AB/BA); eine Korrektur überschreibt sie; Abweichungen zu den Notizen werden markiert.</li>
@@ -386,6 +380,190 @@ function Versions() {
   );
 }
 
+// a change that moves survey answers between participants is asked first:
+// no one's answers change unasked (nothing moves: stored at once)
+const ASK_INTRO = 'Diese Änderung ordnet Umfrage-Antworten anderen Teilnehmenden zu. Für jede Person entscheiden: „Aktuell behalten“ hält die bisherige Zeile fest. Der jetzige Stand wird vorher gesichert.';
+function usePairingAsk() {
+  const { study } = useCtx();
+  const [plan, setPlan] = useState<{ changes: Change[]; title: string; reason: string; intro: string } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const open = (changes: Change[], title: string, reason: string, intro = ASK_INTRO) => setPlan({ changes, title, reason, intro });
+  const ask = (label: string, fields: [string, string][], patch: (w: StudyDocs) => void, reason: string) => {
+    const changes = planPairing(study.latest(), study.game, { label, fields, patch });
+    if (changes.length > 1) return open(changes, label, reason);
+    const { put, del } = resolve(changes, study.latest(), {});
+    study.commit(put, del);
+    logChange(study, reason);
+    setMsg(`${reason}: gespeichert (niemandes Antworten ändern sich).`);
+  };
+  const modal = plan && (
+    <ChangeModal
+      title={plan.title}
+      changes={plan.changes}
+      names={['Aktuell', 'Danach']}
+      intro={plan.intro}
+      busy={busy}
+      onCancel={() => setPlan(null)}
+      onApply={(choices) => {
+        setBusy('Wird gesichert und übernommen …');
+        void applyChanges(study, plan.changes, choices, plan.reason)
+          .then((summary) => {
+            setMsg(summary);
+            setPlan(null);
+          })
+          .catch((e) => setMsg(`Nicht übernommen: ${String((e as Error).message)}`))
+          .finally(() => setBusy(null));
+      }}
+    />
+  );
+  return { ask, open, modal, msg };
+}
+
+// ---- Einstellungen: how answers find their participants, and the times ----
+function Settings() {
+  const { model, study } = useCtx();
+  const { ask, open, modal, msg } = usePairingAsk();
+  const o = matchOptions(study.docs);
+  const steps = o.steps!;
+  const order = ((study.docs.settings.matchOrder as { by?: MatchOrder } | undefined)?.by ?? 'pid') as MatchOrder;
+  const zone = model.tallyZone;
+  const viewing = !!study.viewing;
+  const stepName = (s: MatchStep) => STEP_LABEL[s] + (s === 'zeit' && !o.useTime ? ' – aus' : '');
+  const rules = (st: MatchStep[] = steps): [string, string][] => [['Reihenfolge der Regeln', ['von Hand', ...st.map(stepName)].join(' → ')], ['Teilnehmende in der Reihenfolge', MATCH_ORDER_LABEL[order]], ['Zeitzone der Datei', ZONE_LABEL[zone.zone]]];
+  const setSteps = (n: MatchStep[]) => ask('Reihenfolge der Regeln ändern', [['Vorher', ['von Hand', ...steps.map(stepName)].join(' → ')], ['Danach', ['von Hand', ...n.map(stepName)].join(' → ')]], (w) => void (w.settings.matchSteps = { order: n }), `Regeln: ${n.map((x) => STEP_LABEL[x]).join(' → ')}`);
+  const move = (k: number, d: -1 | 1) => {
+    const n = [...steps];
+    [n[k], n[k + d]] = [n[k + d], n[k]];
+    setSteps(n);
+  };
+  const setWindow = (key: 'before' | 'after', v: string) => {
+    const x = Math.max(0, Math.round(Number(v.replace(',', '.'))));
+    if (!Number.isFinite(x) || x === (key === 'before' ? o.before! : o.after!) / 60000) return;
+    const next = { before: o.before! / 60000, after: o.after! / 60000, [key]: x };
+    ask('Zeitfenster für den Zeitabgleich ändern', [['Fenster', `${next.before} min vor bis ${next.after} min nach dem Öffnen der Umfrage im Spiel`]], (w) => void (w.settings.matchWindow = next), `Zeitfenster: ${next.before} min vor, ${next.after} min nach`);
+  };
+  return (
+    <Section title="Einstellungen" id="einstellungen">
+      <p className="st-note">Was wofür gilt. Jede Änderung, die Umfrage-Antworten anderen Teilnehmenden zuordnen würde, wird vorher pro Person gefragt.</p>
+      {modal}
+      <div className="st-settings">
+        <fieldset disabled={viewing}>
+          <legend>Umfrage ↔ Teilnehmende: Reihenfolge der Regeln</legend>
+          <ol className="st-steps">
+            <li className="is-fixed">
+              <span>Von Hand gewählt (Teilnehmende &amp; Sessions, Zuordnungstabelle)</span>
+              <span className="st-muted">immer zuerst</span>
+            </li>
+            {steps.map((st, k) => (
+              <li key={st}>
+                <span>{STEP_LABEL[st]}</span>
+                {st === 'zeit' && (
+                  <label className="st-check">
+                    <input
+                      type="checkbox"
+                      checked={!!o.useTime}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        ask(`Zeitabgleich ${on ? 'einschalten' : 'ausschalten'}`, [['Zeitabgleich', on ? 'an' : 'aus']], (w) => void (w.settings.matchTime = { on }), `Zuordnung über Zeitabgleich ${on ? 'an' : 'aus'}`);
+                      }}
+                    />
+                    an
+                  </label>
+                )}
+                <span className="st-steps-move">
+                  <button type="button" disabled={k === 0} onClick={() => move(k, -1)} aria-label={`${STEP_LABEL[st]} nach oben`}>
+                    ↑
+                  </button>
+                  <button type="button" disabled={k === steps.length - 1} onClick={() => move(k, 1)} aria-label={`${STEP_LABEL[st]} nach unten`}>
+                    ↓
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <div className="st-toolbar">
+            <button type="button" disabled={steps[steps.length - 1] === 'id'} onClick={() => setSteps([...steps.filter((x) => x !== 'id'), 'id'])}>
+              Test-ID ans Ende
+            </button>
+            <button type="button" disabled={steps.join() === MATCH_STEPS.join()} onClick={() => setSteps(MATCH_STEPS)}>
+              Standard (Test-ID, Zeit, Reihenfolge)
+            </button>
+          </div>
+          <p className="st-note">Kommt die Test-ID später, ordnen Zeit und Reihenfolge auch Antworten mit Test-ID zu; die Test-ID entscheidet dann nur noch, was übrig ist.</p>
+        </fieldset>
+
+        <fieldset disabled={viewing}>
+          <legend>Zeitabgleich: Fenster um das Öffnen der Umfrage im Spiel</legend>
+          <div className="st-fields">
+            <label>
+              Minuten vorher
+              <input type="number" min={0} defaultValue={o.before! / 60000} key={`b${o.before}`} onBlur={(e) => setWindow('before', e.target.value)} />
+            </label>
+            <label>
+              Minuten nachher
+              <input type="number" min={0} defaultValue={o.after! / 60000} key={`a${o.after}`} onBlur={(e) => setWindow('after', e.target.value)} />
+            </label>
+          </div>
+          <p className="st-note">Eine Abgabe passt zu einer Person, wenn sie in diesem Fenster liegt; die nächste zuerst. Nur wenn der Zeitabgleich an ist.</p>
+        </fieldset>
+
+        <fieldset disabled={viewing}>
+          <legend>Reihenfolge: welche Teilnehmende zuerst</legend>
+          <select
+            value={order}
+            onChange={(e) => {
+              const v = e.target.value as MatchOrder;
+              ask('Reihenfolge der Teilnehmenden ändern', [['Teilnehmende in der Reihenfolge', MATCH_ORDER_LABEL[v]]], (w) => void (w.settings.matchOrder = { by: v }), `Zuordnung nach Reihenfolge: ${MATCH_ORDER_LABEL[order]} → ${MATCH_ORDER_LABEL[v]}`);
+            }}
+            aria-label="Teilnehmende in der Reihenfolge"
+          >
+            {(Object.keys(MATCH_ORDER_LABEL) as MatchOrder[]).map((k) => (
+              <option key={k} value={k}>
+                {MATCH_ORDER_LABEL[k]}
+              </option>
+            ))}
+          </select>
+          <p className="st-note">Die übrigen Antworten werden nach Abgabezeit (deutsche Zeit, früheste zuerst) an die Teilnehmenden in dieser Reihenfolge gegeben.</p>
+        </fieldset>
+
+        <fieldset disabled={viewing}>
+          <legend>Zeitzone der Umfrage-Datei</legend>
+          <select
+            value={zone.setting}
+            onChange={(e) => {
+              const v = e.target.value;
+              const name = v === 'auto' ? 'automatisch' : ZONE_LABEL[v as TallyZone];
+              ask('Zeitzone der Umfrage ändern', [['Zeitzone der Datei', name]], (w) => void (w.settings.tallyZone = { zone: v }), `Zeitzone der Umfrage: ${name}`);
+            }}
+            aria-label="Zeitzone der Umfrage-Datei"
+          >
+            <option value="auto">automatisch ({ZONE_LABEL[zone.zone]})</option>
+            <option value="UTC">UTC</option>
+            <option value="Europe/Berlin">deutsche Zeit</option>
+          </select>
+          <p className="st-note">
+            Gelesen als {ZONE_LABEL[zone.zone]}
+            {zone.setting === 'auto' ? (zone.n ? ` (erkannt aus ${zone.n} Abgaben mit Test-ID: im Median ${Math.round(zone.gapMin ?? 0)} min nach dem Öffnen der Umfrage${zone.sure ? '' : '; unsicher – bitte prüfen'})` : ' (Standard von Tally)') : ' (fest eingestellt)'}; gespeichert wie exportiert, angezeigt in deutscher Zeit, verglichen in UTC.
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Bearbeitungsdauer</legend>
+          <DurationSelect />
+          <p className="st-note">Spiel-Uhr: erster Quest-Schritt bis Öffnen der Umfrage. Link-Dauer: Öffnen des Links bis Abschluss bzw. letzter Kontakt. Mehrere Links: Summe oder Hauptlink (Teilnehmende &amp; Sessions).</p>
+        </fieldset>
+      </div>
+      <div className="st-toolbar">
+        <button type="button" disabled={viewing || !study.docs.tally.main} onClick={() => open(planRematch(study.latest(), study.game, rules()), 'Neu zuordnen nach den eingestellten Regeln', 'Neu zuordnen (Umfrage)', 'Alle Antworten nach den Regeln oben zuordnen; Zuordnungen von Hand werden dabei aufgehoben, außer wo „Aktuell behalten“ gewählt ist. Für jede betroffene Person entscheiden. Der jetzige Stand wird vorher gesichert.')}>
+          Neu zuordnen nach diesen Regeln
+        </button>
+        {msg && <span className="st-muted">{msg}</span>}
+      </div>
+    </Section>
+  );
+}
+
 // every survey row and who it was matched to
 function MatchTable() {
   const { model, study } = useCtx();
@@ -394,113 +572,19 @@ function MatchTable() {
   const orderCol = model.mapping.findIndex((m) => m.role === 'order');
   const owner = new Map(model.persons.filter((p) => p.tallyRow != null).map((p) => [p.tallyRow!, p]));
   const meta = (study.docs.settings.notesMeta ?? {}) as Record<string, { slot?: string; group?: string }>;
-  const order = ((study.docs.settings.matchOrder as { by?: MatchOrder } | undefined)?.by ?? 'pid') as MatchOrder;
-  const useTime = !!(study.docs.settings.matchTime as { on?: boolean } | undefined)?.on;
   // the rows in the order they were submitted (file order without a time), with their place
   const sorted = tally.rows
     .map((r, i) => ({ r, i, t: model.submitted[i] ?? null }))
     .sort((a, b) => (a.t != null && b.t != null ? a.t - b.t : a.i - b.i));
   const zone = model.tallyZone;
   const idColM = model.mapping.findIndex((m) => m.role === 'id');
-  // a change that moves answers between participants is asked first (no one's answers change unasked)
-  const [rematch, setRematch] = useState<{ changes: Change[]; title: string; reason: string; intro: string } | null>(null);
-  const ask = (label: string, fields: [string, string][], patch: (w: StudyDocs) => void, reason: string) => {
-    const changes = planPairing(study.latest(), study.game, { label, fields, patch });
-    if (changes.length > 1) return setRematch({ changes, title: label, reason, intro: 'Diese Änderung ordnet Umfrage-Antworten anderen Teilnehmenden zu. Für jede Person entscheiden: „Aktuell behalten“ hält die bisherige Zeile fest. Der jetzige Stand wird vorher gesichert.' });
-    // (nobody's answers change: stored at once)
-    const { put, del } = resolve(changes, study.latest(), {});
-    study.commit(put, del);
-    logChange(study, reason);
-  };
-  const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
+  const { ask, open, modal } = usePairingAsk();
   const rank = new Map<number, number>();
   sorted.filter((x) => !model.ignoredRows.has(x.i)).forEach((x, k) => rank.set(x.i, k + 1));
   return (
     <Section title="Zuordnung Umfrage ↔ Teilnehmende">
-      <p className="st-note">
-        Abgabezeiten: in der Datei gespeichert wie exportiert, gelesen als {ZONE_LABEL[zone.zone]}
-        {zone.setting === 'auto' ? (zone.n ? ` (erkannt aus ${zone.n} Abgaben mit Test-ID: Abgabe im Median ${Math.round(zone.gapMin ?? 0)} min nach dem Öffnen der Umfrage im Spiel${zone.sure ? '' : ', unsicher – bitte prüfen'})` : ' (Standard von Tally; keine Abgaben mit Test-ID zum Prüfen)') : ' (fest eingestellt)'}, angezeigt in deutscher Zeit und erst danach mit dem Spiel-Tracking verglichen.
-      </p>
-      <div className="st-toolbar">
-        <label className="st-scope">
-          <span>Zeitzone der Datei:</span>
-          <select
-            value={zone.setting}
-            onChange={(e) => {
-              const v = e.target.value;
-              const name = v === 'auto' ? 'automatisch' : ZONE_LABEL[v as TallyZone];
-              ask('Zeitzone der Umfrage ändern', [['Zeitzone der Datei', name]], (w) => void (w.settings.tallyZone = { zone: v }), `Zeitzone der Umfrage: ${name}`);
-            }}
-          >
-            <option value="auto">automatisch ({ZONE_LABEL[zone.zone]})</option>
-            <option value="UTC">UTC</option>
-            <option value="Europe/Berlin">deutsche Zeit</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          disabled={!!study.viewing}
-          onClick={() =>
-            setRematch({
-              changes: planRematch(study.latest(), study.game, zone.zone),
-              title: 'Umfrage neu zuordnen',
-              reason: 'Neu zuordnen (Umfrage)',
-              intro: 'Zuordnung nach den Regeln: Test-ID zuerst, dann die übrigen Abgaben nach Abgabezeit (deutsche Zeit, früheste zuerst) an die Teilnehmenden nach P-ID. Für jede Person entscheiden: „Aktuell behalten“ hält die bisherige Zeile fest. Der jetzige Stand wird vorher gesichert.',
-            })
-          }
-        >
-          Neu zuordnen (deutsche Zeit, früheste Abgabe → P001)
-        </button>
-        {msg && <span className="st-muted">{msg}</span>}
-      </div>
-      {rematch && (
-        <ChangeModal
-          title={rematch.title}
-          changes={rematch.changes}
-          names={['Aktuell', 'Danach']}
-          intro={rematch.intro}
-          busy={busy}
-          onCancel={() => setRematch(null)}
-          onApply={(choices) => {
-            setBusy('Wird gesichert und übernommen …');
-            void applyChanges(study, rematch.changes, choices, rematch.reason)
-              .then((summary) => {
-                setMsg(summary);
-                setRematch(null);
-              })
-              .catch((e) => setMsg(`Nicht übernommen: ${String((e as Error).message)}`))
-              .finally(() => setBusy(null));
-          }}
-        />
-      )}
-      <label className="st-scope">
-        <span>Zuordnung nach Reihenfolge:</span>
-        <select
-          value={order}
-          onChange={(e) => {
-            const v = e.target.value as MatchOrder;
-            ask('Reihenfolge der Zuordnung ändern', [['Reihenfolge', MATCH_ORDER_LABEL[v]]], (w) => void (w.settings.matchOrder = { by: v }), `Zuordnung nach Reihenfolge: ${MATCH_ORDER_LABEL[order]} → ${MATCH_ORDER_LABEL[v]}`);
-          }}
-        >
-          {(Object.keys(MATCH_ORDER_LABEL) as MatchOrder[]).map((k) => (
-            <option key={k} value={k}>
-              {MATCH_ORDER_LABEL[k]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="st-check">
-        <input
-          type="checkbox"
-          checked={useTime}
-          onChange={(e) => {
-            const on = e.target.checked;
-            ask(`Zeitabgleich ${on ? 'einschalten' : 'ausschalten'}`, [['Zeitabgleich', on ? 'an' : 'aus']], (w) => void (w.settings.matchTime = { on }), `Zuordnung über Zeitabgleich ${on ? 'an' : 'aus'}`);
-          }}
-        />
-        zuerst über Zeitabgleich zuordnen (Abgabezeit ↔ Öffnen der Umfrage im Spiel)
-      </label>
+      <p className="st-note">Regeln, Zeitfenster, Zeitzone und Reihenfolge stehen oben unter „Einstellungen“. Hier: jede Antwort, wem sie zugeordnet ist und warum; „zuordnen an“ ändert es von Hand (eine Zeile einer anderen Person wird getauscht).</p>
+      {modal}
       <table className="st-table">
         <thead>
           <tr>
@@ -531,7 +615,9 @@ function MatchTable() {
                 <td className="num">{i + 1}</td>
                 <td>
                   {idColM >= 0 && r[idColM] ? (personIdOf(r[idColM]) ?? r[idColM]) : <span className="st-muted">–</span>}
-                  {p && idColM >= 0 && personIdOf(r[idColM] ?? '') && personIdOf(r[idColM] ?? '') !== p.id && <span className="st-flag"> · von Hand anders zugeordnet</span>}
+                  {p && idColM >= 0 && personIdOf(r[idColM] ?? '') && personIdOf(r[idColM] ?? '') !== p.id && (
+                    <span className="st-flag">{p.tallyVia === 'manuell' ? ' · von Hand anders zugeordnet' : ` · ${p.tallyVia ? VIA[p.tallyVia] : 'anders'} zugeordnet, nicht nach Test-ID`}</span>
+                  )}
                 </td>
                 <td title={timeCol >= 0 ? `in der Datei (${ZONE_LABEL[zone.zone]}): ${r[timeCol]}` : undefined}>{model.submitted[i] != null ? fmtBerlin(model.submitted[i]!) : timeCol >= 0 ? r[timeCol] || '–' : '–'}</td>
                 <td>{orderCol >= 0 ? r[orderCol] || '–' : '–'}</td>
@@ -547,11 +633,11 @@ function MatchTable() {
                       onChange={(e) => {
                         const to = e.target.value;
                         if (!to) {
-                          if (p) setRematch({ changes: planAssign(study.latest(), study.game, p.id, null), title: `${p.id}: keine Umfrage-Antworten`, reason: `${p.id}: Tally-Zeile → keine`, intro: SWAP_INTRO });
+                          if (p) open(planAssign(study.latest(), study.game, p.id, null), `${p.id}: keine Umfrage-Antworten`, `${p.id}: Tally-Zeile → keine`, SWAP_INTRO);
                           return;
                         }
                         const changes = planAssign(study.latest(), study.game, to, i);
-                        setRematch({ changes, title: changes[0].label, reason: changes[0].label, intro: SWAP_INTRO });
+                        open(changes, changes[0].label, changes[0].label, SWAP_INTRO);
                       }}
                     >
                       <option value="">{p ? 'keine' : '– keine –'}</option>

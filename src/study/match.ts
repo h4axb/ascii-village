@@ -110,30 +110,55 @@ export function detectZone(pairs: { raw: string; surveyAt: number }[]): ZoneGues
   return Math.abs(mb) < Math.abs(mu) ? { zone: 'Europe/Berlin', n: b.length, gapMin: mb, sure: false } : { zone: 'UTC', n: u.length, gapMin: mu, sure: false };
 }
 
-export function matchRows(rows: MatchRow[], persons: MatchPerson[], useTime = false): Map<string, { row: number; via: MatchVia }> {
+// the pairing rules after "by hand", in the order they run (settings, editable)
+export type MatchStep = 'id' | 'zeit' | 'reihenfolge';
+export const MATCH_STEPS: MatchStep[] = ['id', 'zeit', 'reihenfolge'];
+export const STEP_LABEL: Record<MatchStep, string> = { id: 'Test-ID aus der Umfrage', zeit: 'Zeitabgleich (Abgabe ↔ Öffnen der Umfrage im Spiel)', reihenfolge: 'Reihenfolge (Abgabezeit ↔ Teilnehmende)' };
+export interface MatchOptions {
+  steps?: MatchStep[]; // default: test id, time, order
+  useTime?: boolean; // the time step runs only when on
+  before?: number; // time window around the tracked survey start (ms)
+  after?: number;
+}
+
+export function matchRows(rows: MatchRow[], persons: MatchPerson[], opt: MatchOptions | boolean = {}): Map<string, { row: number; via: MatchVia }> {
+  const o: MatchOptions = typeof opt === 'boolean' ? { useTime: opt } : opt;
+  const steps = (o.steps?.length ? o.steps : MATCH_STEPS).filter((s, i, a) => MATCH_STEPS.includes(s) && a.indexOf(s) === i);
+  const before = o.before ?? SUBMIT_BEFORE;
+  const after = o.after ?? SUBMIT_AFTER;
   const out = new Map<string, { row: number; via: MatchVia }>();
   const taken = new Set<number>();
   const set = (p: string, row: number, via: MatchVia) => {
     out.set(p, { row, via });
     taken.add(row);
   };
-  // 1. by hand (null = "no row")
+  // 1. by hand (null = "no row"), always first
   for (const p of persons) if (p.manual !== undefined && p.manual !== null && rows.some((r) => r.row === p.manual)) set(p.id, p.manual, 'manuell');
   const open = () => persons.filter((p) => p.manual === undefined && !out.has(p.id));
-  // 2. by id
-  for (const p of open()) {
-    const r = rows.find((x) => x.id === p.id && !taken.has(x.row));
-    if (r) set(p.id, r.row, 'id');
-  }
-  // 3. by time, nearest pairs first
-  const pairs: { p: string; row: number; gap: number }[] = [];
-  for (const p of useTime ? open() : [])
-    for (const r of rows)
-      if (!taken.has(r.row) && !r.id && p.surveyAt && r.submitted && r.submitted >= p.surveyAt - SUBMIT_BEFORE && r.submitted <= p.surveyAt + SUBMIT_AFTER)
-        pairs.push({ p: p.id, row: r.row, gap: Math.abs(r.submitted - p.surveyAt) });
-  for (const x of pairs.sort((a, b) => a.gap - b.gap)) if (!out.has(x.p) && !taken.has(x.row)) set(x.p, x.row, 'zeit');
-  // 4. by order (rows that name another id never pair by order)
-  const rest = rows.filter((r) => !taken.has(r.row) && !r.id).sort((a, b) => (a.submitted != null && b.submitted != null ? a.submitted - b.submitted : a.row - b.row));
-  open().forEach((p, i) => rest[i] && set(p.id, rest[i].row, 'reihenfolge'));
+  // rows with a test id: when the test id step ran before, time and order leave
+  // them alone (an id naming nobody here is no answer to hand out by order);
+  // when it comes later or not at all, they take any row
+  const takesIdRows = (k: number) => !steps.includes('id') || steps.indexOf('id') > k;
+  steps.forEach((step, k) => {
+    const free = (r: MatchRow) => !taken.has(r.row) && (!r.id || takesIdRows(k));
+    if (step === 'id') {
+      for (const p of open()) {
+        const r = rows.find((x) => x.id === p.id && !taken.has(x.row));
+        if (r) set(p.id, r.row, 'id');
+      }
+    } else if (step === 'zeit') {
+      if (!o.useTime) return;
+      // nearest pairs first
+      const pairs: { p: string; row: number; gap: number }[] = [];
+      for (const p of open())
+        for (const r of rows)
+          if (free(r) && p.surveyAt && r.submitted && r.submitted >= p.surveyAt - before && r.submitted <= p.surveyAt + after) pairs.push({ p: p.id, row: r.row, gap: Math.abs(r.submitted - p.surveyAt) });
+      for (const x of pairs.sort((a, b) => a.gap - b.gap)) if (!out.has(x.p) && !taken.has(x.row)) set(x.p, x.row, 'zeit');
+    } else {
+      // order: the open participants in their order ↔ the free rows by submit time
+      const rest = rows.filter(free).sort((a, b) => (a.submitted != null && b.submitted != null ? a.submitted - b.submitted : a.row - b.row));
+      open().forEach((p, i) => rest[i] && set(p.id, rest[i].row, 'reihenfolge'));
+    }
+  });
   return out;
 }

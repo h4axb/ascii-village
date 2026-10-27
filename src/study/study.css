@@ -1571,3 +1571,61 @@ body:has(.st-root) {
   background: var(--st-soft);
   color: var(--st-muted);
 }
+
+/* Daten & Validierung → Einstellungen */
+.st-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+.st-settings fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 10px 14px 12px;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  background: var(--st-paper);
+}
+.st-settings legend {
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0 4px;
+}
+.st-settings select {
+  max-width: 100%;
+}
+.st-steps {
+  margin: 4px 0 8px;
+  padding-left: 22px;
+  font-size: 14px;
+}
+.st-steps li {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--st-line);
+}
+/* (holds the floated ↑ ↓ inside its line, numbers kept) */
+.st-steps li::after {
+  content: '';
+  display: table;
+  clear: both;
+}
+.st-steps li > span:first-child {
+  margin-right: 8px;
+}
+.st-steps li.is-fixed {
+  color: var(--st-muted);
+}
+.st-steps li .st-check {
+  margin-right: 8px;
+  font-size: 13px;
+}
+.st-steps-move {
+  display: inline-flex;
+  gap: 4px;
+  float: right;
+}
+.st-steps-move button {
+  min-width: 32px;
+  padding: 2px 8px;
+}

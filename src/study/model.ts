@@ -6,7 +6,7 @@ import { designOf, type FeedbackRecord } from '../feedback/schema';
 import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
 import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
-import { detectZone, matchRows, parseTallyTime, type MatchVia, type TallyZone, type ZoneGuess } from './match';
+import { detectZone, MATCH_STEPS, matchRows, parseTallyTime, SUBMIT_AFTER, SUBMIT_BEFORE, type MatchOptions, type MatchStep, type MatchVia, type TallyZone, type ZoneGuess } from './match';
 import { optionChosen, partOf } from './tally';
 
 // ---- the scope filter: everyone, one person, or one of their links ----
@@ -121,6 +121,16 @@ export function personIdOf(v: string): string | null {
 
 const asOrder = (v: unknown): 'AB' | 'BA' | null => (v === 'AB' || v === 'BA' ? v : null);
 
+// the pairing settings (Daten & Validierung → Einstellungen)
+export const matchOptions = (docs: StudyDocs): MatchOptions => {
+  const w = (docs.settings.matchWindow ?? {}) as { before?: number; after?: number };
+  return {
+    steps: ((docs.settings.matchSteps as { order?: MatchStep[] } | undefined)?.order ?? MATCH_STEPS) as MatchStep[],
+    useTime: !!(docs.settings.matchTime as { on?: boolean } | undefined)?.on,
+    before: (w.before ?? SUBMIT_BEFORE / 60000) * 60000,
+    after: (w.after ?? SUBMIT_AFTER / 60000) * 60000,
+  };
+};
 export const tallyZoneSetting = (docs: StudyDocs) => ((docs.settings.tallyZone as { zone?: TallyZone | 'auto' } | undefined)?.zone ?? 'auto') as TallyZone | 'auto';
 // (ignoreManual: the pairing the rules alone give, for "Neu zuordnen")
 export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual?: boolean } = {}): Model {
@@ -267,9 +277,10 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
   const matched = matchRows(
     (tally?.rows ?? []).map((_, row) => ({ row, id: tallyIds[row], submitted: submitted[row] })).filter((r) => !ignoredRows.has(r.row)),
     ordered.map((id) => ({ id, manual: opts.ignoreManual ? undefined : byId.get(id)!.doc.tallyRow, surveyAt: byId.get(id)!.surveyAt })),
-    // (the time step is off unless chosen: the tracked survey time of a person
-    // with several links, or a time zone, can pair the wrong row)
-    !!(docs.settings.matchTime as { on?: boolean } | undefined)?.on,
+    // (the rules after "by hand" in the order set under Daten & Validierung; the
+    // time step is off unless chosen: the tracked survey time of a person with
+    // several links, or a time zone, can pair the wrong row)
+    matchOptions(docs),
   );
   orderPos = new Map(ordered.map((id, i) => [id, i + 1]));
   for (const p of persons) {

@@ -4,7 +4,7 @@
 // id, else submit time and test id), so manual pairings follow them into the
 // new file. Keeping the current answers puts the old row into the new file.
 import { buildModel, type Model } from './model';
-import { fmtBerlin, ZONE_LABEL, type TallyZone } from './match';
+import { fmtBerlin } from './match';
 import type { Change } from './changes';
 import type { GameData, PersonDoc, StudyDocs, TallyDoc } from './types';
 
@@ -138,19 +138,9 @@ export function planTally(docs: StudyDocs, game: GameData, next: TallyDoc): Chan
 // (times read in the file's zone and compared in UTC; rows without a test id
 // by German submit time, the earliest to P001), against the current one.
 // Taking the new one clears a manual pairing; keeping pins the current row.
-export function planRematch(docs: StudyDocs, game: GameData, zone: TallyZone): Change[] {
-  return planPairing(docs, game, {
-    label: 'Zuordnungsregel speichern',
-    fields: [
-      ['Zeitzone der Datei', ZONE_LABEL[zone]],
-      ['Reihenfolge', 'P-ID; Antworten ohne Test-ID nach Abgabezeit (deutsche Zeit), früheste zuerst'],
-    ],
-    patch: (w) => {
-      w.settings.matchOrder = { by: 'pid' };
-      w.settings.tallyZone = { zone };
-    },
-    rematch: true,
-  });
+export function planRematch(docs: StudyDocs, game: GameData, rules: [string, string][]): Change[] {
+  // (the rules as set under Daten & Validierung → Einstellungen; pairings by hand are left out)
+  return planPairing(docs, game, { label: 'Neu zuordnen nach den eingestellten Regeln', fields: rules, patch: () => undefined, rematch: true });
 }
 
 // any change that moves survey answers between participants (a rule, the time

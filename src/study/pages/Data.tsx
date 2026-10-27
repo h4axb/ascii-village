@@ -3,7 +3,7 @@
 import type { ColumnRole, StudyDocs } from '../types';
 import { GAP_MIN, MATCH_ORDER_LABEL, matchOptions, personIdOf, type MatchOrder } from '../model';
 import { fmtBerlin, MATCH_STEPS, STEP_LABEL, ZONE_LABEL, type MatchStep, type TallyZone } from '../match';
-import { planAssign, planPairing, planRematch } from '../tallyPlan';
+import { planAssign, planFreeText, planPairing, planRematch } from '../tallyPlan';
 
 const SWAP_INTRO = 'Diese Zuordnung ändert Umfrage-Antworten (bei einem Tausch die beider Personen). Weitere betroffene Personen einzeln entscheiden: „Aktuell behalten“ hält ihre bisherige Zeile fest. Der jetzige Stand wird vorher gesichert.';
 import { download } from '../charts';
@@ -73,6 +73,10 @@ export function useChecks(): Check[] {
       z.setting !== 'auto' || z.sure || !z.n,
       `${ZONE_LABEL[z.zone]}${z.setting !== 'auto' ? ' (fest eingestellt)' : z.n ? ` – erkannt aus ${z.n} Abgaben mit Test-ID, Median ${Math.round(z.gapMin ?? 0)} min nach dem Öffnen der Umfrage${z.sure ? '' : '; nicht eindeutig: unter „Zuordnung“ prüfen'}` : ' (Standard; keine Abgaben mit Test-ID zum Prüfen)'}`,
     );
+    const stale = [...new Set(planFreeText(study.docs, model).filter((c) => c.kind === 'konflikt').map((c) => c.group))];
+    add('Umfrage', 'Umfrage-Aussagen (Qualitatives Feedback) passen zur Zuordnung', !stale.length, stale.length ? `${stale.join(', ')} – unter Einstellungen „Umfrage-Aussagen abgleichen …“` : '');
+    const onlyOrder = model.included.filter((p) => p.tallyVia === 'reihenfolge').map((p) => p.id);
+    add('Umfrage', 'Antworten nicht nur nach Abgabe-Reihenfolge zugeordnet', !onlyOrder.length, onlyOrder.length ? `${onlyOrder.join(', ')}: ohne passende Test-ID, nur nach Reihenfolge – Zeitabgleich einschalten oder unter Einstellungen von Hand wählen` : '');
     add('Umfrage', 'Alle Antworten zugeordnet', !model.unmatchedRows.length, model.unmatchedRows.map((r) => `Zeile ${r + 1}${idCol >= 0 && tally.rows[r]?.[idCol] ? ` (${tally.rows[r][idCol]})` : ''}`).join(', '));
     const noRow = inc.filter((p) => p.tallyRow == null);
     add('Umfrage', 'Alle Teilnehmenden mit Antworten', !noRow.length, noRow.map((p) => p.id).join(', '));
@@ -577,6 +581,8 @@ function Settings() {
                 <p className="st-note">
                   „automatisch“ folgt den Regeln oben; eine gewählte Zeile gilt vor allen Regeln (auch nach einem neuen Upload). Eine Zeile, die jemand anderes hat, wird getauscht.
                   {pinned.length ? ` Von Hand festgehalten: ${pinned.map((x) => x.id).join(', ')}.` : ' Zurzeit ist nichts von Hand festgehalten.'}
+                  {model.included.some((x) => x.tallyVia === 'reihenfolge') &&
+                    ` „nach Reihenfolge“ ist unsicher (keine passende Test-ID; eine fehlende oder spätere Abgabe verschiebt alle danach): Zeitabgleich oben einschalten oder hier die Zeile wählen${steps[0] === 'hand' ? '' : ' – „Von Hand“ steht nicht zuerst, eine Wahl gilt dann nur für noch freie Zeilen'}.`}
                 </p>
                 <table className="st-table st-handpick">
                   <thead>
@@ -617,6 +623,8 @@ function Settings() {
                               <span className="st-flag">Test-ID der Zeile: {tid}</span>
                             ) : p.tallyVia === 'manuell' ? (
                               <span className="st-muted">von Hand</span>
+                            ) : p.tallyVia === 'reihenfolge' ? (
+                              <span className="st-flag">unsicher: nur nach Abgabe-Reihenfolge</span>
                             ) : (
                               ''
                             )}
@@ -645,6 +653,9 @@ function Settings() {
         </fieldset>
       </div>
       <div className="st-toolbar">
+        <button type="button" disabled={viewing || !study.docs.tally.main} onClick={() => open(planFreeText(study.latest(), model), 'Umfrage-Aussagen abgleichen', 'Umfrage-Aussagen abgeglichen', 'Die Freitext-Antworten der Umfrage als Aussagen unter Qualitatives Feedback, verglichen mit der aktuellen Zuordnung: was nicht mehr passt, ist ein Konflikt (Tags und Bearbeitungen bleiben). Der jetzige Stand wird vorher gesichert.')}>
+          Umfrage-Aussagen abgleichen …
+        </button>
         <button type="button" disabled={viewing || !study.docs.tally.main} onClick={() => open(planRematch(study.latest(), study.game, rules()), 'Neu zuordnen nach den eingestellten Regeln', 'Neu zuordnen (Umfrage)', 'Alle Antworten nach den Regeln oben zuordnen; Zuordnungen von Hand werden dabei aufgehoben, außer wo „Aktuell behalten“ gewählt ist. Für jede betroffene Person entscheiden. Der jetzige Stand wird vorher gesichert.')}>
           Neu zuordnen nach diesen Regeln
         </button>

@@ -159,7 +159,8 @@ export function planTally(docs: StudyDocs, game: GameData, next: TallyDoc): Chan
   for (const row of mNew.unmatchedRows)
     if (!old || !oldKeys.includes(newKeys[row]))
       out.push({ id: `tally-free:${row}`, kind: 'neu', group: 'Umfrage', label: 'Antwort ohne Zuordnung (unter „Daten & Validierung“ zuordnen)', incoming: { fields: [['Abgegeben (dt. Zeit)', submittedIn(mNew, row)], ...answers(next, row)] }, choice: 'neu', apply: () => undefined });
-  return out;
+  // the survey statements under Qualitatives Feedback, as the answers will be after this file
+  return [...out, ...planFreeText(docs, mNew)];
 }
 
 // "Neu zuordnen": every participant's survey row as the rules alone give it
@@ -186,6 +187,7 @@ export function planPairing(
   o.patch(w0);
   const cur = buildModel(docs, game);
   const next = buildModel(w0, game, { ignoreManual: o.rematch });
+  const freeText = planFreeText(docs, next);
   const timeCol = t ? t.mapping.findIndex((m) => m.role === 'time') : -1;
   const side = (m: Model, row: number | null, via: string | null | undefined): [string, string][] => {
     if (row == null || !t) return [['Zeile', 'keine Antworten zugeordnet']];
@@ -232,7 +234,7 @@ export function planPairing(
       },
     });
   }
-  return out;
+  return [...out, ...freeText];
 }
 
 // give a participant a survey row by hand; a row another participant has is
@@ -254,4 +256,43 @@ export function planAssign(docs: StudyDocs, game: GameData, pid: string, row: nu
     },
     skip: other ? [pid, other.id] : [pid],
   });
+}
+
+// the survey's free-text answers as statements (Qualitatives Feedback, section
+// "Umfrage", id s-<P-ID>-<column>), against the answers each participant has
+// in this model: a statement from an earlier pairing that no longer matches
+// is a conflict (taking it keeps tags and edits), a missing one is new, one
+// whose participant has no answer any more is asked to keep or remove
+export function planFreeText(docs: StudyDocs, m: Model): Change[] {
+  const cols = m.mapping.map((c, j) => (c.role === 'text' ? { j, label: c.label } : null)).filter((x): x is { j: number; label: string } => !!x);
+  if (!cols.length) return [];
+  const out: Change[] = [];
+  const answerOf = new Map(m.survey.filter((r) => r.person).map((r) => [r.person!, r]));
+  for (const p of m.included)
+    for (const c of cols) {
+      const id = `s-${p.id}-${c.j}`;
+      const old = docs.items[id];
+      const text = answerOf.get(p.id)?.text[c.label];
+      if (old && text && old.text === text) continue;
+      if (!old && !text) continue;
+      if (!old && text) {
+        out.push({ id: `ft:${id}`, kind: 'neu', group: p.id, label: `Umfrage-Aussage „${c.label}“`, incoming: { text }, choice: 'neu', apply: (ch, w) => void (ch === 'neu' && (w.items[id] = { id, person: p.id, section: 'survey', question: c.label, text, order: 1000 + c.j, chips: [], suggested: [] })) });
+        continue;
+      }
+      out.push({
+        id: `ft:${id}`,
+        kind: 'konflikt',
+        group: p.id,
+        label: text ? `Umfrage-Aussage „${c.label}“ passt nicht mehr zur Zuordnung` : `Umfrage-Aussage „${c.label}“: ${p.id} hat keine Antwort mehr`,
+        current: { text: old!.text, note: old!.chips.length ? `${old!.chips.length} Tags` : undefined },
+        incoming: text ? { text, note: 'Tags und Bearbeitungen bleiben; die deutsche Fassung wird zur Prüfung markiert' } : undefined,
+        choice: 'alt',
+        apply: (ch, w) => {
+          if (ch !== 'neu') return;
+          if (!text) delete w.items[id];
+          else w.items[id] = { ...(w.items[id] ?? old!), text, original: text, status: 'changed', confirmed: false, deStale: !!old!.de };
+        },
+      });
+    }
+  return out;
 }

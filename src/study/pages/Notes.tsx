@@ -9,6 +9,7 @@ import { distinctPersons, itemsWithRole, type Model } from '../model';
 import { linkLabelOf, parseNotes, planNotes } from '../notes';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
+import { planFreeText } from '../tallyPlan';
 import { designOfItem } from './Codes';
 import { itemText, setContentView, translateNotes, useContentView, type ContentView } from '../translations';
 import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
@@ -188,35 +189,16 @@ function TallyFreeText() {
   const [busy, setBusy] = useState<string | null>(null);
   const cols = model.mapping.map((m, j) => (m.role === 'text' ? { j, label: m.label } : null)).filter((x): x is { j: number; label: string } => !!x);
   if (!cols.length) return null;
-  // (shown as changes first: an answer that differs from the stored statement is a conflict)
-  const build = (): Change[] => {
-    const out: Change[] = [];
-    for (const r of model.survey) {
-      if (!r.person) continue;
-      const person = r.person;
-      for (const c of cols) {
-        const text = r.text[c.label];
-        if (!text) continue;
-        const id = `s-${person}-${c.j}`;
-        const old = study.docs.items[id];
-        if (old && old.text === text) continue;
-        out.push(
-          old
-            ? { id, kind: 'konflikt', group: person, label: `Umfrage-Freitext „${c.label}“ geändert`, current: { text: old.text }, incoming: { text }, choice: 'alt', apply: (ch, w) => void (ch === 'neu' && (w.items[id] = { ...w.items[id], text, status: 'changed', confirmed: false, deStale: !!old.de })) }
-            : { id, kind: 'neu', group: person, label: `Umfrage-Freitext „${c.label}“`, incoming: { text }, choice: 'neu', apply: (ch, w) => void (ch === 'neu' && (w.items[id] = { id, person, section: 'survey', question: c.label, text, order: 1000 + c.j, chips: [], suggested: [] })) },
-        );
-      }
-    }
-    return out;
-  };
+  // (shown as changes first: a statement that no longer matches its participant's answer is a conflict)
+  const build = (): Change[] => planFreeText(study.latest(), model);
   return (
     <>
-      <button type="button" onClick={() => setPlan(build())}>
-        Tally-Freitexte übernehmen
+      <button type="button" onClick={() => setPlan(build())} title="Freitext-Antworten der Umfrage als Aussagen anlegen bzw. an die aktuelle Zuordnung anpassen">
+        Umfrage-Aussagen abgleichen …
       </button>
       {plan && (
         <ChangeModal
-          title="Tally-Freitexte als Aussagen"
+          title="Umfrage-Aussagen abgleichen"
           changes={plan}
           busy={busy}
           onCancel={() => setPlan(null)}

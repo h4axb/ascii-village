@@ -15,7 +15,9 @@ export const VIA: Record<string, string> = { manuell: 'manuell', id: 'nach ID', 
 const CHANGE_NAME: Record<string, string> = { minutes: 'Dauer manuell (min)', excluded: 'ausgeschlossen', reason: 'Grund', swapP1: 'Teil 1 vertauscht', runtime: 'Dauer aus', mainLink: 'Hauptlink', tallyRow: 'Tally-Zeile', group: 'Testgruppe', age: 'Alter' };
 
 export default function People() {
-  const { model, study } = useCtx();
+  const { model, study, scope, omitted, resetFilter } = useCtx();
+  // (the profiles follow the participants menu at the top; excluded ones stay listed here)
+  const shown = scope.kind === 'all' ? model.persons.filter((p) => !omitted.includes(p.id)) : model.persons.filter((p) => p.id === (scope.kind === 'link' ? model.links.find((l) => l.key === scope.key)?.person : scope.id));
   const idCol = model.mapping.findIndex((m) => m.role === 'id');
   const rows = study.docs.tally.main?.rows ?? [];
   const set = (p: Person, patch: Partial<PersonDoc>) => {
@@ -53,8 +55,16 @@ export default function People() {
         />
       )}
       <Section title="Teilnehmende & Sessions">
+        {shown.length < model.persons.length && (
+          <p className="st-note st-filtered">
+            {shown.length} von {model.persons.length} Profilen (Auswahl oben) ·{' '}
+            <button type="button" className="st-linkbtn" onClick={resetFilter}>
+              alle zeigen
+            </button>
+          </p>
+        )}
         <div className="st-people">
-          {model.persons.map((p) => (
+          {shown.map((p) => (
             <article key={p.id} className={`st-person${p.excluded ? ' is-excluded' : ''}`}>
               <header>
                 <h3>{p.id}</h3>
@@ -64,7 +74,7 @@ export default function People() {
                 {p.excluded && <span className="st-flag">ausgeschlossen</span>}
               </header>
 
-              <AttemptsEditor p={p} />
+              <AttemptsEditor p={p} current={scope.kind === 'link' ? scope.key : undefined} />
               <details className="st-linkdiag">
                 <summary>Link-Dauer (technisch, nicht die Spielzeit)</summary>
                 <Durations p={p} />

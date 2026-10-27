@@ -52,8 +52,12 @@ export default function Overview() {
   const dates = slice.persons.map((p) => p.date).filter((d): d is number => !!d);
   // durations per participant (links are attempts, never extra participants)
   const ts = timingSummary(slice.persons.map((p) => p.timing));
+  const mins = (v: number | null) => (v != null ? `${fmt(v, 1)} min` : '–');
   const pm = (x: TimingStat) => (x.n ? `${fmt(x.mean, 1)}${x.n > 1 ? ` ± ${fmt(x.sd, 1)}` : ''} min` : '–');
   const [measure, setMeasure] = useState<'aktiv' | 'verstrichen' | 'sauber'>('aktiv');
+  // one link chosen at the top: the numbers are that attempt's; the person's total for comparison
+  const whole = scope.kind === 'link' ? model.included.find((p) => p.id === slice.persons[0]?.id) : undefined;
+  const attempt = whole?.timing.attempts.find((a) => scope.kind === 'link' && a.key === scope.key);
 
   // Teil 4 (age has its own figure)
   const p4 = part4(slice.survey, model.optionQuestions).filter((f) => !/^alter$|^age$/i.test(f.label));
@@ -79,7 +83,11 @@ export default function Overview() {
           }
         />
         <Stat label="Saubere Durchlaufzeit (M ± SD)" value={pm(ts.clean)} sub={`n = ${ts.clean.n}/${ts.clean.N} (nur gültige, ununterbrochene Erstdurchläufe)`} />
-        <Stat label="Mit Neustart" value={`${ts.withRestart}/${ts.N}`} sub={`Ø ${fmt(ts.attemptsMean, 1)} Versuche je Person · technische Unterbrechung ${ts.technical}/${ts.N}`} />
+        {whole && attempt ? (
+          <Stat label="Versuch" value={`${attempt.n.value} von ${whole.timing.attemptCount}`} sub={`${attempt.label} · ${attempt.outcome.value} · ganze Person: aktiv ${mins(whole.timing.active.value)}, verstrichen ${mins(whole.timing.elapsed.value)}`} />
+        ) : (
+          <Stat label="Mit Neustart" value={`${ts.withRestart}/${ts.N}`} sub={`Ø ${fmt(ts.attemptsMean, 1)} Versuche je Person · technische Unterbrechung ${ts.technical}/${ts.N}`} />
+        )}
       </div>
 
       <Section title="Teilnehmerprofil">
@@ -139,7 +147,7 @@ export default function Overview() {
                       : [];
                 // (why someone has no clean value is listed below the chart, so the bars keep their width)
                 const fl = measure === 'sauber' ? [] : flags(p);
-                return { label: p.id, segments, note: `${v != null ? `${fmt(v, 1)} min` : '–'}${fl.length ? ` · ${fl.join(', ')}` : ''}` };
+                return { label: scope.kind === 'link' ? scope.id : p.id, segments, note: `${v != null ? `${fmt(v, 1)} min` : '–'}${fl.length ? ` · ${fl.join(', ')}` : ''}` };
               });
               const stat = measure === 'aktiv' ? st.active : measure === 'verstrichen' ? st.elapsed : st.clean;
               return (
@@ -175,7 +183,7 @@ export default function Overview() {
                   )}
                   <p className="st-note">
                     {measure === 'aktiv' ? 'Aktive Spielzeit je Teilnehmenden, Segmente = Versuche (Links); wiederholte Abschnitte eingeschlossen.' : measure === 'verstrichen' ? 'Verstrichene Zeit vom ersten Start bis zum letzten Ende, Pausen eingeschlossen.' : 'Gültige, ununterbrochene Erstdurchläufe; übrige ohne Wert (nicht 0).'}{' '}
-                    {stat.n ? `M = ${fmt(stat.mean, 1)} min, SD = ${fmt(stat.sd, 1)}, Median ${fmt(stat.median, 1)}, n = ${stat.n}/${stat.N}.` : `n = 0/${stat.N}.`} Je Person ein Wert, mehrere Links zählen nicht mehrfach.
+                    {stat.n ? `M = ${fmt(stat.mean, 1)} min, SD = ${fmt(stat.sd, 1)}, Median ${fmt(stat.median, 1)}, n = ${stat.n}/${stat.N}.` : `n = 0/${stat.N}.`} {whole && attempt ? `Nur ${attempt.label} (Versuch ${attempt.n.value} von ${whole.timing.attemptCount}).` : 'Je Person ein Wert, mehrere Links zählen nicht mehrfach.'}
                   </p>
                 </>
               );

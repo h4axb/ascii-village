@@ -233,7 +233,7 @@ export default function StudyApp() {
   const subTitle = current.sub?.find((s) => s.id === sub && !s.anchor)?.title ?? (page === 'qualitativ' ? SUB_TITLE[''] : null);
 
   return (
-    <StudyCtx.Provider value={{ study, model, scope, slice, omitted }}>
+    <StudyCtx.Provider value={{ study, model, scope, slice, omitted, resetFilter: () => (setScope('all'), setOmit([])) }}>
       {/* (a language change rebuilds the page, so the translator starts from the German text) */}
       <div key={lang} ref={rootRef} className={`st-root st-app${drawer ? ' has-drawer' : ''}`} lang={lang}>
         {study.viewing && (

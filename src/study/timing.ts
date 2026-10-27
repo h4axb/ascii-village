@@ -113,9 +113,22 @@ export function timingOf(doc: PersonDoc, links: LinkInfo[], durationBy: string):
   const completed = attempts.some((a) => a.outcome.value === 'abgeschlossen');
   const active = pick(td.activeMin, autoActive);
   const interruption = pick(td.interruptionMin, autoInterruption);
+  // (times entered by hand: elapsed = active + interruption; else first start → last end)
+  const byHand = active.manual || interruption.manual || attempts.some((a) => a.active.manual);
+  const handElapsed = byHand && active.value != null ? round1(active.value + (interruption.value ?? 0)) : null;
+  const elapsed = pick(td.elapsedMin, handElapsed ?? autoElapsed);
   const estimated = attempts.some((a) => a.precision.value !== 'exact' || a.source.value !== 'event_log' || a.active.value == null) || active.manual || td.source === 'estimate' || td.source === 'observation';
   const precision = pick<TimingPrecision>(td.precision, attempts.every((a) => a.precision.value === 'exact') ? 'exact' : attempts.some((a) => a.precision.value === 'unavailable') && !active.manual ? 'unavailable' : 'approximate');
   const source = pick<TimingSource>(td.source, attempts.every((a) => a.source.value === 'event_log') && !active.manual ? 'event_log' : 'estimate');
+  return finish({ attempts, elapsed, active, interruption, technical, completed, estimated, precision, source }, td);
+}
+
+// clean time, eligibility and status from the measures (shared by a person and a single link)
+function finish(
+  m: { attempts: Attempt[]; elapsed: Val<number | null>; active: Val<number | null>; interruption: Val<number | null>; technical: Val<boolean>; completed: boolean; estimated: boolean; precision: Val<TimingPrecision>; source: Val<TimingSource> },
+  td: TimingDoc,
+): Timing {
+  const { attempts, active, interruption, technical, completed, precision } = m;
   // a clean first-time completion: one attempt, completed, not interrupted, timed exactly
   const reasons = [
     attempts.length > 1 ? 'Neustarts / Lerneffekte' : '',
@@ -124,28 +137,52 @@ export function timingOf(doc: PersonDoc, links: LinkInfo[], durationBy: string):
     precision.value !== 'exact' ? 'Zeit nicht exakt' : '',
     active.value == null ? 'keine aktive Zeit' : '',
   ].filter(Boolean);
-  const autoEligible = !reasons.length;
-  const eligible = pick(td.eligible, autoEligible);
+  const eligible = pick(td.eligible, !reasons.length);
   const clean = pick(td.cleanMin, eligible.value ? active.value : null);
   const exclusionReason = pick(td.exclusionReason, eligible.value ? '' : reasons.join(', '));
-  const status: TimingStatus = !completed ? 'unvollständig' : attempts.length > 1 ? 'wiederholt' : (interruption.value ?? 0) > GAP_MIN || technical.value ? 'unterbrochen' : estimated ? 'geschätzt' : 'exakt';
+  const status: TimingStatus = !completed ? 'unvollständig' : attempts.length > 1 ? 'wiederholt' : (interruption.value ?? 0) > GAP_MIN || technical.value ? 'unterbrochen' : m.estimated ? 'geschätzt' : 'exakt';
   return {
     attempts,
     attemptCount: attempts.length,
     restartCount: Math.max(0, attempts.length - 1),
-    elapsed: pick(td.elapsedMin, autoElapsed),
+    elapsed: m.elapsed,
     active,
-    activeEstimated: estimated,
+    activeEstimated: m.estimated,
     interruption,
     technical,
     completed,
     clean,
     eligible,
     exclusionReason,
-    source,
+    source: m.source,
     precision,
     status,
   };
+}
+
+// one link of a participant on its own (the top menu set to P005.1): that attempt's times only
+export function attemptTiming(t: Timing, key: string): Timing {
+  const a = t.attempts.find((x) => x.key === key);
+  if (!a) return t;
+  const s = a.start.value;
+  const e = a.end.value;
+  const elapsed = { value: s != null && e != null && e > s ? round1(min(e - s)) : null, manual: a.start.manual || a.end.manual };
+  const estimated = a.precision.value !== 'exact' || a.source.value !== 'event_log' || a.active.value == null;
+  return finish(
+    {
+      attempts: [a],
+      elapsed,
+      active: a.active,
+      interruption: { value: round1(a.link.gaps.minutes), manual: false },
+      technical: { value: a.outcome.value === 'technisch abgebrochen', manual: a.outcome.manual },
+      completed: a.outcome.value === 'abgeschlossen',
+      estimated,
+      precision: a.precision,
+      source: a.source,
+    },
+    // (one of several attempts is never a clean first-time completion)
+    t.attemptCount > 1 ? { eligible: false, exclusionReason: `Versuch ${a.n.value} von ${t.attemptCount} (Neustarts / Lerneffekte)` } : {},
+  );
 }
 
 // ---- statistics over participants (one value per participant, never per link) ----

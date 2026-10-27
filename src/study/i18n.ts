@@ -410,6 +410,9 @@ const EN: Record<string, string> = {
   'Aktive Spieldauer (M ± SD)': 'Active playtime (M ± SD)',
   'Saubere Durchlaufzeit (M ± SD)': 'Clean completion time (M ± SD)',
   'Mit Neustart': 'With restart',
+  Versuch: 'Attempt',
+  'Verstrichen = Aktiv + Unterbrechung, solange Zeiten von Hand eingetragen sind; sonst aus dem Tracking (erster Start bis letztes Ende). Leeres Feld / „auto“ = gemessen, eigener Wert mit ↺ zurücksetzen. „Aktiv“ ist die Summe der Versuche; „kein Wert“ heißt ungültig, nicht 0.': 'Elapsed = active + interruption while times are entered by hand; otherwise from the tracking (first start to last end). Empty field / “auto” = measured; reset your own value with ↺. “Active” is the sum of the attempts; “kein Wert” means invalid, not 0.',
+  'alle zeigen': 'show all',
   Neustarts: 'Restarts',
   'Aktiv gesamt': 'Active total',
   'Noch kein gültiger Erstdurchlauf.': 'No valid first-time completion yet.',
@@ -848,9 +851,14 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^(\d+) von (\d+) Profilen \(Auswahl oben\) ·$/, '$1 of $2 profiles (selection at the top) ·'],
+  [/^(\d+) von (\d+)$/, '$1 of $2'],
+  [/^Nur (\S+) \(Versuch (\d+) von (\d+)\)\.$/, 'Only $1 (attempt $2 of $3).'],
+  [/^(\S+) · (.+) · ganze Person: aktiv (.+), verstrichen (.+)$/, '$1 · $2 · whole person: active $3, elapsed $4'],
   [/^(.+) · auto$/, '$1 · auto'],
   [/^Statistik & Kennzeichnung: zählt in der sauberen Durchlaufzeit · (.+)$/, 'Statistics & labels: counts in the clean completion time · $1'],
   [/^Statistik & Kennzeichnung: ausgeschlossen(?: \((.+)\))? · (.+)$/, 'Statistics & labels: excluded ($1) · $2'],
+  [/^Versuch (\d+) von (\d+) \((.+)\)$/, 'Attempt $1 of $2 ($3)'],
   [/^Versuch (\d+)$/, 'Attempt $1'],
   [/^Versuch (\d+) \((.+)\)$/, 'Attempt $1 ($2)'],
   [/^ · (.+) zugeordnet, nicht nach Test-ID$/, ' · paired $1, not by test ID'],

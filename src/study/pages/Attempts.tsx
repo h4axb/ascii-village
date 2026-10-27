@@ -5,7 +5,8 @@
 // automatic; "kein gültiger Wert" = null (never 0).
 import type { Person } from '../model';
 import type { AttemptDoc, AttemptOutcome, PersonDoc, TimingDoc, TimingPrecision, TimingSource } from '../types';
-import { OUTCOMES, PRECISION_LABEL, SOURCE_LABEL, type Val } from '../timing';
+import { useMemo, useState } from 'react';
+import { OUTCOMES, PRECISION_LABEL, SOURCE_LABEL, timingOf, type Val } from '../timing';
 import { berlinTime } from '../match';
 import { LazyInput, logChange, useCtx } from '../ui';
 
@@ -27,6 +28,8 @@ function atClock(v: string, day: number | null): number | undefined {
   return berlinTime(parts.year, parts.month - 1, parts.day, Number(m[1]), Number(m[2]));
 }
 
+const SAVED_AS = { elapsedMin: 'elapsed', activeMin: 'active', interruptionMin: 'interruption', cleanMin: 'clean' } as const;
+
 function Reset({ v, onReset }: { v: Val<unknown>; onReset: () => void }) {
   return v.manual ? (
     <button type="button" className="st-linkbtn st-reset" onClick={onReset} title="zurück zum gemessenen Wert">
@@ -35,9 +38,32 @@ function Reset({ v, onReset }: { v: Val<unknown>; onReset: () => void }) {
   ) : null;
 }
 
-export function AttemptsEditor({ p }: { p: Person }) {
+export function AttemptsEditor({ p, current }: { p: Person; current?: string }) {
   const { study } = useCtx();
-  const t = p.timing;
+  // what is being typed (not saved yet): "link|field" for an attempt, "|field" for the person;
+  // the totals are worked out from it at once, the value is stored on leaving the field
+  const [draft, setDraft] = useState<Record<string, unknown>>({});
+  const typing = (k: string, v: unknown) => setDraft((d) => ({ ...d, [k]: v }));
+  const typed = (k: string) => () =>
+    setDraft((d) => {
+      const { [k]: _, ...rest } = d;
+      return rest;
+    });
+  const durationBy = (study.docs.settings.durationBy as { by?: string } | undefined)?.by ?? 'auto';
+  const t = useMemo(() => {
+    if (!Object.keys(draft).length) return p.timing;
+    const attempts: Record<string, AttemptDoc> = Object.fromEntries(Object.entries(p.doc.attempts ?? {}).map(([k, v]) => [k, { ...v }]));
+    const timing: TimingDoc = { ...(p.doc.timing ?? {}) };
+    for (const [k, v] of Object.entries(draft)) {
+      const [key, field] = k.split('|');
+      const target = (key ? (attempts[key] ??= {}) : timing) as Record<string, unknown>;
+      if (v === undefined) delete target[field];
+      else target[field] = v;
+    }
+    return timingOf({ ...p.doc, attempts, timing, minutes: 'activeMin' in timing ? undefined : p.doc.minutes }, p.timing.attempts.map((a) => a.link), durationBy);
+  }, [draft, p, durationBy]);
+  // (an input shows what is stored, so leaving it saves what was typed even though the numbers already show it)
+  const sv = (key: string) => p.timing.attempts.find((x) => x.key === key)!;
   const save = (patch: Partial<PersonDoc>, what: string) => {
     study.commit([{ coll: 'people', id: p.id, data: { ...p.doc, id: p.id, ...patch } }]);
     logChange(study, `${p.id}: ${what}`);
@@ -59,15 +85,19 @@ export function AttemptsEditor({ p }: { p: Person }) {
     if (field === 'activeMin') patch.minutes = undefined;
     save(patch, what);
   };
-  const numField = (label: string, v: Val<number | null>, field: keyof TimingDoc, opts: { nullable?: boolean } = {}) => (
+  const numField = (label: string, v: Val<number | null>, field: keyof TimingDoc, opts: { nullable?: boolean } = {}) => {
+    const saved = p.timing[SAVED_AS[field as keyof typeof SAVED_AS]];
+    return (
     <label>
       {label}
       <span className="st-inline">
         <LazyInput
           type="text"
           inputMode="decimal"
-          value={v.manual && v.value != null ? num(v.value) : ''}
+          value={saved.manual && saved.value != null ? num(saved.value) : ''}
           placeholder={v.manual && v.value == null ? 'kein gültiger Wert' : v.value == null ? '–' : `${num(v.value)} · auto`}
+          onDraft={(s) => typing(`|${field}`, parseNum(s))}
+          onBlur={typed(`|${field}`)}
           onSave={(s) => setTiming(field, parseNum(s), `${label} → ${s.trim() || 'automatisch'}`)}
         />
         {opts.nullable && (
@@ -78,7 +108,8 @@ export function AttemptsEditor({ p }: { p: Person }) {
         <Reset v={v} onReset={() => setTiming(field, undefined, `${label} → automatisch`)} />
       </span>
     </label>
-  );
+    );
+  };
   if (!t.attempts.length) return null;
   return (
     <details className="st-attempts" open={t.attemptCount > 1}>
@@ -124,7 +155,7 @@ export function AttemptsEditor({ p }: { p: Person }) {
             {t.attempts.map((a) => {
               const day = a.start.value ?? a.link.started;
               return (
-                <tr key={a.key}>
+                <tr key={a.key} className={a.key === current ? 'is-current' : undefined}>
                   <td data-label="Nr.">
                     <LazyInput type="number" min={1} value={a.n.manual ? String(a.n.value) : ''} placeholder={String(a.n.value)} onSave={(s) => setAttempt(a.key, a.label, 'n', parseNum(s), `Versuch Nr. → ${s || 'automatisch'}`)} aria-label={`${a.label} Nummer`} />
                   </td>
@@ -132,13 +163,13 @@ export function AttemptsEditor({ p }: { p: Person }) {
                     <span className="st-pid">{a.label}</span>
                   </td>
                   <td data-label="Start">
-                    <LazyInput value={a.start.manual ? clock(a.start.value) : ''} placeholder={clock(a.start.value) || 'hh:mm'} onSave={(s) => (s.trim() && atClock(s, day) === undefined ? undefined : setAttempt(a.key, a.label, 'start', atClock(s, day), `Start → ${s || 'automatisch'}`))} aria-label={`${a.label} Start`} />
+                    <LazyInput onDraft={(s) => typing(`${a.key}|start`, atClock(s, day))} onBlur={typed(`${a.key}|start`)} value={sv(a.key).start.manual ? clock(sv(a.key).start.value) : ''} placeholder={clock(a.start.value) || 'hh:mm'} onSave={(s) => (s.trim() && atClock(s, day) === undefined ? undefined : setAttempt(a.key, a.label, 'start', atClock(s, day), `Start → ${s || 'automatisch'}`))} aria-label={`${a.label} Start`} />
                   </td>
                   <td data-label="Ende">
-                    <LazyInput value={a.end.manual ? clock(a.end.value) : ''} placeholder={clock(a.end.value) || 'hh:mm'} onSave={(s) => (s.trim() && atClock(s, day) === undefined ? undefined : setAttempt(a.key, a.label, 'end', atClock(s, day), `Ende → ${s || 'automatisch'}`))} aria-label={`${a.label} Ende`} />
+                    <LazyInput onDraft={(s) => typing(`${a.key}|end`, atClock(s, day))} onBlur={typed(`${a.key}|end`)} value={sv(a.key).end.manual ? clock(sv(a.key).end.value) : ''} placeholder={clock(a.end.value) || 'hh:mm'} onSave={(s) => (s.trim() && atClock(s, day) === undefined ? undefined : setAttempt(a.key, a.label, 'end', atClock(s, day), `Ende → ${s || 'automatisch'}`))} aria-label={`${a.label} Ende`} />
                   </td>
                   <td data-label="Aktiv (min)">
-                    <LazyInput type="text" inputMode="decimal" value={a.active.manual && a.active.value != null ? num(a.active.value) : ''} placeholder={a.active.value != null ? num(a.active.value) : '–'} onSave={(s) => setAttempt(a.key, a.label, 'activeMin', parseNum(s), `aktiv → ${s || 'automatisch'} min`)} aria-label={`${a.label} aktive Minuten`} />
+                    <LazyInput type="text" inputMode="decimal" value={sv(a.key).active.manual && sv(a.key).active.value != null ? num(sv(a.key).active.value) : ''} placeholder={a.active.value != null ? num(a.active.value) : '–'} onDraft={(s) => typing(`${a.key}|activeMin`, parseNum(s))} onBlur={typed(`${a.key}|activeMin`)} onSave={(s) => setAttempt(a.key, a.label, 'activeMin', parseNum(s), `aktiv → ${s || 'automatisch'} min`)} aria-label={`${a.label} aktive Minuten`} />
                   </td>
                   <td data-label="Ausgang">
                     <select value={a.outcome.manual ? a.outcome.value : ''} onChange={(e) => setAttempt(a.key, a.label, 'outcome', (e.target.value || undefined) as AttemptOutcome | undefined, `Ausgang → ${e.target.value || 'automatisch'}`)} aria-label={`${a.label} Ausgang`}>
@@ -185,12 +216,15 @@ export function AttemptsEditor({ p }: { p: Person }) {
           )}
         </table>
       </div>
-      <div className="st-fields st-timing-fields">
-        {numField('Verstrichen (min)', t.elapsed, 'elapsedMin')}
+      {/* (worked out while typing: Aktiv is the attempts' sum, Verstrichen = Aktiv + Unterbrechung) */}
+      <div className="st-equation">
         {numField('Aktiv gesamt (min)', t.active, 'activeMin')}
+        <span className="st-op" aria-hidden="true">+</span>
         {numField('Unterbrechung (min)', t.interruption, 'interruptionMin')}
-        {numField('Saubere Erstdurchlaufzeit (min)', t.clean, 'cleanMin', { nullable: true })}
+        <span className="st-op" aria-hidden="true">=</span>
+        {numField('Verstrichen (min)', t.elapsed, 'elapsedMin')}
       </div>
+      <div className="st-fields st-timing-fields">{numField('Saubere Erstdurchlaufzeit (min)', t.clean, 'cleanMin', { nullable: true })}</div>
       <details className="st-timing-more" open={t.technical.manual || t.eligible.manual || t.exclusionReason.manual || t.source.manual || t.precision.manual}>
         <summary>
           Statistik &amp; Kennzeichnung: {t.eligible.value ? 'zählt in der sauberen Durchlaufzeit' : `ausgeschlossen${t.exclusionReason.value ? ` (${t.exclusionReason.value})` : ''}`} · {SOURCE_LABEL[t.source.value]}, {PRECISION_LABEL[t.precision.value]}
@@ -237,7 +271,7 @@ export function AttemptsEditor({ p }: { p: Person }) {
         </label>
         </div>
       </details>
-      <p className="st-note">Leeres Feld / „auto“ = gemessen, eigener Wert mit ↺ zurücksetzen. „Aktiv“ ist die Summe der Versuche; „kein Wert“ heißt ungültig, nicht 0.</p>
+      <p className="st-note">Verstrichen = Aktiv + Unterbrechung, solange Zeiten von Hand eingetragen sind; sonst aus dem Tracking (erster Start bis letztes Ende). Leeres Feld / „auto“ = gemessen, eigener Wert mit ↺ zurücksetzen. „Aktiv“ ist die Summe der Versuche; „kein Wert“ heißt ungültig, nicht 0.</p>
     </details>
   );
 }

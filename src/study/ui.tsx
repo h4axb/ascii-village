@@ -12,6 +12,7 @@ export interface Ctx {
   scope: Scope;
   slice: Slice;
   omitted: string[]; // ticked off in the participants menu (left out of every view)
+  resetFilter: () => void; // back to all participants
 }
 export const StudyCtx = createContext<Ctx | null>(null);
 export const useCtx = () => useContext(StudyCtx)!;
@@ -111,10 +112,25 @@ export const fmtDate = (t: number | null | undefined) => (t ? new Date(t).toLoca
 export const fmtMin = (m: number | null | undefined) => (m == null ? '–' : `${Math.floor(m)}:${String(Math.round((m % 1) * 60)).padStart(2, '0')} min`);
 
 // a text field saved when it loses focus (not on every key)
-export function LazyInput({ value, onSave, ...rest }: { value: string; onSave: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+// (onDraft: every keystroke, for numbers worked out while typing; saved only on leaving the field)
+export function LazyInput({ value, onSave, onDraft, onBlur, ...rest }: { value: string; onSave: (v: string) => void; onDraft?: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
-  return <input {...rest} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => draft !== value && onSave(draft)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />;
+  return (
+    <input
+      {...rest}
+      value={draft}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        onDraft?.(e.target.value);
+      }}
+      onBlur={(e) => {
+        if (draft !== value) onSave(draft);
+        onBlur?.(e);
+      }}
+      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+    />
+  );
 }
 
 // the change log (Daten & Validierung): imports and corrections, newest first

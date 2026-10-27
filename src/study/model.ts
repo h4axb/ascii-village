@@ -3,7 +3,7 @@
 // every change. Views read only from here, so a correction (A/B swapped,
 // a participant excluded, the run-time rule) reaches every figure at once.
 import { designOf, type FeedbackRecord } from '../feedback/schema';
-import { timingOf, type Timing } from './timing';
+import { attemptTiming, timingOf, type Timing } from './timing';
 import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
 import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
@@ -401,7 +401,14 @@ export function slice(m: Model, s: Scope): Slice {
   const link = s.kind === 'link' ? m.links.find((l) => l.key === s.key) : null;
   // (a link's scope is named by its label, P005.1; its records are under the person, P005)
   const pid = link ? link.person : s.id;
-  const persons = m.included.filter((p) => p.id === pid);
+  // (one link: that attempt's times only, not the person's total)
+  const persons = m.included
+    .filter((p) => p.id === pid)
+    .map((p) => {
+      if (!link) return p;
+      const timing = attemptTiming(p.timing, link.key);
+      return { ...p, timing, minutes: timing.active.value };
+    });
   const inLink = (r: { participant?: string; at: number; key?: string }) => {
     if (!link) return true;
     if (r.key) return r.key === link.key;

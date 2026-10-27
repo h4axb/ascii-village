@@ -225,11 +225,17 @@ export function part4(rows: SurveyRow[], optionQs: OptionQuestion[] = []): P4Fie
   // ("Question (Option)" = true / false) and plain answer columns with the
   // same question text are merged into one field
   const key = (s: string) => s.trim().toLowerCase().replace(/[\s?:.]+$/, '');
-  const fields = new Map<string, { label: string; counts: Map<string, number>; answered: Set<number>; nums: number[]; numericOnly: boolean; options: boolean }>();
+  // (per participant a set of answers, so a question in both forms counts each answer once)
+  const fields = new Map<string, { label: string; counts: Map<string, number>; answered: Map<number, Set<string>>; nums: number[]; numericOnly: boolean; options: boolean }>();
   const fieldOf = (label: string) => {
     let f = fields.get(key(label));
-    if (!f) fields.set(key(label), (f = { label, counts: new Map(), answered: new Set(), nums: [], numericOnly: true, options: false }));
+    if (!f) fields.set(key(label), (f = { label, counts: new Map(), answered: new Map(), nums: [], numericOnly: true, options: false }));
     return f;
+  };
+  const give = (f: { answered: Map<number, Set<string>> }, i: number, v: string) => {
+    let got = f.answered.get(i);
+    if (!got) f.answered.set(i, (got = new Set()));
+    got.add(v);
   };
   // questions exported as one column per option (not in Teil 2/3): all options, also at 0
   for (const q of optionQs.filter((x) => x.part !== 2 && x.part !== 3)) {
@@ -238,9 +244,7 @@ export function part4(rows: SurveyRow[], optionQs: OptionQuestion[] = []): P4Fie
     f.options = true;
     for (const o of q.options) if (!f.counts.has(o)) f.counts.set(o, 0);
     rows.forEach((r, i) => {
-      const ticked = r.multi[q.question] ?? [];
-      if (ticked.length) f.answered.add(i);
-      for (const o of ticked) f.counts.set(o, (f.counts.get(o) ?? 0) + 1);
+      for (const o of r.multi[q.question] ?? []) give(f, i, o);
     });
   }
   for (const label of new Set(rows.flatMap((r) => Object.keys(r.info)))) {
@@ -248,14 +252,14 @@ export function part4(rows: SurveyRow[], optionQs: OptionQuestion[] = []): P4Fie
     rows.forEach((r, i) => {
       const v = r.info[label];
       if (!v) return;
-      f.answered.add(i);
       const num = Number(v.replace(',', '.'));
       if (Number.isFinite(num)) f.nums.push(num);
       else f.numericOnly = false;
       // (a multi-choice answer "a, b" counts for each)
-      for (const part of Number.isFinite(num) ? [v] : v.split(/\s*,\s*(?=[A-ZÄÖÜ])/)) f.counts.set(part, (f.counts.get(part) ?? 0) + 1);
+      for (const part of Number.isFinite(num) ? [v] : v.split(/\s*,\s*(?=[A-ZÄÖÜ])/)) give(f, i, part);
     });
   }
+  for (const f of fields.values()) for (const got of f.answered.values()) for (const v of got) f.counts.set(v, (f.counts.get(v) ?? 0) + 1);
   return [...fields.values()].map((f) => {
     const numeric = f.numericOnly && f.nums.length > 0;
     return {

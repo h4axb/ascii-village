@@ -1,12 +1,13 @@
 // Daten & Validierung: the imports, the data sources, the checks (missing
 // values, conflicts, open work), the matching rules, and the change log.
-import type { ColumnRole } from '../types';
+import type { ColumnRole, StudyDocs } from '../types';
 import { GAP_MIN, MATCH_ORDER_LABEL, personIdOf, type MatchOrder } from '../model';
-import { timeOf } from '../match';
+import { fmtBerlin, ZONE_LABEL, type TallyZone } from '../match';
+import { planPairing, planRematch } from '../tallyPlan';
 import { download } from '../charts';
 import { useEffect, useState } from 'react';
 import type { Version } from '../store';
-import { restoreChanges, type Change } from '../changes';
+import { resolve, restoreChanges, type Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
 import { csv, DurationSelect, fmtMin, logChange, Section, useCtx, type LogEntry } from '../ui';
 import Import from './Import';
@@ -63,6 +64,13 @@ export function useChecks(): Check[] {
     const ids = idCol >= 0 ? tally.rows.map((r) => personIdOf(r[idCol] ?? '')) : [];
     const dup = [...new Set(ids.filter((x, i) => x && ids.indexOf(x) !== i))];
     add('Umfrage', 'Keine doppelten IDs', !dup.length, dup.length ? `${dup.join(', ')} (Zeile auf „Teilnehmende & Sessions“ wählen)` : '');
+    const z = model.tallyZone;
+    add(
+      'Umfrage',
+      'Zeitzone der Abgabezeiten geklärt',
+      z.setting !== 'auto' || z.sure || !z.n,
+      `${ZONE_LABEL[z.zone]}${z.setting !== 'auto' ? ' (fest eingestellt)' : z.n ? ` – erkannt aus ${z.n} Abgaben mit Test-ID, Median ${Math.round(z.gapMin ?? 0)} min nach dem Öffnen der Umfrage${z.sure ? '' : '; nicht eindeutig: unter „Zuordnung“ prüfen'}` : ' (Standard; keine Abgaben mit Test-ID zum Prüfen)'}`,
+    );
     add('Umfrage', 'Alle Antworten zugeordnet', !model.unmatchedRows.length, model.unmatchedRows.map((r) => `Zeile ${r + 1}${idCol >= 0 && tally.rows[r]?.[idCol] ? ` (${tally.rows[r][idCol]})` : ''}`).join(', '));
     const noRow = inc.filter((p) => p.tallyRow == null);
     add('Umfrage', 'Alle Teilnehmenden mit Antworten', !noRow.length, noRow.map((p) => p.id).join(', '));
@@ -153,7 +161,7 @@ export default function Data() {
               <td>
                 {study.game.invites.filter((i) => i.participant_id).length} Links, {study.game.events.length} Ereignisse, {study.game.feedback.length} Bewertungen
               </td>
-              <td>live</td>
+              <td>{study.stand ? `übernommener Stand vom ${berlin(study.stand.at)}` : 'live'}</td>
             </tr>
             <tr>
               <td>Tally-Umfrage</td>
@@ -356,7 +364,7 @@ function Versions() {
           title={`Stand vom ${berlin(restore.v.at)} wiederherstellen`}
           changes={restore.changes}
           names={['Aktuell', 'Gespeicherter Stand']}
-          intro="Jede Abweichung zum gespeicherten Stand; übernommen wird der gespeicherte Stand, außer wo „Aktuell behalten“ gewählt ist. Der jetzige Stand wird vorher gesichert."
+          intro="Jede Abweichung zum gespeicherten Stand: für jede entscheiden (oder oben für alle). Der jetzige Stand wird vorher gesichert."
           busy={busy}
           onCancel={() => setRestore(null)}
           onApply={(choices) => {
@@ -388,19 +396,88 @@ function MatchTable() {
   const useTime = !!(study.docs.settings.matchTime as { on?: boolean } | undefined)?.on;
   // the rows in the order they were submitted (file order without a time), with their place
   const sorted = tally.rows
-    .map((r, i) => ({ r, i, t: timeCol >= 0 ? timeOf(r[timeCol] ?? '') : null }))
+    .map((r, i) => ({ r, i, t: model.submitted[i] ?? null }))
     .sort((a, b) => (a.t != null && b.t != null ? a.t - b.t : a.i - b.i));
+  const zone = model.tallyZone;
+  // a change that moves answers between participants is asked first (no one's answers change unasked)
+  const [rematch, setRematch] = useState<{ changes: Change[]; title: string; reason: string; intro: string } | null>(null);
+  const ask = (label: string, fields: [string, string][], patch: (w: StudyDocs) => void, reason: string) => {
+    const changes = planPairing(study.latest(), study.game, { label, fields, patch });
+    if (changes.length > 1) return setRematch({ changes, title: label, reason, intro: 'Diese Änderung ordnet Umfrage-Antworten anderen Teilnehmenden zu. Für jede Person entscheiden: „Aktuell behalten“ hält die bisherige Zeile fest. Der jetzige Stand wird vorher gesichert.' });
+    // (nobody's answers change: stored at once)
+    const { put, del } = resolve(changes, study.latest(), {});
+    study.commit(put, del);
+    logChange(study, reason);
+  };
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
   const rank = new Map<number, number>();
   sorted.filter((x) => !model.ignoredRows.has(x.i)).forEach((x, k) => rank.set(x.i, k + 1));
   return (
     <Section title="Zuordnung Umfrage ↔ Teilnehmende">
+      <p className="st-note">
+        Abgabezeiten: in der Datei gespeichert wie exportiert, gelesen als {ZONE_LABEL[zone.zone]}
+        {zone.setting === 'auto' ? (zone.n ? ` (erkannt aus ${zone.n} Abgaben mit Test-ID: Abgabe im Median ${Math.round(zone.gapMin ?? 0)} min nach dem Öffnen der Umfrage im Spiel${zone.sure ? '' : ', unsicher – bitte prüfen'})` : ' (Standard von Tally; keine Abgaben mit Test-ID zum Prüfen)') : ' (fest eingestellt)'}, angezeigt in deutscher Zeit und erst danach mit dem Spiel-Tracking verglichen.
+      </p>
+      <div className="st-toolbar">
+        <label className="st-scope">
+          <span>Zeitzone der Datei:</span>
+          <select
+            value={zone.setting}
+            onChange={(e) => {
+              const v = e.target.value;
+              const name = v === 'auto' ? 'automatisch' : ZONE_LABEL[v as TallyZone];
+              ask('Zeitzone der Umfrage ändern', [['Zeitzone der Datei', name]], (w) => void (w.settings.tallyZone = { zone: v }), `Zeitzone der Umfrage: ${name}`);
+            }}
+          >
+            <option value="auto">automatisch ({ZONE_LABEL[zone.zone]})</option>
+            <option value="UTC">UTC</option>
+            <option value="Europe/Berlin">deutsche Zeit</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          disabled={!!study.viewing}
+          onClick={() =>
+            setRematch({
+              changes: planRematch(study.latest(), study.game, zone.zone),
+              title: 'Umfrage neu zuordnen',
+              reason: 'Neu zuordnen (Umfrage)',
+              intro: 'Zuordnung nach den Regeln: Test-ID zuerst, dann die übrigen Abgaben nach Abgabezeit (deutsche Zeit, früheste zuerst) an die Teilnehmenden nach P-ID. Für jede Person entscheiden: „Aktuell behalten“ hält die bisherige Zeile fest. Der jetzige Stand wird vorher gesichert.',
+            })
+          }
+        >
+          Neu zuordnen (deutsche Zeit, früheste Abgabe → P001)
+        </button>
+        {msg && <span className="st-muted">{msg}</span>}
+      </div>
+      {rematch && (
+        <ChangeModal
+          title={rematch.title}
+          changes={rematch.changes}
+          names={['Aktuell', 'Danach']}
+          intro={rematch.intro}
+          busy={busy}
+          onCancel={() => setRematch(null)}
+          onApply={(choices) => {
+            setBusy('Wird gesichert und übernommen …');
+            void applyChanges(study, rematch.changes, choices, rematch.reason)
+              .then((summary) => {
+                setMsg(summary);
+                setRematch(null);
+              })
+              .catch((e) => setMsg(`Nicht übernommen: ${String((e as Error).message)}`))
+              .finally(() => setBusy(null));
+          }}
+        />
+      )}
       <label className="st-scope">
         <span>Zuordnung nach Reihenfolge:</span>
         <select
           value={order}
           onChange={(e) => {
-            study.commit([{ coll: 'settings', id: 'matchOrder', data: { by: e.target.value } }]);
-            logChange(study, `Zuordnung nach Reihenfolge: ${MATCH_ORDER_LABEL[order]} → ${MATCH_ORDER_LABEL[e.target.value as MatchOrder]}`);
+            const v = e.target.value as MatchOrder;
+            ask('Reihenfolge der Zuordnung ändern', [['Reihenfolge', MATCH_ORDER_LABEL[v]]], (w) => void (w.settings.matchOrder = { by: v }), `Zuordnung nach Reihenfolge: ${MATCH_ORDER_LABEL[order]} → ${MATCH_ORDER_LABEL[v]}`);
           }}
         >
           {(Object.keys(MATCH_ORDER_LABEL) as MatchOrder[]).map((k) => (
@@ -415,8 +492,8 @@ function MatchTable() {
           type="checkbox"
           checked={useTime}
           onChange={(e) => {
-            study.commit([{ coll: 'settings', id: 'matchTime', data: { on: e.target.checked } }]);
-            logChange(study, `Zuordnung über Zeitabgleich ${e.target.checked ? 'an' : 'aus'}`);
+            const on = e.target.checked;
+            ask(`Zeitabgleich ${on ? 'einschalten' : 'ausschalten'}`, [['Zeitabgleich', on ? 'an' : 'aus']], (w) => void (w.settings.matchTime = { on }), `Zuordnung über Zeitabgleich ${on ? 'an' : 'aus'}`);
           }}
         />
         zuerst über Zeitabgleich zuordnen (Abgabezeit ↔ Öffnen der Umfrage im Spiel)
@@ -442,14 +519,13 @@ function MatchTable() {
             const ignored = model.ignoredRows.has(i);
             const toggle = () => {
               const rows = ignored ? [...model.ignoredRows].filter((x) => x !== i) : [...model.ignoredRows, i];
-              study.commit([{ coll: 'settings', id: 'ignoredRows', data: { rows } }]);
-              logChange(study, `Umfrage-Zeile ${i + 1} ${ignored ? 'wieder gewertet' : 'ignoriert'}`);
+              ask(`Umfrage-Zeile ${i + 1} ${ignored ? 'wieder werten' : 'ignorieren'}`, [['Zeile', String(i + 1)], ['Danach', ignored ? 'gewertet' : 'ignoriert']], (w) => void (w.settings.ignoredRows = { rows }), `Umfrage-Zeile ${i + 1} ${ignored ? 'wieder gewertet' : 'ignoriert'}`);
             };
             return (
               <tr key={i} className={ignored ? 'is-ignored' : !p || p.tallyConflict ? 'is-open' : ''}>
                 <td className="num">{rank.get(i) ?? '–'}</td>
                 <td className="num">{i + 1}</td>
-                <td title={timeCol >= 0 ? `in der Datei (UTC): ${r[timeCol]}` : undefined}>{timeCol >= 0 ? localTime(r[timeCol] ?? '') : '–'}</td>
+                <td title={timeCol >= 0 ? `in der Datei (${ZONE_LABEL[zone.zone]}): ${r[timeCol]}` : undefined}>{model.submitted[i] != null ? fmtBerlin(model.submitted[i]!) : timeCol >= 0 ? r[timeCol] || '–' : '–'}</td>
                 <td>{orderCol >= 0 ? r[orderCol] || '–' : '–'}</td>
                 <td>{ignored ? <span className="st-muted">ignoriert</span> : p ? p.id : <span className="st-flag">keine</span>}</td>
                 <td className="num">{p && !ignored ? (model.orderPos.get(p.id) ?? '–') : ''}</td>
@@ -475,7 +551,3 @@ function MatchTable() {
 }
 
 // Tally's export is in UTC; shown in German time, as on tally.so
-function localTime(v: string): string {
-  const t = timeOf(v);
-  return t == null ? v || '–' : new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}

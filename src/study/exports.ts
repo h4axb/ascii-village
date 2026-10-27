@@ -6,6 +6,7 @@
 //   Analyse   – the analysis layer: statements with German version,
 //               interpretation, later addition, codes and findings, plus
 //               each participant's quantitative values per design.
+import { fmtBerlin } from './match';
 import { studyFiles, zip } from '../feedback/studyExport';
 import type { Model } from './model';
 import { gameRatings, RATING_LABEL } from './model';
@@ -110,6 +111,9 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
       'Teilnehmende',
       'Gruppe',
       'Bearbeitungsdauer (min)',
+      'Umfrage abgegeben (dt. Zeit)',
+      'Umfrage abgegeben (UTC)',
+      'Umfrage zugeordnet über',
       ...p1q.map((q) => `Teil 1: ${q}`),
       ...lik.flatMap((q) => [`Teil 2 A: ${q}`, `Teil 2 B: ${q}`]),
       ...lik1.map((q) => `Teil 2: ${q}`),
@@ -124,6 +128,10 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
         p.id,
         p.group ?? '',
         n2(p.minutes),
+        ...(() => {
+          const t = r ? model.submitted[r.row] : null;
+          return [t != null ? fmtBerlin(t, true) : '', t != null ? new Date(t).toISOString().replace('T', ' ').slice(0, 19) : '', p.tallyVia ?? ''];
+        })(),
         ...p1q.map((q) => (r?.p1[q] === 'neutral' ? 'keine Präferenz' : (r?.p1[q] ?? ''))),
         ...lik.flatMap((q) => [n2(r?.likert[q]?.A), n2(r?.likert[q]?.B)]),
         ...lik1.map((q) => n2(r?.likertSingle[q])),

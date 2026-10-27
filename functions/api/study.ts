@@ -14,7 +14,14 @@
 //   GET    /api/study/versions        the saved states of all documents (id, time, reason)
 //   POST   /api/study/versions        save the current state {reason} → {id}
 //   GET    /api/study/versions/<id>   one saved state: every document as it was
-import { dbOf, isAdmin, json, type D1Database, type SessionEnv } from './session';
+//   GET    /api/study/game[/<id>]     the game data the dashboard works with (accepted
+//                                    stand; the newest, or one by id) and the live data
+//   POST   /api/study/game            take over records of the live game data
+//                                    {accept: {invites, events, feedback}, drop: {…}, reason}
+//                                    (nothing of the game's own changes is used unasked)
+import { dbOf, handleAdmin, isAdmin, json, type D1Database, type SessionEnv } from './session';
+import { handleEvents } from './events';
+import { handleFeedback, type FeedbackEnv } from './feedback';
 
 export const STUDY_COLLS = ['tally', 'notes', 'items', 'findings', 'tags', 'people', 'captions', 'hypotheses', 'claims', 'settings'] as const;
 type Coll = (typeof STUDY_COLLS)[number];
@@ -91,13 +98,92 @@ async function versions(request: Request, db: D1Database, id?: string): Promise<
   if (request.method === 'POST' && !id) {
     const body = (await request.json().catch(() => null)) as { reason?: unknown } | null;
     const reason = String(body?.reason ?? 'gesichert').slice(0, 200);
-    const text = JSON.stringify(await allDocs(db));
+    await ensureGame(db);
+    const g = (await db.prepare('SELECT id FROM study_game WHERE part = 0 ORDER BY at DESC LIMIT 1').all<{ id: string }>()).results[0];
+    const text = JSON.stringify({ ...(await allDocs(db)), _game: g?.id ?? null });
     const packed = await gzip(text);
     const vid = `v-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const at = Date.now();
     for (let k = 0; k * PART < packed.length || k === 0; k++)
       await db.prepare('INSERT INTO study_versions (id, part, at, reason, size, data) VALUES (?1, ?2, ?3, ?4, ?5, ?6)').bind(vid, k, at, reason, text.length, packed.slice(k * PART, (k + 1) * PART)).run();
     return json(200, { id: vid, at });
+  }
+  return json(405, { error: 'method not allowed' });
+}
+
+// ---- the accepted game data: a stand of links, events and ratings, changed only by "accept" ----
+type GameKind = 'invites' | 'events' | 'feedback';
+type GameData = Record<GameKind, Record<string, unknown>[]>;
+const GAME_KEY: Record<GameKind, string> = { invites: 'key', events: 'id', feedback: 'id' };
+let gameReady: Promise<unknown> | null = null;
+function ensureGame(db: D1Database) {
+  gameReady ??= db
+    .prepare('CREATE TABLE IF NOT EXISTS study_game (id TEXT NOT NULL, part INTEGER NOT NULL, at INTEGER NOT NULL, reason TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY (id, part))')
+    .run()
+    .catch((e) => {
+      gameReady = null;
+      throw e;
+    });
+  return gameReady;
+}
+// the game's live data, through its own routes (the same shape the dashboards get)
+async function liveGame(request: Request, env: StudyEnv): Promise<GameData> {
+  const origin = new URL(request.url).origin;
+  const headers = { Authorization: request.headers.get('Authorization') ?? '' };
+  const get = async (r: Promise<Response>) => {
+    const res = await r;
+    const d = (await res.json().catch(() => [])) as unknown;
+    return (Array.isArray(d) ? d : []) as Record<string, unknown>[];
+  };
+  const [invites, events, feedback] = await Promise.all([
+    get(handleAdmin(new Request(`${origin}/api/admin/invites`, { headers }), env)),
+    get(handleEvents(new Request(`${origin}/api/events`, { headers }), env)),
+    get(handleFeedback(new Request(`${origin}/api/feedback`, { headers }), env as FeedbackEnv)),
+  ]);
+  return { invites, events, feedback };
+}
+async function loadGame(db: D1Database, id?: string): Promise<{ id: string; at: number; reason: string; data: GameData } | null> {
+  type Head = { id: string; at: number; reason: string };
+  const head = (
+    id
+      ? await db.prepare('SELECT id, at, reason FROM study_game WHERE id = ?1 AND part = 0').bind(id).all<Head>()
+      : await db.prepare('SELECT id, at, reason FROM study_game WHERE part = 0 ORDER BY at DESC LIMIT 1').all<Head>()
+  ).results[0];
+  if (!head) return null;
+  const { results } = await db.prepare('SELECT data FROM study_game WHERE id = ?1 ORDER BY part').bind(head.id).all<{ data: string }>();
+  return { ...head, data: JSON.parse(await gunzip(results.map((r) => r.data).join(''))) as GameData };
+}
+async function game(request: Request, env: StudyEnv, db: D1Database, id?: string): Promise<Response> {
+  await ensureGame(db);
+  if (request.method === 'GET' && id === 'list') {
+    const { results } = await db.prepare('SELECT id, at, reason FROM study_game WHERE part = 0 ORDER BY at DESC LIMIT 200').all<{ id: string; at: number; reason: string }>();
+    return json(200, results);
+  }
+  if (request.method === 'GET') {
+    const stand = await loadGame(db, id);
+    return json(200, { stand, live: id ? null : await liveGame(request, env) });
+  }
+  if (request.method === 'POST' && !id) {
+    const body = (await request.json().catch(() => null)) as { accept?: Partial<Record<GameKind, string[]>>; drop?: Partial<Record<GameKind, string[]>>; reason?: string } | null;
+    if (!body) return json(400, { error: 'invalid JSON' });
+    const prev = await loadGame(db);
+    const live = await liveGame(request, env);
+    const next = {} as GameData;
+    for (const kind of Object.keys(GAME_KEY) as GameKind[]) {
+      const k = GAME_KEY[kind];
+      const byId = new Map((prev?.data[kind] ?? []).map((r) => [String(r[k]), r]));
+      const take = new Set(body.accept?.[kind] ?? []);
+      for (const r of live[kind]) if (take.has(String(r[k]))) byId.set(String(r[k]), r);
+      for (const gone of body.drop?.[kind] ?? []) byId.delete(gone);
+      next[kind] = [...byId.values()];
+    }
+    const packed = await gzip(JSON.stringify(next));
+    const gid = `g-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const at = Date.now();
+    const reason = String(body.reason ?? 'Spieldaten übernommen').slice(0, 200);
+    for (let k = 0; k * PART < packed.length || k === 0; k++)
+      await db.prepare('INSERT INTO study_game (id, part, at, reason, data) VALUES (?1, ?2, ?3, ?4, ?5)').bind(gid, k, at, reason, packed.slice(k * PART, (k + 1) * PART)).run();
+    return json(200, { stand: { id: gid, at, reason, data: next } });
   }
   return json(405, { error: 'method not allowed' });
 }
@@ -122,6 +208,7 @@ export async function handleStudy(request: Request, env: StudyEnv): Promise<Resp
 
   if (request.method === 'GET' && parts.length === 0) return json(200, await allDocs(db));
   if (parts[0] === 'versions') return versions(request, db, parts[1]);
+  if (parts[0] === 'game') return game(request, env, db, parts[1]);
 
   if (request.method === 'POST' && parts[0] === 'batch') {
     const body = (await request.json().catch(() => null)) as { put?: { coll: string; id: string; data: unknown }[]; del?: { coll: string; id: string }[] } | null;

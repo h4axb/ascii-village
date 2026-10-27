@@ -35,6 +35,10 @@ export interface TallyDoc {
   rows: string[][];
   mapping: ColumnRole[];
   parts?: (number | null)[]; // the first column of Teil 1–4 (the roles inside follow it)
+  // the submit times as moments (UTC ms) and the zone the file was read in, as
+  // of the import (the cells stay as exported; the dashboard reads them anew)
+  times?: (number | null)[];
+  timeZone?: 'UTC' | 'Europe/Berlin';
 }
 
 // ---- participants: corrections that apply everywhere ----

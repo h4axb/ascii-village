@@ -5,6 +5,10 @@
 import type { PersonDoc } from '../types';
 import { personIdOf, type Person } from '../model';
 import { fmtDate, fmtMin, LazyInput, logChange, Section, useCtx } from '../ui';
+import { useState } from 'react';
+import { planPairing } from '../tallyPlan';
+import type { Change } from '../changes';
+import { applyChanges, ChangeModal } from '../ChangeModal';
 
 export const VIA: Record<string, string> = { manuell: 'manuell', id: 'nach ID', zeit: 'nach Zeit', reihenfolge: 'nach Reihenfolge' };
 const CHANGE_NAME: Record<string, string> = { minutes: 'Dauer manuell (min)', excluded: 'ausgeschlossen', reason: 'Grund', swapP1: 'Teil 1 vertauscht', runtime: 'Dauer aus', mainLink: 'Hauptlink', tallyRow: 'Tally-Zeile', group: 'Testgruppe', age: 'Alter' };
@@ -18,9 +22,39 @@ export default function People() {
     logChange(study, `${p.id}: ${Object.entries(patch).map(([k, v]) => `${CHANGE_NAME[k] ?? k} → ${v === undefined ? 'automatisch' : v === null ? 'keine' : v === true ? 'ja' : v === false ? 'nein' : String(v)}`).join(', ')}`);
   };
   const owner = new Map(model.persons.filter((p) => p.tallyRow != null).map((p) => [p.tallyRow!, p.id]));
+  // a row chosen by hand can free or move answers of others: then each of them is asked first
+  const [ask, setAsk] = useState<{ changes: Change[]; reason: string } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const setRow = (p: Person, tallyRow: number | null | undefined) => {
+    const name = tallyRow === undefined ? 'automatisch' : tallyRow === null ? 'keine' : `Zeile ${tallyRow + 1}`;
+    const changes = planPairing(study.latest(), study.game, {
+      label: `${p.id}: Tally-Zeile ${name}`,
+      fields: [['Tally-Zeile', name]],
+      patch: (w) => void (w.people[p.id] = { ...(w.people[p.id] ?? { id: p.id }), id: p.id, tallyRow }),
+      skip: [p.id],
+    });
+    if (changes.length > 1) setAsk({ changes, reason: `${p.id}: Tally-Zeile → ${name}` });
+    else set(p, { tallyRow });
+  };
 
   return (
     <>
+      {ask && (
+        <ChangeModal
+          title={ask.changes[0].label}
+          changes={ask.changes}
+          names={['Aktuell', 'Danach']}
+          intro="Diese Wahl ändert auch die Antworten anderer Teilnehmender. Für jede Person entscheiden: „Aktuell behalten“ hält ihre bisherige Zeile fest. Der jetzige Stand wird vorher gesichert."
+          busy={busy}
+          onCancel={() => setAsk(null)}
+          onApply={(choices) => {
+            setBusy('Wird gesichert und übernommen …');
+            void applyChanges(study, ask.changes, choices, ask.reason)
+              .then(() => setAsk(null))
+              .finally(() => setBusy(null));
+          }}
+        />
+      )}
       <Section title="Teilnehmende & Sessions">
         <div className="st-people">
           {model.persons.map((p) => (
@@ -70,7 +104,7 @@ export default function People() {
                   Tally-Zeile
                   <select
                     value={p.doc.tallyRow === undefined ? 'auto' : p.doc.tallyRow === null ? 'none' : String(p.doc.tallyRow)}
-                    onChange={(e) => set(p, { tallyRow: e.target.value === 'auto' ? undefined : e.target.value === 'none' ? null : Number(e.target.value) })}
+                    onChange={(e) => setRow(p, e.target.value === 'auto' ? undefined : e.target.value === 'none' ? null : Number(e.target.value))}
                   >
                     <option value="auto">automatisch{p.doc.tallyRow === undefined && p.tallyRow != null ? ` (Zeile ${p.tallyRow + 1} · ${VIA[p.tallyVia ?? 'id']})` : ''}</option>
                     <option value="none">keine</option>

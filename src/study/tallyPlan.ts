@@ -4,7 +4,7 @@
 // id, else submit time and test id), so manual pairings follow them into the
 // new file. Keeping the current answers puts the old row into the new file.
 import { buildModel, type Model } from './model';
-import { fmtBerlin, timeOf } from './match';
+import { fmtBerlin, ZONE_LABEL, type TallyZone } from './match';
 import type { Change } from './changes';
 import type { GameData, PersonDoc, StudyDocs, TallyDoc } from './types';
 
@@ -24,10 +24,10 @@ function answers(t: TallyDoc, row: number | null | undefined): [string, string][
   return t.headers.map((h, j) => [h, (t.rows[row][j] ?? '').trim()] as [string, string]).filter((_, j) => (t.mapping[j]?.role ?? 'ignore') !== 'ignore');
 }
 
-function submitted(t: TallyDoc, row: number | null | undefined): string {
-  const time = t.mapping.findIndex((m) => m.role === 'time');
-  const v = row != null && time >= 0 ? timeOf(t.rows[row]?.[time] ?? '') : null;
-  return v ? fmtBerlin(v) : '–';
+// a row's submit time in German time (read in the zone the model found for that file)
+function submittedIn(m: Model | null, row: number | null | undefined): string {
+  const v = m && row != null ? m.submitted[row] : null;
+  return v != null ? fmtBerlin(v) : '–';
 }
 
 export function planTally(docs: StudyDocs, game: GameData, next: TallyDoc): Change[] {
@@ -57,7 +57,7 @@ export function planTally(docs: StudyDocs, game: GameData, next: TallyDoc): Chan
     choice: 'neu',
     apply: (c, w) => {
       if (c !== 'neu') return;
-      w.tally.main = { ...next, rows: next.rows.map((r) => [...r]) };
+      w.tally.main = { ...next, rows: next.rows.map((r) => [...r]), times: mNew.submitted, timeZone: mNew.tallyZone.zone };
       for (const [id, p] of Object.entries(people)) w.people[id] = p;
     },
   });
@@ -67,9 +67,9 @@ export function planTally(docs: StudyDocs, game: GameData, next: TallyDoc): Chan
     const oRow = mOld?.persons.find((x) => x.id === p.id)?.tallyRow ?? null;
     const a = old ? answers(old, oRow) : [];
     const b = answers(next, nRow);
-    const head = (t: TallyDoc | undefined, row: number | null, via: string | null | undefined): [string, string][] => (t && row != null ? [['Abgegeben', submitted(t, row)], ['Zuordnung', VIA[via ?? ''] ?? '–']] : []);
-    const curFields = [...head(old, oRow, mOld?.persons.find((x) => x.id === p.id)?.tallyVia), ...a];
-    const newFields = [...head(next, nRow, p.tallyVia), ...b];
+    const head = (m: Model | null, row: number | null, via: string | null | undefined): [string, string][] => (m && row != null ? [['Abgegeben (dt. Zeit)', submittedIn(m, row)], ['Zuordnung', VIA[via ?? ''] ?? '–']] : []);
+    const curFields = [...head(mOld, oRow, mOld?.persons.find((x) => x.id === p.id)?.tallyVia), ...a];
+    const newFields = [...head(mNew, nRow, p.tallyVia), ...b];
     const same = a.length === b.length && a.every(([h, v], k) => b[k]?.[0] === h && b[k]?.[1] === v);
     if (!old || oRow == null) {
       if (nRow != null) out.push({ id: `tally:${p.id}`, kind: 'neu', group: p.id, label: `Umfrage-Antworten zugeordnet (${VIA[p.tallyVia ?? ''] ?? ''})`, incoming: { fields: newFields }, choice: 'neu', apply: () => undefined });
@@ -112,7 +112,7 @@ export function planTally(docs: StudyDocs, game: GameData, next: TallyDoc): Chan
         kind: 'konflikt',
         group: owner?.id ?? 'Umfrage',
         label: 'Antwort fehlt in der neuen Datei',
-        current: { fields: [['Abgegeben', submitted(old, i)], ...answers(old, i)] },
+        current: { fields: [['Abgegeben (dt. Zeit)', submittedIn(mOld, i)], ...answers(old, i)] },
         choice: 'alt',
         apply: (c, w) => {
           if (c !== 'alt' || !isNew(w)) return;
@@ -127,6 +127,89 @@ export function planTally(docs: StudyDocs, game: GameData, next: TallyDoc): Chan
   // answers nobody is paired with
   for (const row of mNew.unmatchedRows)
     if (!old || !oldKeys.includes(newKeys[row]))
-      out.push({ id: `tally-free:${row}`, kind: 'neu', group: 'Umfrage', label: 'Antwort ohne Zuordnung (unter „Daten & Validierung“ zuordnen)', incoming: { fields: [['Abgegeben', submitted(next, row)], ...answers(next, row)] }, choice: 'neu', apply: () => undefined });
+      out.push({ id: `tally-free:${row}`, kind: 'neu', group: 'Umfrage', label: 'Antwort ohne Zuordnung (unter „Daten & Validierung“ zuordnen)', incoming: { fields: [['Abgegeben (dt. Zeit)', submittedIn(mNew, row)], ...answers(next, row)] }, choice: 'neu', apply: () => undefined });
+  return out;
+}
+
+// "Neu zuordnen": every participant's survey row as the rules alone give it
+// (times read in the file's zone and compared in UTC; rows without a test id
+// by German submit time, the earliest to P001), against the current one.
+// Taking the new one clears a manual pairing; keeping pins the current row.
+export function planRematch(docs: StudyDocs, game: GameData, zone: TallyZone): Change[] {
+  return planPairing(docs, game, {
+    label: 'Zuordnungsregel speichern',
+    fields: [
+      ['Zeitzone der Datei', ZONE_LABEL[zone]],
+      ['Reihenfolge', 'P-ID; Antworten ohne Test-ID nach Abgabezeit (deutsche Zeit), früheste zuerst'],
+    ],
+    patch: (w) => {
+      w.settings.matchOrder = { by: 'pid' };
+      w.settings.tallyZone = { zone };
+    },
+    rematch: true,
+  });
+}
+
+// any change that moves survey answers between participants (a rule, the time
+// zone, a row ignored, a row chosen by hand): the change itself, and for each
+// participant whose answers would change a conflict to decide; keeping pins
+// their current row. (rematch: manual pairings are left out of the new
+// pairing, and taking it clears them.)
+export function planPairing(
+  docs: StudyDocs,
+  game: GameData,
+  o: { label: string; fields: [string, string][]; patch: (w: StudyDocs) => void; rematch?: boolean; skip?: string[] },
+): Change[] {
+  const t = docs.tally.main;
+  const w0: StudyDocs = { ...docs, settings: { ...docs.settings }, people: { ...docs.people } };
+  o.patch(w0);
+  const cur = buildModel(docs, game);
+  const next = buildModel(w0, game, { ignoreManual: o.rematch });
+  const timeCol = t ? t.mapping.findIndex((m) => m.role === 'time') : -1;
+  const side = (m: Model, row: number | null, via: string | null | undefined): [string, string][] => {
+    if (row == null || !t) return [['Zeile', 'keine Antworten zugeordnet']];
+    const at = m.submitted[row];
+    const sample = answers(t, row)
+      .filter(([h]) => t.headers.indexOf(h) !== timeCol)
+      .slice(0, 3);
+    return [['Zeile', String(row + 1)], ['Abgabe (dt. Zeit)', at != null ? fmtBerlin(at) : '–'], ['In der Datei', timeCol >= 0 ? (t.rows[row]?.[timeCol] ?? '') : '–'], ['Zuordnung', VIA[via ?? ''] ?? '–'], ...sample];
+  };
+  const out: Change[] = [
+    {
+      id: 'pairing-rule',
+      kind: 'neu',
+      group: 'Änderung',
+      label: o.label,
+      incoming: { fields: o.fields },
+      choice: 'neu',
+      apply: (c, w) => {
+        if (c === 'neu') o.patch(w);
+      },
+    },
+  ];
+  for (const p of next.included) {
+    if (o.skip?.includes(p.id)) continue;
+    const before = cur.persons.find((x) => x.id === p.id);
+    const oRow = before?.tallyRow ?? null;
+    const nRow = p.tallyRow;
+    if (oRow === nRow) continue;
+    out.push({
+      id: `pairing:${p.id}`,
+      kind: 'konflikt',
+      group: p.id,
+      label: nRow == null ? 'Danach keine Antworten mehr zugeordnet' : oRow == null ? 'Bekommt Antworten zugeordnet' : `Andere Antworten: Zeile ${oRow + 1} → ${nRow + 1}`,
+      current: { fields: side(cur, oRow, before?.tallyVia) },
+      incoming: { fields: side(next, nRow, p.tallyVia) },
+      choice: 'neu',
+      apply: (c, w) => {
+        const doc = { ...(w.people[p.id] ?? { id: p.id }) };
+        if (c === 'neu') {
+          if (!o.rematch) return;
+          delete doc.tallyRow;
+        } else doc.tallyRow = oRow; // (kept: pinned, so the change leaves it)
+        w.people[p.id] = doc;
+      },
+    });
+  }
   return out;
 }

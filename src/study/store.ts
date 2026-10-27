@@ -20,6 +20,13 @@ export interface Del {
   coll: Coll;
   id: string;
 }
+export interface GameStand {
+  id: string;
+  at: number;
+  reason: string;
+  data: GameData;
+}
+export type GameIds = Partial<Record<keyof GameData, string[]>>;
 export interface Version {
   id: string;
   at: number;
@@ -38,6 +45,10 @@ export function useStudy() {
   const [saving, setSaving] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [viewing, setViewing] = useState<Version | null>(null);
+  // the game data the dashboard works with: an accepted stand; the live data
+  // beside it only to show what is new or changed (taken over on "accept")
+  const [live, setLive] = useState<GameData | null>(null);
+  const [stand, setStand] = useState<GameStand | null>(null);
   const docsRef = useRef(docs);
   const passRef = useRef(pass);
   passRef.current = pass;
@@ -64,21 +75,31 @@ export function useStudy() {
       }
       sessionStorage.setItem(PASS_KEY, p);
       setPass(p);
-      const get = (path: string) =>
-        fetch(path, { headers: auth(p) })
-          .then((r) => (r.ok ? r.json() : []))
-          .catch(() => []);
-      const [feedback, events, invites] = await Promise.all([get('/api/feedback'), get('/api/events'), get('/api/admin/invites')]);
-      const d = { ...empty(), ...(body as StudyDocs) };
+      const { _game: gameId, ...saved } = body as StudyDocs & { _game?: string | null };
+      const d = { ...empty(), ...(saved as StudyDocs) };
       if (VIEW_ID) {
-        // (a saved state: shown as it was, no migrations, nothing stored)
+        // (a saved state: shown as it was, with the game data accepted then; no migrations, nothing stored)
         const list = (await fetch('/api/study/versions', { headers: auth(p) }).then((r) => (r.ok ? r.json() : [])).catch(() => [])) as Version[];
         setViewing(list.find((v) => v.id === VIEW_ID) ?? { id: VIEW_ID, at: 0, reason: '', size: 0 });
+        const g = gameId ? ((await fetch(`/api/study/game/${encodeURIComponent(gameId)}`, { headers: auth(p) }).then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { stand?: GameStand | null } | null) : null;
         docsRef.current = d;
         setDocs(d);
-        setGame({ feedback: Array.isArray(feedback) ? feedback : [], events: Array.isArray(events) ? events : [], invites: Array.isArray(invites) ? invites : [] });
+        setStand(g?.stand ?? null);
+        setGame(g?.stand?.data ?? { feedback: [], events: [], invites: [] });
         setState('ready');
         return;
+      }
+      const gres = (await fetch('/api/study/game', { headers: auth(p) }).then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { stand: GameStand | null; live: GameData } | null;
+      const liveData = gres?.live ?? { feedback: [], events: [], invites: [] };
+      let gameStand = gres?.stand ?? null;
+      // the very first visit: the live data becomes the first stand (nothing is replaced)
+      if (gres && !gameStand) {
+        const r = await fetch('/api/study/game', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...auth(p) },
+          body: JSON.stringify({ reason: 'erster Stand der Spieldaten', accept: { invites: liveData.invites.map((i) => i.key), events: liveData.events.map((e) => e.id), feedback: liveData.feedback.map((f) => f.id) } }),
+        });
+        gameStand = ((await r.json().catch(() => null)) as { stand?: GameStand } | null)?.stand ?? null;
       }
       // the first visit stores the default tag sets
       if (!Object.keys(d.tags).length) {
@@ -138,7 +159,9 @@ export function useStudy() {
         });
       }
       setDocs(d);
-      setGame({ feedback: Array.isArray(feedback) ? feedback : [], events: Array.isArray(events) ? events : [], invites: Array.isArray(invites) ? invites : [] });
+      setLive(liveData);
+      setStand(gameStand);
+      setGame(gameStand?.data ?? liveData);
       setState('ready');
     } catch (e) {
       setState('error');
@@ -234,8 +257,24 @@ export function useStudy() {
     return { ...empty(), ...((await res.json()) as StudyDocs) };
   }, []);
 
+  // take over chosen records of the live game data (ids per kind); the rest stays as accepted
+  const acceptGame = useCallback(async (accept: GameIds, drop: GameIds, reason: string) => {
+    if (VIEW_ID) throw new Error('nur ansehen');
+    const res = await fetch('/api/study/game', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify({ accept, drop, reason }) });
+    const d = (await res.json().catch(() => null)) as { stand?: GameStand; error?: string } | null;
+    if (!res.ok || !d?.stand) throw new Error(d?.error ?? String(res.status));
+    setStand(d.stand);
+    setGame(d.stand.data);
+  }, []);
+  // (a fresh look at the live game data, for the check of what is new)
+  const refreshLive = useCallback(async () => {
+    const g = (await fetch('/api/study/game', { headers: auth() }).then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { live?: GameData } | null;
+    if (g?.live) setLive(g.live);
+    return g?.live ?? null;
+  }, []);
+
   // (the newest documents, for changes that build on the one just made)
   const latest = useCallback(() => docsRef.current, []);
-  return { state, error, docs, game, saving, saveError, load, commit, suggest, translate, pass, latest, viewing, versions, saveVersion, loadVersion };
+  return { state, error, docs, game, live, stand, acceptGame, refreshLive, saving, saveError, load, commit, suggest, translate, pass, latest, viewing, versions, saveVersion, loadVersion };
 }
 export type Study = ReturnType<typeof useStudy>;

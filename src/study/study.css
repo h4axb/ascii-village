@@ -1304,6 +1304,10 @@ body:has(.st-root) {
   padding: 8px 10px;
   margin-bottom: 8px;
 }
+.st-change.is-open {
+  border-color: var(--st-warn);
+  box-shadow: inset 3px 0 0 var(--st-warn);
+}
 .st-change-head {
   display: flex;
   flex-wrap: wrap;
@@ -1487,4 +1491,29 @@ body:has(.st-root) {
     right: auto;
     max-width: calc(100vw - 32px);
   }
+}
+/* (a long label wraps instead of widening the page on a phone) */
+.st-toolbar button,
+.st-toolbar .st-scope {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
+/* new game data waiting to be checked */
+.st-gamebar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  border: 1px solid #b9cde8;
+  background: #eef4fb;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.st-gamebar > span {
+  flex: 1;
+  min-width: 0;
 }

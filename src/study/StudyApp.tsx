@@ -14,6 +14,7 @@ import Codes from './pages/Codes';
 import People from './pages/People';
 import Data from './pages/Data';
 import Results from './pages/Results';
+import { GameReview } from './GameReview';
 import './study.css';
 
 interface Page {
@@ -316,6 +317,7 @@ export default function StudyApp() {
             <ScopePicker model={model} scope={scope} omitted={omitted} onScope={setScope} onOmit={setOmit} />
             </div>
           </div>
+          <GameReview />
           {body}
         </main>
       </div>

@@ -6,7 +6,7 @@ import { designOf, type FeedbackRecord } from '../feedback/schema';
 import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
 import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
-import { matchRows, timeOf, type MatchVia } from './match';
+import { detectZone, matchRows, parseTallyTime, type MatchVia, type TallyZone, type ZoneGuess } from './match';
 import { optionChosen, partOf } from './tally';
 
 // ---- the scope filter: everyone, one person, or one of their links ----
@@ -76,6 +76,10 @@ export interface Model {
   survey: SurveyRow[]; // rows of included persons (and unmatched rows)
   unmatchedRows: number[];
   ignoredRows: Set<number>;
+  // the survey's submit times: the zone they are read in (set, or found from
+  // the rows with a test id), and each row's moment (UTC ms)
+  tallyZone: ZoneGuess & { setting: TallyZone | 'auto' };
+  submitted: (number | null)[];
   orderPos: Map<string, number>; // each participant's place in the order used for pairing
   mapping: ColumnRole[];
   parts: (number | null)[] | undefined; // where Teil 1–4 start (Daten & Validierung)
@@ -117,7 +121,9 @@ export function personIdOf(v: string): string | null {
 
 const asOrder = (v: unknown): 'AB' | 'BA' | null => (v === 'AB' || v === 'BA' ? v : null);
 
-export function buildModel(docs: StudyDocs, game: GameData): Model {
+export const tallyZoneSetting = (docs: StudyDocs) => ((docs.settings.tallyZone as { zone?: TallyZone | 'auto' } | undefined)?.zone ?? 'auto') as TallyZone | 'auto';
+// (ignoreManual: the pairing the rules alone give, for "Neu zuordnen")
+export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual?: boolean } = {}): Model {
   // (the user-testing links only: /intro/1 and /intro/2)
   const invites = game.invites.filter((i) => i.participant_id && P_ID.test(i.participant_id) && /^\/intro\/[12]$/.test(i.link));
   const labels = linkLabels(invites);
@@ -248,9 +254,19 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
         ? [...persons].sort((a, b) => (a.date ?? Infinity) - (b.date ?? Infinity) || a.id.localeCompare(b.id, undefined, { numeric: true })).map((p) => p.id)
         : [...notesOrder, ...byPid.filter((id) => !notesOrder.includes(id))];
   const byId = new Map(persons.map((p) => [p.id, p]));
+  // the submit times, read in the file's zone, then compared in UTC with the game's tracking
+  const setting = tallyZoneSetting(docs);
+  const raw = (row: number) => (timeCol >= 0 ? (tally?.rows[row]?.[timeCol] ?? '') : '');
+  const guess = detectZone(
+    (tally?.rows ?? [])
+      .map((_, row) => ({ raw: raw(row), surveyAt: tallyIds[row] ? (byId.get(tallyIds[row]!)?.surveyAt ?? null) : null }))
+      .filter((x): x is { raw: string; surveyAt: number } => !!x.raw && x.surveyAt != null),
+  );
+  const tallyZone = { ...guess, zone: setting === 'auto' ? guess.zone : setting, setting };
+  const submitted = (tally?.rows ?? []).map((_, row) => parseTallyTime(raw(row), tallyZone.zone));
   const matched = matchRows(
-    (tally?.rows ?? []).map((r, row) => ({ row, id: tallyIds[row], submitted: timeCol >= 0 ? timeOf(r[timeCol] ?? '') : null })).filter((r) => !ignoredRows.has(r.row)),
-    ordered.map((id) => ({ id, manual: byId.get(id)!.doc.tallyRow, surveyAt: byId.get(id)!.surveyAt })),
+    (tally?.rows ?? []).map((_, row) => ({ row, id: tallyIds[row], submitted: submitted[row] })).filter((r) => !ignoredRows.has(r.row)),
+    ordered.map((id) => ({ id, manual: opts.ignoreManual ? undefined : byId.get(id)!.doc.tallyRow, surveyAt: byId.get(id)!.surveyAt })),
     // (the time step is off unless chosen: the tracked survey time of a person
     // with several links, or a time zone, can pair the wrong row)
     !!(docs.settings.matchTime as { on?: boolean } | undefined)?.on,
@@ -337,6 +353,8 @@ export function buildModel(docs: StudyDocs, game: GameData): Model {
     links: included.flatMap((p) => p.links),
     survey,
     unmatchedRows,
+    tallyZone,
+    submitted,
     ignoredRows,
     orderPos,
     mapping,

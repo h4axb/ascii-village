@@ -251,6 +251,8 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect }: { ite
   const view = useContentView();
   const [editDe, setEditDe] = useState(false);
   const [editQ, setEditQ] = useState(false);
+  // (a question shared by several statements is changed for all of them, unless "nur diese Aussage")
+  const [qOnlyThis, setQOnlyThis] = useState(false);
   // a statement just added: open for typing and scrolled into view
   const [editOrig, setEditOrig] = useState(!!fresh);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -285,11 +287,12 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect }: { ite
     parts.slice(1).forEach((t, i) => save({ ...item, id: `${item.id}-${Date.now().toString(36)}${i}`, original: t, text: t, de: undefined, deAuto: undefined, order: item.order + (i + 1) / 100, chips: [...item.chips], suggested: [], manual: true }));
   };
   // the follow-up question: changed on every answer of that person under the same question
+  const sharing = () => Object.values(study.latest().items).filter((i) => i.person === item.person && i.section === item.section && i.question === item.question);
   const saveQuestion = (draft: string) => {
     const q = draft.trim().replace(/\s*\n\s*/g, ' ') || undefined;
     if (q === item.question) return;
     logChange(study, `${item.person}: Frage geändert „${item.question ?? ''}“ → „${q ?? ''}“`);
-    const same = item.question ? Object.values(study.latest().items).filter((i) => i.person === item.person && i.section === item.section && i.question === item.question) : [item];
+    const same = item.question && !qOnlyThis ? sharing() : [item];
     for (const i of same) save({ ...i, question: q, questionOwn: true });
   };
   const saveDe = (de: string) => save({ ...item, de: de.trim() || undefined, deAuto: false, deStale: false });
@@ -344,7 +347,18 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect }: { ite
           {item.status === 'new' && <span className="st-flag">neu</span>}
         </div>
         {editQ ? (
-          <LazyArea value={item.question ?? ''} onSave={saveQuestion} autoFocus onDone={() => setEditQ(false)} placeholder="Frage im Nachgespräch …" />
+          <div className="st-item-qedit">
+            <LazyArea value={item.question ?? ''} onSave={saveQuestion} autoFocus onDone={() => setEditQ(false)} placeholder="Frage zu dieser Aussage …" />
+            <div className="st-muted">
+              Leer lassen = keine Frage · Esc: fertig
+              {item.question && sharing().length > 1 && (
+                <label className="st-check">
+                  <input type="checkbox" checked={qOnlyThis} onMouseDown={(e) => e.preventDefault()} onChange={(e) => setQOnlyThis(e.target.checked)} />
+                  nur diese Aussage (sonst alle {sharing().length} mit dieser Frage)
+                </label>
+              )}
+            </div>
+          </div>
         ) : (
           item.question && (
             <div className="st-item-q" data-notr onClick={() => setEditQ(true)} title="Klicken: Frage bearbeiten">
@@ -421,11 +435,9 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect }: { ite
         <button type="button" onClick={() => setEditOrig(true)} title="Original korrigieren: wird mit altem und neuem Wortlaut protokolliert; neue Zeile teilt die Aussage">
           Original korrigieren
         </button>
-        {(item.section === 'followup' || item.question) && (
-          <button type="button" onClick={() => setEditQ(true)} title="Frage im Nachgespräch bearbeiten (gilt für alle Antworten darunter)">
-            Frage bearbeiten
-          </button>
-        )}
+        <button type="button" onClick={() => (setQOnlyThis(false), setEditQ(true))} title={item.question ? 'Frage bearbeiten (gilt für alle Aussagen mit dieser Frage, wahlweise nur diese)' : 'Dieser Aussage eine Frage zuordnen'}>
+          {item.question ? 'Frage bearbeiten' : 'Frage hinzufügen'}
+        </button>
         <button type="button" onClick={() => confirm('Aussage löschen?') && remove(item)} title="Löschen">
           Löschen
         </button>

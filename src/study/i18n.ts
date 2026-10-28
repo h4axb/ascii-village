@@ -410,6 +410,11 @@ const EN: Record<string, string> = {
   'Aktive Spieldauer (M ± SD)': 'Active playtime (M ± SD)',
   'Saubere Durchlaufzeit (M ± SD)': 'Clean completion time (M ± SD)',
   'Mit Neustart': 'With restart',
+  'Frage hinzufügen': 'Add question',
+  'Frage zu dieser Aussage …': 'Question for this statement …',
+  'Leer lassen = keine Frage · Esc: fertig': 'Leave empty = no question · Esc: done',
+  'Dieser Aussage eine Frage zuordnen': 'Give this statement a question',
+  'Frage bearbeiten (gilt für alle Aussagen mit dieser Frage, wahlweise nur diese)': 'Edit question (applies to all statements with this question, or only this one)',
   'Teil 1: direkter Vergleich': 'Part 1: direct comparison',
   'kein Unterschied': 'no difference',
   'zurück zur Tally-Antwort': 'back to the Tally answer',
@@ -856,6 +861,7 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^nur diese Aussage \(sonst alle (\d+) mit dieser Frage\)$/, 'only this statement (otherwise all $1 with this question)'],
   [/^aus Tally: (.+?) \((\d)\. Durchlauf\)$/, 'from Tally: $1 (run $2)'],
   [/^aus Tally: (.+)$/, 'from Tally: $1'],
   [/^Tally: (.+?) \((\d)\. Durchlauf\)$/, 'Tally: $1 (run $2)'],

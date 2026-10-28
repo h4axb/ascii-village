@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import type { Version } from '../store';
 import { resolve, restoreChanges, type Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
-import { csv, DurationSelect, fmtMin, logChange, Section, useAiName, useCtx, type LogEntry } from '../ui';
+import { csv, DurationSelect, fmtMin, logChange, Section, useCtx, type LogEntry } from '../ui';
 import Import from './Import';
 import Translations from './Translations';
 import { VIA } from './People';
@@ -275,7 +275,6 @@ export default function Data({ sub = '' }: { sub?: string }) {
 // the three sources at a glance, each with its one button (the file pickers of the detailed imports below)
 function Uploads({ failed }: { failed: number }) {
   const { study, model } = useCtx();
-  const ai = useAiName();
   const tally = study.docs.tally.main;
   const notes = study.docs.notes.main;
   const when = (t: number) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -318,14 +317,6 @@ function Uploads({ failed }: { failed: number }) {
             {study.stand ? ` · Stand vom ${when(study.stand.at)}` : ''}
           </p>
           <p className="st-muted">Kommen automatisch aus dem Spiel. Neue Daten erscheinen oben auf jeder Seite zum Prüfen.</p>
-        </div>
-        <div className="st-upload">
-          <h3>KI</h3>
-          <p>{ai ? ai.name : '…'}</p>
-          <p className="st-muted">
-            Für Tags, Umformulierungen, Befunde und Übersetzungen.
-            {ai && !ai.claude ? ' Auf Claude wechseln: im Cloudflare-Worker das Secret ANTHROPIC_API_KEY setzen.' : ''}
-          </p>
         </div>
       </div>
     </Section>

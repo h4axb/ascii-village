@@ -233,13 +233,6 @@ export function useStudy() {
     return d?.groups ?? [];
   }, []);
 
-  // which AI answers the dashboard's AI functions (name only)
-  const aiInfo = useCallback(async () => {
-    const res = await fetch('/api/study/ai', { headers: auth() }).catch(() => null);
-    const d = res?.ok ? ((await res.json().catch(() => null)) as { name?: string; claude?: boolean } | null) : null;
-    return { name: d?.name ?? 'unbekannt', claude: !!d?.claude };
-  }, []);
-
   // AI: statements reworded by the criteria set (proposals)
   const rewrite = useCallback(async (body: { items: { id: string; text: string; question?: string; hint?: string; previous?: string }[]; criteria: string }) => {
     const res = await fetch('/api/study/rewrite', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify(body) });
@@ -298,6 +291,6 @@ export function useStudy() {
 
   // (the newest documents, for changes that build on the one just made)
   const latest = useCallback(() => docsRef.current, []);
-  return { state, error, docs, game, live, stand, acceptGame, refreshLive, saving, saveError, load, commit, suggest, cluster, rewrite, aiInfo, translate, pass, latest, viewing, versions, saveVersion, loadVersion };
+  return { state, error, docs, game, live, stand, acceptGame, refreshLive, saving, saveError, load, commit, suggest, cluster, rewrite, translate, pass, latest, viewing, versions, saveVersion, loadVersion };
 }
 export type Study = ReturnType<typeof useStudy>;

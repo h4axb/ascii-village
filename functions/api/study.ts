@@ -7,7 +7,6 @@
 //   PUT    /api/study/<coll>/<id>     store (replace) one document
 //   DELETE /api/study/<coll>/<id>     remove one
 //   POST   /api/study/batch           several puts/deletes at once {put: [...], del: [...]}
-//   GET    /api/study/ai              which AI answers (name only, never a key)
 //   POST   /api/study/suggest         AI tag suggestions for statements (never stored:
 //                                    the dashboard shows them as suggestions to confirm)
 //   POST   /api/study/cluster         AI: similar statements of several participants as
@@ -24,7 +23,6 @@
 //   POST   /api/study/game            take over records of the live game data
 //                                    {accept: {invites, events, feedback}, drop: {…}, reason}
 //                                    (nothing of the game's own changes is used unasked)
-import Anthropic from '@anthropic-ai/sdk';
 import { dbOf, handleAdmin, isAdmin, json, type D1Database, type SessionEnv } from './session';
 import { handleEvents } from './events';
 import { handleFeedback, type FeedbackEnv } from './feedback';
@@ -33,7 +31,6 @@ export const STUDY_COLLS = ['tally', 'notes', 'items', 'findings', 'tags', 'peop
 type Coll = (typeof STUDY_COLLS)[number];
 
 interface StudyEnv extends SessionEnv {
-  ANTHROPIC_API_KEY?: string; // Claude (Anthropic): used for every AI function when set
   'asciia-bay-crafting'?: string;
   LLM_API_KEY?: string;
   LLM_BASE_URL?: string;
@@ -226,7 +223,6 @@ export async function handleStudy(request: Request, env: StudyEnv): Promise<Resp
     return json(200, { ok: true });
   }
 
-  if (request.method === 'GET' && parts[0] === 'ai') return json(200, { name: AI_NAME(env), claude: aiOf(env)?.kind === 'claude' });
   if (request.method === 'POST' && parts[0] === 'suggest') return suggest(request, env);
   if (request.method === 'POST' && parts[0] === 'translate') return translate(request, env);
   if (request.method === 'POST' && parts[0] === 'cluster') return cluster(request, env);
@@ -299,33 +295,15 @@ function readJson(text: string, list?: string): unknown {
   return out.length ? { [list]: out } : null;
 }
 
-// which AI answers: Claude when its key is set, else the older provider (Requesty)
-type Ai = { kind: 'claude'; key: string } | { kind: 'requesty'; key: string };
-const CLAUDE_MODEL = 'claude-opus-5-5';
-function aiOf(env: StudyEnv): Ai | null {
-  if (env.ANTHROPIC_API_KEY) return { kind: 'claude', key: env.ANTHROPIC_API_KEY };
-  const key = env['asciia-bay-crafting'] ?? env.LLM_API_KEY;
-  return key ? { kind: 'requesty', key } : null;
-}
-const AI_NAME = (env: StudyEnv) => {
-  const ai = aiOf(env);
-  return ai?.kind === 'claude' ? 'Claude Opus 5.5 (Anthropic)' : ai ? 'Gemini 2.5 Flash-Lite (Requesty)' : env.STUDY_FAKE_AI === '1' ? 'Testmodus (keine echte KI)' : 'keine KI eingerichtet';
-};
-
-interface ChatOpts {
-  schema: Record<string, unknown>; // the answer's shape (Claude keeps to it exactly)
-  effort: 'low' | 'medium';
-}
-async function chat(env: StudyEnv, ai: Ai, system: string, user: string, list: string, opts: ChatOpts): Promise<{ ok: true; value: unknown } | { ok: false; res: Response }> {
-  if (ai.kind === 'claude') return chatClaude(ai.key, system, user, list, opts);
+async function chat(env: StudyEnv, key: string, system: string, user: string, list?: string, maxTokens = 8000): Promise<{ ok: true; value: unknown } | { ok: false; res: Response }> {
   const base = (env.LLM_BASE_URL || 'https://router.requesty.ai/v1').replace(/\/$/, '');
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ai.key}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
       model: 'google/gemini-2.5-flash-lite',
       temperature: 0,
-      max_tokens: 8000,
+      max_tokens: maxTokens,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: system },
@@ -341,46 +319,6 @@ async function chat(env: StudyEnv, ai: Ai, system: string, user: string, list: s
   return { ok: true, value };
 }
 
-// Claude: the answer in the given JSON shape (structured outputs); a declined
-// request goes to Anthropic's recommended fallback model on the server
-async function chatClaude(key: string, system: string, user: string, list: string, opts: ChatOpts): Promise<{ ok: true; value: unknown } | { ok: false; res: Response }> {
-  const client = new Anthropic({ apiKey: key });
-  try {
-    const msg = await client.beta.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 16000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      system,
-      messages: [{ role: 'user', content: user }],
-      output_config: { effort: opts.effort, format: { type: 'json_schema', schema: opts.schema } },
-    });
-    if (msg.stop_reason === 'refusal') return { ok: false, res: json(502, { error: 'KI hat die Anfrage abgelehnt' }) };
-    const text = msg.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
-    // (cut off at the length limit: the complete entries, the rest is asked again)
-    const value = readJson(text, list);
-    if (value == null) return { ok: false, res: json(502, { error: `AI answer was not JSON${msg.stop_reason === 'max_tokens' ? ' (cut off: too long)' : ''}` }) };
-    return { ok: true, value };
-  } catch (e) {
-    if (e instanceof Anthropic.AuthenticationError) return { ok: false, res: json(502, { error: 'Claude-Schlüssel ungültig (ANTHROPIC_API_KEY prüfen)' }) };
-    if (e instanceof Anthropic.RateLimitError) return { ok: false, res: json(502, { error: 'Zu viele Anfragen an Claude – kurz warten und erneut versuchen' }) };
-    if (e instanceof Anthropic.APIError) return { ok: false, res: json(502, { error: `Claude nicht verfügbar (${e.status ?? 'Netzwerk'})` }) };
-    return { ok: false, res: json(502, { error: 'Claude nicht erreichbar' }) };
-  }
-}
-
-// the answer shapes (strict: every field named, nothing else)
-const obj = (properties: Record<string, unknown>) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
-const str = { type: 'string' };
-const strOrNull = { anyOf: [{ type: 'string' }, { type: 'null' }] };
-const listOf = (key: string, item: Record<string, unknown>) => obj({ [key]: { type: 'array', items: obj(item) } });
-const SCHEMA = {
-  texte: listOf('texte', { id: str, text: str }),
-  tags: listOf('aussagen', { id: str, chips: { type: 'array', items: str }, finding: strOrNull, newFinding: strOrNull }),
-  befunde: listOf('befunde', { name: str, description: str, ids: { type: 'array', items: str }, finding: strOrNull }),
-  rewrite: listOf('aussagen', { id: str, text: str }),
-};
-
 // ---- AI translations ----
 // Faithful, neutral translations of note statements and survey texts; text
 // already in the target language comes back as it is. Only drafts: the
@@ -390,8 +328,8 @@ async function translate(request: Request, env: StudyEnv): Promise<Response> {
   const texts = (body?.texts ?? []).filter((t) => t && typeof t.text === 'string').slice(0, 40);
   if (!texts.length) return json(400, { error: 'texts required' });
   const to = body?.to === 'en' ? 'en' : 'de';
-  const ai = aiOf(env);
-  if (!ai) {
+  const key = env['asciia-bay-crafting'] ?? env.LLM_API_KEY;
+  if (!key) {
     if (env.STUDY_FAKE_AI === '1') return json(200, { translations: texts.map((t) => ({ id: t.id, text: `[${to.toUpperCase()}] ${t.text}` })) });
     return json(503, { error: 'no AI key on the server' });
   }
@@ -402,7 +340,7 @@ async function translate(request: Request, env: StudyEnv): Promise<Response> {
     `Texte, die schon auf ${lang} sind, gib unverändert zurück; gemischte Texte vollständig auf ${lang}. ` +
     'Behalte Teilnehmer-IDs (P001), Eigennamen (Mitchy, Asciia Bay), Variante A/B und Zahlen unverändert.';
   const user = JSON.stringify({ texte: texts.map((t) => ({ id: t.id, text: t.text.slice(0, 2000) })), format: { texte: [{ id: 'string', text: 'string' }] } });
-  const r = await chat(env, ai, system, user, 'texte', { schema: SCHEMA.texte, effort: 'low' });
+  const r = await chat(env, key, system, user, 'texte');
   if (!r.ok) return r.res;
   const out = (r.value as { texte?: { id?: string; text?: string }[] }).texte ?? [];
   return json(200, { translations: out.filter((t) => t?.id && typeof t.text === 'string') });
@@ -413,8 +351,8 @@ async function translate(request: Request, env: StudyEnv): Promise<Response> {
 // answers, per statement, which existing chips fit (and which recurring
 // finding it repeats). Only suggestions: nothing counts until confirmed.
 async function suggest(request: Request, env: StudyEnv): Promise<Response> {
-  const ai = aiOf(env);
-  if (!ai && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
+  const key = env['asciia-bay-crafting'] ?? env.LLM_API_KEY;
+  if (!key && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
   const body = (await request.json().catch(() => null)) as {
     items?: { id: string; text: string; section?: string; question?: string }[];
     groups?: { id: string; name: string; multi?: boolean; chips: { id: string; label: string }[] }[];
@@ -423,7 +361,7 @@ async function suggest(request: Request, env: StudyEnv): Promise<Response> {
   if (!body?.items?.length || !body.groups) return json(400, { error: 'items and groups required' });
   const groups = body.groups;
   const items = body.items.slice(0, 40);
-  if (!ai)
+  if (!key)
     return json(200, { suggestions: items.map((i) => ({ id: i.id, chips: Object.fromEntries(groups.map((g) => [g.id, g.chips.slice(0, 1).map((c) => c.id)])), finding: null, newFinding: null })) });
   const system =
     'Du ordnest Rückmeldungen aus einem Usability-Test eines Spiels ein. Antworte nur mit einem JSON-Objekt, ohne Text davor oder danach. ' +
@@ -436,9 +374,9 @@ async function suggest(request: Request, env: StudyEnv): Promise<Response> {
       kategorien: groups.map((g) => ({ id: g.id, name: g.name, multi: !!g.multi, chips: g.chips })),
       befunde: body.findings ?? [],
       aussagen: part.map((i) => ({ id: i.id, text: i.text.slice(0, 1500), abschnitt: i.section, frage: i.question })),
-      format: { aussagen: [{ id: 'string', chips: ['<chip-id>'], finding: '<befund-id> | null', newFinding: 'string | null' }] },
+      format: { aussagen: [{ id: 'string', chips: { '<kategorie-id>': ['<chip-id>'] }, finding: '<befund-id> | null', newFinding: 'string | null' }] },
     });
-    const r = await chat(env, ai, system, user, 'aussagen', { schema: SCHEMA.tags, effort: 'low' });
+    const r = await chat(env, key, system, user, 'aussagen');
     const list = r.ok ? (r.value as { aussagen?: unknown }).aussagen : undefined;
     if (r.ok && Array.isArray(list)) {
       // (a cut-off answer: the statements it did not reach are asked again)
@@ -461,19 +399,7 @@ async function suggest(request: Request, env: StudyEnv): Promise<Response> {
   };
   const r = await ask(items);
   if (!r.ok) return r.res;
-  // (Claude answers the chips as one list: sorted into their groups as the dashboard reads them)
-  const groupOf = new Map(groups.flatMap((g) => g.chips.map((c) => [c.id, g.id] as const)));
-  const suggestions = r.list.map((x) => {
-    const a = x as { chips?: unknown };
-    if (!Array.isArray(a.chips)) return x;
-    const byGroup: Record<string, string[]> = {};
-    for (const c of a.chips) {
-      const g = typeof c === 'string' ? groupOf.get(c) : undefined;
-      if (g) (byGroup[g] ??= []).push(c as string);
-    }
-    return { ...a, chips: byGroup };
-  });
-  return json(200, { suggestions });
+  return json(200, { suggestions: r.list });
 }
 
 // ---- AI: recurring findings ----
@@ -484,8 +410,8 @@ async function suggest(request: Request, env: StudyEnv): Promise<Response> {
 type ClusterItem = { id: string; person: string; text: string; section?: string; question?: string };
 type ClusterGroup = { name?: string; description?: string; ids?: string[]; finding?: string | null };
 async function cluster(request: Request, env: StudyEnv): Promise<Response> {
-  const ai = aiOf(env);
-  if (!ai && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
+  const key = env['asciia-bay-crafting'] ?? env.LLM_API_KEY;
+  if (!key && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
   const body = (await request.json().catch(() => null)) as { items?: ClusterItem[]; findings?: { id: string; name: string; description?: string }[] } | null;
   const items = (body?.items ?? []).filter((i) => i && typeof i.text === 'string' && i.id && i.person).slice(0, 300);
   if (items.length < 2) return json(400, { error: 'at least two statements required' });
@@ -503,7 +429,7 @@ async function cluster(request: Request, env: StudyEnv): Promise<Response> {
     }
     return out;
   };
-  if (!ai) {
+  if (!key) {
     // (test mode without a key: statements sharing a longer word)
     const byWord = new Map<string, string[]>();
     for (const i of items) for (const w of new Set(i.text.toLowerCase().match(/[a-zäöüß]{6,}/g) ?? [])) byWord.set(w, [...(byWord.get(w) ?? []), i.id]);
@@ -523,7 +449,7 @@ async function cluster(request: Request, env: StudyEnv): Promise<Response> {
       aussagen: part.map((i) => ({ id: i.id, person: i.person, text: i.text.slice(0, 500), abschnitt: i.section, frage: i.question })),
       format: { befunde: [{ name: 'string', description: 'string', ids: ['<aussage-id>'], finding: '<befund-id> | null' }] },
     });
-    const r = await chat(env, ai, system, user, 'befunde', { schema: SCHEMA.befunde, effort: 'medium' });
+    const r = await chat(env, key, system, user, 'befunde');
     const list = r.ok ? (r.value as { befunde?: unknown }).befunde : undefined;
     if (r.ok && Array.isArray(list)) return { ok: true, groups: list as ClusterGroup[] };
     // (unreadable: the statements in two halves, by participant so groups can still form)
@@ -547,13 +473,13 @@ async function cluster(request: Request, env: StudyEnv): Promise<Response> {
 // (set there, e.g. "sachlich, neutral, vollständige Sätze"); the meaning
 // stays. Only proposals: shown side by side and editable before storing.
 async function rewrite(request: Request, env: StudyEnv): Promise<Response> {
-  const ai = aiOf(env);
-  if (!ai && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
+  const key = env['asciia-bay-crafting'] ?? env.LLM_API_KEY;
+  if (!key && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
   const body = (await request.json().catch(() => null)) as { items?: { id: string; text: string; question?: string; hint?: string; previous?: string }[]; criteria?: string } | null;
   const items = (body?.items ?? []).filter((i) => i && i.id && typeof i.text === 'string' && i.text.trim()).slice(0, 20);
   if (!items.length) return json(400, { error: 'items required' });
   const criteria = String(body?.criteria ?? '').slice(0, 2000);
-  if (!ai) return json(200, { rewrites: items.map((i) => ({ id: i.id, text: i.hint?.trim() ? `Umformuliert (Hinweis: ${i.hint.trim().slice(0, 500)}): ${i.text.trim()}` : `Umformuliert: ${i.text.trim()}` })) });
+  if (!key) return json(200, { rewrites: items.map((i) => ({ id: i.id, text: i.hint?.trim() ? `Umformuliert (Hinweis: ${i.hint.trim().slice(0, 500)}): ${i.text.trim()}` : `Umformuliert: ${i.text.trim()}` })) });
   const system =
     'Du formulierst Aussagen aus den Notizen eines Usability-Tests eines Spiels um. Antworte nur mit einem JSON-Objekt, ohne Text davor oder danach. ' +
     'Halte dich an diese Kriterien: ' +
@@ -564,7 +490,7 @@ async function rewrite(request: Request, env: StudyEnv): Promise<Response> {
     aussagen: items.map((i) => ({ id: i.id, text: i.text.slice(0, 2000), frage: i.question, ...(i.hint?.trim() ? { hinweis: i.hint.trim().slice(0, 500), bisheriger_vorschlag: String(i.previous ?? '').slice(0, 2000) } : {}) })),
     format: { aussagen: [{ id: 'string', text: 'string' }] },
   });
-  const r = await chat(env, ai, system, user, 'aussagen', { schema: SCHEMA.rewrite, effort: 'medium' });
+  const r = await chat(env, key, system, user, 'aussagen');
   if (!r.ok) return r.res;
   const out = ((r.value as { aussagen?: { id?: string; text?: string }[] }).aussagen ?? []).filter((x) => x?.id && typeof x.text === 'string' && x.text.trim());
   return json(200, { rewrites: out.map((x) => ({ id: x.id, text: x.text!.trim() })) });

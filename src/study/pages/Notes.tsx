@@ -13,7 +13,7 @@ import { RewriteReview, TagReview, workingText, type Rewrite, type TagProposal }
 import { planFreeText } from '../tallyPlan';
 import { designOfItem } from './Codes';
 import { itemText, setContentView, translateNotes, useContentView, type ContentView } from '../translations';
-import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
+import { Empty, LazyArea, logChange, Section, useAiName, useCtx, type Ctx } from '../ui';
 
 // ---- chip logic ----
 const groupOfChip = (tags: TagGroup[], chip: string) => tags.find((g) => g.chips.some((c) => c.id === chip));
@@ -628,6 +628,7 @@ export default function Notes() {
   const [tagPlan, setTagPlan] = useState<TagProposal[] | null>(null);
   const [rewritePlan, setRewritePlan] = useState<Rewrite[] | null>(null);
   const [showCriteria, setShowCriteria] = useState(false);
+  const ai = useAiName();
   const criteria = ((study.docs.settings.rewrite as { criteria?: string } | undefined)?.criteria ?? '').trim() || DEFAULT_CRITERIA;
   // what the AI works on: the selected statements, else (tags) the unchecked ones / (wording) the ones shown
   const forTags = selShown.length ? selShown : open;
@@ -729,6 +730,7 @@ export default function Notes() {
             />
           </label>
           <p className="st-muted">Gilt für jede Umformulierung. Immer gilt zusätzlich: Bedeutung bleibt gleich, nichts wird hinzugefügt oder weggelassen, IDs, Namen und Zahlen bleiben.</p>
+          <p className="st-muted">{`KI: ${ai?.name ?? '…'}`}</p>
           <div className="st-toolbar">
             <button
               type="button"

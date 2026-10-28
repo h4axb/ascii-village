@@ -133,6 +133,22 @@ export function LazyInput({ value, onSave, onDraft, onBlur, ...rest }: { value: 
   );
 }
 
+// which AI answers the dashboard's AI functions (asked once per page load)
+let aiCache: Promise<{ name: string; claude: boolean }> | null = null;
+export function useAiName(): { name: string; claude: boolean } | null {
+  const { study } = useCtx();
+  const [ai, setAi] = useState<{ name: string; claude: boolean } | null>(null);
+  useEffect(() => {
+    aiCache ??= study.aiInfo();
+    let live = true;
+    void aiCache.then((x) => live && setAi(x));
+    return () => {
+      live = false;
+    };
+  }, [study]);
+  return ai;
+}
+
 // the change log (Daten & Validierung): imports and corrections, newest first
 export interface LogEntry {
   at: number;

@@ -20,6 +20,7 @@ interface Env extends FeedbackEnv {
   ASSETS: { fetch: (request: Request) => Promise<Response> };
   'asciia-bay-crafting'?: string; // the provider API key secret
   LLM_API_KEY?: string; // (its older name, still accepted)
+  ANTHROPIC_API_KEY?: string; // the study dashboard's AI on Claude (secret; without it the provider above)
   LLM_BASE_URL?: string;
   LLM_ALLOWED_MODELS?: string;
   LLM_MAX_TOKENS?: string;

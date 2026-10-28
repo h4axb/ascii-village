@@ -4,7 +4,7 @@
 // of the Übersicht.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } from '../types';
-import { CATEGORY, SECTION_LABEL } from '../types';
+import { CATEGORY, hintOf, SECTION_LABEL } from '../types';
 import { distinctPersons, itemsWithRole, type Model } from '../model';
 import { linkLabelOf, parseNotes, planNotes } from '../notes';
 import type { Change } from '../changes';
@@ -173,11 +173,12 @@ export function NotesImport() {
   const [applying, setApplying] = useState<string | null>(null);
 
   return (
-    <Section title="Import: Notizen">
+    <Section title="Testnotizen: Datei oder Text" id="st-notes-detail">
       <div className="st-toolbar">
         <label className="st-file">
           Datei wählen (.md, .txt)
           <input
+            id="st-notes-file"
             type="file"
             accept=".md,.txt,text/plain,text/markdown"
             onChange={(e) => {
@@ -309,6 +310,11 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
   }, [editOrig]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showInt, setShowInt] = useState(!!item.interpretation);
   const [showAdd, setShowAdd] = useState(!!item.addition);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const tagIt = (g: TagGroup, chip: string) => (onTag ? onTag(g, chip) : save(toggleChip(item, g, chip)));
+  const chipsOf = (ids: string[]) => model.tags.flatMap((g) => g.chips.filter((c) => ids.includes(c.id)).map((c) => ({ g, c })));
+  const onChips = chipsOf(item.chips);
+  const sugChips = chipsOf(item.suggested.filter((c) => !item.chips.includes(c)));
   const findings = Object.values(study.docs.findings).sort((a, b) => a.name.localeCompare(b.name));
   const sf = item.suggestedFinding ? study.docs.findings[item.suggestedFinding] : null;
   const open = item.suggested.length > 0 || !!item.suggestedFinding;
@@ -451,59 +457,110 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
             <LazyArea value={item.addition ?? ''} onSave={(v) => save({ ...item, addition: v.trim() || undefined })} autoFocus={!item.addition} />
           </label>
         )}
-        <div className="st-item-more">
-          {!showInt && (
-            <button type="button" className="st-linkbtn" onClick={() => setShowInt(true)}>
-              + Interpretation
+        {/* the tags in one line; the full editor only on request */}
+        <div className="st-tagline">
+          {onChips.map(({ g, c }) => (
+            <span key={c.id} className="st-chip is-on is-small" title={hintOf(g) ? `${g.name}: ${hintOf(g)}` : g.name}>
+              {c.label}
+            </span>
+          ))}
+          {sugChips.map(({ g, c }) => (
+            <button key={c.id} type="button" className="st-chip is-suggested is-small" title={many ? `Vorschlag „${g.name}“: übernehmen für alle ${many} ausgewählten` : `Vorschlag „${g.name}“: klicken zum Übernehmen`} onClick={() => tagIt(g, c.id)}>
+              {c.label}
             </button>
-          )}
-          {!showAdd && (
-            <button type="button" className="st-linkbtn" onClick={() => setShowAdd(true)} title="Woran du dich später erinnerst – getrennt von der Originalnotiz">
-              + Nachträgliche Ergänzung
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="st-item-chips">
-        {model.tags.map((g) => (
-          <ChipCell key={g.id} item={item} g={g} onChange={save} labelOnly onTag={onTag} many={many} />
-        ))}
-        <div className="st-cell">
-          <span className="st-cell-label">Befund</span>
+          ))}
+          {item.finding && <span className="st-chip is-finding is-small">{`Befund: ${study.docs.findings[item.finding]?.name ?? '?'}`}</span>}
           {sf && (
-            <button type="button" className="st-chip is-suggested" title="Vorschlag: klicken zum Bestätigen" onClick={() => save({ ...item, finding: sf.id, suggestedFinding: null })}>
-              {sf.name}
+            <button type="button" className="st-chip is-suggested is-small" title="Befund-Vorschlag: klicken zum Übernehmen" onClick={() => save({ ...item, finding: sf.id, suggestedFinding: null })}>
+              {`Befund: ${sf.name}`}
             </button>
           )}
-          {!sf && item.suggestedNewFinding && !item.finding && <span className="st-chip is-suggested is-new" title="neuer Befund vorgeschlagen (unter „Befunde“ anlegen)">{item.suggestedNewFinding}</span>}
-          <select value={item.finding ?? ''} onChange={(e) => save({ ...item, finding: e.target.value || null, suggestedFinding: null })} aria-label="Befund">
-            <option value="">–</option>
-            {findings.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+          {!onChips.length && !sugChips.length && !item.finding && <span className="st-muted">noch keine Tags</span>}
+          <button type="button" className="st-linkbtn st-tagtoggle" aria-expanded={tagsOpen} onClick={() => setTagsOpen((x) => !x)}>
+            {tagsOpen ? 'Tags schließen' : many ? `Tags für ${many} ausgewählte` : 'Tags bearbeiten'}
+          </button>
         </div>
       </div>
-      <div className="st-item-actions">
+      <div className="st-item-side">
         <button type="button" className={item.confirmed && !open ? 'is-on' : ''} onClick={() => save(confirmItem(item, model.tags))} title="Vorschläge übernehmen und als geprüft markieren">
-          {item.confirmed && !open ? 'Geprüft' : open ? 'Bestätigen' : 'Geprüft?'}
+          {item.confirmed && !open ? 'Geprüft ✓' : open ? 'Bestätigen' : 'Geprüft?'}
         </button>
-        <button type="button" onClick={() => setEditDe(true)} title="Deutsche Fassung bearbeiten">
-          Deutsch bearbeiten
-        </button>
-        <button type="button" onClick={() => setEditOrig(true)} title="Original korrigieren: wird mit altem und neuem Wortlaut protokolliert; neue Zeile teilt die Aussage">
-          Original korrigieren
-        </button>
-        <button type="button" onClick={() => (setQOnlyThis(false), setEditQ(true))} title={item.question ? 'Frage bearbeiten (gilt für alle Aussagen mit dieser Frage, wahlweise nur diese)' : 'Dieser Aussage eine Frage zuordnen'}>
-          {item.question ? 'Frage bearbeiten' : 'Frage hinzufügen'}
-        </button>
-        <button type="button" onClick={() => confirm('Aussage löschen?') && remove(item)} title="Löschen">
-          Löschen
-        </button>
+        <MoreMenu
+          actions={[
+            ['Deutsch bearbeiten', () => setEditDe(true)],
+            ['Original korrigieren', () => setEditOrig(true)],
+            [item.question ? 'Frage bearbeiten' : 'Frage hinzufügen', () => (setQOnlyThis(false), setEditQ(true))],
+            ...(!showInt ? [['Interpretation hinzufügen', () => setShowInt(true)] as [string, () => void]] : []),
+            ...(!showAdd ? [['Nachträgliche Ergänzung', () => setShowAdd(true)] as [string, () => void]] : []),
+            ['Löschen', () => confirm('Aussage löschen?') && remove(item), true],
+          ]}
+        />
       </div>
+      {tagsOpen && (
+        <div className="st-tageditor">
+          {many && <p className="st-note">{`Jeder Klick gilt für alle ${many} ausgewählten Aussagen; ein schon gesetzter Tag wird bei allen entfernt.`}</p>}
+          {model.tags.map((g) => (
+            <div key={g.id} className="st-tagrow">
+              <div className="st-tagrow-head">
+                <strong>{g.name}</strong>
+                {hintOf(g) && <span className="st-muted">{hintOf(g)}</span>}
+              </div>
+              <ChipCell item={item} g={g} onChange={save} onTag={onTag} many={many} />
+            </div>
+          ))}
+          <div className="st-tagrow">
+            <div className="st-tagrow-head">
+              <strong>Befund</strong>
+              <span className="st-muted">Wiederkehrender Befund, zu dem die Aussage gehört (Seite „Wiederkehrende Befunde“).</span>
+            </div>
+            <div className="st-cell">
+              {!sf && item.suggestedNewFinding && !item.finding && <span className="st-chip is-suggested is-new" title="neuer Befund vorgeschlagen (unter „Befunde“ anlegen)">{item.suggestedNewFinding}</span>}
+              <select value={item.finding ?? ''} onChange={(e) => save({ ...item, finding: e.target.value || null, suggestedFinding: null })} aria-label="Befund">
+                <option value="">–</option>
+                {findings.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// "Bearbeiten ⋯": the rarer actions of a statement, out of the way until needed
+function MoreMenu({ actions }: { actions: [string, () => unknown, boolean?][] }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (ref.current?.open && !ref.current.contains(e.target as Node)) ref.current.open = false;
+    };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
+  return (
+    <details ref={ref} className="st-more">
+      <summary>Bearbeiten ⋯</summary>
+      <div className="st-more-list" role="menu">
+        {actions.map(([label, run, danger]) => (
+          <button
+            key={label}
+            type="button"
+            role="menuitem"
+            className={danger ? 'is-danger' : undefined}
+            onClick={() => {
+              if (ref.current) ref.current.open = false;
+              run();
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -611,19 +668,31 @@ export default function Notes() {
     }
   }
 
-  if (!model.allItems.length) return <Empty>Noch keine Notizen. Unter „Import“ einlesen.</Empty>;
+  if (!model.allItems.length)
+    return (
+      <Empty>
+        Noch keine Notizen. Unter <a href="#daten">Daten &amp; Validierung → Hochladen</a> einlesen.
+      </Empty>
+    );
   return (
     <>
-      <div className="st-toolbar">
-        <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Anzeige">
-          <option value="all">Alle Aussagen ({live.length})</option>
-          <option value="open">Ungeprüft ({open.length})</option>
-          <option value="changed">Geändert / neu ({live.filter((i) => i.status).length})</option>
-        </select>
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Suchen" />
-        <button type="button" disabled={!open.length || !!busy?.endsWith('…')} onClick={() => void suggestOpen()}>
-          KI-Vorschläge für ungeprüfte
-        </button>
+      <PageIntro />
+      <div className="st-toolbar st-notes-bar">
+        <div className="st-barpart" role="group" aria-label="Anzeigen">
+          <span className="st-barlabel">Anzeigen</span>
+          <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Anzeige">
+            <option value="all">Alle Aussagen ({live.length})</option>
+            <option value="open">Ungeprüft ({open.length})</option>
+            <option value="changed">Geändert / neu ({live.filter((i) => i.status).length})</option>
+          </select>
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Suchen in Aussagen" />
+        </div>
+        <div className="st-barpart" role="group" aria-label="KI">
+          <span className="st-barlabel">KI</span>
+          <button type="button" disabled={!open.length || !!busy?.endsWith('…')} onClick={() => void suggestOpen()} title="Tags und Befunde für alle ungeprüften Aussagen vorschlagen lassen; du prüfst sie vor dem Übernehmen">
+            Tags vorschlagen ({open.length} ungeprüft)
+          </button>
+        </div>
         {busy && <span className="st-muted">{busy}</span>}
       </div>
       {aiPlan && (
@@ -739,6 +808,52 @@ export default function Notes() {
     </>
   );
 }
+// a short guide for whoever opens the page first; closed, it stays closed
+const INTRO_KEY = 'asciia-study-notes-intro';
+function PageIntro() {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(INTRO_KEY) !== 'closed';
+    } catch {
+      return true;
+    }
+  });
+  return (
+    <details
+      className="st-intro"
+      open={open}
+      onToggle={(e) => {
+        const now = (e.target as HTMLDetailsElement).open;
+        setOpen(now);
+        try {
+          localStorage.setItem(INTRO_KEY, now ? 'open' : 'closed');
+        } catch {
+          // (not remembered)
+        }
+      }}
+    >
+      <summary>So funktioniert diese Seite</summary>
+      <ol>
+        <li>
+          <strong>Aussagen lesen:</strong> je Testperson die Beobachtungen, das Nachgespräch und die Umfrage-Freitexte. Oben rechts wählst du Deutsch, Original oder beides.
+        </li>
+        <li>
+          <strong>Tags setzen:</strong> unter jeder Aussage stehen ihre Tags in einer Zeile; „Tags bearbeiten“ öffnet alle Gruppen mit Erklärung. Gestrichelte Tags sind Vorschläge: anklicken übernimmt sie.
+        </li>
+        <li>
+          <strong>Prüfen:</strong> „Geprüft?“ bestätigt die Vorschläge einer Aussage. Weitere Aktionen (Deutsch, Original korrigieren, Frage, Löschen) unter „Bearbeiten ⋯“.
+        </li>
+        <li>
+          <strong>Mehrere auf einmal:</strong> Kästchen links anhaken (Umschalt: ganzer Bereich); ein Tag-Klick bei einer davon gilt dann für alle.
+        </li>
+        <li>
+          <strong>KI und Auswertung:</strong> „Tags vorschlagen“ lässt die KI vorschlagen (du prüfst vor dem Übernehmen). Links unter Qualitatives Feedback: Nach Priorität, Codes, Wiederkehrende Befunde und die Tag-Gruppen.
+        </li>
+      </ol>
+    </details>
+  );
+}
+
 const sectionRank = (s: Sec) => ({ during: 0, followup: 1, survey: 2 })[s];
 
 // ---- Nach Priorität ----
@@ -850,6 +965,10 @@ export function Tags() {
               Kategorie löschen
             </button>
           </header>
+          <label className="st-fprop-field st-taghint">
+            <span className="st-cell-label">Erklärung (beim Taggen sichtbar)</span>
+            <input defaultValue={hintOf(g)} placeholder="Wofür steht diese Kategorie?" onBlur={(e) => e.target.value.trim() !== hintOf(g) && saveGroup({ ...g, hint: e.target.value.trim() || undefined })} />
+          </label>
           <div className="st-chipedit">
             {g.chips.map((c: Chip) => (
               <div key={c.id} className="st-chipedit-row">

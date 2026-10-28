@@ -141,6 +141,7 @@ export interface Chip {
 export interface TagGroup {
   id: string;
   name: string;
+  hint?: string; // what the group says about a statement (shown when tagging)
   multi: boolean;
   order: number;
   chips: Chip[];
@@ -149,6 +150,9 @@ export interface TagGroup {
 export interface FindingDoc {
   id: string;
   name: string;
+  description?: string; // an objective wording of the pattern (for the thesis)
+  descriptionAuto?: boolean; // the description is still the unedited AI draft
+  auto?: boolean; // created from an AI proposal
 }
 
 export interface CaptionDoc {
@@ -275,6 +279,18 @@ export const DEFAULT_TAGS: TagGroup[] = [
     chips: [{ id: 'verworfen', label: 'Verworfen', role: 'rejected' }],
   },
 ];
+
+// what each default group means, when the group has no own hint
+export const DEFAULT_HINTS: Record<string, string> = {
+  bereich: 'Worauf sich die Aussage bezieht: das Spiel, die Umfrage oder den Testablauf.',
+  art: 'Was für eine Rückmeldung es ist: ein Problem, etwas Positives, eine Überraschung oder eine Anmerkung.',
+  prioritaet: 'Wie dringend ein Problem ist (fließt in „Nach Priorität“).',
+  thema: 'Welcher Teil des Spiels betroffen ist (mehrere möglich).',
+  code: 'Qualitative Codes für die Auswertung (mehrere möglich; Seite „Codes“).',
+  moderation: 'Die Testleitung musste eingreifen.',
+  gueltigkeit: '„Verworfen“: die Aussage zählt nirgends mit.',
+};
+export const hintOf = (g: TagGroup) => g.hint ?? DEFAULT_HINTS[g.id] ?? '';
 
 // the formal names of the feedback categories (thesis wording)
 export const CATEGORY = {

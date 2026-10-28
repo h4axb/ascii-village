@@ -18,7 +18,11 @@ const LIKERT7 = ['1', '2', '3', '4', '5', '6', '7'];
 const SCALE_NAME = { pragmatisch: 'Pragmatische Qualität', hedonisch: 'Hedonische Qualität', gesamt: 'Gesamt' } as const;
 
 function NoTally() {
-  return <Empty>Noch keine Umfragedaten. Den Tally-Export unter „Import“ hochladen.</Empty>;
+  return (
+    <Empty>
+      Noch keine Umfragedaten. Den Tally-Export unter <a href="#daten">Daten &amp; Validierung → Hochladen</a> hochladen.
+    </Empty>
+  );
 }
 
 export default function Survey() {

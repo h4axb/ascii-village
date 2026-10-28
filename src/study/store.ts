@@ -225,6 +225,14 @@ export function useStudy() {
     return d?.suggestions ?? [];
   }, []);
 
+  // AI: similar statements of several participants as proposed findings
+  const cluster = useCallback(async (body: unknown) => {
+    const res = await fetch('/api/study/cluster', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify(body) });
+    const d = (await res.json().catch(() => null)) as { groups?: { name: string; description: string; ids: string[]; finding: string | null }[]; error?: string } | null;
+    if (!res.ok) throw new Error(d?.error ?? String(res.status));
+    return d?.groups ?? [];
+  }, []);
+
   // AI translations (drafts), in batches; throws when the AI is unavailable
   const translate = useCallback(async (texts: { id: string; text: string }[], to: 'de' | 'en' = 'de', onProgress?: (done: number, all: number) => void) => {
     const out = new Map<string, string>();
@@ -275,6 +283,6 @@ export function useStudy() {
 
   // (the newest documents, for changes that build on the one just made)
   const latest = useCallback(() => docsRef.current, []);
-  return { state, error, docs, game, live, stand, acceptGame, refreshLive, saving, saveError, load, commit, suggest, translate, pass, latest, viewing, versions, saveVersion, loadVersion };
+  return { state, error, docs, game, live, stand, acceptGame, refreshLive, saving, saveError, load, commit, suggest, cluster, translate, pass, latest, viewing, versions, saveVersion, loadVersion };
 }
 export type Study = ReturnType<typeof useStudy>;

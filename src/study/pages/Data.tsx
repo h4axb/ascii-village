@@ -152,17 +152,37 @@ export function useChecks(): Check[] {
   return out;
 }
 
-export default function Data() {
+export default function Data({ sub = '' }: { sub?: string }) {
   const { model, study } = useCtx();
   const checks = useChecks();
   const tally = study.docs.tally.main;
   const notes = study.docs.notes.main;
   const log = ((study.docs.settings.log as { entries?: LogEntry[] } | undefined)?.entries ?? []) as LogEntry[];
   const failed = checks.filter((c) => !c.ok).length;
-  return (
-    <>
-      <Settings />
-
+  // the sub-pages: Hochladen (the page itself), Zuordnung & Einstellungen, Prüfungen, Versionen & Protokoll
+  if (sub === 'zuordnung')
+    return (
+      <>
+        <Settings />
+        {tally && <MatchTable />}
+      <Section title="Zuordnungsregeln">
+        <ul className="st-rules">
+          <li>Teilnehmende: P-ID aus dem persönlichen Link bzw. den Notizen.</li>
+          <li>Umfrage-Zeilen ↔ Teilnehmende: wie oben unter „Einstellungen“ ({matchOptions(study.docs).steps!.map((x) => STEP_LABEL[x]).join(' → ')}). Abweichende AB/BA-Angaben werden markiert.</li>
+          <li>Mehrere Links einer Person: P009.1, P009.2 … sind Versuche derselben Person (nie eigene Teilnehmende). Je Person drei Zeiten: verstrichen (erster Start bis letztes Ende), aktiv (Summe der Versuche; geschätzt markiert) und saubere Erstdurchlaufzeit (nur ein ununterbrochener, exakt gemessener Durchlauf, sonst kein Wert statt 0). Mittelwert und SD je Person, Stichprobe n/N angegeben. Alles unter Teilnehmende &amp; Sessions → Versuche &amp; Zeiten von Hand änderbar.</li>
+          <li>Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links. Unterbrechung: mehr als 10 min ohne Ereignis im Spiel-Tracking.</li>
+          <li>Testgruppe: aus dem Link (AB/BA); eine Korrektur überschreibt sie; Abweichungen zu den Notizen werden markiert.</li>
+          <li>Teil 1: „vertauscht“ kehrt A und B der betreffenden Person um; „keine Präferenz“ zählt nicht im Vorzeichentest.</li>
+          <li>Teil 3: Antworten 1–7, gedrehte Items umgepolt, Werte −3 bis +3; nur vollständige Skalen.</li>
+          <li>Rückmeldungen: nur bestätigte Tags zählen; Vorschläge der KI bleiben bis zur Bestätigung unberücksichtigt; „Verworfen“ schließt eine Aussage aus.</li>
+          <li>Ausgeschlossene Teilnehmende fehlen in allen Abbildungen, Tests und Listen.</li>
+        </ul>
+      </Section>
+      </>
+    );
+  if (sub === 'pruefung')
+    return (
+      <>
       <Section title="Datenquellen">
         <table className="st-table">
           <thead>
@@ -195,7 +215,6 @@ export default function Data() {
           </tbody>
         </table>
       </Section>
-
       <Section title={`Prüfergebnisse (${failed ? `${failed} offen` : 'alle erfüllt'})`}>
         <table className="st-table st-checks">
           <thead>
@@ -223,29 +242,12 @@ export default function Data() {
           </button>
         </div>
       </Section>
-
-      {tally && <MatchTable />}
-
-      <Section title="Zuordnungsregeln">
-        <ul className="st-rules">
-          <li>Teilnehmende: P-ID aus dem persönlichen Link bzw. den Notizen.</li>
-          <li>Umfrage-Zeilen ↔ Teilnehmende: wie oben unter „Einstellungen“ ({matchOptions(study.docs).steps!.map((x) => STEP_LABEL[x]).join(' → ')}). Abweichende AB/BA-Angaben werden markiert.</li>
-          <li>Mehrere Links einer Person: P009.1, P009.2 … sind Versuche derselben Person (nie eigene Teilnehmende). Je Person drei Zeiten: verstrichen (erster Start bis letztes Ende), aktiv (Summe der Versuche; geschätzt markiert) und saubere Erstdurchlaufzeit (nur ein ununterbrochener, exakt gemessener Durchlauf, sonst kein Wert statt 0). Mittelwert und SD je Person, Stichprobe n/N angegeben. Alles unter Teilnehmende &amp; Sessions → Versuche &amp; Zeiten von Hand änderbar.</li>
-          <li>Ende einer Sitzung: Abschluss der Umfrage; sonst letzter Kontakt des Spiels vor Ablauf des Links. Unterbrechung: mehr als 10 min ohne Ereignis im Spiel-Tracking.</li>
-          <li>Testgruppe: aus dem Link (AB/BA); eine Korrektur überschreibt sie; Abweichungen zu den Notizen werden markiert.</li>
-          <li>Teil 1: „vertauscht“ kehrt A und B der betreffenden Person um; „keine Präferenz“ zählt nicht im Vorzeichentest.</li>
-          <li>Teil 3: Antworten 1–7, gedrehte Items umgepolt, Werte −3 bis +3; nur vollständige Skalen.</li>
-          <li>Rückmeldungen: nur bestätigte Tags zählen; Vorschläge der KI bleiben bis zur Bestätigung unberücksichtigt; „Verworfen“ schließt eine Aussage aus.</li>
-          <li>Ausgeschlossene Teilnehmende fehlen in allen Abbildungen, Tests und Listen.</li>
-        </ul>
-      </Section>
-
-      <Import />
-
-      <Translations />
-
-      <Versions />
-
+      </>
+    );
+  if (sub === 'versionen')
+    return (
+      <>
+        <Versions />
       <Section title="Änderungen">
         {log.length ? (
           <ol className="st-log" data-notr>
@@ -259,7 +261,65 @@ export default function Data() {
           <p className="st-empty">Noch keine Änderungen.</p>
         )}
       </Section>
+        <Translations />
+      </>
+    );
+  return (
+    <>
+      <Uploads failed={failed} />
+      <Import />
     </>
+  );
+}
+
+// the three sources at a glance, each with its one button (the file pickers of the detailed imports below)
+function Uploads({ failed }: { failed: number }) {
+  const { study, model } = useCtx();
+  const tally = study.docs.tally.main;
+  const notes = study.docs.notes.main;
+  const when = (t: number) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return (
+    <Section title="Daten hochladen">
+      <p className="st-note st-page-hint">
+        Hier kommen die Daten ins Dashboard. Vor dem Speichern zeigt jedes Hochladen, was neu ist und was sich ändert; nichts wird ungefragt überschrieben.
+        {failed > 0 && (
+          <>
+            {' '}
+            <a href="#daten/pruefung">{`${failed} Prüfungen offen →`}</a>
+          </>
+        )}
+      </p>
+      <div className="st-uploads">
+        <div className="st-upload">
+          <h3>Tally-Umfrage</h3>
+          <p className="st-muted">{tally ? `${tally.file} · ${tally.rows.length} Antworten · ${when(tally.importedAt)}` : 'noch nicht hochgeladen'}</p>
+          <label className="st-file is-primary" htmlFor="st-tally-file">
+            {tally ? 'Neue Tally-CSV hochladen' : 'Tally-CSV hochladen'}
+          </label>
+          <button type="button" className="st-linkbtn" onClick={() => document.getElementById('st-tally-detail')?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>
+            Spalten-Zuordnung ↓
+          </button>
+        </div>
+        <div className="st-upload">
+          <h3>Testnotizen</h3>
+          <p className="st-muted">{notes ? `${notes.file ?? 'eingefügt'} · ${model.allItems.length} Aussagen · ${when(notes.importedAt)}` : 'noch nicht hochgeladen'}</p>
+          <label className="st-file is-primary" htmlFor="st-notes-file">
+            {notes ? 'Neue Notizen hochladen' : 'Notizen hochladen (.md, .txt)'}
+          </label>
+          <button type="button" className="st-linkbtn" onClick={() => document.getElementById('st-notes-detail')?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>
+            oder Text einfügen ↓
+          </button>
+        </div>
+        <div className="st-upload">
+          <h3>Spieldaten</h3>
+          <p className="st-muted">
+            {`${study.game.invites.filter((i) => i.participant_id).length} Links · ${study.game.events.length} Ereignisse`}
+            {study.stand ? ` · Stand vom ${when(study.stand.at)}` : ''}
+          </p>
+          <p className="st-muted">Kommen automatisch aus dem Spiel. Neue Daten erscheinen oben auf jeder Seite zum Prüfen.</p>
+        </div>
+      </div>
+    </Section>
   );
 }
 

@@ -45,10 +45,19 @@ const PAGES: Page[] = [
     ],
   },
   { id: 'teilnehmende', title: 'Teilnehmende & Sessions' },
-  { id: 'daten', title: 'Daten & Validierung' },
+  {
+    id: 'daten',
+    title: 'Daten & Validierung',
+    sub: [
+      { id: 'zuordnung', title: 'Zuordnung & Einstellungen' },
+      { id: 'pruefung', title: 'Prüfungen' },
+      { id: 'versionen', title: 'Versionen & Protokoll' },
+    ],
+  },
   { id: 'ergebnisse', title: 'Ergebnisse & Export' },
 ];
-const SUB_TITLE: Record<string, string> = { '': 'Aussagen' };
+// (the page itself, when it has sub-pages: what its first view is called)
+const SUB_TITLE: Record<string, string> = { qualitativ: 'Aussagen', daten: 'Hochladen' };
 
 function readHash(): [string, string] {
   const [p, s] = window.location.hash.replace(/^#/, '').split('/');
@@ -223,14 +232,14 @@ export default function StudyApp() {
       case 'teilnehmende':
         return <People />;
       case 'daten':
-        return <Data />;
+        return <Data sub={sub} />;
       case 'ergebnisse':
         return <Results />;
       default:
         return <Overview />;
     }
   })();
-  const subTitle = current.sub?.find((s) => s.id === sub && !s.anchor)?.title ?? (page === 'qualitativ' ? SUB_TITLE[''] : null);
+  const subTitle = current.sub?.find((s) => s.id === sub && !s.anchor)?.title ?? (SUB_TITLE[page] ?? null);
 
   return (
     <StudyCtx.Provider value={{ study, model, scope, slice, omitted, resetFilter: () => (setScope('all'), setOmit([])) }}>
@@ -244,7 +253,7 @@ export default function StudyApp() {
             {study.viewing.reason && <span data-notr>{study.viewing.reason}</span>}
             <span>nur ansehen</span>
             <span className="st-selbar-gap" />
-            <a href={`/feedback?restore=${encodeURIComponent(study.viewing.id)}#daten`}>Wiederherstellen …</a>
+            <a href={`/feedback?restore=${encodeURIComponent(study.viewing.id)}#daten/versionen`}>Wiederherstellen …</a>
             <a href={`/feedback${window.location.hash}`}>Zum aktuellen Stand</a>
           </div>
         )}

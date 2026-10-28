@@ -1928,3 +1928,320 @@ body:has(.st-root) {
   background: transparent;
   max-width: 100%;
 }
+/* ---- Wiederkehrende Befunde: cards, the AI review ---- */
+.st-finding > summary {
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  list-style-position: outside;
+}
+.st-finding-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.st-finding-ids {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.st-finding-body {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+.st-fprop-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.st-fprop-field input,
+.st-fprop-field textarea {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+}
+.st-finding-count {
+  margin: 0;
+  font-size: 13.5px;
+}
+.st-fstmts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.st-fstmts > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+}
+.st-fstmts > li.is-off {
+  opacity: 0.5;
+}
+.st-fstmts > li.is-suggested {
+  border-style: dashed;
+}
+.st-fstmts p {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+.st-fstmt-meta {
+  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.st-finding-add input {
+  width: 100%;
+  min-width: 0;
+}
+.st-fhits {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+.st-fhits button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--st-line);
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 10px;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+.st-fhits button:hover,
+.st-fhits button:focus-visible {
+  background: var(--st-soft);
+}
+.st-finding-more {
+  justify-content: flex-end;
+}
+.st-fprop {
+  display: grid;
+  gap: 8px;
+}
+.st-fprop.is-off {
+  opacity: 0.55;
+}
+.st-fprop .st-change-head {
+  flex-wrap: wrap;
+}
+.st-page-hint {
+  margin: 0 0 10px;
+}
+.st-fresh > summary {
+  cursor: pointer;
+  color: var(--st-muted);
+}
+@media (max-width: 560px) {
+  .st-fstmts > li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* ---- a statement: text with its tags in one line | Geprüft + Bearbeiten ⋯ ---- */
+.st-item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 14px;
+}
+.st-tagline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 8px;
+  font-size: 12.5px;
+}
+.st-root .st-chip.is-small {
+  padding: 0 7px;
+  line-height: 1.6;
+}
+.st-root .st-chip.is-finding {
+  border-color: var(--st-accent);
+  color: var(--st-accent);
+}
+.st-tagtoggle {
+  margin-left: 4px;
+  font-size: 12.5px;
+}
+.st-item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.st-item-side > button,
+.st-more > summary {
+  font-size: 12.5px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.st-more {
+  position: relative;
+}
+.st-more > summary {
+  list-style: none;
+  cursor: pointer;
+  border: 1px solid var(--st-line);
+  border-radius: 6px;
+  text-align: center;
+  color: var(--st-muted);
+}
+.st-more > summary::-webkit-details-marker {
+  display: none;
+}
+.st-more-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 6;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--st-paper);
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.st-more-list button {
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+}
+.st-more-list button:hover,
+.st-more-list button:focus-visible {
+  background: var(--st-soft);
+}
+.st-more-list button.is-danger {
+  color: var(--st-warn);
+}
+.st-tageditor {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--st-soft);
+  border-radius: 8px;
+}
+.st-tagrow {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 4px 14px;
+  align-items: start;
+}
+.st-tagrow-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12.5px;
+}
+.st-tagrow-head .st-muted {
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+@media (max-width: 700px) {
+  .st-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .st-item-side {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .st-tagrow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .st-more-list {
+    left: 0;
+    right: auto;
+  }
+}
+/* Qualitatives Feedback: the short guide and the toolbar in two groups */
+.st-intro {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  background: var(--st-paper);
+  font-size: 13.5px;
+}
+.st-intro > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.st-intro ol {
+  margin: 8px 0 2px;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+.st-notes-bar {
+  gap: 10px 18px;
+}
+.st-barpart {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.st-barlabel {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--st-muted);
+}
+/* Daten & Validierung → Hochladen: one card per source, its button first */
+.st-uploads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 12px;
+}
+.st-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--st-paper);
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  min-width: 0;
+}
+.st-upload h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.st-upload p {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.st-file.is-primary {
+  background: var(--st-ink);
+  color: #fff;
+  border-color: var(--st-ink);
+}
+.st-mapdetails > summary {
+  cursor: pointer;
+  margin: 8px 0;
+  font-weight: 500;
+}

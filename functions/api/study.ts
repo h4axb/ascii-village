@@ -9,6 +9,8 @@
 //   POST   /api/study/batch           several puts/deletes at once {put: [...], del: [...]}
 //   POST   /api/study/suggest         AI tag suggestions for statements (never stored:
 //                                    the dashboard shows them as suggestions to confirm)
+//   POST   /api/study/cluster         AI: similar statements of several participants as
+//                                    recurring findings (proposals, checked before storing)
 //   POST   /api/study/translate       AI translations of notes and survey texts (the
 //                                    dashboard stores them as editable drafts)
 //   GET    /api/study/versions        the saved states of all documents (id, time, reason)
@@ -221,6 +223,7 @@ export async function handleStudy(request: Request, env: StudyEnv): Promise<Resp
 
   if (request.method === 'POST' && parts[0] === 'suggest') return suggest(request, env);
   if (request.method === 'POST' && parts[0] === 'translate') return translate(request, env);
+  if (request.method === 'POST' && parts[0] === 'cluster') return cluster(request, env);
 
   const [coll, id] = parts;
   if (!coll || !id || !isColl(coll)) return json(404, { error: 'unknown collection' });
@@ -394,4 +397,70 @@ async function suggest(request: Request, env: StudyEnv): Promise<Response> {
   const r = await ask(items);
   if (!r.ok) return r.res;
   return json(200, { suggestions: r.list });
+}
+
+// ---- AI: recurring findings ----
+// Statements of the test that say the same thing (a problem, praise or a
+// behaviour) grouped across participants, each group with a short neutral
+// name and an objective description fit for a thesis. Only proposals: the
+// dashboard shows them for checking and editing before anything is stored.
+type ClusterItem = { id: string; person: string; text: string; section?: string; question?: string };
+type ClusterGroup = { name?: string; description?: string; ids?: string[]; finding?: string | null };
+async function cluster(request: Request, env: StudyEnv): Promise<Response> {
+  const key = env['asciia-bay-crafting'] ?? env.LLM_API_KEY;
+  if (!key && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
+  const body = (await request.json().catch(() => null)) as { items?: ClusterItem[]; findings?: { id: string; name: string; description?: string }[] } | null;
+  const items = (body?.items ?? []).filter((i) => i && typeof i.text === 'string' && i.id && i.person).slice(0, 300);
+  if (items.length < 2) return json(400, { error: 'at least two statements required' });
+  const findings = body?.findings ?? [];
+  const persons = new Map(items.map((i) => [i.id, i.person]));
+  // (a group counts only with two or more participants; each statement in one group)
+  const clean = (groups: ClusterGroup[]) => {
+    const used = new Set<string>();
+    const out: { name: string; description: string; ids: string[]; finding: string | null }[] = [];
+    for (const g of groups) {
+      const ids = (g.ids ?? []).filter((id) => persons.has(id) && !used.has(id));
+      if (new Set(ids.map((id) => persons.get(id))).size < 2 || !g.name) continue;
+      ids.forEach((id) => used.add(id));
+      out.push({ name: String(g.name).slice(0, 120), description: String(g.description ?? '').slice(0, 800), ids, finding: g.finding && findings.some((f) => f.id === g.finding) ? g.finding : null });
+    }
+    return out;
+  };
+  if (!key) {
+    // (test mode without a key: statements sharing a longer word)
+    const byWord = new Map<string, string[]>();
+    for (const i of items) for (const w of new Set(i.text.toLowerCase().match(/[a-zäöüß]{6,}/g) ?? [])) byWord.set(w, [...(byWord.get(w) ?? []), i.id]);
+    const groups = [...byWord].sort((a, b) => b[1].length - a[1].length).map(([w, ids]) => ({ name: `Wiederkehrend: ${w}`, description: `Mehrere Testpersonen äußerten sich zu „${w}“.`, ids, finding: null }));
+    return json(200, { groups: clean(groups) });
+  }
+  const system =
+    'Du wertest Notizen eines Usability-Tests eines Spiels für eine Bachelorarbeit aus. Antworte nur mit einem JSON-Objekt, ohne Text davor oder danach. ' +
+    'Bilde Gruppen aus Aussagen verschiedener Testpersonen, die dasselbe Problem, dasselbe Lob oder dasselbe Verhalten beschreiben. ' +
+    'Eine Gruppe braucht Aussagen von mindestens zwei verschiedenen Testpersonen; jede Aussage gehört höchstens zu einer Gruppe; Aussagen ohne Entsprechung lässt du weg. ' +
+    'name: kurz, neutral, höchstens acht Wörter, auf Deutsch. ' +
+    'description: ein bis drei Sätze auf Deutsch, sachlich und wissenschaftlich formuliert, wie in einer Bachelorarbeit: beschreibt das beobachtete Muster, ohne Wertung, ohne Zitate, ohne Zahlen zu erfinden. ' +
+    'Passt eine Gruppe zu einem bestehenden Befund, gib dessen id in finding an, sonst null.';
+  const ask = async (part: ClusterItem[]): Promise<{ ok: true; groups: ClusterGroup[] } | { ok: false; res: Response }> => {
+    const user = JSON.stringify({
+      befunde: findings.map((f) => ({ id: f.id, name: f.name, description: f.description ?? '' })),
+      aussagen: part.map((i) => ({ id: i.id, person: i.person, text: i.text.slice(0, 500), abschnitt: i.section, frage: i.question })),
+      format: { befunde: [{ name: 'string', description: 'string', ids: ['<aussage-id>'], finding: '<befund-id> | null' }] },
+    });
+    const r = await chat(env, key, system, user, 'befunde');
+    const list = r.ok ? (r.value as { befunde?: unknown }).befunde : undefined;
+    if (r.ok && Array.isArray(list)) return { ok: true, groups: list as ClusterGroup[] };
+    // (unreadable: the statements in two halves, by participant so groups can still form)
+    if (part.length > 40) {
+      const sorted = [...part].sort((a, b) => a.person.localeCompare(b.person));
+      const mid = Math.ceil(sorted.length / 2);
+      const x = await ask(sorted.slice(0, mid));
+      const y = await ask(sorted.slice(mid));
+      if (!x.ok && !y.ok) return x;
+      return { ok: true, groups: [...(x.ok ? x.groups : []), ...(y.ok ? y.groups : [])] };
+    }
+    return r.ok ? { ok: false, res: json(502, { error: 'AI answer was not JSON' }) } : r;
+  };
+  const r = await ask(items);
+  if (!r.ok) return r.res;
+  return json(200, { groups: clean(r.groups) });
 }

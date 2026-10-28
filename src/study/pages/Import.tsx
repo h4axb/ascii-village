@@ -92,11 +92,12 @@ export default function Import() {
 
   return (
     <>
-      <Section title="Import: Tally-Export">
+      <Section title="Tally-Umfrage: Datei und Spalten" id="st-tally-detail">
         <div className="st-toolbar">
           <label className="st-file">
             CSV-Datei wählen
             <input
+              id="st-tally-file"
               type="file"
               accept=".csv,text/csv"
               onChange={(e) => {
@@ -151,6 +152,9 @@ export default function Import() {
             }}
           />
         )}
+        {tally && (
+          <details className="st-mapdetails">
+            <summary>{`Spalten-Zuordnung (${tally.mapping.filter((m) => m.role !== 'ignore').length} von ${tally.headers.length} Spalten zugeordnet)`}</summary>
         {tally && <PartRanges tally={tally} />}
         {tally && (
           <div className="st-mapping">
@@ -181,6 +185,8 @@ export default function Import() {
               );
             })}
           </div>
+        )}
+          </details>
         )}
       </Section>
       <NotesImport />

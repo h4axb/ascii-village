@@ -11,6 +11,8 @@
 //                                    the dashboard shows them as suggestions to confirm)
 //   POST   /api/study/cluster         AI: similar statements of several participants as
 //                                    recurring findings (proposals, checked before storing)
+//   POST   /api/study/rewrite         AI: statements reworded by given criteria (proposals,
+//                                    checked and editable before storing)
 //   POST   /api/study/translate       AI translations of notes and survey texts (the
 //                                    dashboard stores them as editable drafts)
 //   GET    /api/study/versions        the saved states of all documents (id, time, reason)
@@ -224,6 +226,7 @@ export async function handleStudy(request: Request, env: StudyEnv): Promise<Resp
   if (request.method === 'POST' && parts[0] === 'suggest') return suggest(request, env);
   if (request.method === 'POST' && parts[0] === 'translate') return translate(request, env);
   if (request.method === 'POST' && parts[0] === 'cluster') return cluster(request, env);
+  if (request.method === 'POST' && parts[0] === 'rewrite') return rewrite(request, env);
 
   const [coll, id] = parts;
   if (!coll || !id || !isColl(coll)) return json(404, { error: 'unknown collection' });
@@ -463,4 +466,31 @@ async function cluster(request: Request, env: StudyEnv): Promise<Response> {
   const r = await ask(items);
   if (!r.ok) return r.res;
   return json(200, { groups: clean(r.groups) });
+}
+
+// ---- AI: statements reworded ----
+// Each statement in a clearer wording by the criteria the dashboard sends
+// (set there, e.g. "sachlich, neutral, vollständige Sätze"); the meaning
+// stays. Only proposals: shown side by side and editable before storing.
+async function rewrite(request: Request, env: StudyEnv): Promise<Response> {
+  const key = env['asciia-bay-crafting'] ?? env.LLM_API_KEY;
+  if (!key && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
+  const body = (await request.json().catch(() => null)) as { items?: { id: string; text: string; question?: string }[]; criteria?: string } | null;
+  const items = (body?.items ?? []).filter((i) => i && i.id && typeof i.text === 'string' && i.text.trim()).slice(0, 20);
+  if (!items.length) return json(400, { error: 'items required' });
+  const criteria = String(body?.criteria ?? '').slice(0, 2000);
+  if (!key) return json(200, { rewrites: items.map((i) => ({ id: i.id, text: `Umformuliert: ${i.text.trim()}` })) });
+  const system =
+    'Du formulierst Aussagen aus den Notizen eines Usability-Tests eines Spiels um. Antworte nur mit einem JSON-Objekt, ohne Text davor oder danach. ' +
+    'Halte dich an diese Kriterien: ' +
+    (criteria || 'sachlich, neutral, vollständige Sätze auf Deutsch') +
+    '. Immer gilt: die Bedeutung bleibt gleich; nichts hinzufügen, nichts weglassen, nichts deuten; Teilnehmer-IDs (P001), Eigennamen, Variante A/B und Zahlen bleiben unverändert.';
+  const user = JSON.stringify({
+    aussagen: items.map((i) => ({ id: i.id, text: i.text.slice(0, 2000), frage: i.question })),
+    format: { aussagen: [{ id: 'string', text: 'string' }] },
+  });
+  const r = await chat(env, key, system, user, 'aussagen');
+  if (!r.ok) return r.res;
+  const out = ((r.value as { aussagen?: { id?: string; text?: string }[] }).aussagen ?? []).filter((x) => x?.id && typeof x.text === 'string' && x.text.trim());
+  return json(200, { rewrites: out.map((x) => ({ id: x.id, text: x.text!.trim() })) });
 }

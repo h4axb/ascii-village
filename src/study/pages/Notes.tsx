@@ -9,6 +9,7 @@ import { distinctPersons, itemsWithRole, type Model } from '../model';
 import { linkLabelOf, parseNotes, planNotes } from '../notes';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
+import { RewriteReview, TagReview, workingText, type Rewrite, type TagProposal } from '../AiReview';
 import { planFreeText } from '../tallyPlan';
 import { designOfItem } from './Codes';
 import { itemText, setContentView, translateNotes, useContentView, type ContentView } from '../translations';
@@ -41,26 +42,17 @@ export function confirmItem(item: ItemDoc, tags: TagGroup[]): ItemDoc {
 }
 
 // ---- AI suggestions ----
-// AI suggestions for statements, as changes to check in the review window
-// (nothing is stored here): per statement the tags (and the recurring
-// finding) it would get; taken over, they are real tags. A tag already chosen
-// in a single-choice group stays.
-export async function suggestFor(ctx: Ctx, items: ItemDoc[], onProgress?: (done: number, all: number) => void): Promise<Change[]> {
+// AI suggestions for statements, as proposals to check in TagReview (nothing
+// is stored here): per statement the whole set of tags it would carry (its
+// own plus the suggested ones; a tag already chosen in a single-choice group
+// stays) and the recurring finding
+export async function suggestFor(ctx: Ctx, items: ItemDoc[], onProgress?: (done: number, all: number) => void): Promise<TagProposal[]> {
   const { study, model } = ctx;
   const groups = model.tags.map((g) => ({ id: g.id, name: g.name, multi: g.multi, chips: g.chips.filter((c) => c.role !== 'rejected').map((c) => ({ id: c.id, label: c.label })) })).filter((g) => g.chips.length);
   const findings = Object.values(study.docs.findings).map((f) => ({ id: f.id, name: f.name }));
   const findingIds = new Set(findings.map((f) => f.id));
   const byId = new Map(items.map((i) => [i.id, i]));
-  const label = (id: string) => {
-    const g = model.tags.find((x) => x.chips.some((c) => c.id === id));
-    return g ? `${g.name}: ${model.chipLabel.get(id) ?? id}` : '';
-  };
-  const fieldsOf = (chips: string[], finding: string | null | undefined, newFinding?: string | null): [string, string][] => [
-    ...model.tags.map((g): [string, string] => [g.name, chips.filter((c) => g.chips.some((x) => x.id === c)).map((c) => model.chipLabel.get(c) ?? c).join(', ')]).filter(([, v]) => v),
-    ...(finding ? [['Befund', study.docs.findings[finding]?.name ?? finding] as [string, string]] : []),
-    ...(newFinding ? [['Neuer Befund (Vorschlag)', newFinding] as [string, string]] : []),
-  ];
-  const out: Change[] = [];
+  const out: TagProposal[] = [];
   let done = 0;
   // (10 at a time: shorter answers, which the model finishes)
   for (let i = 0; i < items.length; i += 10) {
@@ -75,7 +67,6 @@ export async function suggestFor(ctx: Ctx, items: ItemDoc[], onProgress?: (done:
       const it = s.id ? byId.get(s.id) : undefined;
       if (!it) continue;
       const cur = study.latest().items[it.id] ?? it;
-      // what the statement would carry afterwards
       const add: string[] = [];
       for (const g of groups) {
         const tg = model.tags.find((x) => x.id === g.id)!;
@@ -86,37 +77,13 @@ export async function suggestFor(ctx: Ctx, items: ItemDoc[], onProgress?: (done:
       const finding = !cur.finding && s.finding && findingIds.has(s.finding) ? s.finding : null;
       const newFinding = !cur.finding && !finding && s.newFinding ? String(s.newFinding).slice(0, 120) : null;
       if (!add.length && !finding && !newFinding) continue;
-      out.push({
-        id: `ai:${it.id}`,
-        kind: 'konflikt',
-        group: it.person,
-        label: `KI-Vorschlag: ${[...add.map(label), finding ? `Befund „${study.docs.findings[finding]?.name}“` : '', newFinding ? `neuer Befund „${newFinding}“` : ''].filter(Boolean).join(' · ')}`,
-        current: { text: cur.de || cur.text, fields: fieldsOf(cur.chips, cur.finding) },
-        incoming: { text: cur.de || cur.text, fields: fieldsOf([...cur.chips, ...add], cur.finding ?? finding, newFinding) },
-        choice: 'neu',
-        apply: (c, w) => {
-          if (c !== 'neu') return;
-          const now = w.items[it.id];
-          if (!now) return;
-          w.items[it.id] = {
-            ...now,
-            chips: [...new Set([...now.chips, ...add])],
-            suggested: now.suggested.filter((x) => !add.includes(x)),
-            finding: now.finding ?? finding,
-            suggestedFinding: null,
-            suggestedNewFinding: newFinding ?? now.suggestedNewFinding ?? null,
-          };
-        },
-      });
+      out.push({ id: it.id, chips: [...cur.chips, ...add], finding: cur.finding ?? finding, newFinding });
     }
     done += batch.length;
     onProgress?.(done, items.length);
   }
   return out;
 }
-
-const AI_NAMES: [string, string] = ['Aktuell', 'KI-Vorschlag'];
-const AI_INTRO = 'Die KI schlägt Tags und Befunde vor. Alle Vorschläge sind vorausgewählt: abwählen („Aktuell behalten“), was nicht übernommen werden soll; Übernommenes zählt als bestätigter Tag. Vor dem Übernehmen wird der jetzige Stand gesichert.';
 
 // ---- import ----
 export function NotesImport() {
@@ -127,7 +94,7 @@ export function NotesImport() {
   const [busy, setBusy] = useState(false);
   const notes = study.docs.notes.main;
 
-  const [plan, setPlan] = useState<{ title: string; changes: Change[]; reason: string; ai?: boolean } | null>(null);
+  const [plan, setPlan] = useState<{ title: string; changes: Change[]; reason: string } | null>(null);
   const tagLabel = (id: string) => model.chipLabel.get(id) ?? '';
 
   // read the file and show what it would change; nothing is stored yet
@@ -160,9 +127,9 @@ export function NotesImport() {
     if (todo.length) {
       setBusy(true);
       try {
-        const changes = await suggestFor(ctx, todo, (d, a) => setMsg(`KI-Vorschläge: ${d} von ${a} …`));
-        if (changes.length) setPlan({ title: `KI-Vorschläge (${changes.length} Aussagen)`, changes, reason: 'KI-Vorschläge', ai: true });
-        setMsg(changes.length ? `KI-Vorschläge für ${changes.length} Aussagen: im Fenster prüfen.` : 'KI: keine neuen Vorschläge.');
+        const found = await suggestFor(ctx, todo, (d, a) => setMsg(`KI-Vorschläge: ${d} von ${a} …`));
+        if (found.length) setTagPlan(found);
+        setMsg(found.length ? `KI-Tags für ${found.length} Aussagen: im Fenster prüfen.` : 'KI: keine neuen Tags vorgeschlagen.');
       } catch (e) {
         setMsg(`Import fertig; KI-Vorschläge nicht verfügbar (${String((e as Error).message)}).`);
       } finally {
@@ -171,6 +138,7 @@ export function NotesImport() {
     }
   }
   const [applying, setApplying] = useState<string | null>(null);
+  const [tagPlan, setTagPlan] = useState<TagProposal[] | null>(null);
 
   return (
     <Section title="Testnotizen: Datei oder Text" id="st-notes-detail">
@@ -203,21 +171,31 @@ export function NotesImport() {
           title={plan.title}
           changes={plan.changes}
           busy={applying}
-          {...(plan.ai ? { names: AI_NAMES, intro: AI_INTRO } : {})}
           onCancel={() => {
             setPlan(null);
-            setMsg(plan.ai ? 'KI-Vorschläge verworfen: nichts übernommen.' : 'Abgebrochen: nichts übernommen.');
+            setMsg('Abgebrochen: nichts übernommen.');
           }}
           onApply={(choices) => {
             setApplying('Stand wird gesichert, Änderungen werden übernommen …');
             void applyChanges(study, plan.changes, choices, plan.reason)
               .then((summary) => {
                 setPlan(null);
-                if (plan.ai) return setMsg(`${summary}.`);
                 return after(summary);
               })
               .catch((e) => setMsg(`Nicht übernommen: ${String((e as Error).message)}`))
               .finally(() => setApplying(null));
+          }}
+        />
+      )}
+      {tagPlan && (
+        <TagReview
+          study={study}
+          tags={model.tags}
+          items={new Map(Object.values(study.latest().items).map((i) => [i.id, i]))}
+          proposals={tagPlan}
+          onClose={(m) => {
+            setTagPlan(null);
+            if (m) setMsg(m);
           }}
         />
       )}
@@ -646,9 +624,14 @@ export default function Notes() {
     if (put.length) study.commit(put.map((p) => ({ coll: 'items' as const, id: p.id, data: p })));
   };
 
-  // the AI's suggestions, checked in the review window before anything is stored
-  const [aiPlan, setAiPlan] = useState<Change[] | null>(null);
-  const [aiBusy, setAiBusy] = useState<string | null>(null);
+  // the AI's proposals (tags; reworded statements), checked in a review window before anything is stored
+  const [tagPlan, setTagPlan] = useState<TagProposal[] | null>(null);
+  const [rewritePlan, setRewritePlan] = useState<Rewrite[] | null>(null);
+  const [showCriteria, setShowCriteria] = useState(false);
+  const criteria = ((study.docs.settings.rewrite as { criteria?: string } | undefined)?.criteria ?? '').trim() || DEFAULT_CRITERIA;
+  // what the AI works on: the selected statements, else (tags) the unchecked ones / (wording) the ones shown
+  const forTags = selShown.length ? selShown : open;
+  const forRewrite = selShown.length ? selShown : shown;
   // a tag clicked on one of several selected statements: set on all of them, or (already on the clicked one) taken off all
   const tagSelected = (clicked: ItemDoc, g: TagGroup, chip: string) => {
     const on = !clicked.chips.includes(chip);
@@ -658,11 +641,31 @@ export default function Notes() {
     logChange(study, `Tag „${model.chipLabel.get(chip) ?? chip}“ ${on ? 'gesetzt' : 'entfernt'}: ${put.length} ausgewählte Aussagen`);
   };
   async function suggestOpen() {
-    setBusy('KI-Vorschläge …');
+    setBusy('KI schlägt Tags vor …');
     try {
-      const changes = await suggestFor(ctx, open, (d, a) => setBusy(`KI-Vorschläge: ${d} von ${a} …`));
-      setBusy(changes.length ? null : 'KI: keine neuen Vorschläge.');
-      if (changes.length) setAiPlan(changes);
+      const found = await suggestFor(ctx, forTags, (d, a) => setBusy(`KI schlägt Tags vor: ${d} von ${a} …`));
+      setBusy(found.length ? null : 'KI: keine neuen Tags vorgeschlagen.');
+      if (found.length) setTagPlan(found);
+    } catch (e) {
+      setBusy(`KI nicht verfügbar: ${String((e as Error).message)}`);
+    }
+  }
+  async function rewriteShown() {
+    const todo = forRewrite.filter((i) => workingText(i).trim());
+    setBusy('KI formuliert um …');
+    try {
+      const out: Rewrite[] = [];
+      for (let k = 0; k < todo.length; k += 20) {
+        const batch = todo.slice(k, k + 20);
+        out.push(...(await study.rewrite({ items: batch.map((i) => ({ id: i.id, text: workingText(study.latest().items[i.id] ?? i), question: i.question })), criteria })));
+        setBusy(`KI formuliert um: ${Math.min(k + 20, todo.length)} von ${todo.length} …`);
+      }
+      const changed = out.filter((r) => {
+        const i = study.latest().items[r.id];
+        return i && r.text.trim() !== workingText(i).trim();
+      });
+      setBusy(changed.length ? null : 'KI: keine Änderungen an den Aussagen vorgeschlagen.');
+      if (changed.length) setRewritePlan(changed);
     } catch (e) {
       setBusy(`KI nicht verfügbar: ${String((e as Error).message)}`);
     }
@@ -689,25 +692,80 @@ export default function Notes() {
         </div>
         <div className="st-barpart" role="group" aria-label="KI">
           <span className="st-barlabel">KI</span>
-          <button type="button" disabled={!open.length || !!busy?.endsWith('…')} onClick={() => void suggestOpen()} title="Tags und Befunde für alle ungeprüften Aussagen vorschlagen lassen; du prüfst sie vor dem Übernehmen">
-            Tags vorschlagen ({open.length} ungeprüft)
+          <button
+            type="button"
+            disabled={!forTags.length || !!busy?.endsWith('…')}
+            onClick={() => void suggestOpen()}
+            title={`Die KI schlägt passende Tags und einen Befund vor – für ${selShown.length ? 'die ausgewählten' : 'alle ungeprüften'} Aussagen. Du prüfst und änderst alles im Fenster, bevor etwas gespeichert wird.\nBeispiel: „Crafting-Menü schwer zu finden“ → Bereich: Spiel · Art: Problem · Thema: Crafting.`}
+          >
+            {`KI: Tags vorschlagen (${forTags.length})`}
+          </button>
+          <button
+            type="button"
+            disabled={!forRewrite.length || !!busy?.endsWith('…')}
+            onClick={() => void rewriteShown()}
+            title={`Die KI formuliert ${selShown.length ? 'die ausgewählten' : 'die angezeigten'} Aussagen nach deinen Kriterien neu (Bedeutung bleibt gleich). Du vergleichst alt und neu im Fenster und kannst jeden Vorschlag selbst anpassen. Die Originalnotiz bleibt erhalten.\nBeispiel: „menü crafting nich gefunden, hat lange gesucht“ → „Die Testperson fand das Crafting-Menü nicht und suchte lange danach.“`}
+          >
+            {`KI: Aussagen umformulieren (${forRewrite.length})`}
+          </button>
+          <button type="button" className="st-linkbtn" aria-expanded={showCriteria} onClick={() => setShowCriteria((x) => !x)} title="Festlegen, wie die KI umformulieren soll (z. B. sachlich, Präsens, vollständige Sätze).">
+            Kriterien
           </button>
         </div>
         {busy && <span className="st-muted">{busy}</span>}
       </div>
-      {aiPlan && (
-        <ChangeModal
-          title={`KI-Vorschläge (${aiPlan.length} Aussagen)`}
-          changes={aiPlan}
-          names={AI_NAMES}
-          intro={AI_INTRO}
-          busy={aiBusy}
-          onCancel={() => setAiPlan(null)}
-          onApply={(choices) => {
-            setAiBusy('Wird übernommen …');
-            void applyChanges(study, aiPlan, choices, 'KI-Vorschläge')
-              .then(() => setAiPlan(null))
-              .finally(() => setAiBusy(null));
+      {showCriteria && (
+        <div className="st-criteria">
+          <label className="st-fprop-field">
+            <span className="st-cell-label">Kriterien für „KI: Aussagen umformulieren“</span>
+            <LazyArea
+              value={criteria}
+              onSave={(v) => {
+                const next = v.trim();
+                study.commit([{ coll: 'settings', id: 'rewrite', data: { criteria: next && next !== DEFAULT_CRITERIA ? next : undefined } }]);
+                logChange(study, 'Kriterien für die KI-Umformulierung geändert');
+              }}
+              placeholder={DEFAULT_CRITERIA}
+            />
+          </label>
+          <p className="st-muted">Gilt für jede Umformulierung. Immer gilt zusätzlich: Bedeutung bleibt gleich, nichts wird hinzugefügt oder weggelassen, IDs, Namen und Zahlen bleiben.</p>
+          <div className="st-toolbar">
+            <button
+              type="button"
+              disabled={criteria === DEFAULT_CRITERIA}
+              onClick={() => {
+                study.commit([{ coll: 'settings', id: 'rewrite', data: {} }]);
+                logChange(study, 'Kriterien für die KI-Umformulierung: Standard');
+              }}
+            >
+              Standard wiederherstellen
+            </button>
+            <button type="button" onClick={() => setShowCriteria(false)}>
+              Schließen
+            </button>
+          </div>
+        </div>
+      )}
+      {tagPlan && (
+        <TagReview
+          study={study}
+          tags={model.tags}
+          items={new Map(model.allItems.map((i) => [i.id, i]))}
+          proposals={tagPlan}
+          onClose={(m) => {
+            setTagPlan(null);
+            setBusy(m ?? null);
+          }}
+        />
+      )}
+      {rewritePlan && (
+        <RewriteReview
+          study={study}
+          items={new Map(model.allItems.map((i) => [i.id, i]))}
+          rewrites={rewritePlan}
+          onClose={(m) => {
+            setRewritePlan(null);
+            setBusy(m ?? null);
           }}
         />
       )}
@@ -808,6 +866,9 @@ export default function Notes() {
     </>
   );
 }
+// how the AI rewords statements unless set otherwise (Kriterien)
+const DEFAULT_CRITERIA = 'Sachlich und neutral, in vollständigen Sätzen und im Präsens, auf Deutsch; Umgangssprache und Stichworte in klare Standardsprache; kurz und eindeutig; aus Sicht der Beobachtung („Die Testperson …“).';
+
 // a short guide for whoever opens the page first; closed, it stays closed
 const INTRO_KEY = 'asciia-study-notes-intro';
 function PageIntro() {
@@ -847,7 +908,7 @@ function PageIntro() {
           <strong>Mehrere auf einmal:</strong> Kästchen links anhaken (Umschalt: ganzer Bereich); ein Tag-Klick bei einer davon gilt dann für alle.
         </li>
         <li>
-          <strong>KI und Auswertung:</strong> „Tags vorschlagen“ lässt die KI vorschlagen (du prüfst vor dem Übernehmen). Links unter Qualitatives Feedback: Nach Priorität, Codes, Wiederkehrende Befunde und die Tag-Gruppen.
+          <strong>KI und Auswertung:</strong> „KI: Tags vorschlagen“ und „KI: Aussagen umformulieren“ (nach deinen „Kriterien“) arbeiten mit den ausgewählten Aussagen, sonst mit allen ungeprüften bzw. angezeigten; jedes Ergebnis prüfst und bearbeitest du in einem Fenster, bevor es gespeichert wird. Über jedem Button erklärt ein Hinweis mit Beispiel, was er tut. Links unter Qualitatives Feedback: Nach Priorität, Codes, Wiederkehrende Befunde und die Tag-Gruppen.
         </li>
       </ol>
     </details>

@@ -73,7 +73,13 @@ export default function Findings() {
       )}
       <p className="st-note st-page-hint">Ein Befund bündelt Aussagen, die bei mehreren Testpersonen wiederkehren. Er zählt, wie viele verschiedene Testpersonen ihn genannt haben.</p>
       <div className="st-toolbar">
-        <button type="button" className="is-primary" disabled={!!busy?.endsWith('…') || model.items.length < 2} onClick={() => void bundle()}>
+        <button
+          type="button"
+          className="is-primary"
+          disabled={!!busy?.endsWith('…') || model.items.length < 2}
+          onClick={() => void bundle()}
+          title={'Die KI sucht Aussagen, die bei mindestens zwei Testpersonen dasselbe sagen, und fasst sie zu Befunden mit sachlicher Beschreibung zusammen. Du prüfst und bearbeitest alles im Fenster, bevor etwas gespeichert wird.\nBeispiel: P001 „Crafting-Menü verwirrend“ + P004 „Crafting schwer zu finden“ → Befund „Crafting-Menü schwer auffindbar“ (2 Testpersonen).'}
+        >
           KI: ähnliche Aussagen bündeln …
         </button>
         <span className="st-selbar-gap" />

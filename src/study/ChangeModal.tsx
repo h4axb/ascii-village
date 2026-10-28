@@ -7,7 +7,7 @@ import { diffWords, resolve, type Change, type Choice, type DiffSide, type Piece
 import type { Study } from './store';
 import { logChange } from './ui';
 
-function Words({ pieces }: { pieces: Piece[] }) {
+export function Words({ pieces }: { pieces: Piece[] }) {
   return (
     <>
       {pieces.map((p, i) =>

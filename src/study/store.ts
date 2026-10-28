@@ -233,6 +233,14 @@ export function useStudy() {
     return d?.groups ?? [];
   }, []);
 
+  // AI: statements reworded by the criteria set (proposals)
+  const rewrite = useCallback(async (body: { items: { id: string; text: string; question?: string }[]; criteria: string }) => {
+    const res = await fetch('/api/study/rewrite', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify(body) });
+    const d = (await res.json().catch(() => null)) as { rewrites?: { id: string; text: string }[]; error?: string } | null;
+    if (!res.ok) throw new Error(d?.error ?? String(res.status));
+    return d?.rewrites ?? [];
+  }, []);
+
   // AI translations (drafts), in batches; throws when the AI is unavailable
   const translate = useCallback(async (texts: { id: string; text: string }[], to: 'de' | 'en' = 'de', onProgress?: (done: number, all: number) => void) => {
     const out = new Map<string, string>();
@@ -283,6 +291,6 @@ export function useStudy() {
 
   // (the newest documents, for changes that build on the one just made)
   const latest = useCallback(() => docsRef.current, []);
-  return { state, error, docs, game, live, stand, acceptGame, refreshLive, saving, saveError, load, commit, suggest, cluster, translate, pass, latest, viewing, versions, saveVersion, loadVersion };
+  return { state, error, docs, game, live, stand, acceptGame, refreshLive, saving, saveError, load, commit, suggest, cluster, rewrite, translate, pass, latest, viewing, versions, saveVersion, loadVersion };
 }
 export type Study = ReturnType<typeof useStudy>;

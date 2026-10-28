@@ -176,12 +176,32 @@ export interface Rewrite {
   id: string;
   text: string;
 }
-export function RewriteReview({ study, items, rewrites, onClose }: { study: Study; items: Map<string, ItemDoc>; rewrites: Rewrite[]; onClose: (msg?: string) => void }) {
+export function RewriteReview({ study, items, rewrites, criteria, onClose }: { study: Study; items: Map<string, ItemDoc>; rewrites: Rewrite[]; criteria: string; onClose: (msg?: string) => void }) {
   const list = rewrites.filter((r) => items.has(r.id) && r.text.trim() !== workingText(items.get(r.id)!).trim());
   const [texts, setTexts] = useState<Record<string, string>>(() => Object.fromEntries(list.map((r) => [r.id, r.text])));
   const [picks, setPicks] = useState<Record<string, Pick>>(() => Object.fromEntries(list.map((r) => [r.id, 'neu' as Pick])));
   const [busy, setBusy] = useState<string | null>(null);
   const setPick = (id: string, p: Pick) => setPicks((x) => ({ ...x, [id]: p }));
+  // one statement again, by a short hint of what should change; the text before is kept for "↶"
+  const [hints, setHints] = useState<Record<string, string>>({});
+  const [before, setBefore] = useState<Record<string, string>>({});
+  const [working, setWorking] = useState<Record<string, string | null>>({});
+  async function regenerate(id: string) {
+    const hint = (hints[id] ?? '').trim();
+    if (!hint || working[id] === 'KI arbeitet …') return;
+    const i = study.latest().items[id] ?? items.get(id)!;
+    setWorking((x) => ({ ...x, [id]: 'KI arbeitet …' }));
+    try {
+      const [r] = await study.rewrite({ items: [{ id, text: workingText(i), question: i.question, hint, previous: texts[id] }], criteria });
+      if (!r?.text.trim()) throw new Error('keine Antwort');
+      setBefore((x) => ({ ...x, [id]: texts[id] }));
+      setTexts((x) => ({ ...x, [id]: r.text.trim() }));
+      setPick(id, 'neu');
+      setWorking((x) => ({ ...x, [id]: null }));
+    } catch (e) {
+      setWorking((x) => ({ ...x, [id]: `Nicht neu generiert: ${String((e as Error).message)}` }));
+    }
+  }
   const rows: Row[] = list.map((r) => {
     const i = items.get(r.id)!;
     return { id: r.id, group: i.link ?? i.person, label: short(workingText(i)) };
@@ -240,6 +260,38 @@ export function RewriteReview({ study, items, rewrites, onClose }: { study: Stud
               <p className="st-pane-text st-pane-diff" data-notr>
                 <Words pieces={d.right} />
               </p>
+              <div className="st-regen">
+                <input
+                  value={hints[id] ?? ''}
+                  onChange={(e) => setHints((x) => ({ ...x, [id]: e.target.value }))}
+                  onKeyDown={(e) => e.key === 'Enter' && void regenerate(id)}
+                  placeholder="Was soll sich ändern? z. B. kürzer, ohne Wertung, Präsens"
+                  aria-label="Hinweis an die KI für diese Aussage"
+                />
+                <button
+                  type="button"
+                  disabled={!(hints[id] ?? '').trim() || working[id] === 'KI arbeitet …'}
+                  onClick={() => void regenerate(id)}
+                  title={'Die KI formuliert nur diese Aussage noch einmal – nach deinem Hinweis links daneben. Der bisherige Vorschlag lässt sich mit „↶“ zurückholen.\nBeispiel: Hinweis „kürzer“ → „Crafting-Menü schwer auffindbar.“'}
+                >
+                  Neu generieren
+                </button>
+                {before[id] != null && (
+                  <button
+                    type="button"
+                    className="st-linkbtn"
+                    onClick={() => {
+                      const back = before[id];
+                      setBefore((x) => ({ ...x, [id]: texts[id] }));
+                      setTexts((x) => ({ ...x, [id]: back }));
+                    }}
+                    title="Den Vorschlag vor dem letzten Neu-Generieren zurückholen (noch einmal: wieder vor)"
+                  >
+                    ↶ vorheriger Vorschlag
+                  </button>
+                )}
+              </div>
+              {working[id] && <p className="st-muted st-regen-msg">{working[id]}</p>}
             </div>
           </div>
         );

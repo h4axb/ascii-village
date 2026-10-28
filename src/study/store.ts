@@ -234,7 +234,7 @@ export function useStudy() {
   }, []);
 
   // AI: statements reworded by the criteria set (proposals)
-  const rewrite = useCallback(async (body: { items: { id: string; text: string; question?: string }[]; criteria: string }) => {
+  const rewrite = useCallback(async (body: { items: { id: string; text: string; question?: string; hint?: string; previous?: string }[]; criteria: string }) => {
     const res = await fetch('/api/study/rewrite', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify(body) });
     const d = (await res.json().catch(() => null)) as { rewrites?: { id: string; text: string }[]; error?: string } | null;
     if (!res.ok) throw new Error(d?.error ?? String(res.status));

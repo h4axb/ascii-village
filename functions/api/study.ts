@@ -475,18 +475,19 @@ async function cluster(request: Request, env: StudyEnv): Promise<Response> {
 async function rewrite(request: Request, env: StudyEnv): Promise<Response> {
   const key = env['asciia-bay-crafting'] ?? env.LLM_API_KEY;
   if (!key && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
-  const body = (await request.json().catch(() => null)) as { items?: { id: string; text: string; question?: string }[]; criteria?: string } | null;
+  const body = (await request.json().catch(() => null)) as { items?: { id: string; text: string; question?: string; hint?: string; previous?: string }[]; criteria?: string } | null;
   const items = (body?.items ?? []).filter((i) => i && i.id && typeof i.text === 'string' && i.text.trim()).slice(0, 20);
   if (!items.length) return json(400, { error: 'items required' });
   const criteria = String(body?.criteria ?? '').slice(0, 2000);
-  if (!key) return json(200, { rewrites: items.map((i) => ({ id: i.id, text: `Umformuliert: ${i.text.trim()}` })) });
+  if (!key) return json(200, { rewrites: items.map((i) => ({ id: i.id, text: i.hint?.trim() ? `Umformuliert (Hinweis: ${i.hint.trim().slice(0, 500)}): ${i.text.trim()}` : `Umformuliert: ${i.text.trim()}` })) });
   const system =
     'Du formulierst Aussagen aus den Notizen eines Usability-Tests eines Spiels um. Antworte nur mit einem JSON-Objekt, ohne Text davor oder danach. ' +
     'Halte dich an diese Kriterien: ' +
     (criteria || 'sachlich, neutral, vollständige Sätze auf Deutsch') +
-    '. Immer gilt: die Bedeutung bleibt gleich; nichts hinzufügen, nichts weglassen, nichts deuten; Teilnehmer-IDs (P001), Eigennamen, Variante A/B und Zahlen bleiben unverändert.';
+    '. Immer gilt: die Bedeutung bleibt gleich; nichts hinzufügen, nichts weglassen, nichts deuten; Teilnehmer-IDs (P001), Eigennamen, Variante A/B und Zahlen bleiben unverändert. ' +
+    'Hat eine Aussage einen "hinweis", überarbeite ihren "bisheriger_vorschlag" nach diesem Hinweis; maßgeblich für den Inhalt bleibt "text".';
   const user = JSON.stringify({
-    aussagen: items.map((i) => ({ id: i.id, text: i.text.slice(0, 2000), frage: i.question })),
+    aussagen: items.map((i) => ({ id: i.id, text: i.text.slice(0, 2000), frage: i.question, ...(i.hint?.trim() ? { hinweis: i.hint.trim().slice(0, 500), bisheriger_vorschlag: String(i.previous ?? '').slice(0, 2000) } : {}) })),
     format: { aussagen: [{ id: 'string', text: 'string' }] },
   });
   const r = await chat(env, key, system, user, 'aussagen');

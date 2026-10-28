@@ -2306,3 +2306,27 @@ body:has(.st-root) {
   margin: 0;
   font-size: 12.5px;
 }
+/* one statement again: a short hint for the AI */
+.st-regen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+  padding: 0 10px 10px;
+}
+.st-regen .st-linkbtn {
+  white-space: nowrap;
+}
+.st-regen input {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 13px;
+}
+.st-regen button {
+  font-size: 12.5px;
+}
+.st-regen-msg {
+  margin: 0 10px 10px;
+  font-size: 12.5px;
+}

@@ -761,6 +761,7 @@ export default function Notes() {
       {rewritePlan && (
         <RewriteReview
           study={study}
+          criteria={criteria}
           items={new Map(model.allItems.map((i) => [i.id, i]))}
           rewrites={rewritePlan}
           onClose={(m) => {

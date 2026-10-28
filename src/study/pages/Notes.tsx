@@ -29,16 +29,10 @@ export function toggleChip(item: ItemDoc, g: TagGroup, chip: string): ItemDoc {
 export function setChip(item: ItemDoc, g: TagGroup, chip: string): ItemDoc {
   return item.chips.includes(chip) ? item : toggleChip(item, g, chip);
 }
+// checked: only the tags chosen count; suggestions not clicked are dropped, never taken over
 export function confirmItem(item: ItemDoc, tags: TagGroup[]): ItemDoc {
-  let chips = [...item.chips];
-  for (const s of item.suggested) {
-    const g = groupOfChip(tags, s);
-    if (!g || chips.includes(s)) continue;
-    if (!g.multi && chips.some((c) => g.chips.some((x) => x.id === c))) continue; // a choice already made stays
-    chips.push(s);
-  }
-  chips = chips.filter((c) => groupOfChip(tags, c));
-  return { ...item, chips, suggested: [], finding: item.finding ?? item.suggestedFinding ?? null, suggestedFinding: null, confirmed: true, status: item.status === 'removed' ? 'removed' : undefined };
+  const chips = item.chips.filter((c) => groupOfChip(tags, c));
+  return { ...item, chips, suggested: [], suggestedFinding: null, confirmed: true, status: item.status === 'removed' ? 'removed' : undefined };
 }
 
 // ---- AI suggestions ----
@@ -454,14 +448,15 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
             </button>
           )}
           {!onChips.length && !sugChips.length && !item.finding && <span className="st-muted">noch keine Tags</span>}
+          {(sugChips.length > 0 || sf) && <span className="st-muted st-sughint">Vorschläge anklicken, um sie zu übernehmen</span>}
           <button type="button" className="st-linkbtn st-tagtoggle" aria-expanded={tagsOpen} onClick={() => setTagsOpen((x) => !x)}>
             {tagsOpen ? 'Tags schließen' : many ? `Tags für ${many} ausgewählte` : 'Tags bearbeiten'}
           </button>
         </div>
       </div>
       <div className="st-item-side">
-        <button type="button" className={item.confirmed && !open ? 'is-on' : ''} onClick={() => save(confirmItem(item, model.tags))} title="Vorschläge übernehmen und als geprüft markieren">
-          {item.confirmed && !open ? 'Geprüft ✓' : open ? 'Bestätigen' : 'Geprüft?'}
+        <button type="button" className={item.confirmed && !open ? 'is-on' : ''} onClick={() => save(confirmItem(item, model.tags))} title="Als geprüft markieren. Nur angeklickte Tags zählen; nicht angeklickte Vorschläge werden verworfen.">
+          {item.confirmed && !open ? 'Geprüft ✓' : 'Geprüft?'}
         </button>
         <MoreMenu
           actions={[
@@ -806,7 +801,7 @@ export default function Notes() {
               {person?.groupMismatch && <span className="st-flag">Tracking: {person.trackedGroup}</span>}
               {person?.excluded && <span className="st-flag">ausgeschlossen</span>}
               <button type="button" onClick={() => study.commit(mine.map((i) => ({ coll: 'items' as const, id: i.id, data: confirmItem(i, model.tags) })))}>
-                Alle bestätigen
+                Alle als geprüft markieren
               </button>
               <button type="button" onClick={() => selectAll(mine)}>
                 Alle auswählen
@@ -903,7 +898,7 @@ function PageIntro() {
           <strong>Tags setzen:</strong> unter jeder Aussage stehen ihre Tags in einer Zeile; „Tags bearbeiten“ öffnet alle Gruppen mit Erklärung. Gestrichelte Tags sind Vorschläge: anklicken übernimmt sie.
         </li>
         <li>
-          <strong>Prüfen:</strong> „Geprüft?“ bestätigt die Vorschläge einer Aussage. Weitere Aktionen (Deutsch, Original korrigieren, Frage, Löschen) unter „Bearbeiten ⋯“.
+          <strong>Prüfen:</strong> „Geprüft?“ markiert eine Aussage als geprüft; es zählen nur die angeklickten Tags, nicht angeklickte Vorschläge werden dabei verworfen. Weitere Aktionen (Deutsch, Original korrigieren, Frage, Löschen) unter „Bearbeiten ⋯“.
         </li>
         <li>
           <strong>Mehrere auf einmal:</strong> Kästchen links anhaken (Umschalt: ganzer Bereich); ein Tag-Klick bei einer davon gilt dann für alle.

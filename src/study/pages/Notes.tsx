@@ -505,7 +505,7 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
 }
 
 // "Bearbeiten ⋯": the rarer actions of a statement, out of the way until needed
-function MoreMenu({ actions }: { actions: [string, () => unknown, boolean?][] }) {
+function MoreMenu({ actions, up, label = 'Bearbeiten ⋯' }: { actions: [string, () => unknown, boolean?][]; up?: boolean; label?: string }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -515,8 +515,8 @@ function MoreMenu({ actions }: { actions: [string, () => unknown, boolean?][] })
     return () => document.removeEventListener('click', close);
   }, []);
   return (
-    <details ref={ref} className="st-more">
-      <summary>Bearbeiten ⋯</summary>
+    <details ref={ref} className={`st-more${up ? ' is-up' : ''}`}>
+      <summary>{label}</summary>
       <div className="st-more-list" role="menu">
         {actions.map(([label, run, danger]) => (
           <button
@@ -627,6 +627,34 @@ export default function Notes() {
   // what the AI works on: the selected statements, else (tags) the unchecked ones / (wording) the ones shown
   const forTags = selShown.length ? selShown : open;
   const forRewrite = selShown.length ? selShown : shown;
+  // the selection bar's own actions: on every selected statement at once
+  const [bulk, setBulk] = useState<null | 'frage' | 'befund'>(null);
+  const [bulkQ, setBulkQ] = useState('');
+  const putAll = (items: ItemDoc[], what: string) => {
+    if (!items.length) return;
+    study.commit(items.map((i) => ({ coll: 'items' as const, id: i.id, data: i })));
+    logChange(study, `${what}: ${items.length} ausgewählte Aussagen`);
+  };
+  const bulkQuestion = (q: string | undefined) => {
+    putAll(selShown.map((i) => ({ ...i, question: q, questionOwn: true })), q ? `Frage „${q}“ gesetzt` : 'Frage entfernt');
+    setBulk(null);
+    setBulkQ('');
+  };
+  const bulkSection = (section: 'during' | 'followup') =>
+    putAll(
+      selShown.filter((i) => i.section !== 'survey' && i.section !== section).map((i) => ({ ...i, section, sectionOwn: true })),
+      `Bereich → ${SECTION_LABEL[section]}`,
+    );
+  async function bulkDelete() {
+    const n = selShown.length;
+    if (!confirm(`${n} ausgewählte ${n === 1 ? 'Aussage' : 'Aussagen'} löschen? Der jetzige Stand wird vorher gesichert.`)) return;
+    await study.saveVersion(`vor dem Löschen von ${n} Aussagen`);
+    study.commit([], selShown.map((i) => ({ coll: 'items' as const, id: i.id })));
+    logChange(study, `${n} ausgewählte Aussagen gelöscht`);
+    setSel(new Set());
+  }
+  const findingList = Object.values(study.docs.findings).sort((a, b) => a.name.localeCompare(b.name));
+
   // a tag clicked on one of several selected statements: set on all of them, or (already on the clicked one) taken off all
   const tagSelected = (clicked: ItemDoc, g: TagGroup, chip: string) => {
     const on = !clicked.chips.includes(chip);
@@ -850,6 +878,59 @@ export default function Notes() {
           <button type="button" disabled={!pickTag} onClick={() => applyTag(false)}>
             Tag entfernen
           </button>
+          <MoreMenu
+            up
+            label="Ausgewählte bearbeiten ⋯"
+            actions={[
+              ['Als geprüft markieren', () => putAll(selShown.map((i) => confirmItem(i, model.tags)), 'Als geprüft markiert')],
+              ['Frage setzen …', () => setBulk('frage')],
+              ['Bereich: Beobachtung', () => bulkSection('during')],
+              ['Bereich: Nachgespräch', () => bulkSection('followup')],
+              ['Befund zuordnen …', () => setBulk('befund')],
+              ['Löschen', () => void bulkDelete(), true],
+            ]}
+          />
+          {bulk === 'frage' && (
+            <span className="st-selbar-form">
+              <input value={bulkQ} onChange={(e) => setBulkQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && bulkQ.trim() && bulkQuestion(bulkQ.trim())} placeholder="Frage für alle ausgewählten …" aria-label="Frage für alle ausgewählten" autoFocus />
+              <button type="button" disabled={!bulkQ.trim()} onClick={() => bulkQuestion(bulkQ.trim())}>
+                Setzen
+              </button>
+              <button type="button" onClick={() => bulkQuestion(undefined)} title="Die Frage bei allen ausgewählten entfernen">
+                Frage entfernen
+              </button>
+              <button type="button" className="st-linkbtn" onClick={() => setBulk(null)}>
+                Abbrechen
+              </button>
+            </span>
+          )}
+          {bulk === 'befund' && (
+            <span className="st-selbar-form">
+              <select
+                value=""
+                autoFocus
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  const f = v === '-' ? null : v;
+                  putAll(selShown.map((i) => ({ ...i, finding: f, suggestedFinding: null })), f ? `Befund „${study.docs.findings[f]?.name}“ zugeordnet` : 'Befund entfernt');
+                  setBulk(null);
+                }}
+                aria-label="Befund für alle ausgewählten"
+              >
+                <option value="">Befund wählen …</option>
+                <option value="-">kein Befund</option>
+                {findingList.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="st-linkbtn" onClick={() => setBulk(null)}>
+                Abbrechen
+              </button>
+            </span>
+          )}
           <span className="st-selbar-gap" />
           <button type="button" className="st-linkbtn" onClick={() => selectAll(shown)}>
             Alle sichtbaren auswählen

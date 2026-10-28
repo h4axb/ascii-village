@@ -2334,3 +2334,25 @@ body:has(.st-root) {
   font-size: 11.5px;
   font-style: italic;
 }
+/* the selection bar: its menu opens upwards, its small forms inline */
+.st-more.is-up .st-more-list {
+  top: auto;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: auto;
+}
+.st-selbar-form {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.st-selbar-form input {
+  min-width: 0;
+  flex: 1 1 200px;
+}
+.st-selbar-form select {
+  max-width: 100%;
+  min-width: 0;
+}

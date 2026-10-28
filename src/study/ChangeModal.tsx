@@ -94,7 +94,7 @@ export function ChangeModal({
   onCancel,
   busy,
   names = ['Aktuell', 'Neu'],
-  intro = 'Jeder Konflikt wird erst übernommen, wenn du ihn entschieden hast. Vor dem Übernehmen wird der jetzige Stand gesichert.',
+  intro = 'Alle Änderungen sind vorausgewählt: abwählen oder „Aktuell behalten“ wählen, was nicht übernommen werden soll. Vor dem Übernehmen wird der jetzige Stand gesichert.',
 }: {
   title: string;
   changes: Change[];
@@ -104,8 +104,8 @@ export function ChangeModal({
   names?: [string, string]; // the two sides (a restore: current and saved)
   intro?: string;
 }) {
-  // new things start ticked; conflicts start undecided: each one is asked
-  const [choices, setChoices] = useState<Record<string, Choice | undefined>>(() => Object.fromEntries(changes.map((c) => [c.id, c.kind === 'konflikt' ? undefined : c.kind === 'gleich' ? 'alt' : c.choice])));
+  // every change starts selected (the new side); what should not be applied is deselected
+  const [choices, setChoices] = useState<Record<string, Choice | undefined>>(() => Object.fromEntries(changes.map((c) => [c.id, c.kind === 'gleich' ? 'alt' : 'neu'])));
   // the last step: what will be applied, what stays, what was already so, before anything is stored
   const [review, setReview] = useState(false);
   const set = (id: string, v: Choice) => setChoices((x) => ({ ...x, [id]: v }));

@@ -41,43 +41,82 @@ export function confirmItem(item: ItemDoc, tags: TagGroup[]): ItemDoc {
 }
 
 // ---- AI suggestions ----
-export async function suggestFor(ctx: Ctx, items: ItemDoc[], onProgress?: (done: number, all: number) => void) {
+// AI suggestions for statements, as changes to check in the review window
+// (nothing is stored here): per statement the tags (and the recurring
+// finding) it would get; taken over, they are real tags. A tag already chosen
+// in a single-choice group stays.
+export async function suggestFor(ctx: Ctx, items: ItemDoc[], onProgress?: (done: number, all: number) => void): Promise<Change[]> {
   const { study, model } = ctx;
   const groups = model.tags.map((g) => ({ id: g.id, name: g.name, multi: g.multi, chips: g.chips.filter((c) => c.role !== 'rejected').map((c) => ({ id: c.id, label: c.label })) })).filter((g) => g.chips.length);
   const findings = Object.values(study.docs.findings).map((f) => ({ id: f.id, name: f.name }));
-  const chipIds = new Set(groups.flatMap((g) => g.chips.map((c) => c.id)));
   const findingIds = new Set(findings.map((f) => f.id));
   const byId = new Map(items.map((i) => [i.id, i]));
+  const label = (id: string) => {
+    const g = model.tags.find((x) => x.chips.some((c) => c.id === id));
+    return g ? `${g.name}: ${model.chipLabel.get(id) ?? id}` : '';
+  };
+  const fieldsOf = (chips: string[], finding: string | null | undefined, newFinding?: string | null): [string, string][] => [
+    ...model.tags.map((g): [string, string] => [g.name, chips.filter((c) => g.chips.some((x) => x.id === c)).map((c) => model.chipLabel.get(c) ?? c).join(', ')]).filter(([, v]) => v),
+    ...(finding ? [['Befund', study.docs.findings[finding]?.name ?? finding] as [string, string]] : []),
+    ...(newFinding ? [['Neuer Befund (Vorschlag)', newFinding] as [string, string]] : []),
+  ];
+  const out: Change[] = [];
   let done = 0;
-  for (let i = 0; i < items.length; i += 25) {
-    const batch = items.slice(i, i + 25);
-    const out = (await study.suggest({ items: batch.map((x) => { const cur = study.latest().items[x.id] ?? x; return { id: x.id, text: cur.de || cur.text, section: SECTION_LABEL[x.section], question: x.question }; }), groups, findings })) as {
+  // (10 at a time: shorter answers, which the model finishes)
+  for (let i = 0; i < items.length; i += 10) {
+    const batch = items.slice(i, i + 10);
+    const answer = (await study.suggest({ items: batch.map((x) => { const cur = study.latest().items[x.id] ?? x; return { id: x.id, text: cur.de || cur.text, section: SECTION_LABEL[x.section], question: x.question }; }), groups, findings })) as {
       id?: string;
       chips?: Record<string, string[]>;
       finding?: string | null;
       newFinding?: string | null;
     }[];
-    const put: ItemDoc[] = [];
-    for (const s of out) {
+    for (const s of answer) {
       const it = s.id ? byId.get(s.id) : undefined;
       if (!it) continue;
-      const sug: string[] = [];
+      const cur = study.latest().items[it.id] ?? it;
+      // what the statement would carry afterwards
+      const add: string[] = [];
       for (const g of groups) {
-        const picked = (s.chips?.[g.id] ?? []).filter((c) => chipIds.has(c) && g.chips.some((x) => x.id === c));
-        sug.push(...(g.multi ? picked : picked.slice(0, 1)));
+        const tg = model.tags.find((x) => x.id === g.id)!;
+        const picked = (s.chips?.[g.id] ?? []).filter((c) => g.chips.some((x) => x.id === c));
+        const had = cur.chips.some((c) => tg.chips.some((x) => x.id === c));
+        for (const c of g.multi ? picked : had ? [] : picked.slice(0, 1)) if (!cur.chips.includes(c)) add.push(c);
       }
-      put.push({
-        ...it,
-        suggested: sug.filter((c) => !it.chips.includes(c)),
-        suggestedFinding: s.finding && findingIds.has(s.finding) && s.finding !== it.finding ? s.finding : null,
-        suggestedNewFinding: !s.finding && s.newFinding ? String(s.newFinding).slice(0, 120) : null,
+      const finding = !cur.finding && s.finding && findingIds.has(s.finding) ? s.finding : null;
+      const newFinding = !cur.finding && !finding && s.newFinding ? String(s.newFinding).slice(0, 120) : null;
+      if (!add.length && !finding && !newFinding) continue;
+      out.push({
+        id: `ai:${it.id}`,
+        kind: 'konflikt',
+        group: it.person,
+        label: `KI-Vorschlag: ${[...add.map(label), finding ? `Befund „${study.docs.findings[finding]?.name}“` : '', newFinding ? `neuer Befund „${newFinding}“` : ''].filter(Boolean).join(' · ')}`,
+        current: { text: cur.de || cur.text, fields: fieldsOf(cur.chips, cur.finding) },
+        incoming: { text: cur.de || cur.text, fields: fieldsOf([...cur.chips, ...add], cur.finding ?? finding, newFinding) },
+        choice: 'neu',
+        apply: (c, w) => {
+          if (c !== 'neu') return;
+          const now = w.items[it.id];
+          if (!now) return;
+          w.items[it.id] = {
+            ...now,
+            chips: [...new Set([...now.chips, ...add])],
+            suggested: now.suggested.filter((x) => !add.includes(x)),
+            finding: now.finding ?? finding,
+            suggestedFinding: null,
+            suggestedNewFinding: newFinding ?? now.suggestedNewFinding ?? null,
+          };
+        },
       });
     }
-    if (put.length) study.commit(put.map((p) => ({ coll: 'items', id: p.id, data: p })));
     done += batch.length;
     onProgress?.(done, items.length);
   }
+  return out;
 }
+
+const AI_NAMES: [string, string] = ['Aktuell', 'KI-Vorschlag'];
+const AI_INTRO = 'Die KI schlägt Tags und Befunde vor. Alle Vorschläge sind vorausgewählt: abwählen („Aktuell behalten“), was nicht übernommen werden soll; Übernommenes zählt als bestätigter Tag. Vor dem Übernehmen wird der jetzige Stand gesichert.';
 
 // ---- import ----
 export function NotesImport() {
@@ -88,7 +127,7 @@ export function NotesImport() {
   const [busy, setBusy] = useState(false);
   const notes = study.docs.notes.main;
 
-  const [plan, setPlan] = useState<{ title: string; changes: Change[]; reason: string } | null>(null);
+  const [plan, setPlan] = useState<{ title: string; changes: Change[]; reason: string; ai?: boolean } | null>(null);
   const tagLabel = (id: string) => model.chipLabel.get(id) ?? '';
 
   // read the file and show what it would change; nothing is stored yet
@@ -121,8 +160,9 @@ export function NotesImport() {
     if (todo.length) {
       setBusy(true);
       try {
-        await suggestFor(ctx, todo, (d, a) => setMsg(`KI-Vorschläge: ${d} von ${a} …`));
-        setMsg((m) => `${m?.startsWith('KI') ? '' : `${m} `}KI-Vorschläge für ${todo.length} Aussagen erstellt. Bitte unter „Notizen“ prüfen.`);
+        const changes = await suggestFor(ctx, todo, (d, a) => setMsg(`KI-Vorschläge: ${d} von ${a} …`));
+        if (changes.length) setPlan({ title: `KI-Vorschläge (${changes.length} Aussagen)`, changes, reason: 'KI-Vorschläge', ai: true });
+        setMsg(changes.length ? `KI-Vorschläge für ${changes.length} Aussagen: im Fenster prüfen.` : 'KI: keine neuen Vorschläge.');
       } catch (e) {
         setMsg(`Import fertig; KI-Vorschläge nicht verfügbar (${String((e as Error).message)}).`);
       } finally {
@@ -162,15 +202,17 @@ export function NotesImport() {
           title={plan.title}
           changes={plan.changes}
           busy={applying}
+          {...(plan.ai ? { names: AI_NAMES, intro: AI_INTRO } : {})}
           onCancel={() => {
             setPlan(null);
-            setMsg('Abgebrochen: nichts übernommen.');
+            setMsg(plan.ai ? 'KI-Vorschläge verworfen: nichts übernommen.' : 'Abgebrochen: nichts übernommen.');
           }}
           onApply={(choices) => {
             setApplying('Stand wird gesichert, Änderungen werden übernommen …');
             void applyChanges(study, plan.changes, choices, plan.reason)
               .then((summary) => {
                 setPlan(null);
+                if (plan.ai) return setMsg(`${summary}.`);
                 return after(summary);
               })
               .catch((e) => setMsg(`Nicht übernommen: ${String((e as Error).message)}`))
@@ -215,7 +257,9 @@ function TallyFreeText() {
 }
 
 // ---- one statement, Excel-like: text | a cell of chips per tag group | finding ----
-function ChipCell({ item, g, onChange, labelOnly }: { item: ItemDoc; g: TagGroup; onChange: (i: ItemDoc) => void; labelOnly?: boolean }) {
+// (onTag: a click that sets or removes the tag on all selected statements at once)
+function ChipCell({ item, g, onChange, labelOnly, onTag, many }: { item: ItemDoc; g: TagGroup; onChange: (i: ItemDoc) => void; labelOnly?: boolean; onTag?: (g: TagGroup, chip: string) => void; many?: number }) {
+  const tag = (chip: string) => (onTag ? onTag(g, chip) : onChange(toggleChip(item, g, chip)));
   const shown = g.multi || g.chips.length > 5 ? g.chips.filter((c) => item.chips.includes(c.id) || item.suggested.includes(c.id)) : g.chips;
   const rest = g.chips.filter((c) => !shown.includes(c));
   return (
@@ -226,14 +270,14 @@ function ChipCell({ item, g, onChange, labelOnly }: { item: ItemDoc; g: TagGroup
           key={c.id}
           type="button"
           className={`st-chip${item.chips.includes(c.id) ? ' is-on' : item.suggested.includes(c.id) ? ' is-suggested' : ''}`}
-          title={item.suggested.includes(c.id) ? 'Vorschlag: klicken zum Bestätigen' : undefined}
-          onClick={() => onChange(toggleChip(item, g, c.id))}
+          title={many ? `gilt für alle ${many} ausgewählten Aussagen` : item.suggested.includes(c.id) ? 'Vorschlag: klicken zum Bestätigen' : undefined}
+          onClick={() => tag(c.id)}
         >
           {c.label}
         </button>
       ))}
       {rest.length > 0 && (
-        <select className="st-chip-add" value="" onChange={(e) => e.target.value && onChange(toggleChip(item, g, e.target.value))} aria-label={`${g.name} hinzufügen`}>
+        <select className="st-chip-add" value="" onChange={(e) => e.target.value && tag(e.target.value)} aria-label={`${g.name} hinzufügen`}>
           <option value="">+</option>
           {rest.map((c) => (
             <option key={c.id} value={c.id}>
@@ -246,7 +290,7 @@ function ChipCell({ item, g, onChange, labelOnly }: { item: ItemDoc; g: TagGroup
   );
 }
 
-function ItemRow({ item, model, save, remove, fresh, selected, onSelect }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void; fresh?: boolean; selected?: boolean; onSelect?: (shift: boolean) => void }) {
+function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, many }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void; fresh?: boolean; selected?: boolean; onSelect?: (shift: boolean) => void; onTag?: (g: TagGroup, chip: string) => void; many?: number }) {
   const { study } = useCtx();
   const view = useContentView();
   const [editDe, setEditDe] = useState(false);
@@ -422,7 +466,7 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect }: { ite
       </div>
       <div className="st-item-chips">
         {model.tags.map((g) => (
-          <ChipCell key={g.id} item={item} g={g} onChange={save} labelOnly />
+          <ChipCell key={g.id} item={item} g={g} onChange={save} labelOnly onTag={onTag} many={many} />
         ))}
         <div className="st-cell">
           <span className="st-cell-label">Befund</span>
@@ -545,11 +589,23 @@ export default function Notes() {
     if (put.length) study.commit(put.map((p) => ({ coll: 'items' as const, id: p.id, data: p })));
   };
 
+  // the AI's suggestions, checked in the review window before anything is stored
+  const [aiPlan, setAiPlan] = useState<Change[] | null>(null);
+  const [aiBusy, setAiBusy] = useState<string | null>(null);
+  // a tag clicked on one of several selected statements: set on all of them, or (already on the clicked one) taken off all
+  const tagSelected = (clicked: ItemDoc, g: TagGroup, chip: string) => {
+    const on = !clicked.chips.includes(chip);
+    const put = selShown.map((i) => (on ? setChip(i, g, chip) : { ...i, chips: i.chips.filter((c) => c !== chip) })).filter((n, k) => n.chips.join() !== selShown[k].chips.join());
+    if (!put.length) return;
+    study.commit(put.map((p) => ({ coll: 'items' as const, id: p.id, data: p })));
+    logChange(study, `Tag „${model.chipLabel.get(chip) ?? chip}“ ${on ? 'gesetzt' : 'entfernt'}: ${put.length} ausgewählte Aussagen`);
+  };
   async function suggestOpen() {
     setBusy('KI-Vorschläge …');
     try {
-      await suggestFor(ctx, open, (d, a) => setBusy(`KI-Vorschläge: ${d} von ${a} …`));
-      setBusy(null);
+      const changes = await suggestFor(ctx, open, (d, a) => setBusy(`KI-Vorschläge: ${d} von ${a} …`));
+      setBusy(changes.length ? null : 'KI: keine neuen Vorschläge.');
+      if (changes.length) setAiPlan(changes);
     } catch (e) {
       setBusy(`KI nicht verfügbar: ${String((e as Error).message)}`);
     }
@@ -570,6 +626,22 @@ export default function Notes() {
         </button>
         {busy && <span className="st-muted">{busy}</span>}
       </div>
+      {aiPlan && (
+        <ChangeModal
+          title={`KI-Vorschläge (${aiPlan.length} Aussagen)`}
+          changes={aiPlan}
+          names={AI_NAMES}
+          intro={AI_INTRO}
+          busy={aiBusy}
+          onCancel={() => setAiPlan(null)}
+          onApply={(choices) => {
+            setAiBusy('Wird übernommen …');
+            void applyChanges(study, aiPlan, choices, 'KI-Vorschläge')
+              .then(() => setAiPlan(null))
+              .finally(() => setAiBusy(null));
+          }}
+        />
+      )}
 
       {removed.length > 0 && (
         <div className="st-removed">
@@ -626,7 +698,7 @@ export default function Notes() {
               </button>
             </header>
             {mine.map((i) => (
-              <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} fresh={i.id === fresh} selected={sel.has(i.id)} onSelect={(shift) => select(i.id, shift)} />
+              <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} fresh={i.id === fresh} selected={sel.has(i.id)} onSelect={(shift) => select(i.id, shift)} {...(sel.has(i.id) && selShown.length > 1 ? { onTag: (g: TagGroup, chip: string) => tagSelected(i, g, chip), many: selShown.length } : {})} />
             ))}
           </section>
         );

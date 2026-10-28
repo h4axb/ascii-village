@@ -44,7 +44,7 @@ export default function People() {
           title={ask.changes[0].label}
           changes={ask.changes}
           names={['Aktuell', 'Danach']}
-          intro="Diese Wahl ändert Umfrage-Antworten (bei einem Tausch die beider Personen). Weitere betroffene Personen einzeln entscheiden: „Aktuell behalten“ hält ihre bisherige Zeile fest. Der jetzige Stand wird vorher gesichert."
+          intro="Diese Wahl ändert Umfrage-Antworten (bei einem Tausch die beider Personen). Die neue Zuordnung ist für alle Betroffenen vorausgewählt; „Aktuell behalten“ hält die bisherige Zeile einer Person fest. Der jetzige Stand wird vorher gesichert."
           busy={busy}
           onCancel={() => setAsk(null)}
           onApply={(choices) => {

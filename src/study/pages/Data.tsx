@@ -5,7 +5,7 @@ import { GAP_MIN, MATCH_ORDER_LABEL, matchOptions, personIdOf, type MatchOrder }
 import { fmtBerlin, MATCH_STEPS, STEP_LABEL, ZONE_LABEL, type MatchStep, type TallyZone } from '../match';
 import { planAssign, planFreeText, planPairing, planRematch } from '../tallyPlan';
 
-const SWAP_INTRO = 'Diese Zuordnung ändert Umfrage-Antworten (bei einem Tausch die beider Personen). Weitere betroffene Personen einzeln entscheiden: „Aktuell behalten“ hält ihre bisherige Zeile fest. Der jetzige Stand wird vorher gesichert.';
+const SWAP_INTRO = 'Diese Zuordnung ändert Umfrage-Antworten (bei einem Tausch die beider Personen). Die neue Zuordnung ist für alle Betroffenen vorausgewählt; „Aktuell behalten“ hält die bisherige Zeile einer Person fest. Der jetzige Stand wird vorher gesichert.';
 import { download } from '../charts';
 import { useEffect, useState } from 'react';
 import type { Version } from '../store';
@@ -373,7 +373,7 @@ function Versions() {
           title={`Stand vom ${berlin(restore.v.at)} wiederherstellen`}
           changes={restore.changes}
           names={['Aktuell', 'Gespeicherter Stand']}
-          intro="Jede Abweichung zum gespeicherten Stand: für jede entscheiden (oder oben für alle). Der jetzige Stand wird vorher gesichert."
+          intro="Jede Abweichung zum gespeicherten Stand ist vorausgewählt; abwählen, was bleiben soll (oder oben für alle). Der jetzige Stand wird vorher gesichert."
           busy={busy}
           onCancel={() => setRestore(null)}
           onApply={(choices) => {
@@ -395,7 +395,7 @@ function Versions() {
 
 // a change that moves survey answers between participants is asked first:
 // no one's answers change unasked (nothing moves: stored at once)
-const ASK_INTRO = 'Diese Änderung ordnet Umfrage-Antworten anderen Teilnehmenden zu. Für jede Person entscheiden: „Aktuell behalten“ hält die bisherige Zeile fest. Der jetzige Stand wird vorher gesichert.';
+const ASK_INTRO = 'Diese Änderung ordnet Umfrage-Antworten anderen Teilnehmenden zu. Die neue Zuordnung ist vorausgewählt; „Aktuell behalten“ hält die bisherige Zeile einer Person fest. Der jetzige Stand wird vorher gesichert.';
 function usePairingAsk() {
   const { study } = useCtx();
   const [plan, setPlan] = useState<{ changes: Change[]; title: string; reason: string; intro: string } | null>(null);
@@ -665,7 +665,7 @@ function Settings() {
         <button type="button" disabled={viewing || !study.docs.tally.main} onClick={() => open(planFreeText(study.latest(), model), 'Umfrage-Aussagen abgleichen', 'Umfrage-Aussagen abgeglichen', 'Die Freitext-Antworten der Umfrage als Aussagen unter Qualitatives Feedback, verglichen mit der aktuellen Zuordnung: was nicht mehr passt, ist ein Konflikt (Tags und Bearbeitungen bleiben). Der jetzige Stand wird vorher gesichert.')}>
           Umfrage-Aussagen abgleichen …
         </button>
-        <button type="button" disabled={viewing || !study.docs.tally.main} onClick={() => open(planRematch(study.latest(), study.game, rules()), 'Neu zuordnen nach den eingestellten Regeln', 'Neu zuordnen (Umfrage)', 'Alle Antworten nach den Regeln oben zuordnen; Zuordnungen von Hand werden dabei aufgehoben, außer wo „Aktuell behalten“ gewählt ist. Für jede betroffene Person entscheiden. Der jetzige Stand wird vorher gesichert.')}>
+        <button type="button" disabled={viewing || !study.docs.tally.main} onClick={() => open(planRematch(study.latest(), study.game, rules()), 'Neu zuordnen nach den eingestellten Regeln', 'Neu zuordnen (Umfrage)', 'Alle Antworten nach den Regeln oben zuordnen; Zuordnungen von Hand werden dabei aufgehoben, außer wo „Aktuell behalten“ gewählt ist. Die neue Zuordnung ist für alle vorausgewählt. Der jetzige Stand wird vorher gesichert.')}>
           Neu zuordnen nach diesen Regeln
         </button>
         {msg && <span className="st-muted">{msg}</span>}

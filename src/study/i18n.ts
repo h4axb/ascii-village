@@ -410,6 +410,11 @@ const EN: Record<string, string> = {
   'Aktive Spieldauer (M ± SD)': 'Active playtime (M ± SD)',
   'Saubere Durchlaufzeit (M ± SD)': 'Clean completion time (M ± SD)',
   'Mit Neustart': 'With restart',
+  'KI-Vorschlag': 'AI suggestion',
+  'Neuer Befund (Vorschlag)': 'New finding (suggested)',
+  'KI: keine neuen Vorschläge.': 'AI: no new suggestions.',
+  'KI-Vorschläge verworfen: nichts übernommen.': 'AI suggestions discarded: nothing applied.',
+  'Die KI schlägt Tags und Befunde vor. Alle Vorschläge sind vorausgewählt: abwählen („Aktuell behalten“), was nicht übernommen werden soll; Übernommenes zählt als bestätigter Tag. Vor dem Übernehmen wird der jetzige Stand gesichert.': 'The AI suggests tags and findings. All suggestions are preselected: deselect (“Aktuell behalten”) what should not be applied; what is applied counts as a confirmed tag. The current state is saved first.',
   'Bereich: woher die Aussage stammt (bleibt beim Neu-Import erhalten)': 'Section: where the statement comes from (kept on re-import)',
   'Frage hinzufügen': 'Add question',
   'Frage zu dieser Aussage …': 'Question for this statement …',
@@ -503,7 +508,7 @@ const EN: Record<string, string> = {
   'Im Spiel jetzt': 'In the game now',
   'Neuer Link': 'New link',
   'Noch 1 Konflikt zu entscheiden': '1 conflict still to decide',
-  'Jeder Konflikt wird erst übernommen, wenn du ihn entschieden hast. Vor dem Übernehmen wird der jetzige Stand gesichert.': 'A conflict is only applied once you have decided it. The current state is saved first.',
+  'Alle Änderungen sind vorausgewählt: abwählen oder „Aktuell behalten“ wählen, was nicht übernommen werden soll. Vor dem Übernehmen wird der jetzige Stand gesichert.': 'All changes are preselected: deselect, or choose “Aktuell behalten”, for what should not be applied. The current state is saved first.',
   'Zeitzone der Datei:': 'Time zone of the file:',
   'deutsche Zeit': 'German time',
   'Neu zuordnen (deutsche Zeit, früheste Abgabe → P001)': 'Rematch (German time, earliest submission → P001)',
@@ -862,6 +867,10 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^KI-Vorschläge \((\d+) Aussagen\)$/, 'AI suggestions ($1 statements)'],
+  [/^KI-Vorschlag: (.+)$/, 'AI suggestion: $1'],
+  [/^KI-Vorschläge für (\d+) Aussagen: im Fenster prüfen\.$/, 'AI suggestions for $1 statements: check them in the window.'],
+  [/^gilt für alle (\d+) ausgewählten Aussagen$/, 'applies to all $1 selected statements'],
   [/^nur diese Aussage \(sonst alle (\d+) mit dieser Frage\)$/, 'only this statement (otherwise all $1 with this question)'],
   [/^aus Tally: (.+?) \((\d)\. Durchlauf\)$/, 'from Tally: $1 (run $2)'],
   [/^aus Tally: (.+)$/, 'from Tally: $1'],

@@ -237,7 +237,59 @@ export async function handleStudy(request: Request, env: StudyEnv): Promise<Resp
   return json(405, { error: 'method not allowed' });
 }
 
-async function chat(env: StudyEnv, key: string, system: string, user: string): Promise<{ ok: true; value: unknown } | { ok: false; res: Response }> {
+// the model's answer as JSON: code fences, text around the object and an
+// answer cut off at the length limit (the complete entries of its list) are
+// all read; null only when nothing usable is in it
+function readJson(text: string, list?: string): unknown {
+  const t = text.replace(/```(?:json)?/gi, '').trim();
+  const tryParse = (x: string) => {
+    try {
+      return JSON.parse(x) as unknown;
+    } catch {
+      return undefined;
+    }
+  };
+  const whole = tryParse(t);
+  if (whole !== undefined) return whole;
+  const a = t.indexOf('{');
+  const b = t.lastIndexOf('}');
+  if (a >= 0 && b > a) {
+    const inner = tryParse(t.slice(a, b + 1));
+    if (inner !== undefined) return inner;
+  }
+  // cut off: the entries of the list that are complete
+  if (!list) return null;
+  const at = t.indexOf(`"${list}"`);
+  const open = at >= 0 ? t.indexOf('[', at) : -1;
+  if (open < 0) return null;
+  const out: unknown[] = [];
+  let depth = 0;
+  let start = -1;
+  let inStr = false;
+  for (let i = open + 1; i < t.length; i++) {
+    const c = t[i];
+    if (inStr) {
+      if (c === '\\') i++;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (c === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        const v = tryParse(t.slice(start, i + 1));
+        if (v !== undefined) out.push(v);
+        start = -1;
+      }
+    } else if (c === ']' && depth === 0) break;
+  }
+  return out.length ? { [list]: out } : null;
+}
+
+async function chat(env: StudyEnv, key: string, system: string, user: string, list?: string, maxTokens = 8000): Promise<{ ok: true; value: unknown } | { ok: false; res: Response }> {
   const base = (env.LLM_BASE_URL || 'https://router.requesty.ai/v1').replace(/\/$/, '');
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
@@ -245,7 +297,7 @@ async function chat(env: StudyEnv, key: string, system: string, user: string): P
     body: JSON.stringify({
       model: 'google/gemini-2.5-flash-lite',
       temperature: 0,
-      max_tokens: 6000,
+      max_tokens: maxTokens,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: system },
@@ -254,13 +306,11 @@ async function chat(env: StudyEnv, key: string, system: string, user: string): P
     }),
   }).catch(() => null);
   if (!res?.ok) return { ok: false, res: json(502, { error: `AI unavailable (${res?.status ?? 'network'})` }) };
-  const data = (await res.json().catch(() => null)) as { choices?: { message?: { content?: string } }[] } | null;
+  const data = (await res.json().catch(() => null)) as { choices?: { message?: { content?: string }; finish_reason?: string }[] } | null;
   const text = data?.choices?.[0]?.message?.content ?? '';
-  try {
-    return { ok: true, value: JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')) };
-  } catch {
-    return { ok: false, res: json(502, { error: 'AI answer was not JSON' }) };
-  }
+  const value = readJson(text, list);
+  if (value == null) return { ok: false, res: json(502, { error: `AI answer was not JSON${data?.choices?.[0]?.finish_reason === 'length' ? ' (cut off: too long)' : ''}` }) };
+  return { ok: true, value };
 }
 
 // ---- AI translations ----
@@ -284,7 +334,7 @@ async function translate(request: Request, env: StudyEnv): Promise<Response> {
     `Texte, die schon auf ${lang} sind, gib unverändert zurück; gemischte Texte vollständig auf ${lang}. ` +
     'Behalte Teilnehmer-IDs (P001), Eigennamen (Mitchy, Asciia Bay), Variante A/B und Zahlen unverändert.';
   const user = JSON.stringify({ texte: texts.map((t) => ({ id: t.id, text: t.text.slice(0, 2000) })), format: { texte: [{ id: 'string', text: 'string' }] } });
-  const r = await chat(env, key, system, user);
+  const r = await chat(env, key, system, user, 'texte');
   if (!r.ok) return r.res;
   const out = (r.value as { texte?: { id?: string; text?: string }[] }).texte ?? [];
   return json(200, { translations: out.filter((t) => t?.id && typeof t.text === 'string') });
@@ -296,48 +346,52 @@ async function translate(request: Request, env: StudyEnv): Promise<Response> {
 // finding it repeats). Only suggestions: nothing counts until confirmed.
 async function suggest(request: Request, env: StudyEnv): Promise<Response> {
   const key = env['asciia-bay-crafting'] ?? env.LLM_API_KEY;
-  if (!key) return json(503, { error: 'no AI key on the server' });
+  if (!key && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
   const body = (await request.json().catch(() => null)) as {
     items?: { id: string; text: string; section?: string; question?: string }[];
     groups?: { id: string; name: string; multi?: boolean; chips: { id: string; label: string }[] }[];
     findings?: { id: string; name: string }[];
   } | null;
   if (!body?.items?.length || !body.groups) return json(400, { error: 'items and groups required' });
+  const groups = body.groups;
   const items = body.items.slice(0, 40);
+  if (!key)
+    return json(200, { suggestions: items.map((i) => ({ id: i.id, chips: Object.fromEntries(groups.map((g) => [g.id, g.chips.slice(0, 1).map((c) => c.id)])), finding: null, newFinding: null })) });
   const system =
-    'Du ordnest Rückmeldungen aus einem Usability-Test eines Spiels ein. Antworte nur mit JSON. ' +
+    'Du ordnest Rückmeldungen aus einem Usability-Test eines Spiels ein. Antworte nur mit einem JSON-Objekt, ohne Text davor oder danach. ' +
     'Wähle für jede Aussage pro Kategorie die passenden Chips ausschließlich aus der gegebenen Liste (IDs). ' +
-    'Bei Kategorien ohne "multi" höchstens einen Chip. Wenn nichts passt, lass die Kategorie leer. ' +
+    'Bei Kategorien ohne "multi" höchstens einen Chip. Wenn nichts passt, lass die Kategorie weg. ' +
     'Ordne eine Aussage einem bestehenden wiederkehrenden Befund nur zu, wenn sie inhaltlich dasselbe Problem oder Lob beschreibt. ' +
     'Schlage für neue, eindeutig benennbare Befunde einen kurzen neutralen Namen vor (newFinding), sonst null.';
-  const user = JSON.stringify({
-    kategorien: body.groups.map((g) => ({ id: g.id, name: g.name, multi: !!g.multi, chips: g.chips })),
-    befunde: body.findings ?? [],
-    aussagen: items.map((i) => ({ id: i.id, text: i.text, abschnitt: i.section, frage: i.question })),
-    format: { aussagen: [{ id: 'string', chips: { '<kategorie-id>': ['<chip-id>'] }, finding: '<befund-id> | null', newFinding: 'string | null' }] },
-  });
-  const base = (env.LLM_BASE_URL || 'https://router.requesty.ai/v1').replace(/\/$/, '');
-  const res = await fetch(`${base}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash-lite',
-      temperature: 0,
-      max_tokens: 4000,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-    }),
-  }).catch(() => null);
-  if (!res?.ok) return json(502, { error: `AI unavailable (${res?.status ?? 'network'})` });
-  const data = (await res.json().catch(() => null)) as { choices?: { message?: { content?: string } }[] } | null;
-  const text = data?.choices?.[0]?.message?.content ?? '';
-  try {
-    const parsed = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')) as { aussagen?: unknown[] };
-    return json(200, { suggestions: Array.isArray(parsed.aussagen) ? parsed.aussagen : [] });
-  } catch {
-    return json(502, { error: 'AI answer was not JSON' });
-  }
+  const ask = async (part: typeof items): Promise<{ ok: true; list: unknown[] } | { ok: false; res: Response }> => {
+    const user = JSON.stringify({
+      kategorien: groups.map((g) => ({ id: g.id, name: g.name, multi: !!g.multi, chips: g.chips })),
+      befunde: body.findings ?? [],
+      aussagen: part.map((i) => ({ id: i.id, text: i.text.slice(0, 1500), abschnitt: i.section, frage: i.question })),
+      format: { aussagen: [{ id: 'string', chips: { '<kategorie-id>': ['<chip-id>'] }, finding: '<befund-id> | null', newFinding: 'string | null' }] },
+    });
+    const r = await chat(env, key, system, user, 'aussagen');
+    const list = r.ok ? (r.value as { aussagen?: unknown }).aussagen : undefined;
+    if (r.ok && Array.isArray(list)) {
+      // (a cut-off answer: the statements it did not reach are asked again)
+      const got = new Set(list.map((x) => (x as { id?: string })?.id));
+      const missing = part.filter((i) => !got.has(i.id));
+      if (!missing.length || missing.length === part.length) return { ok: true, list };
+      const more = await ask(missing);
+      return more.ok ? { ok: true, list: [...list, ...more.list] } : { ok: true, list };
+    }
+    // (unreadable: half as many at a time)
+    if (part.length > 1) {
+      const mid = Math.ceil(part.length / 2);
+      const x = await ask(part.slice(0, mid));
+      if (!x.ok) return x;
+      const y = await ask(part.slice(mid));
+      if (!y.ok) return y;
+      return { ok: true, list: [...x.list, ...y.list] };
+    }
+    return r.ok ? { ok: false, res: json(502, { error: 'AI answer was not JSON' }) } : r;
+  };
+  const r = await ask(items);
+  if (!r.ok) return r.res;
+  return json(200, { suggestions: r.list });
 }

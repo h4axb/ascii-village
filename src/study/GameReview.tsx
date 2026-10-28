@@ -44,7 +44,7 @@ export function GameReview() {
           title="Neue Spieldaten prüfen"
           changes={plan.changes}
           names={['Übernommen', 'Im Spiel jetzt']}
-          intro="Die Auswertung rechnet nur mit übernommenen Spieldaten. Neues ist angehakt; jede Änderung oder Löschung im Spiel ist ein Konflikt zum Entscheiden. Der jetzige Stand wird vorher gesichert."
+          intro="Die Auswertung rechnet nur mit übernommenen Spieldaten. Neues, Änderungen und Löschungen im Spiel sind vorausgewählt; abwählen bzw. „Aktuell behalten“, was nicht übernommen werden soll. Der jetzige Stand wird vorher gesichert."
           busy={busy}
           onCancel={() => setOpen(false)}
           onApply={(choices) => {

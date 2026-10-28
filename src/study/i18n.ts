@@ -407,11 +407,6 @@ const EN: Record<string, string> = {
   'Aktive Spieldauer (M ± SD)': 'Active playtime (M ± SD)',
   'Saubere Durchlaufzeit (M ± SD)': 'Clean completion time (M ± SD)',
   'Mit Neustart': 'With restart',
-  'Für Tags, Umformulierungen, Befunde und Übersetzungen.': 'For tags, rewording, findings and translations.',
-  ' Auf Claude wechseln: im Cloudflare-Worker das Secret ANTHROPIC_API_KEY setzen.': ' To switch to Claude: set the secret ANTHROPIC_API_KEY in the Cloudflare Worker.',
-  'Testmodus (keine echte KI)': 'test mode (no real AI)',
-  'keine KI eingerichtet': 'no AI set up',
-  'KI hat die Anfrage abgelehnt': 'The AI declined the request',
   'Neu generieren': 'Regenerate',
   '↶ vorheriger Vorschlag': '↶ previous proposal',
   'Was soll sich ändern? z. B. kürzer, ohne Wertung, Präsens': 'What should change? e.g. shorter, no judgement, present tense',
@@ -934,7 +929,6 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
-  [/^KI: (.+)$/, 'AI: $1'],
   [/^KI: Tags vorschlagen \((\d+)\)$/, 'AI: suggest tags ($1)'],
   [/^KI: Aussagen umformulieren \((\d+)\)$/, 'AI: reword statements ($1)'],
   [/^KI-Umformulierung prüfen \((\d+) Aussagen\)$/, 'Check AI rewording ($1 statements)'],

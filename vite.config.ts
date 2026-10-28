@@ -272,8 +272,6 @@ function workerApiDevPlugin(): Plugin {
       FEEDBACK_DB: db as never,
       FEEDBACK_ADMIN_TOKEN: e.FEEDBACK_ADMIN_TOKEN || 'dev',
       LLM_API_KEY: e.LLM_API_KEY || e.VITE_LLM_API_KEY,
-      // (the study dashboard's AI on Claude, when set)
-      ANTHROPIC_API_KEY: e.ANTHROPIC_API_KEY,
       LLM_BASE_URL: e.LLM_BASE_URL,
       // (dev only: /api/study/translate answers "[DE] …" without a key, for testing)
       STUDY_FAKE_AI: e.STUDY_FAKE_AI,

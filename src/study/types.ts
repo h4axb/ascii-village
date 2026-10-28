@@ -113,6 +113,7 @@ export interface ItemDoc {
   section: Section;
   question?: string; // the Follow-up question it answers
   questionOwn?: boolean; // the question was edited by hand (kept on re-import)
+  sectionOwn?: boolean; // Beobachtung / Nachgespräch set by hand (kept on re-import, found in either section)
   text: string; // the statement as noted (the original)
   original?: string; // the wording first imported (never overwritten)
   de?: string; // the German version (AI draft or own wording)

@@ -244,6 +244,8 @@ export function planNotes(parsed: Parsed, docs: StudyDocs, tags: (id: string) =>
   const pool = all.filter((i) => !i.manual && persons.has(i.person));
   const used = new Set<string>();
   const firstImport = !all.some((i) => !i.manual);
+  // (a statement whose section was set by hand is found in either section, and keeps its own)
+  const sameSec = (i: ItemDoc, st: { section: ItemDoc['section'] }) => i.section === st.section || (!!i.sectionOwn && st.section !== 'survey');
   const same = (i: ItemDoc, text: string) => norm(i.text) === norm(text) || (!!i.original && norm(i.original) === norm(text));
   const note = (i: ItemDoc) => [i.chips.map(tags).filter(Boolean).join(', '), i.de ? `DE: ${i.de}` : '', i.finding ? 'mit Befund' : ''].filter(Boolean).join(' · ') || undefined;
   const freshItem = (st: Parsed['statements'][number]): ItemDoc => ({ ...st, id: `n-${st.person}-${hash(`${st.section}|${norm(st.text)}|${st.order}|${Date.now()}|${Math.random()}`)}`, original: st.text, chips: [], suggested: [], status: firstImport ? undefined : 'new' });
@@ -254,7 +256,7 @@ export function planNotes(parsed: Parsed, docs: StudyDocs, tags: (id: string) =>
   // 1. the same wording, the same person: nothing to do
   const unchanged = new Map<string, string[]>();
   for (const st of parsed.statements) {
-    const hit = pool.find((i) => !used.has(i.id) && i.person === st.person && i.section === st.section && same(i, st.text));
+    const hit = pool.find((i) => !used.has(i.id) && i.person === st.person && sameSec(i, st) && same(i, st.text));
     if (hit) {
       used.add(hit.id);
       unchanged.set(st.person, [...(unchanged.get(st.person) ?? []), hit.text]);
@@ -265,7 +267,7 @@ export function planNotes(parsed: Parsed, docs: StudyDocs, tags: (id: string) =>
   const rest: Parsed['statements'] = [];
   for (const st of pending) {
     // 2. the same wording under another participant: move it?
-    const moved = all.find((i) => !used.has(i.id) && !i.manual && i.person !== st.person && i.section === st.section && same(i, st.text));
+    const moved = all.find((i) => !used.has(i.id) && !i.manual && i.person !== st.person && sameSec(i, st) && same(i, st.text));
     if (moved) {
       used.add(moved.id);
       out.push({
@@ -327,7 +329,7 @@ export function planNotes(parsed: Parsed, docs: StudyDocs, tags: (id: string) =>
     let best: ItemDoc | null = null;
     let score = 0.5;
     for (const i of pool) {
-      if (used.has(i.id) || i.person !== st.person || i.section !== st.section) continue;
+      if (used.has(i.id) || i.person !== st.person || !sameSec(i, st)) continue;
       const v = similarity(i.text, st.text);
       if (v > score) {
         score = v;

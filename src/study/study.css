@@ -1913,3 +1913,18 @@ body:has(.st-root) {
     grid-column: 1;
   }
 }
+/* the statement's section, changeable: as small as the label it replaces */
+.st-item-meta {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.st-item-section {
+  font: inherit;
+  font-size: 12px;
+  color: var(--st-muted);
+  padding: 1px 4px;
+  border: 1px solid var(--st-line);
+  border-radius: 6px;
+  background: transparent;
+  max-width: 100%;
+}

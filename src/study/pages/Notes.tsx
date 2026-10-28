@@ -342,7 +342,24 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect }: { ite
             {item.link ?? item.person}
             {d ? ` · ${d}` : ''}
           </span>
-          <span>{SECTION_LABEL[item.section]}</span>
+          {item.section === 'survey' ? (
+            <span>{SECTION_LABEL[item.section]}</span>
+          ) : (
+            <select
+              className="st-item-section"
+              value={item.section}
+              onChange={(e) => {
+                const section = e.target.value as 'during' | 'followup';
+                logChange(study, `${item.person}: Bereich „${SECTION_LABEL[item.section]}“ → „${SECTION_LABEL[section]}“ (${item.text.slice(0, 40)}${item.text.length > 40 ? ' …' : ''})`);
+                save({ ...item, section, sectionOwn: true });
+              }}
+              aria-label="Bereich"
+              title="Bereich: woher die Aussage stammt (bleibt beim Neu-Import erhalten)"
+            >
+              <option value="during">{SECTION_LABEL.during}</option>
+              <option value="followup">{SECTION_LABEL.followup}</option>
+            </select>
+          )}
           {item.status === 'changed' && <span className="st-flag">geändert – prüfen</span>}
           {item.status === 'new' && <span className="st-flag">neu</span>}
         </div>

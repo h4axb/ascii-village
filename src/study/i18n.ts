@@ -410,6 +410,7 @@ const EN: Record<string, string> = {
   'Aktive Spieldauer (M ± SD)': 'Active playtime (M ± SD)',
   'Saubere Durchlaufzeit (M ± SD)': 'Clean completion time (M ± SD)',
   'Mit Neustart': 'With restart',
+  'Bereich: woher die Aussage stammt (bleibt beim Neu-Import erhalten)': 'Section: where the statement comes from (kept on re-import)',
   'Frage hinzufügen': 'Add question',
   'Frage zu dieser Aussage …': 'Question for this statement …',
   'Leer lassen = keine Frage · Esc: fertig': 'Leave empty = no question · Esc: done',

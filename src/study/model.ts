@@ -6,7 +6,7 @@ import { designOf, type FeedbackRecord } from '../feedback/schema';
 import { attemptTiming, timingOf, type Timing } from './timing';
 import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
-import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
+import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, NotesMeta, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
 import { detectZone, matchRows, withHand, parseTallyTime, SUBMIT_AFTER, SUBMIT_BEFORE, type MatchOptions, type MatchStep, type MatchVia, type TallyZone, type ZoneGuess } from './match';
 import { optionChosen, partOf } from './tally';
 
@@ -136,10 +136,24 @@ export const matchOptions = (docs: StudyDocs): MatchOptions => {
   };
 };
 export const tallyZoneSetting = (docs: StudyDocs) => ((docs.settings.tallyZone as { zone?: TallyZone | 'auto' } | undefined)?.zone ?? 'auto') as TallyZone | 'auto';
+// a link's key (…/intro/1?k=abc → abc); a bare key as it is
+export const linkKeyOf = (l: string) => /[?&]k=([\w-]+)/.exec(l)?.[1] ?? (/^(?=.*\d)[\w-]{8,}$/.test(l.trim()) ? l.trim() : null);
+// the links in a participant's notes header (imported or added by hand): key → participant
+export function linkOwners(docs: StudyDocs): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of Object.values((docs.settings.notesMeta ?? {}) as Record<string, NotesMeta>))
+    for (const l of [m.link, ...(m.links ?? [])]) {
+      const k = linkKeyOf(l);
+      if (k) out.set(k, m.id);
+    }
+  return out;
+}
 // (ignoreManual: the pairing the rules alone give, for "Neu zuordnen")
 export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual?: boolean } = {}): Model {
   // (the user-testing links only: /intro/1 and /intro/2)
-  const invites = game.invites.filter((i) => i.participant_id && P_ID.test(i.participant_id) && /^\/intro\/[12]$/.test(i.link));
+  // (a link added by hand to a participant's notes header counts as theirs)
+  const owners = linkOwners(docs);
+  const invites = game.invites.map((i) => (owners.has(i.key) ? { ...i, participant_id: owners.get(i.key)! } : i)).filter((i) => i.participant_id && P_ID.test(i.participant_id) && /^\/intro\/[12]$/.test(i.link));
   const labels = linkLabels(invites);
   const tally = docs.tally.main;
   const mapping = tally?.mapping ?? [];

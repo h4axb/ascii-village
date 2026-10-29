@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } from '../types';
 import { CATEGORY, hintOf, SECTION_LABEL } from '../types';
-import { distinctPersons, itemsWithRole, type Model } from '../model';
+import { distinctPersons, itemsWithRole, linkKeyOf, type Model, type Person } from '../model';
 import { linkLabelOf, parseNotes, planNotes } from '../notes';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
@@ -263,6 +263,104 @@ function ChipCell({ item, g, onChange, labelOnly, onTag, many }: { item: ItemDoc
   );
 }
 
+// ---- a participant's header: name, links, slot, group; editable, links can be added ----
+// (each link with a ?k= key counts as this participant's run, so all their runs are tracked)
+function PersonInfo({ pid, meta, person }: { pid: string; meta?: NotesMeta; person?: Person }) {
+  const { study } = useCtx();
+  const [edit, setEdit] = useState(false);
+  const blank: NotesMeta = { id: pid, name: '', link: '', slot: '', group: '' };
+  const [draft, setDraft] = useState<NotesMeta>(meta ?? blank);
+  const links = (m: NotesMeta) => [m.link, ...(m.links ?? [])].filter((l) => l.trim());
+  const shown = links(meta ?? blank);
+  // a link the game knows: its label (P005.2); otherwise not found
+  const tracked = (l: string) => {
+    const k = linkKeyOf(l);
+    return k ? person?.links.find((x) => x.key === k)?.label ?? null : null;
+  };
+  const open = () => {
+    const m = meta ?? blank;
+    setDraft({ ...m, links: m.links ?? [] });
+    setEdit(true);
+  };
+  const saveIt = () => {
+    const ls = links(draft).map((l) => l.trim());
+    const next: NotesMeta = { ...draft, id: pid, name: draft.name.trim(), slot: draft.slot.trim(), group: draft.group.trim(), link: ls[0] ?? '', links: ls.slice(1) };
+    const all = { ...((study.latest().settings.notesMeta ?? {}) as Record<string, NotesMeta>), [pid]: next };
+    study.commit([{ coll: 'settings', id: 'notesMeta', data: all }]);
+    logChange(study, `${pid}: Profil bearbeitet (${[next.name && 'Name', 'Links', next.slot && 'Termin', next.group && 'Gruppe'].filter(Boolean).join(', ')})`);
+    setEdit(false);
+  };
+  if (edit) {
+    const ls = [draft.link, ...(draft.links ?? [])];
+    const setLink = (k: number, v: string) => {
+      const n = [...ls];
+      n[k] = v;
+      setDraft({ ...draft, link: n[0] ?? '', links: n.slice(1) });
+    };
+    return (
+      <div className="st-pinfo-edit">
+        <h2>{pid}</h2>
+        <label>
+          <span className="st-cell-label">Name (nur hier sichtbar)</span>
+          <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        </label>
+        <label>
+          <span className="st-cell-label">Termin</span>
+          <input value={draft.slot} onChange={(e) => setDraft({ ...draft, slot: e.target.value })} placeholder="11:00-12:00 (21.10.26)" />
+        </label>
+        <label>
+          <span className="st-cell-label">Gruppe</span>
+          <input value={draft.group} onChange={(e) => setDraft({ ...draft, group: e.target.value })} />
+        </label>
+        <div className="st-pinfo-links">
+          <span className="st-cell-label">Links (je Durchlauf einer)</span>
+          {ls.map((l, k) => (
+            <div key={k} className="st-pinfo-link">
+              <span className="st-muted">{`Link ${k + 1}`}</span>
+              <input value={l} onChange={(e) => setLink(k, e.target.value)} placeholder="https://…/intro/1?k=…" aria-label={`Link ${k + 1}`} />
+              <span className="st-pinfo-state">{l.trim() && (tracked(l) ? <span className="st-badge">{`getrackt als ${tracked(l)}`}</span> : linkKeyOf(l) ? <span className="st-muted">wird nach dem Speichern zugeordnet</span> : <span className="st-flag">kein ?k=-Schlüssel</span>)}</span>
+              <button type="button" className="st-linkbtn" onClick={() => setDraft({ ...draft, link: k === 0 ? (ls[1] ?? '') : draft.link, links: k === 0 ? ls.slice(2) : ls.slice(1).filter((_, j) => j !== k - 1) })} aria-label={`Link ${k + 1} entfernen`}>
+                entfernen
+              </button>
+            </div>
+          ))}
+          <button type="button" className="st-linkbtn" onClick={() => setDraft({ ...draft, links: [...(draft.links ?? []), ''] })}>
+            + Link
+          </button>
+        </div>
+        <div className="st-pinfo-foot">
+          <button type="button" onClick={() => setEdit(false)}>
+            Abbrechen
+          </button>
+          <button type="button" className="is-primary" onClick={saveIt}>
+            Speichern
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="st-pinfo" onClick={open} title="Klicken: Angaben bearbeiten, Links hinzufügen">
+      <h2>{pid}</h2>
+      {meta?.name && <span className="st-name" data-notr>{meta.name}</span>}
+      {shown.map((l, k) => (
+        <span key={k} className="st-muted" data-notr>
+          {shown.length > 1 && !/^link\s*\d/i.test(l) ? `Link ${k + 1}: ${l}` : l}
+          {linkKeyOf(l) && !tracked(l) && <span className="st-flag">nicht im Spiel gefunden</span>}
+        </span>
+      ))}
+      {meta?.slot && <span className="st-muted" data-notr>{meta.slot}</span>}
+      {meta?.group && <span className="st-muted">Gruppe {meta.group}</span>}
+      {person?.groupMismatch && <span className="st-flag">Tracking: {person.trackedGroup}</span>}
+      {person?.excluded && <span className="st-flag">ausgeschlossen</span>}
+      {!!person?.links.length && <span className="st-muted">{`getrackt: ${person.links.map((x) => x.label).join(', ')}`}</span>}
+      <button type="button" className="st-linkbtn" onClick={(e) => (e.stopPropagation(), open())}>
+        bearbeiten · + Link
+      </button>
+    </div>
+  );
+}
+
 function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, many }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void; fresh?: boolean; selected?: boolean; onSelect?: (shift: boolean) => void; onTag?: (g: TagGroup, chip: string) => void; many?: number }) {
   const { study } = useCtx();
   const view = useContentView();
@@ -283,6 +381,8 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
   const [showInt, setShowInt] = useState(!!item.interpretation);
   const [showAdd, setShowAdd] = useState(!!item.addition);
   const [tagsOpen, setTagsOpen] = useState(false);
+  // the statement before "Geprüft", for undoing it
+  const before = useRef<ItemDoc | null>(null);
   const tagIt = (g: TagGroup, chip: string) => (onTag ? onTag(g, chip) : save(toggleChip(item, g, chip)));
   const chipsOf = (ids: string[]) => model.tags.flatMap((g) => g.chips.filter((c) => ids.includes(c.id)).map((c) => ({ g, c })));
   const onChips = chipsOf(item.chips);
@@ -326,11 +426,11 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
         <p data-notr onClick={() => setEditDe(true)} title="Klicken: bearbeiten">
           {item.de}
         </p>
-      ) : (
-        <button type="button" className="st-linkbtn" onClick={() => setEditDe(true)}>
-          + Deutsche Fassung
+      ) : !showInt ? (
+        <button type="button" className="st-linkbtn" onClick={() => setShowInt(true)}>
+          + Interpretation hinzufügen
         </button>
-      )}
+      ) : null}
       {item.de && (item.deAuto || item.deStale) && (
         <div className="st-item-meta">
           {item.deAuto && <span className="st-badge">automatisch</span>}
@@ -351,7 +451,9 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
           {item.text && <div className="st-muted">Korrektur wird protokolliert · neue Zeile teilt die Aussage · Esc: fertig</div>}
         </>
       ) : (
-        <p data-notr>{item.text}</p>
+        <p data-notr className="st-editable" onClick={() => setEditOrig(true)} title="Klicken: Original korrigieren">
+          {item.text}
+        </p>
       )}
     </div>
   );
@@ -455,7 +557,21 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
         </div>
       </div>
       <div className="st-item-side">
-        <button type="button" className={item.confirmed && !open ? 'is-on' : ''} onClick={() => save(confirmItem(item, model.tags))} title="Als geprüft markieren. Nur angeklickte Tags zählen; nicht angeklickte Vorschläge werden verworfen.">
+        <button
+          type="button"
+          className={item.confirmed && !open ? 'is-on' : ''}
+          onClick={() => {
+            if (!(item.confirmed && !open)) {
+              before.current = item;
+              return save(confirmItem(item, model.tags));
+            }
+            // again: undone; the suggestions it dropped come back (while the page stays open)
+            const b = before.current;
+            before.current = null;
+            save({ ...item, confirmed: b?.confirmed ?? false, ...(b ? { status: b.status, suggested: b.suggested.filter((c) => !item.chips.includes(c)), suggestedFinding: item.finding ? null : b.suggestedFinding } : {}) });
+          }}
+          title={item.confirmed && !open ? 'Geprüft. Nochmal klicken: rückgängig' : 'Als geprüft markieren. Nur angeklickte Tags zählen; nicht angeklickte Vorschläge werden verworfen.'}
+        >
           {item.confirmed && !open ? 'Geprüft ✓' : 'Geprüft?'}
         </button>
         <MoreMenu
@@ -821,13 +937,8 @@ export default function Notes() {
         return (
           <section key={pid} className="st-section st-notes-person">
             <header className="st-notes-head">
-              <h2>{pid}</h2>
-              {meta?.name && <span className="st-name" data-notr>{meta.name}</span>}
-              {meta?.link && <span className="st-muted" data-notr>{meta.link}</span>}
-              {meta?.slot && <span className="st-muted" data-notr>{meta.slot}</span>}
-              {meta?.group && <span className="st-muted">Gruppe {meta.group}</span>}
-              {person?.groupMismatch && <span className="st-flag">Tracking: {person.trackedGroup}</span>}
-              {person?.excluded && <span className="st-flag">ausgeschlossen</span>}
+              <PersonInfo pid={pid} meta={meta} person={person} />
+              <div className="st-notes-actions">
               <button type="button" onClick={() => study.commit(mine.map((i) => ({ coll: 'items' as const, id: i.id, data: confirmItem(i, model.tags) })))}>
                 Alle als geprüft markieren
               </button>
@@ -847,6 +958,7 @@ export default function Notes() {
               >
                 + Aussage
               </button>
+              </div>
             </header>
             {mine.map((i) => (
               <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} fresh={i.id === fresh} selected={sel.has(i.id)} onSelect={(shift) => select(i.id, shift)} {...(sel.has(i.id) && selShown.length > 1 ? { onTag: (g: TagGroup, chip: string) => tagSelected(i, g, chip), many: selShown.length } : {})} />

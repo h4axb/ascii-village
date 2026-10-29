@@ -547,6 +547,79 @@ body:has(.st-root) {
 .st-notes-head h2 {
   margin: 0;
 }
+.st-notes-head {
+  flex-direction: column;
+  align-items: stretch;
+}
+.st-pinfo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  cursor: pointer;
+  min-width: 0;
+}
+.st-pinfo > span {
+  overflow-wrap: anywhere;
+}
+.st-pinfo .st-flag {
+  margin-left: 6px;
+}
+.st-notes-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.st-pinfo-edit {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+  padding: 12px;
+  border: 1px solid var(--st-line);
+  border-radius: 10px;
+  background: var(--st-paper, #fff);
+}
+.st-pinfo-edit h2,
+.st-pinfo-links,
+.st-pinfo-foot {
+  grid-column: 1 / -1;
+}
+.st-pinfo-edit label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.st-pinfo-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.st-pinfo-link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+.st-pinfo-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .st-pinfo-edit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .st-pinfo-link {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .st-pinfo-link > :nth-child(3) {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+}
 .st-name {
   font-weight: 500;
 }
@@ -2355,4 +2428,20 @@ body:has(.st-root) {
 .st-selbar-form select {
   max-width: 100%;
   min-width: 0;
+}
+/* the original: a click corrects it, as with the question */
+.st-editable {
+  cursor: text;
+  border-radius: 6px;
+}
+.st-editable:hover {
+  background: var(--st-soft, #f3f3f5);
+}
+.st-pinfo:hover h2 {
+  text-decoration: underline dotted;
+}
+.st-pinfo-edit .st-cell-label {
+  width: auto;
+  min-width: 0;
+  white-space: normal;
 }

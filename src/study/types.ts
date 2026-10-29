@@ -100,6 +100,7 @@ export interface NotesMeta {
   id: string;
   name: string; // kept on the Notizen page only: never in figures, quotes or exports
   link: string;
+  links?: string[]; // further links, added by hand (participants with several runs)
   slot: string;
   group: string;
 }

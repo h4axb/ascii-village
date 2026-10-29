@@ -11,7 +11,7 @@ export const MUTED = '#6b6b66';
 export const GRID = '#e4e3de';
 export const SERIES = { A: '#4b4b48', B: '#c2571a' } as const; // variant A grey, B the accent
 export const NEUTRAL = '#bdbcb5';
-const FONT = "'ABeeZee', Arial, sans-serif";
+const FONT = "'Inter', system-ui, Arial, sans-serif";
 
 function useWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
   const ref = useRef<T>(null);
@@ -561,13 +561,13 @@ export function download(blob: Blob, name: string) {
 // the font, embedded into the exported SVG (an <img> can't load web fonts)
 let fontCss: Promise<string> | null = null;
 function embeddedFont(): Promise<string> {
-  fontCss ??= fetch('/fonts/abeezee-latin.woff2')
+  fontCss ??= fetch('/fonts/inter-latin-wght-normal.woff2')
     .then((r) => (r.ok ? r.blob() : Promise.reject()))
     .then(
       (b) =>
         new Promise<string>((res) => {
           const fr = new FileReader();
-          fr.onload = () => res(`@font-face{font-family:'ABeeZee';font-weight:400;src:url(${fr.result}) format('woff2');}`);
+          fr.onload = () => res(`@font-face{font-family:'Inter';font-weight:100 900;src:url(${fr.result}) format('woff2');}`);
           fr.readAsDataURL(b);
         }),
     )
@@ -617,11 +617,11 @@ export async function exportPng(host: HTMLElement | null, caption: string, name:
         }),
     ),
   );
-  await document.fonts?.load(`${Math.round(13 * k)}px 'ABeeZee'`).catch(() => null);
+  await document.fonts?.load(`${Math.round(13 * k)}px 'Inter'`).catch(() => null);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
   const fontPx = Math.round(13 * k);
-  ctx.font = `${fontPx}px 'ABeeZee', Arial, sans-serif`;
+  ctx.font = `${fontPx}px 'Inter', system-ui, Arial, sans-serif`;
   const lines = wrap(ctx, caption, OUT);
   const figH = imgs.reduce((a, i) => a + i.h * k, 0);
   canvas.width = OUT + pad * 2;
@@ -633,7 +633,7 @@ export async function exportPng(host: HTMLElement | null, caption: string, name:
     ctx.drawImage(img, pad, y, OUT, h * k);
     y += h * k;
   }
-  ctx.font = `${fontPx}px 'ABeeZee', Arial, sans-serif`;
+  ctx.font = `${fontPx}px 'Inter', system-ui, Arial, sans-serif`;
   ctx.fillStyle = INK;
   y += fontPx * 1.2;
   for (const l of lines) {

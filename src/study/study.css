@@ -1,26 +1,28 @@
 /* /feedback: quiet, greyscale with one accent (the colour of variant B) */
+/* Inter (variable, 100–900; SIL OFL, public/fonts/Inter-OFL.txt), served from the site itself */
 @font-face {
-  font-family: 'ABeeZee';
+  font-family: 'Inter';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/abeezee-latin.woff2') format('woff2');
+  src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'ABeeZee';
+  font-family: 'Inter';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/abeezee-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  src: url('/fonts/inter-latin-ext-wght-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family: 'ABeeZee';
+  font-family: 'Inter';
   font-style: italic;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/abeezee-italic-latin.woff2') format('woff2');
+  src: url('/fonts/inter-latin-wght-italic.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 :root {
   --st-ink: #1d1d1b;
@@ -46,8 +48,8 @@ body:has(.st-root) {
   background: var(--st-bg);
 }
 .st-root {
-  font-family: 'ABeeZee', Arial, sans-serif;
-  font-size: 14.5px;
+  font-family: 'Inter', system-ui, Arial, sans-serif;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--st-ink);
   background: var(--st-bg);
@@ -2463,7 +2465,7 @@ body:has(.st-root) {
   white-space: normal;
 }
 
-/* theme: ABeeZee, light greys, softer rounded shapes */
+/* theme: Inter, light greys, softer rounded shapes */
 :root {
   --st-ink: #2b2b2f;
   --st-muted: #7b7b83;
@@ -2475,20 +2477,19 @@ body:has(.st-root) {
   --st-radius-sm: 10px; /* buttons, inputs */
 }
 .st-root {
-  letter-spacing: 0.005em;
-  /* (ABeeZee has one weight: no fake bold, hierarchy by size and ink) */
-  font-synthesis: none;
+  letter-spacing: -0.005em;
 }
 .st-root h1,
 .st-root h2,
 .st-root h3,
 .st-root strong,
 .st-root b,
-.st-root th,
-.st-brand,
+.st-root th {
+  font-weight: 600;
+}
 .st-figtitle,
 .st-stat-value {
-  font-weight: 400;
+  font-weight: 500;
 }
 .st-root h1 {
   letter-spacing: -0.01em;

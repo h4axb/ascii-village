@@ -379,7 +379,7 @@ export function GameFlow() {
 
   return (
     <Section title="Spielablauf" id="ablauf">
-      <Fig id="ablauf" table={(s) => csv([['Teilnehmende', ...parts.map((p) => PART_LABEL[p] ?? p), 'Summe'], ...perRunOf(s).map((r) => [r.k, ...parts.map((p) => (r.t[p] ? fmt(r.t[p] / 60000, 1) : '')), fmt(total(r.t) / 60000, 1)])])}>
+      <Fig id="ablauf" valid={(s) => new Set(perRunOf(s).map((r) => r.k.split('.')[0])).size} table={(s) => csv([['Teilnehmende', ...parts.map((p) => PART_LABEL[p] ?? p), 'Summe'], ...perRunOf(s).map((r) => [r.k, ...parts.map((p) => (r.t[p] ? fmt(r.t[p] / 60000, 1) : '')), fmt(total(r.t) / 60000, 1)])])}>
         {(s) => {
           const runs = perRunOf(s);
           return (

@@ -140,14 +140,15 @@ function finish(
   const eligible = pick(td.eligible, !reasons.length);
   const clean = pick(td.cleanMin, eligible.value ? active.value : null);
   const exclusionReason = pick(td.exclusionReason, eligible.value ? '' : reasons.join(', '));
-  const status: TimingStatus = !completed ? 'unvollständig' : attempts.length > 1 ? 'wiederholt' : (interruption.value ?? 0) > GAP_MIN || technical.value ? 'unterbrochen' : m.estimated ? 'geschätzt' : 'exakt';
+  const status: TimingStatus = !completed || active.value == null ? 'unvollständig' : attempts.length > 1 ? 'wiederholt' : (interruption.value ?? 0) > GAP_MIN || technical.value ? 'unterbrochen' : m.estimated ? 'geschätzt' : 'exakt';
   return {
     attempts,
     attemptCount: attempts.length,
     restartCount: Math.max(0, attempts.length - 1),
     elapsed: m.elapsed,
     active,
-    activeEstimated: m.estimated,
+    // (a time that is missing is not an estimate)
+    activeEstimated: m.estimated && active.value != null,
     interruption,
     technical,
     completed,
@@ -201,6 +202,7 @@ const stat = (xs: (number | null)[], N: number): TimingStat => {
 export interface TimingSummary {
   elapsed: TimingStat;
   active: TimingStat;
+  activeMeasured: TimingStat; // only times measured by the game (no estimate), for reporting apart
   clean: TimingStat; // eligible participants only
   attemptsMean: number;
   withRestart: number; // participants with ≥ 1 restart
@@ -219,6 +221,10 @@ export function timingSummary(ts: Timing[]): TimingSummary {
       ts.map((t) => t.active.value),
       N,
     ),
+    activeMeasured: stat(
+      ts.map((t) => (t.activeEstimated ? null : t.active.value)),
+      N,
+    ),
     clean: stat(
       ts.map((t) => (t.eligible.value ? t.clean.value : null)),
       N,
@@ -226,7 +232,8 @@ export function timingSummary(ts: Timing[]): TimingSummary {
     attemptsMean: N ? mean(ts.map((t) => t.attemptCount)) : NaN,
     withRestart: ts.filter((t) => t.restartCount > 0).length,
     technical: ts.filter((t) => t.technical.value).length,
-    estimated: ts.filter((t) => t.activeEstimated).length,
+    // (only values that exist: someone without a time is missing, not estimated)
+    estimated: ts.filter((t) => t.activeEstimated && t.active.value != null).length,
     N,
   };
 }

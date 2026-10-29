@@ -56,6 +56,7 @@ export default function Survey() {
           <>
             <Fig
               id="teil2"
+              valid={(s) => part2(s.survey).map((r) => r.pairs)}
               table={(s) =>
                 csv([
                   ['Item', 'Variante', ...(p2[0].scale === 7 ? LIKERT7 : LIKERT5), 'Median', 'Q1', 'Q3'],
@@ -128,6 +129,7 @@ export default function Survey() {
           <>
             <Fig
               id="teil3"
+              valid={(sl) => part3(sl.survey).scales.flatMap((s) => [s.A.n, s.B.n])}
               table={(sl) =>
                 csv([
                   ['Skala', 'M A', 'KI A', 'SD A', 'α A', 'Benchmark A', 'M B', 'KI B', 'SD B', 'α B', 'Benchmark B', 'p (Wilcoxon)', 'r'],
@@ -199,7 +201,7 @@ export default function Survey() {
               </tbody>
             </table>
             <p className="st-note">Skalenwerte −3 bis +3 (Schrepp, Hinderks &amp; Thomaschewski, 2017); nur vollständige Skalen. Benchmark-Grenzen vor der Verwendung mit der aktuellen UEQ-S-Handreichung abgleichen.</p>
-            <Fig id="teil3items" table={(sl) => csv([['Item', 'M A', 'M B'], ...part3(sl.survey).items.map((i) => [UEQS_ITEMS[i.item].join(' – '), fmt(i.A), fmt(i.B)])])}>
+            <Fig id="teil3items" valid={(sl) => part3(sl.survey).scales.flatMap((s) => [s.A.n, s.B.n])} table={(sl) => csv([['Item', 'M A', 'M B'], ...part3(sl.survey).items.map((i) => [UEQS_ITEMS[i.item].join(' – '), fmt(i.A), fmt(i.B)])])}>
               {(sl) => (
                 <Dots
                   series={AB}
@@ -344,12 +346,16 @@ export function SurveySummary() {
 
 // in-game ratings and telemetry (the game's own tracking)
 const csOf = (s: Slice) => craftStats(s.events, s.feedback);
+// the participants with crafts / with ratings of results
+const craftPersons = (s: Slice) => new Set(s.events.filter((e) => e.type === 'craft' && e.data.outcome === 'crafted').map((e) => e.participant)).size;
+const votePersons = (s: Slice) => new Set(s.feedback.filter((r) => !r.rating && r.vote).map((r) => r.participant)).size;
 function Telemetry() {
   return (
       <Section title="In-Game-Ratings und Telemetrie" id="spiel">
         <div className="st-grid">
           <Fig
             id="crafts"
+            valid={(s) => craftPersons(s)}
             table={(s) => {
               const cs = csOf(s);
               return csv([['Kennzahl', 'A', 'B'], ['Crafts', cs.A.crafts, cs.B.crafts], ['Überarbeitungen', cs.A.reworks, cs.B.reworks], ['Ersatzergebnisse', cs.A.fallbacks, cs.B.fallbacks], ['Minuten im Crafting', fmt(cs.A.minutes, 1), fmt(cs.B.minutes, 1)]]);
@@ -357,6 +363,7 @@ function Telemetry() {
           >
             {(s) => {
               const cs = csOf(s);
+              if (!cs.A.crafts && !cs.B.crafts) return <Empty>Keine Crafting-Vorgänge im Spiel-Tracking (n = 0).</Empty>;
               return (
                 <>
                   <Bars
@@ -376,6 +383,7 @@ function Telemetry() {
           </Fig>
           <Fig
             id="votes"
+            valid={(s) => votePersons(s)}
             table={(s) => {
               const cs = csOf(s);
               return csv([['Bewertung', 'A', 'B'], ['Passt', cs.A.up, cs.B.up], ['Nicht ganz', cs.A.down, cs.B.down]]);
@@ -385,6 +393,7 @@ function Telemetry() {
               const cs = csOf(s);
               const a = cs.A.up + cs.A.down;
               const b = cs.B.up + cs.B.down;
+              if (!a && !b) return <Empty>Keine Bewertungen der Ergebnisse (n = 0).</Empty>;
               return (
                 <>
                   <Bars
@@ -405,6 +414,7 @@ function Telemetry() {
           </Fig>
           <Fig
             id="spielfragen"
+            valid={(s) => new Set(s.feedback.filter((r) => r.rating).map((r) => r.participant)).size}
             table={(s) =>
               csv([
                 ['Frage', 'M A', 'SD A', 'n A', 'M B', 'SD B', 'n B'],
@@ -427,12 +437,13 @@ function Telemetry() {
                   }))}
                 />
               ) : (
-                <Empty>Keine Bewertungen im Spiel.</Empty>
+                <Empty>Keine Bewertungen im Spiel (n = 0).</Empty>
               );
             }}
           </Fig>
           <Fig
             id="praeferenzen"
+            valid={(s) => new Set(s.feedback.filter((r) => r.answers).map((r) => r.participant)).size}
             table={(sl) => {
               const { prefs, scopes } = prefChoices(sl.feedback);
               return csv([
@@ -454,7 +465,7 @@ function Telemetry() {
                   )}
                 </>
               ) : (
-                <Empty>Keine Präferenzen gewählt.</Empty>
+                <Empty>Keine Präferenzen gewählt (n = 0).</Empty>
               );
             }}
           </Fig>
@@ -515,7 +526,7 @@ function Part2Single({ items }: { items: P2Single[] }) {
   const scale = items[0].scale === 7 ? LIKERT7 : LIKERT5;
   return (
     <>
-      <Fig id="teil2single" table={(s) => csv([['Aussage', ...scale, 'Median', 'Q1', 'Q3', 'M', 'SD', 'n'], ...part2Single(s.survey).map((r) => [r.item, ...r.counts, fmt(r.stats.median, 1), fmt(r.stats.q1, 1), fmt(r.stats.q3, 1), fmt(r.stats.mean), fmt(r.stats.sd), r.stats.n])])}>
+      <Fig id="teil2single" valid={(s) => part2Single(s.survey).map((r) => r.stats.n)} table={(s) => csv([['Aussage', ...scale, 'Median', 'Q1', 'Q3', 'M', 'SD', 'n'], ...part2Single(s.survey).map((r) => [r.item, ...r.counts, fmt(r.stats.median, 1), fmt(r.stats.q1, 1), fmt(r.stats.q3, 1), fmt(r.stats.mean), fmt(r.stats.sd), r.stats.n])])}>
         {(s) => <Diverging scale={scale} rows={part2Single(s.survey).map((r) => ({ label: T(r.item), counts: r.counts }))} />}
       </Fig>
       <table className="st-table">
@@ -551,7 +562,7 @@ function Part3Overall({ p3 }: { p3: P3Result }) {
   const o = p3.overall!;
   return (
     <>
-      <Fig id="teil3gesamt" table={(s) => csv([['Skala', 'M', 'KI unten', 'KI oben', 'SD', 'α', 'Benchmark', 'n'], ...(part3(s.survey).overall ?? []).map((x) => [SCALE_NAME[x.scale], fmt(x.v.mean), fmt(x.v.ci[0]), fmt(x.v.ci[1]), fmt(x.v.sd), fmt(x.v.alpha), x.v.bench, x.v.n])])}>
+      <Fig id="teil3gesamt" valid={(s) => (part3(s.survey).overall ?? []).map((x) => x.v.n)} table={(s) => csv([['Skala', 'M', 'KI unten', 'KI oben', 'SD', 'α', 'Benchmark', 'n'], ...(part3(s.survey).overall ?? []).map((x) => [SCALE_NAME[x.scale], fmt(x.v.mean), fmt(x.v.ci[0]), fmt(x.v.ci[1]), fmt(x.v.sd), fmt(x.v.alpha), x.v.bench, x.v.n])])}>
         {(s) => {
           const f = part3(s.survey);
           return (
@@ -615,6 +626,7 @@ function ChoiceBlock({ results, figId }: { results: P1Result[]; figId: string })
     <>
             <Fig
               id={figId}
+              valid={(s) => of(s).map((r) => r.n)}
               table={(s) => csv([['Frage', 'A', 'B', 'Keine Präferenz', 'n', 'Anteil Mehrheit', 'KI unten', 'KI oben', 'p (Vorzeichentest)'], ...of(s).map((r) => [r.question, r.A, r.B, r.neutral, r.n, fmt(r.share), fmt(r.ci[0]), fmt(r.ci[1]), fmtP(r.p)])])}
             >
               {(s) => (
@@ -667,7 +679,7 @@ function SingleChoice({ c, figId, n }: { c: ChoiceResult; figId: string; n: numb
   const of = (s: Slice): ChoiceResult => choices(s.survey, model.optionQuestions).find((x) => x.question === c.question) ?? { ...c, n: 0, options: c.options.map((o) => ({ ...o, k: 0, share: 0, persons: [] })) };
   return (
     <>
-      <Fig id={figId} sub={{ n, title: T(c.question) }} table={(s) => csv([['Antwort', 'n', 'Anteil', 'KI unten', 'KI oben', 'Teilnehmende'], ...of(s).options.map((o) => [o.option, o.k, fmt(o.share), fmt(o.ci[0]), fmt(o.ci[1]), o.persons.join(' ')])])}>
+      <Fig id={figId} sub={{ n, title: T(c.question) }} valid={(s) => of(s).n} table={(s) => csv([['Antwort', 'n', 'Anteil', 'KI unten', 'KI oben', 'Teilnehmende'], ...of(s).options.map((o) => [o.option, o.k, fmt(o.share), fmt(o.ci[0]), fmt(o.ci[1]), o.persons.join(' ')])])}>
         {(s) => {
           const cc = of(s);
           const missing = s.persons.length - cc.n;

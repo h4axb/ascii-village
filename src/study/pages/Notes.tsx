@@ -1091,7 +1091,7 @@ function PageIntro() {
           <strong>Tags setzen:</strong> unter jeder Aussage stehen ihre Tags in einer Zeile; „Tags bearbeiten“ öffnet alle Gruppen mit Erklärung. Gestrichelte Tags sind Vorschläge: anklicken übernimmt sie.
         </li>
         <li>
-          <strong>Prüfen:</strong> „Geprüft?“ markiert eine Aussage als geprüft; es zählen nur die angeklickten Tags, nicht angeklickte Vorschläge werden dabei verworfen. Weitere Aktionen (Deutsch, Original korrigieren, Frage, Löschen) unter „Bearbeiten ⋯“.
+          <strong>Prüfen:</strong> „Geprüft?“ markiert eine Aussage als geprüft; es zählen nur die angeklickten Tags, nicht angeklickte Vorschläge werden dabei verworfen. Nochmal klicken macht es rückgängig. Weitere Aktionen (Deutsch, Original korrigieren, Frage, Löschen) unter „Bearbeiten ⋯“.
         </li>
         <li>
           <strong>Mehrere auf einmal:</strong> Kästchen links anhaken (Umschalt: ganzer Bereich); ein Tag-Klick bei einer davon gilt dann für alle.

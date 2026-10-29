@@ -1,6 +1,6 @@
 // Shared pieces of the /feedback pages: the context every page reads (model,
 // scope, saving), figure numbering and captions, small layout parts.
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { DURATION_LABEL, omit, type DurationBy, type Model, type Scope, type Slice } from './model';
 import type { Study } from './store';
 import { Figure } from './charts';
@@ -50,7 +50,9 @@ export const figNumber = (id: string) => FIGURES.findIndex((f) => f.id === id) +
 
 // children and table may take the figure's slice: the scope's, without the
 // participants left out in this figure (stored per figure, like the caption)
-export function Fig({ id, sub, title, children, table }: { id: string; sub?: { n: number; title: string }; title?: string; children: ReactNode | ((s: Slice) => ReactNode); table?: (s: Slice) => string }) {
+// valid: the participants each value rests on (one number, or one per question / item);
+// shown as "n = 4/5" or "n = 3–4/5" beside the title
+export function Fig({ id, sub, title, children, table, tabs, valid }: { id: string; sub?: { n: number; title: string }; title?: string; children: ReactNode | ((s: Slice) => ReactNode); table?: (s: Slice) => string; tabs?: ReactNode; valid?: (s: Slice) => number | number[] }) {
   const ctx = useCtx();
   const { study, slice } = ctx;
   const figKey = sub ? `${id}.${sub.n}` : id;
@@ -65,8 +67,13 @@ export function Fig({ id, sub, title, children, table }: { id: string; sub?: { n
   const base = en ? tr(f.caption) : f.caption;
   const caption = storedCaption ?? (sub ? `${base.replace(/\.$/, '')}: ${sub.title}${/[.?!]$/.test(sub.title) ? '' : '.'}` : base);
   const n = figNumber(id);
+  const ns = valid ? [valid(s)].flat() : [];
+  const lo = ns.length ? Math.min(...ns) : 0;
+  const hi = ns.length ? Math.max(...ns) : 0;
+  const validLabel = valid ? `n = ${lo === hi ? lo : `${lo}–${hi}`}/${s.persons.length}` : undefined;
   return (
     <Figure
+      valid={validLabel}
       n={sub ? `${n}.${sub.n}` : n}
       title={title ?? (sub ? `${f.title}: ${sub.title}` : f.title)}
       caption={caption}
@@ -76,6 +83,7 @@ export function Fig({ id, sub, title, children, table }: { id: string; sub?: { n
       omitted={stored}
       alsoOmitted={ctx.omitted}
       onOmit={(ids) => study.commit([{ coll: 'settings', id: omitKey, data: { ids } }])}
+      tabs={tabs}
     >
       {/* (components inside read the figure's slice from the context too) */}
       <StudyCtx.Provider value={{ ...ctx, slice: s }}>{typeof children === 'function' ? children(s) : children}</StudyCtx.Provider>
@@ -83,21 +91,66 @@ export function Fig({ id, sub, title, children, table }: { id: string; sub?: { n
   );
 }
 
+// a section as one card: its title inside, at the top, above a thin line
 export function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return (
-    <section className="st-section" id={id}>
+    <section className="st-section st-csection" id={id}>
       <h2>{title}</h2>
-      {children}
+      <div className="st-csection-body">{children}</div>
     </section>
   );
 }
 
-export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
+// a summary card: the value, its valid n (and a mark such as "1 geschätzt"),
+// the method behind it in a small popover ("ⓘ Methode"), so the cards of a row
+// stay the same height
+export function Stat({ label, value, sub, n, mark, details }: { label: string; value: ReactNode; sub?: ReactNode; n?: ReactNode; mark?: ReactNode; details?: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const [left, setLeft] = useState(false); // (near the right edge: the popover opens to the left)
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('click', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
   return (
-    <div className="st-stat">
+    <div className="st-stat" ref={ref}>
       <div className="st-stat-label">{label}</div>
       <div className="st-stat-value">{value}</div>
+      {(n != null || mark != null) && (
+        <div className="st-stat-n">
+          {n}
+          {mark != null && <span className="st-stat-mark">{mark}</span>}
+        </div>
+      )}
       {sub != null && <div className="st-stat-sub">{sub}</div>}
+      {details != null && (
+        <>
+          <button
+            type="button"
+            className="st-linkbtn st-stat-info"
+            aria-expanded={open}
+            onClick={() => {
+              const r = ref.current?.getBoundingClientRect();
+              setLeft(!!r && r.left + 320 > window.innerWidth);
+              setOpen((x) => !x);
+            }}
+          >
+            ⓘ Methode
+          </button>
+          {open && (
+            <div className={`st-pop${left ? ' is-left' : ''}`} role="dialog" aria-label={`${label}: Methode`}>
+              {details}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

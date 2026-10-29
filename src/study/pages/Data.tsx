@@ -230,7 +230,7 @@ export default function Data({ sub = '' }: { sub?: string }) {
               <tr key={i} className={c.ok ? '' : 'is-open'}>
                 <td>{c.area}</td>
                 <td>{c.label}</td>
-                <td>{c.ok ? '✓ erfüllt' : '! offen'}</td>
+                <td className="st-nowrap">{c.ok ? '✓ erfüllt' : '! offen'}</td>
                 <td>{c.detail}</td>
               </tr>
             ))}

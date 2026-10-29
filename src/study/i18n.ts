@@ -366,6 +366,87 @@ const EN: Record<string, string> = {
   'Deutsche Fassung': 'German version',
   'Klicken: bearbeiten': 'Click: edit',
   '+ Deutsche Fassung': '+ German version',
+  // design rollout: figures, tiles, empty states, timing
+  'Versuche & Zeiten': 'Attempts & times',
+  'unter Teilnehmende & Sessions': 'under Participants & sessions',
+  'PNG herunterladen': 'Download PNG',
+  'CSV herunterladen': 'Download CSV',
+  'Bildunterschrift kopieren': 'Copy caption',
+  'Spieldauer je Teilnehmenden in Minuten (aktiv, Segmente = Versuche).': 'Play time per participant in minutes (active, segments = attempts).',
+  'Keine gültigen Altersdaten (n = 0)': 'No valid age data (n = 0)',
+  'Tally-Spalte unter Daten & Validierung als „Alter“ zuordnen.': 'Map the Tally column as “Age” under Data & validation.',
+  'Noch keine bestätigten Rückmeldungen (n = 0)': 'No confirmed feedback yet (n = 0)',
+  'Aussagen unter Qualitatives Feedback taggen und als geprüft markieren.': 'Tag the statements under Qualitative feedback and mark them as checked.',
+  'Keine Crafting-Vorgänge im Spiel-Tracking (n = 0).': 'No crafts in the game tracking (n = 0).',
+  'Keine Bewertungen der Ergebnisse (n = 0).': 'No ratings of the results (n = 0).',
+  'Keine Bewertungen im Spiel (n = 0).': 'No in-game ratings (n = 0).',
+  'Keine Präferenzen gewählt (n = 0).': 'No preferences chosen (n = 0).',
+  'geschätzt (schraffiert)': 'estimated (hatched)',
+  '(geschätzt)': '(estimated)',
+  'Aktive Spielzeit je Teilnehmenden, Segmente = Versuche (Links); wiederholte Abschnitte eingeschlossen; schraffiert = geschätzt.': 'Active play time per participant, segments = attempts (links); repeated sections included; hatched = estimated.',
+  'Verstrichene Zeit vom ersten Start bis zum letzten Ende, Pausen eingeschlossen.': 'Elapsed time from the first start to the last end, breaks included.',
+  'Gültige, ununterbrochene Erstdurchläufe; übrige ohne Wert (nicht 0).': 'Valid, uninterrupted first runs; the others without a value (not 0).',
+  'Je Person ein Wert, mehrere Links zählen nicht mehrfach.': 'One value per person; several links do not count several times.',
+  'Keine Zeiten.': 'No times.',
+  Maß: 'Measure',
+  'ⓘ Methode': 'ⓘ Method',
+  Exportieren: 'Export',
+  'exakt gemessen': 'measured exactly',
+  'nicht abgeschlossen': 'not completed',
+  'mehrere Versuche': 'several attempts',
+  'Zeit nicht exakt': 'time not exact',
+  'Neustarts / Lerneffekte': 'restarts / learning effects',
+  'keine aktive Zeit': 'no active time',
+  'z. B. Neustart nach Absturz': 'e.g. restart after a crash',
+  'kein gültiger Wert (zählt nicht, nicht 0)': 'no valid value (does not count, not 0)',
+  'Geschätzte Zeiten gekennzeichnet': 'Estimated times labelled',
+  'alle exakt gemessen': 'all measured exactly',
+  'Mehrere Links: Ausgang je Versuch geprüft': 'Several links: outcome checked per attempt',
+  'Saubere Durchlaufzeit: gültige Erstdurchläufe': 'Clean completion time: valid first runs',
+  'zählt in der sauberen Durchlaufzeit': 'counts in the clean completion time',
+  'keine Tally-Zeile': 'no Tally row',
+  'Teilnehmende in der Reihenfolge': 'Participants in the order',
+  'Nur gültige Erstdurchläufe: ein Versuch, abgeschlossen, ohne Unterbrechung, exakt gemessen. Alle anderen zählen nicht (kein Wert statt 0).': 'Valid first runs only: one attempt, completed, without interruption, measured exactly. All others do not count (no value instead of 0).',
+  'Aktive Spielzeit je Person, über alle ihre Versuche (Links) zusammengezählt; je Person ein Wert.': 'Active play time per person, added up over all their attempts (links); one value per person.',
+  Gemessen: 'Measured',
+  Geschätzt: 'Estimated',
+  ': von der Spiel-Uhr erfasst.': ': recorded by the game clock.',
+  ': aus den Zeiten der Quest-Schritte oder den Spielereignissen berechnet, oder von Hand eingetragen. Der Hauptwert enthält nur gemessene Zeiten; „mit Schätzungen“ nimmt beide zusammen. Verstrichen (erster Start bis letztes Ende):':
+    ': calculated from the quest steps’ times or the game events, or entered by hand. The main value holds measured times only; “with estimates” takes both together. Elapsed (first start to last end):',
+  'Zeiten bearbeiten': 'Edit times',
+  // notes page help
+  'Aussagen lesen:': 'Reading statements:',
+  'je Testperson die Beobachtungen, das Nachgespräch und die Umfrage-Freitexte. Oben rechts wählst du Deutsch, Original oder beides.': 'per participant the observations, the debriefing and the survey free texts. At the top right you choose German, original or both.',
+  'unter jeder Aussage stehen ihre Tags in einer Zeile; „Tags bearbeiten“ öffnet alle Gruppen mit Erklärung. Gestrichelte Tags sind Vorschläge: anklicken übernimmt sie.': 'under each statement its tags sit in one line; “Edit tags” opens all groups with an explanation. Dashed tags are suggestions: a click takes them over.',
+  'Prüfen:': 'Checking:',
+  '„Geprüft?“ markiert eine Aussage als geprüft; es zählen nur die angeklickten Tags, nicht angeklickte Vorschläge werden dabei verworfen. Nochmal klicken macht es rückgängig. Weitere Aktionen (Deutsch, Original korrigieren, Frage, Löschen) unter „Bearbeiten ⋯“.': '“Checked?” marks a statement as checked; only the clicked tags count, suggestions not clicked are dropped. Clicking it again undoes it. More actions (German, correct original, question, delete) under “Edit ⋯”.',
+  'Kästchen links anhaken (Umschalt: ganzer Bereich); ein Tag-Klick bei einer davon gilt dann für alle.': 'tick the boxes on the left (Shift: a whole range); a tag click on one of them then applies to all.',
+  'KI und Auswertung:': 'AI and analysis:',
+  '„KI: Tags vorschlagen“ und „KI: Aussagen umformulieren“ (nach deinen „Kriterien“) arbeiten mit den ausgewählten Aussagen, sonst mit allen ungeprüften bzw. angezeigten; jedes Ergebnis prüfst und bearbeitest du in einem Fenster, bevor es gespeichert wird. Über jedem Button erklärt ein Hinweis mit Beispiel, was er tut. Links unter Qualitatives Feedback: Nach Priorität, Codes, Wiederkehrende Befunde und die Tag-Gruppen.':
+    '“AI: suggest tags” and “AI: reword statements” (by your “criteria”) work on the selected statements, otherwise on all unchecked or shown ones; you check and edit every result in a window before it is saved. A hint with an example above each button explains what it does. On the left under Qualitative feedback: By priority, Codes, Recurring findings and the tag groups.',
+  'Noch keine Befunde. „KI: ähnliche Aussagen bündeln“ schlägt welche vor; oder oben von Hand anlegen.': 'No findings yet. “AI: group similar statements” suggests some; or create them above by hand.',
+  'Festlegen, wie die KI umformulieren soll (z. B. sachlich, Präsens, vollständige Sätze).': 'Set how the AI should reword (e.g. factual, present tense, full sentences).',
+  'Die KI sucht Aussagen, die bei mindestens zwei Testpersonen dasselbe sagen, und fasst sie zu Befunden mit sachlicher Beschreibung zusammen. Du prüfst und bearbeitest alles im Fenster, bevor etwas gespeichert wird.\nBeispiel: P001 „Crafting-Menü verwirrend“ + P004 „Crafting schwer zu finden“ → Befund „Crafting-Menü schwer auffindbar“ (2 Testpersonen).':
+    'The AI looks for statements that say the same for at least two participants and groups them into findings with a factual description. You check and edit everything in the window before anything is saved.\nExample: P001 “crafting menu confusing” + P004 “crafting hard to find” → finding “Crafting menu hard to find” (2 participants).',
+  // data & validation notes
+  'A / B = Design. „1. / 2. Durchlauf“ aus Tally wird über die Testgruppe (': 'A / B = design. “1st / 2nd run” from Tally is converted via the test group (',
+  ') umgerechnet. Von Hand gesetzte Antworten werden nicht getauscht und bei einem neuen Tally-Upload nicht überschrieben.': '). Answers set by hand are not swapped and not overwritten by a new Tally upload.',
+  'Umfrage-Zeilen ↔ Teilnehmende: wie oben unter „Einstellungen“ (': 'Survey rows ↔ participants: as set above under “Settings” (',
+  '). Abweichende AB/BA-Angaben werden markiert.': '). Differing AB/BA entries are flagged.',
+  'Die übrigen Antworten werden nach Abgabezeit (deutsche Zeit, früheste zuerst) an die Teilnehmenden in dieser Reihenfolge gegeben.': 'The remaining answers go to the participants in this order by submission time (German time, earliest first).',
+  'Eine Abgabe passt zu einer Person, wenn sie in diesem Fenster liegt; die nächste zuerst. Nur wenn der Zeitabgleich an ist.': 'A submission fits a person if it lies in this window; the nearest first. Only when time matching is on.',
+  'Spiel-Uhr: erster Quest-Schritt bis Öffnen der Umfrage (exakt). Sonst die Quest-Schritte bzw. erstes bis letztes Ereignis ohne Pausen (ungefähr). Die Link-Dauer (Öffnen bis Schließen des Links) ist keine Spielzeit und dient nur der Diagnose. Mehrere Links sind Versuche: je Versuch und je Person unter Teilnehmende & Sessions → Versuche & Zeiten von Hand änderbar.':
+    'Game clock: first quest step to opening the survey (exact). Otherwise the quest steps or first to last event without breaks (approximate). The link duration (opening to closing the link) is not play time and only serves diagnosis. Several links are attempts: editable by hand per attempt and per person under Participants & sessions → Attempts & times.',
+  'Jede Regel ordnet nur zu, was die Regeln davor offen gelassen haben. Steht „Von Hand“ weiter unten, gilt eine Wahl von Hand nur noch für Antworten, die keine Regel davor vergeben hat. Kommt die Test-ID später, ordnen Zeit und Reihenfolge auch Antworten mit Test-ID zu. „keine Antworten“ von Hand gilt immer.':
+    'Each rule only assigns what the rules before it left open. If “By hand” is further down, a choice by hand only applies to answers no rule before it assigned. If the test ID comes later, time and order also assign answers with a test ID. “no answers” by hand always applies.',
+  'Mehrere Links einer Person: P009.1, P009.2 … sind Versuche derselben Person (nie eigene Teilnehmende). Je Person drei Zeiten: verstrichen (erster Start bis letztes Ende), aktiv (Summe der Versuche; geschätzt markiert) und saubere Erstdurchlaufzeit (nur ein ununterbrochener, exakt gemessener Durchlauf, sonst kein Wert statt 0). Mittelwert und SD je Person, Stichprobe n/N angegeben. Alles unter Teilnehmende & Sessions → Versuche & Zeiten von Hand änderbar.':
+    'Several links of one person: P009.1, P009.2 … are attempts of the same person (never participants of their own). Three times per person: elapsed (first start to last end), active (sum of the attempts; estimates labelled) and clean first-run time (only one uninterrupted, exactly measured run, otherwise no value instead of 0). Mean and SD per person, sample n/N given. All editable by hand under Participants & sessions → Attempts & times.',
+  'Regeln, Zeitfenster, Zeitzone und Reihenfolge stehen oben unter „Einstellungen“. Hier: jede Antwort, wem sie zugeordnet ist und warum; „zuordnen an“ ändert es von Hand (eine Zeile einer anderen Person wird getauscht).':
+    'Rules, time window, time zone and order are above under “Settings”. Here: each answer, who it is assigned to and why; “assign to” changes it by hand (a row of another person is swapped).',
+  'Vor jedem Import und jeder Wiederherstellung wird der ganze Stand gesichert. „Ansehen“ öffnet ihn als Link (nur lesen), „Wiederherstellen“ zeigt zuerst jede Abweichung.': 'Before every import and every restore the whole state is saved. “View” opens it as a link (read only), “Restore” first shows every difference.',
+  'Was wofür gilt. Jede Änderung, die Umfrage-Antworten anderen Teilnehmenden zuordnen würde, wird vorher pro Person gefragt.': 'What applies to what. Every change that would assign survey answers to other participants is asked about per person first.',
+  '„automatisch“ folgt den Regeln oben; eine gewählte Zeile gilt vor allen Regeln (auch nach einem neuen Upload). Eine Zeile, die jemand anderes hat, wird getauscht.': '“automatic” follows the rules above; a chosen row applies before all rules (also after a new upload). A row someone else has is swapped.',
+  '(Standard; keine Abgaben mit Test-ID zum Prüfen)': '(default; no submissions with a test ID to check)',
   '+ Interpretation hinzufügen': '+ Add interpretation',
   'Klicken: Original korrigieren': 'Click: correct the original',
   'Geprüft. Nochmal klicken: rückgängig': 'Checked. Click again: undo',
@@ -955,6 +1036,22 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^(\d+) Versuche$/, '$1 attempts'],
+  [/^Gemessen: (.+?), n = (\d+)\/(\d+)\. Mit Schätzungen: (.+?), n = (\d+)\/(\d+) \((\d+) geschätzt\)\.$/, 'Measured: $1, n = $2/$3. With estimates: $4, n = $5/$6 ($7 estimated).'],
+  [/^mit Schätzungen: (.+?) · n = (\d+)\/(\d+) \((\d+) geschätzt\)$/, 'with estimates: $1 · n = $2/$3 ($4 estimated)'],
+  [/^n = (\d+)\/(\d+) gemessen$/, 'n = $1/$2 measured'],
+  [/^von (\d+) erfasst$/, 'of $1 recorded'],
+  [/^Ø (\S+) Versuche je Person$/, 'Ø $1 attempts per person'],
+  [/^Teilnehmende wählen \((\d+)\/(\d+)\) …$/, 'Choose participants ($1/$2) …'],
+  [/^(.+): aktive Zeit geschätzt \(in Abbildungen und Export markiert\)$/, '$1: active time estimated (labelled in figures and exports)'],
+  [/^(.+) – Versuch (\d+) \((.+)\): (.+) \(geschätzt\)$/, '$1 – attempt $2 ($3): $4 (estimated)'],
+  [/^(.+) nach oben$/, '$1 up'],
+  [/^(.+) nach unten$/, '$1 down'],
+  [/^übernommener Stand vom (.+)$/, 'accepted state of $1'],
+  [/^ausgeschlossen \((.+)\)$/, 'excluded ($1)'],
+  [/^n = (\d+)\/(\d+); ohne: (.+)$/, 'n = $1/$2; without: $3'],
+  [/^Die KI formuliert die (ausgewählten|angezeigten) Aussagen nach deinen Kriterien neu \(Bedeutung bleibt gleich\)\. Du vergleichst alt und neu im Fenster und kannst jeden Vorschlag selbst anpassen\. Die Originalnotiz bleibt erhalten\.\n[\s\S]*$/, 'The AI rewords the shown or selected statements by your criteria (the meaning stays the same). You compare old and new in the window and can adjust every suggestion yourself. The original note is kept.\nExample: “menu crafting not found, searched long” → “The participant did not find the crafting menu and searched for it for a long time.”'],
+  [/^Die KI schlägt passende Tags und einen Befund vor – für (die ausgewählten|alle ungeprüften) Aussagen\. Du prüfst und änderst alles im Fenster, bevor etwas gespeichert wird\.\n[\s\S]*$/, 'The AI suggests fitting tags and a finding for the selected or all unchecked statements. You check and change everything in the window before anything is saved.\nExample: “crafting menu hard to find” → Area: Game · Kind: Problem · Topic: Crafting.'],
   [/^getrackt: (.+)$/, 'tracked: $1'],
   [/^getrackt als (.+)$/, 'tracked as $1'],
   [/^Link (\d+) entfernen$/, 'Remove link $1'],
@@ -1125,16 +1222,44 @@ export function tr(s: string): string {
   const out = trCore(m[2], 0);
   return out === undefined ? s : m[1] + out + m[3];
 }
+// split on sep, but not inside parentheses
+function splitTop(s: string, sep: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let from = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '(') depth++;
+    else if (s[i] === ')') depth = Math.max(0, depth - 1);
+    else if (!depth && s.startsWith(sep, i)) {
+      out.push(s.slice(from, i));
+      from = i + sep.length;
+      i += sep.length - 1;
+    }
+  }
+  return [...out, s.slice(from)];
+}
 function trCore(core: string, depth: number): string | undefined {
   const exact = EN[core];
   if (exact !== undefined) return exact;
   for (const [re, rep] of PATTERNS) if (re.test(core)) return core.replace(re, (...g: string[]) => rep.replace(/\$(\d)/g, (_, k: string) => trCore(g[Number(k)], depth + 1) ?? g[Number(k)]));
   if (depth > 3) return undefined;
   // composites: "A – B – C", "Label: value", "Name (3)"
-  if (core.includes(' – ')) {
-    const parts = core.split(' – ');
+  for (const sep of [' – ', ' → ', ' · ']) {
+    if (!core.includes(sep)) continue;
+    const parts = core.split(sep);
     const t = parts.map((x) => trCore(x, depth + 1));
-    if (t.some((x) => x !== undefined)) return parts.map((x, i) => t[i] ?? x).join(' – ');
+    if (t.some((x) => x !== undefined)) return parts.map((x, i) => t[i] ?? x).join(sep);
+  }
+  // "· text" (a joined detail)
+  if (core.startsWith('· ')) {
+    const t = trCore(core.slice(2), depth + 1);
+    if (t !== undefined) return `· ${t}`;
+  }
+  // lists ("a, b, c"): only when every part is known, so sentences stay whole
+  if (core.includes(', ')) {
+    const parts = splitTop(core, ', ');
+    const t = parts.map((x) => trCore(x, depth + 1));
+    if (t.every((x) => x !== undefined)) return t.join(', ');
   }
   const k = core.indexOf(': ');
   if (k > 0) {
@@ -1145,7 +1270,8 @@ function trCore(core: string, depth: number): string | undefined {
   const paren = /^(.+?) (\(.*\))$/.exec(core);
   if (paren) {
     const left = trCore(paren[1], depth + 1);
-    if (left !== undefined) return `${left} ${paren[2]}`;
+    const inner = trCore(paren[2], depth + 1) ?? ((x) => (x === undefined ? undefined : `(${x})`))(trCore(paren[2].slice(1, -1), depth + 1));
+    if (left !== undefined || inner !== undefined) return `${left ?? paren[1]} ${inner ?? paren[2]}`;
   }
   // short texts with numbers (check details and the like): word by word
   if (core.length < 90 && /\d/.test(core)) {
@@ -1191,7 +1317,7 @@ function translateNode(n: Node) {
   }
 }
 // keeps everything under `root` in English while the language is English
-export function useTranslator(root: React.RefObject<HTMLElement>, l: Lang) {
+export function useTranslator(root: React.RefObject<HTMLElement>, l: Lang, mounted?: unknown) {
   useEffect(() => {
     const el = root.current;
     if (!el || l === 'de') return;
@@ -1214,5 +1340,5 @@ export function useTranslator(root: React.RefObject<HTMLElement>, l: Lang) {
       window.confirm = confirm0;
       window.prompt = prompt0;
     };
-  }, [root, l]);
+  }, [root, l, mounted]);
 }

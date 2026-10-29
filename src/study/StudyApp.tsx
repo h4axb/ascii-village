@@ -105,7 +105,8 @@ export default function StudyApp() {
   const [typed, setTyped] = useState('');
   const lang = useLang();
   const rootRef = useRef<HTMLDivElement>(null);
-  useTranslator(rootRef, lang);
+  // (starts once the page is there: while loading or locked there is no root yet)
+  useTranslator(rootRef, lang, study.state);
 
   useEffect(() => {
     document.title = lang === 'en' ? 'User test evaluation' : 'Auswertung Usertest';
@@ -263,8 +264,7 @@ export default function StudyApp() {
           </button>
           <span>{current.title}</span>
         </header>
-        <nav id="st-nav" className="st-nav">
-          <div className="st-brand">Auswertung Usertest</div>
+        <nav id="st-nav" className="st-nav" aria-label="Auswertung Usertest">
           <ul>
             {PAGES.map((p) => (
               <li key={p.id}>

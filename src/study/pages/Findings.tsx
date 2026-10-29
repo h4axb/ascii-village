@@ -110,7 +110,7 @@ export default function Findings() {
       )}
 
       {rows.some((r) => r.persons) && (
-        <Fig id="befunde" table={(s) => csv([['Befund', 'Beschreibung', 'Teilnehmende', 'IDs', 'Aussagen'], ...rowsOf(s).map((r) => [r.f.name, r.f.description ?? '', r.persons, personsOf(r.items).join(' '), r.items.length])])}>
+        <Fig id="befunde" valid={(s) => personsOf(rowsOf(s).flatMap((r) => r.items)).length} table={(s) => csv([['Befund', 'Beschreibung', 'Teilnehmende', 'IDs', 'Aussagen'], ...rowsOf(s).map((r) => [r.f.name, r.f.description ?? '', r.persons, personsOf(r.items).join(' '), r.items.length])])}>
           {(s) => <Bars rows={rowsOf(s).filter((r) => r.persons).map((r) => ({ label: r.f.name, values: [r.persons], note: `${r.persons}/${s.persons.length}` }))} max={s.persons.length} />}
         </Fig>
       )}

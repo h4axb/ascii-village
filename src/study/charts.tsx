@@ -11,7 +11,7 @@ export const MUTED = '#6b6b66';
 export const GRID = '#e4e3de';
 export const SERIES = { A: '#4b4b48', B: '#c2571a' } as const; // variant A grey, B the accent
 export const NEUTRAL = '#bdbcb5';
-const FONT = "'IBM Plex Sans', Arial, sans-serif";
+const FONT = "'ABeeZee', Arial, sans-serif";
 
 function useWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
   const ref = useRef<T>(null);
@@ -213,15 +213,18 @@ export interface SegRow {
   label: string;
   segments: { value: number; name: string }[];
   note?: string;
+  estimated?: boolean; // drawn hatched: not measured by the game's clock
 }
 const SEG_COLORS = ['#3f3f3c', '#7d7c77', '#aeada6', '#cfcec8', '#e2e1dc'];
 export function Segments({ rows, unit = '', digits = 0, legend }: { rows: SegRow[]; unit?: string; digits?: number; legend?: string[] }) {
   const [ref, w] = useWidth<HTMLDivElement>();
   const col = labelColumn(rows.map((r) => r.label), w, 0.3);
   const labelW = col.labelW;
-  const names = legend ?? [];
-  const lg = names.length > 1 ? legendLayout(names, labelW, w) : { pos: [], height: 0 };
-  const top = names.length > 1 ? lg.height + 8 : 6;
+  const hatched = rows.some((r) => r.estimated && r.segments.length);
+  const segNames = legend && legend.length > 1 ? legend : [];
+  const names = [...segNames, ...(hatched ? ['geschätzt (schraffiert)'] : [])];
+  const lg = names.length ? legendLayout(names, labelW, w) : { pos: [], height: 0 };
+  const top = names.length ? lg.height + 8 : 6;
   const barH = 16;
   const rowHs = rows.map((_, i) => Math.max(barH, col.lines[i].length * LINE) + 12);
   const rowY = rowHs.map((_, i) => top + rowHs.slice(0, i).reduce((a, b) => a + b, 0));
@@ -235,10 +238,17 @@ export function Segments({ rows, unit = '', digits = 0, legend }: { rows: SegRow
   return (
     <div ref={ref} className="st-chart">
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fontFamily={FONT} role="img">
-        {names.length > 1 &&
+        <defs>
+          <pattern id="st-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="5" height="5" fill="transparent" />
+            <line x1="0" y1="0" x2="0" y2="5" stroke="#fff" strokeWidth="2.2" />
+          </pattern>
+        </defs>
+        {names.length > 0 &&
           names.map((n, i) => (
             <g key={n} transform={`translate(${lg.pos[i].x}, ${8 + lg.pos[i].y})`}>
-              <rect width={10} height={10} rx={2} fill={SEG_COLORS[Math.min(i, SEG_COLORS.length - 1)]} />
+              <rect width={10} height={10} rx={2} fill={i < segNames.length ? SEG_COLORS[Math.min(i, SEG_COLORS.length - 1)] : SEG_COLORS[1]} />
+              {i >= segNames.length && <rect width={10} height={10} rx={2} fill="url(#st-hatch)" />}
               <text x={15} y={9} fontSize={12} fill={INK}>
                 {n}
               </text>
@@ -263,9 +273,12 @@ export function Segments({ rows, unit = '', digits = 0, legend }: { rows: SegRow
                 at += sg.value;
                 const bw = Math.max(sg.value > 0 ? 2 : 0, x(at) - x0 - (j < r.segments.length - 1 ? 1 : 0));
                 return (
-                  <rect key={j} x={x0} y={y} width={bw} height={barH} rx={Math.min(3, bw / 2)} fill={SEG_COLORS[Math.min(j, SEG_COLORS.length - 1)]}>
-                    <title>{`${r.label} – ${sg.name}: ${nf(sg.value, digits)}${unit}`}</title>
-                  </rect>
+                  <g key={j}>
+                    <rect x={x0} y={y} width={bw} height={barH} rx={Math.min(3, bw / 2)} fill={SEG_COLORS[Math.min(j, SEG_COLORS.length - 1)]}>
+                      <title>{`${r.label} – ${sg.name}: ${nf(sg.value, digits)}${unit}${r.estimated ? ' (geschätzt)' : ''}`}</title>
+                    </rect>
+                    {r.estimated && <rect x={x0} y={y} width={bw} height={barH} rx={Math.min(3, bw / 2)} fill="url(#st-hatch)" pointerEvents="none" />}
+                  </g>
                 );
               })}
               <text x={x(total(r)) + 5} y={y + barH / 2 + 4} fontSize={11} fill={MUTED}>
@@ -413,6 +426,8 @@ export function Figure({
   omitted = [],
   alsoOmitted = [],
   onOmit,
+  tabs,
+  valid,
 }: {
   n: number | string;
   title: string;
@@ -424,8 +439,11 @@ export function Figure({
   omitted?: string[];
   alsoOmitted?: string[]; // left out everywhere (the participants menu)
   onOmit?: (ids: string[]) => void;
+  tabs?: ReactNode; // switches on the top edge of the chart's box (e.g. Aktiv / Verstrichen / Sauber)
+  valid?: string; // the valid n it rests on (n = 4/5)
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDetailsElement>(null);
   const [draft, setDraft] = useState(caption);
   const [copied, setCopied] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -433,65 +451,99 @@ export function Figure({
   const gone = [...alsoOmitted, ...omitted];
   const without = gone.length ? `${tr('ohne')} ${gone.join(', ')}${people ? ` (n = ${people.length - omitted.length})` : ''}` : '';
   const full = `${getLang() === 'en' ? 'Figure' : 'Abbildung'} ${n}: ${draft}${without ? ` (${without})` : ''}`;
+  // the export menu: closes on a click elsewhere
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (menu.current?.open && !menu.current.contains(e.target as Node)) menu.current.open = false;
+    };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
+  const done = () => menu.current && (menu.current.open = false);
+  // (four rows: title, tabs, the chart's box, caption – in a grid of figures they line up across the row)
   return (
-    <figure className="st-figure">
+    <figure className={`st-figure${tabs ? ' has-tabs' : ''}`}>
       <figcaption className="st-figtitle">
-        <span className="st-fignum">Abb. {n}</span> {title}
-      </figcaption>
-      <div ref={ref}>
-        {children}
-        {without && <p className="st-note">{without}</p>}
-      </div>
-      <textarea
-        className="st-caption"
-        value={draft}
-        rows={Math.max(1, Math.ceil(draft.length / 48))}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => draft !== caption && onCaption(draft)}
-        aria-label={`Bildunterschrift Abbildung ${n}`}
-      />
-      {picking && people && onOmit && (
-        <div className="st-figpick">
-          {people.map((id) => (
-            <span key={id} className="st-figpick-one">
-              <label>
-                <input type="checkbox" checked={!omitted.includes(id)} onChange={(e) => onOmit(e.target.checked ? omitted.filter((x) => x !== id) : [...omitted, id])} />
-                {id}
-              </label>
-              <button type="button" className="st-linkbtn" onClick={() => onOmit(people.filter((x) => x !== id))} title={`Nur ${id} in dieser Abbildung`}>
-                nur
+        <span>
+          <span className="st-fignum">Abb. {n}</span> {title}
+          {valid && <span className="st-fig-n">{valid}</span>}
+        </span>
+        <details ref={menu} className="st-more st-figmenu">
+          <summary aria-label={`Abbildung ${n}: exportieren`} title="Exportieren">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" />
+            </svg>
+            <svg className="st-figmenu-caret" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </summary>
+          <div className="st-more-list" role="menu">
+            <button type="button" role="menuitem" onClick={() => (done(), void exportPng(ref.current, full, `${tr('Abbildung')}-${n}.png`))}>
+              PNG herunterladen
+            </button>
+            {table && (
+              <button type="button" role="menuitem" onClick={() => (done(), download(new Blob(['\uFEFF' + table()], { type: 'text/csv;charset=utf-8' }), `${tr('Abbildung')}-${n}.csv`))}>
+                CSV herunterladen
               </button>
-            </span>
-          ))}
-          <button type="button" className="st-linkbtn" onClick={() => onOmit([])} disabled={!omitted.length}>
-            alle
-          </button>
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                done();
+                void navigator.clipboard?.writeText(full).then(() => {
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1500);
+                });
+              }}
+            >
+              Bildunterschrift kopieren
+            </button>
+            {people && onOmit && (
+              <button type="button" role="menuitem" onClick={() => (done(), setPicking((x) => !x))}>
+                {`Teilnehmende wählen (${people.length - omitted.length}/${people.length}) …`}
+              </button>
+            )}
+          </div>
+        </details>
+      </figcaption>
+      <div className="st-figtabs">{tabs}</div>
+      <div className="st-figbox">
+        <div ref={ref}>
+          {children}
+          {without && <p className="st-note">{without}</p>}
         </div>
-      )}
-      <div className="st-figtools">
-        {people && onOmit && (
-          <button type="button" className={omitted.length ? 'is-on' : ''} onClick={() => setPicking((x) => !x)} title="Einzelne Teilnehmende in dieser Abbildung weglassen" aria-expanded={picking}>
-            Teilnehmende {people.length - omitted.length}/{people.length}
-          </button>
-        )}
-        <button type="button" onClick={() => void exportPng(ref.current, full, `${tr('Abbildung')}-${n}.png`)}>
-          PNG
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            void navigator.clipboard?.writeText(full).then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1500);
-            });
-          }}
-        >
-          {copied ? 'Kopiert' : 'Text kopieren'}
-        </button>
-        {table && (
-          <button type="button" onClick={() => download(new Blob(['\uFEFF' + table()], { type: 'text/csv;charset=utf-8' }), `${tr('Abbildung')}-${n}.csv`)}>
-            CSV
-          </button>
+      </div>
+      <div className="st-figfoot">
+        {copied && <span className="st-muted st-copied">Kopiert</span>}
+        <textarea
+          className="st-caption"
+          value={draft}
+          rows={Math.max(1, Math.ceil(draft.length / 48))}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => draft !== caption && onCaption(draft)}
+          aria-label={`Bildunterschrift Abbildung ${n}`}
+        />
+        {picking && people && onOmit && (
+          <div className="st-figpick">
+            {people.map((id) => (
+              <span key={id} className="st-figpick-one">
+                <label>
+                  <input type="checkbox" checked={!omitted.includes(id)} onChange={(e) => onOmit(e.target.checked ? omitted.filter((x) => x !== id) : [...omitted, id])} />
+                  {id}
+                </label>
+                <button type="button" className="st-linkbtn" onClick={() => onOmit(people.filter((x) => x !== id))} title={`Nur ${id} in dieser Abbildung`}>
+                  nur
+                </button>
+              </span>
+            ))}
+            <button type="button" className="st-linkbtn" onClick={() => onOmit([])} disabled={!omitted.length}>
+              alle
+            </button>
+            <button type="button" className="st-linkbtn" onClick={() => setPicking(false)}>
+              fertig
+            </button>
+          </div>
         )}
       </div>
     </figure>
@@ -509,13 +561,13 @@ export function download(blob: Blob, name: string) {
 // the font, embedded into the exported SVG (an <img> can't load web fonts)
 let fontCss: Promise<string> | null = null;
 function embeddedFont(): Promise<string> {
-  fontCss ??= fetch('/fonts/ibm-plex-sans-latin.woff2')
+  fontCss ??= fetch('/fonts/abeezee-latin.woff2')
     .then((r) => (r.ok ? r.blob() : Promise.reject()))
     .then(
       (b) =>
         new Promise<string>((res) => {
           const fr = new FileReader();
-          fr.onload = () => res(`@font-face{font-family:'IBM Plex Sans';font-weight:100 700;src:url(${fr.result}) format('woff2');}`);
+          fr.onload = () => res(`@font-face{font-family:'ABeeZee';font-weight:400;src:url(${fr.result}) format('woff2');}`);
           fr.readAsDataURL(b);
         }),
     )
@@ -565,11 +617,11 @@ export async function exportPng(host: HTMLElement | null, caption: string, name:
         }),
     ),
   );
-  await document.fonts?.load(`${Math.round(13 * k)}px 'IBM Plex Sans'`).catch(() => null);
+  await document.fonts?.load(`${Math.round(13 * k)}px 'ABeeZee'`).catch(() => null);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
   const fontPx = Math.round(13 * k);
-  ctx.font = `${fontPx}px 'IBM Plex Sans', Arial, sans-serif`;
+  ctx.font = `${fontPx}px 'ABeeZee', Arial, sans-serif`;
   const lines = wrap(ctx, caption, OUT);
   const figH = imgs.reduce((a, i) => a + i.h * k, 0);
   canvas.width = OUT + pad * 2;
@@ -581,7 +633,7 @@ export async function exportPng(host: HTMLElement | null, caption: string, name:
     ctx.drawImage(img, pad, y, OUT, h * k);
     y += h * k;
   }
-  ctx.font = `${fontPx}px 'IBM Plex Sans', Arial, sans-serif`;
+  ctx.font = `${fontPx}px 'ABeeZee', Arial, sans-serif`;
   ctx.fillStyle = INK;
   y += fontPx * 1.2;
   for (const l of lines) {

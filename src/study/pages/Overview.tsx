@@ -68,31 +68,38 @@ export default function Overview() {
         <Stat
           label="Teilnehmende"
           value={n}
-          sub={all && (model.persons.length > nAll || omitted.length) ? [model.persons.length > nAll ? `${model.persons.length - nAll} ausgeschlossen` : '', omitted.length ? `ohne ${omitted.join(', ')} (Auswahl oben)` : ''].filter(Boolean).join(' · ') : undefined}
+          n={nAll !== n || model.persons.length > nAll ? `von ${model.persons.length} erfasst` : undefined}
+          details={all && (model.persons.length > nAll || omitted.length) ? [model.persons.length > nAll ? `${model.persons.length - nAll} ausgeschlossen (Teilnehmende & Sessions)` : '', omitted.length ? `ohne ${omitted.join(', ')} (Auswahl oben)` : ''].filter(Boolean).join(' · ') : undefined}
         />
-        <Stat label="Testgruppen" value={`${groups.AB} AB · ${groups.BA} BA`} />
+        <Stat label="Testgruppen" value={`${groups.AB} AB · ${groups.BA} BA`} n={`n = ${n}`} />
         <Stat label="Zeitraum" value={dates.length ? `${fmtDate(Math.min(...dates))}${dates.length > 1 && fmtDate(Math.min(...dates)) !== fmtDate(Math.max(...dates)) ? ` – ${fmtDate(Math.max(...dates))}` : ''}` : '–'} />
         <Stat
           label="Aktive Spieldauer (M ± SD)"
-          value={pm(ts.active)}
-          sub={
+          value={ts.estimated ? pm(ts.activeMeasured) : pm(ts.active)}
+          n={ts.estimated ? `n = ${ts.activeMeasured.n}/${ts.active.N} gemessen` : `n = ${ts.active.n}/${ts.active.N}`}
+          sub={ts.estimated ? `mit Schätzungen: ${pm(ts.active)} · n = ${ts.active.n}/${ts.active.N} (${ts.estimated} geschätzt)` : undefined}
+          details={
             <>
-              {`n = ${ts.active.n}/${ts.active.N}${ts.estimated ? ` · ${ts.estimated} geschätzt` : ''} · verstrichen ${pm(ts.elapsed)} · `}
-              <a href="#teilnehmende">bearbeiten</a>
+              Aktive Spielzeit je Person, über alle ihre Versuche (Links) zusammengezählt; je Person ein Wert. <b>Gemessen</b>: von der Spiel-Uhr erfasst. <b>Geschätzt</b>: aus den Zeiten der Quest-Schritte oder den Spielereignissen berechnet, oder von Hand eingetragen. Der Hauptwert enthält nur gemessene Zeiten; „mit Schätzungen“ nimmt beide zusammen. Verstrichen (erster Start bis letztes Ende): {pm(ts.elapsed)}. <a href="#teilnehmende">Zeiten bearbeiten</a>
             </>
           }
         />
-        <Stat label="Saubere Durchlaufzeit (M ± SD)" value={pm(ts.clean)} sub={`n = ${ts.clean.n}/${ts.clean.N} (nur gültige, ununterbrochene Erstdurchläufe)`} />
         {whole && attempt ? (
-          <Stat label="Versuch" value={`${attempt.n.value} von ${whole.timing.attemptCount}`} sub={`${attempt.label} · ${attempt.outcome.value} · ganze Person: aktiv ${mins(whole.timing.active.value)}, verstrichen ${mins(whole.timing.elapsed.value)}`} />
+          <Stat label="Versuch" value={`${attempt.n.value} von ${whole.timing.attemptCount}`} n={attempt.label} details={`${attempt.outcome.value} · ganze Person: aktiv ${mins(whole.timing.active.value)}, verstrichen ${mins(whole.timing.elapsed.value)}`} />
         ) : (
-          <Stat label="Mit Neustart" value={`${ts.withRestart}/${ts.N}`} sub={`Ø ${fmt(ts.attemptsMean, 1)} Versuche je Person · technische Unterbrechung ${ts.technical}/${ts.N}`} />
+          <Stat label="Mit Neustart" value={`${ts.withRestart}/${ts.N}`} n={`Ø ${fmt(ts.attemptsMean, 1)} Versuche je Person`} details={`Teilnehmende mit mehr als einem Link (Versuch). Technische Unterbrechung: ${ts.technical}/${ts.N}.`} />
         )}
+        <Stat
+          label="Saubere Durchlaufzeit (M ± SD)"
+          value={pm(ts.clean)}
+          n={`n = ${ts.clean.n}/${ts.clean.N}`}
+          details="Nur gültige Erstdurchläufe: ein Versuch, abgeschlossen, ohne Unterbrechung, exakt gemessen. Alle anderen zählen nicht (kein Wert statt 0)."
+        />
       </div>
 
       <Section title="Teilnehmerprofil">
         <div className="st-grid">
-          <Fig id="alter" table={(s) => csv([['Alter', 'Anzahl'], ...agesOf(s).bins.map((b) => [b.label, b.values[0]])])}>
+          <Fig id="alter" valid={(s) => agesOf(s).ages.length} table={(s) => csv([['Alter', 'Anzahl'], ...agesOf(s).bins.map((b) => [b.label, b.values[0]])])}>
             {(s) => {
               const { ages, bins } = agesOf(s);
               const ageD = describe(ages);
@@ -104,11 +111,14 @@ export default function Overview() {
                   </p>
                 </>
               ) : (
-                <Empty>Keine Altersangaben (Import: Tally-Spalte als „Alter“ zuordnen).</Empty>
+                <Empty>
+                  Keine gültigen Altersdaten (n = 0)
+                  <span className="st-empty-line2">Tally-Spalte unter Daten &amp; Validierung als „Alter“ zuordnen.</span>
+                </Empty>
               );
             }}
           </Fig>
-          <Fig id="gruppe" table={(s) => csv([['Gruppe', 'Anzahl'], ['AB', groupsOf(s).AB], ['BA', groupsOf(s).BA]])}>
+          <Fig id="gruppe" valid={(s) => groupsOf(s).AB + groupsOf(s).BA} table={(s) => csv([['Gruppe', 'Anzahl'], ['AB', groupsOf(s).AB], ['BA', groupsOf(s).BA]])}>
             {(s) => (
               <Bars
                 rows={[
@@ -120,6 +130,25 @@ export default function Overview() {
           </Fig>
           <Fig
             id="laufzeit"
+            valid={(s) => {
+              const st = timingSummary(s.persons.map((p) => p.timing));
+              return (measure === 'aktiv' ? st.active : measure === 'verstrichen' ? st.elapsed : st.clean).n;
+            }}
+            tabs={
+              <div className="st-tabs" role="tablist" aria-label="Maß">
+                    {(
+                      [
+                        ['aktiv', 'Aktiv'],
+                        ['verstrichen', 'Verstrichen'],
+                        ['sauber', 'Sauber'],
+                      ] as const
+                    ).map(([k, l]) => (
+                      <button key={k} type="button" role="tab" aria-selected={measure === k} className={measure === k ? 'is-on' : ''} onClick={() => setMeasure(k)}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+            }
             table={(s) =>
               csv([
                 ['Teilnehmende', 'Versuch', 'Link', 'Start (dt. Zeit)', 'Ende (dt. Zeit)', 'Aktiv (min)', 'Ausgang', 'Quelle', 'Genauigkeit', 'Verstrichen (min)', 'Aktiv gesamt (min)', 'Aktiv geschätzt', 'Unterbrechung (min)', 'Saubere Erstdurchlaufzeit (min)', 'In sauberer Statistik', 'Ausschlussgrund'],
@@ -135,7 +164,7 @@ export default function Overview() {
               const st = timingSummary(s.persons.map((p) => p.timing));
               const maxAttempts = Math.max(1, ...s.persons.map((p) => p.timing.attemptCount));
               const flags = (p: (typeof s.persons)[number]) =>
-                [p.timing.activeEstimated ? 'geschätzt' : '', p.timing.attemptCount > 1 ? `${p.timing.attemptCount} Versuche` : '', (p.timing.interruption.value ?? 0) > 10 || p.timing.technical.value ? 'unterbrochen' : ''].filter(Boolean);
+                [p.timing.attemptCount > 1 ? `${p.timing.attemptCount} Versuche` : '', (p.timing.interruption.value ?? 0) > 10 || p.timing.technical.value ? 'unterbrochen' : ''].filter(Boolean);
               const rows = s.persons.map((p) => {
                 const t = p.timing;
                 const v = measure === 'aktiv' ? t.active.value : measure === 'verstrichen' ? t.elapsed.value : t.eligible.value ? t.clean.value : null;
@@ -147,24 +176,11 @@ export default function Overview() {
                       : [];
                 // (why someone has no clean value is listed below the chart, so the bars keep their width)
                 const fl = measure === 'sauber' ? [] : flags(p);
-                return { label: scope.kind === 'link' ? scope.id : p.id, segments, note: `${v != null ? `${fmt(v, 1)} min` : '–'}${fl.length ? ` · ${fl.join(', ')}` : ''}` };
+                return { label: scope.kind === 'link' ? scope.id : p.id, estimated: measure === 'aktiv' && t.activeEstimated, segments, note: `${v != null ? `${fmt(v, 1)} min` : '–'}${fl.length ? ` · ${fl.join(', ')}` : ''}` };
               });
               const stat = measure === 'aktiv' ? st.active : measure === 'verstrichen' ? st.elapsed : st.clean;
               return (
                 <>
-                  <div className="st-seg" role="group" aria-label="Maß">
-                    {(
-                      [
-                        ['aktiv', 'Aktiv'],
-                        ['verstrichen', 'Verstrichen'],
-                        ['sauber', 'Sauber'],
-                      ] as const
-                    ).map(([k, l]) => (
-                      <button key={k} type="button" className={measure === k ? 'is-on' : ''} onClick={() => setMeasure(k)}>
-                        {l}
-                      </button>
-                    ))}
-                  </div>
                   {rows.some((r) => r.segments.length) ? (
                     <Segments rows={rows} digits={1} unit=" min" legend={measure === 'aktiv' && maxAttempts > 1 ? Array.from({ length: maxAttempts }, (_, i) => `Versuch ${i + 1}`) : undefined} />
                   ) : (
@@ -182,17 +198,22 @@ export default function Overview() {
                     </ul>
                   )}
                   <p className="st-note">
-                    {measure === 'aktiv' ? 'Aktive Spielzeit je Teilnehmenden, Segmente = Versuche (Links); wiederholte Abschnitte eingeschlossen.' : measure === 'verstrichen' ? 'Verstrichene Zeit vom ersten Start bis zum letzten Ende, Pausen eingeschlossen.' : 'Gültige, ununterbrochene Erstdurchläufe; übrige ohne Wert (nicht 0).'}{' '}
-                    {stat.n ? `M = ${fmt(stat.mean, 1)} min, SD = ${fmt(stat.sd, 1)}, Median ${fmt(stat.median, 1)}, n = ${stat.n}/${stat.N}.` : `n = 0/${stat.N}.`} {whole && attempt ? `Nur ${attempt.label} (Versuch ${attempt.n.value} von ${whole.timing.attemptCount}).` : 'Je Person ein Wert, mehrere Links zählen nicht mehrfach.'}
+                    {measure === 'aktiv' ? 'Aktive Spielzeit je Teilnehmenden, Segmente = Versuche (Links); wiederholte Abschnitte eingeschlossen; schraffiert = geschätzt.' : measure === 'verstrichen' ? 'Verstrichene Zeit vom ersten Start bis zum letzten Ende, Pausen eingeschlossen.' : 'Gültige, ununterbrochene Erstdurchläufe; übrige ohne Wert (nicht 0).'}{' '}
+                    {measure === 'aktiv' && st.estimated
+                      ? `Gemessen: ${st.activeMeasured.n ? `M = ${fmt(st.activeMeasured.mean, 1)} min${st.activeMeasured.n > 1 ? `, SD = ${fmt(st.activeMeasured.sd, 1)}` : ''}` : '–'}, n = ${st.activeMeasured.n}/${st.N}. Mit Schätzungen: M = ${fmt(st.active.mean, 1)} min${st.active.n > 1 ? `, SD = ${fmt(st.active.sd, 1)}` : ''}, n = ${st.active.n}/${st.N} (${st.estimated} geschätzt).`
+                      : stat.n
+                        ? `M = ${fmt(stat.mean, 1)} min, SD = ${fmt(stat.sd, 1)}, Median ${fmt(stat.median, 1)}, n = ${stat.n}/${stat.N}.`
+                        : `n = 0/${stat.N}.`}{' '}
+                    {whole && attempt ? `Nur ${attempt.label} (Versuch ${attempt.n.value} von ${whole.timing.attemptCount}).` : 'Je Person ein Wert, mehrere Links zählen nicht mehrfach.'}
                   </p>
                 </>
               );
             }}
           </Fig>
           {p4.length > 0 && <Profile fields={p4} />}
-          <Fig id="kategorien" table={(s) => csv([['Kategorie', 'Rückmeldungen', 'Teilnehmende'], ...catsOf(s, model).map((c) => [c.label, c.items.length, distinctPersons(c.items)])])}>
-            {(s) => (
-              <>
+          <Fig id="kategorien" valid={(s) => distinctPersons(catsOf(s, model).flatMap((c) => c.items))} table={(s) => csv([['Kategorie', 'Rückmeldungen', 'Teilnehmende'], ...catsOf(s, model).map((c) => [c.label, c.items.length, distinctPersons(c.items)])])}>
+            {(s) =>
+              catsOf(s, model).some((c) => c.items.length) ? (
                 <Bars
                   rows={catsOf(s, model).map((c) => ({ label: c.label, values: [c.items.length, distinctPersons(c.items)] }))}
                   series={[
@@ -200,9 +221,13 @@ export default function Overview() {
                     { name: 'Teilnehmende', color: SERIES.B },
                   ]}
                 />
-                {!s.items.length && <Empty>Noch keine bestätigten Rückmeldungen (Notizen).</Empty>}
-              </>
-            )}
+              ) : (
+                <Empty>
+                  Noch keine bestätigten Rückmeldungen (n = 0)
+                  <span className="st-empty-line2">Aussagen unter Qualitatives Feedback taggen und als geprüft markieren.</span>
+                </Empty>
+              )
+            }
           </Fig>
         </div>
       </Section>
@@ -251,6 +276,10 @@ function Profile({ fields }: { fields: P4Field[] }) {
     <Fig
       id="teil4"
       sub={shownAll.length === 1 && fields.length > 1 ? { n: fields.indexOf(shownAll[0]) + 1, title: T(shownAll[0].label) } : undefined}
+      valid={(s) => {
+        const { persons, answerOf } = profileOf(s, model);
+        return shownAll.map((f) => persons.filter((p) => answerOf(p, f.label)).length);
+      }}
       table={(s) => {
         const { persons, gave, counted } = profileOf(s, model);
         return csv([['Frage', 'Antwort', 'Anzahl', 'Teilnehmende'], ...counted(shownAll).flatMap((f) => f.counts.map(([v, c]) => [f.label, v, c, persons.filter((p) => gave(p, f.label, v)).join(' ')]))]);

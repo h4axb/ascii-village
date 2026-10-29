@@ -4,7 +4,7 @@
 import { Bars, SERIES, INK, Segments } from '../charts';
 import { PRECISION_LABEL, SOURCE_LABEL, timingSummary, type TimingStat } from '../timing';
 import { fmtBerlin } from '../match';
-import { distinctPersons, itemsWithRole, type Model, type Slice } from '../model';
+import { distinctPersons, findingsOf, itemsWithRole, type Model, type Slice } from '../model';
 import { part4, type P4Field } from '../analysis';
 import { useState } from 'react';
 import { describe, fmt } from '../stats';
@@ -40,7 +40,7 @@ const catsOf = (s: Slice, model: Model) => [
   { label: CATEGORY.positive, items: itemsWithRole(s.items, model, 'positive') },
   { label: CATEGORY.surprise, items: itemsWithRole(s.items, model, 'surprise') },
   { label: CATEGORY.intervention, items: itemsWithRole(s.items, model, 'intervention') },
-  { label: CATEGORY.recurring, items: s.items.filter((i) => i.finding) },
+  { label: CATEGORY.recurring, items: s.items.filter((i) => findingsOf(i).length > 0) },
 ];
 
 export default function Overview() {

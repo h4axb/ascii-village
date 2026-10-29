@@ -2,7 +2,7 @@
 // thesis wording, and the evidence rating of a hypothesis from the
 // statements linked to it. The rule is shown next to every rating.
 import type { Model, Slice } from './model';
-import { craftStats, distinctPersons, gameRatings, partOfKey, RATING_LABEL } from './model';
+import { craftStats, distinctPersons, findingsOf, gameRatings, partOfKey, RATING_LABEL } from './model';
 import { choices, part1, part2, part3 } from './analysis';
 import { describe, fmt, fmtP, pct, wilcoxon } from './stats';
 import { getLang, tr } from './i18n';
@@ -139,7 +139,7 @@ export function buildClaims(m: Model, s: Slice, findings: Record<string, Finding
   // recurring findings
   const total = m.included.length;
   for (const f of Object.values(findings)) {
-    const items = s.items.filter((i) => i.finding === f.id);
+    const items = s.items.filter((i) => findingsOf(i).includes(f.id));
     const n = distinctPersons(items);
     if (!n) continue;
     const designs = new Set(items.flatMap((i) => i.chips.filter((c) => c === 'variante-a' || c === 'variante-b')));

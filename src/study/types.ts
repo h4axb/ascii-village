@@ -125,7 +125,8 @@ export interface ItemDoc {
   order: number;
   chips: string[]; // confirmed chip ids
   suggested: string[]; // AI suggestions, not counted
-  finding?: string | null; // confirmed recurring finding
+  finding?: string | null; // confirmed recurring finding (the first, if several)
+  moreFindings?: string[]; // further recurring findings of the same statement
   suggestedFinding?: string | null;
   suggestedNewFinding?: string | null;
   confirmed?: boolean; // the statement has been checked

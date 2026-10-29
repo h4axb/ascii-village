@@ -540,6 +540,18 @@ export function itemsWithRole(items: ItemDoc[], m: Model, role: ChipRole) {
 }
 export const distinctPersons = (items: ItemDoc[]) => new Set(items.map((i) => i.person)).size;
 
+// the recurring findings of a statement (one or several; stored as the first + the rest)
+export const findingsOf = (i: Pick<ItemDoc, 'finding' | 'moreFindings'>): string[] => [...new Set([i.finding, ...(i.moreFindings ?? [])].filter((x): x is string => !!x))];
+export function setFindings<T extends ItemDoc>(i: T, ids: string[]): T {
+  const list = [...new Set(ids.filter(Boolean))];
+  return { ...i, finding: list[0] ?? null, moreFindings: list.length > 1 ? list.slice(1) : undefined };
+}
+export function withFinding<T extends ItemDoc>(i: T, id: string): T {
+  const out = setFindings(i, [...findingsOf(i), id]);
+  return out.suggestedFinding === id ? { ...out, suggestedFinding: null } : out;
+}
+export const withoutFinding = <T extends ItemDoc>(i: T, id: string): T => setFindings(i, findingsOf(i).filter((x) => x !== id));
+
 // the chosen duration measure (auto: the game's clock where recorded, else the link)
 export function pickDuration(by: DurationBy, link: number | null, clock: number | null, steps: number | null): { minutes: number | null; used: Duration | null } {
   if (by === 'link') return { minutes: link, used: link != null ? 'link' : null };

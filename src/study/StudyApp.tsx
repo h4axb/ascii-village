@@ -83,18 +83,47 @@ function readScope(): string {
   }
 }
 
-// the scroll position of this tab, so a reload comes back to it (the page
-// loads its data first, too late for the browser's own restoring)
-const SCROLL_KEY = 'asciia-study-scroll';
-function readScroll(): { route: string; y: number } | null {
+// the scroll place of each page in this tab, so a reload or a way back comes to
+// it again. Kept as the element at the top of the window ([data-anchor]) and its
+// distance from the top: content that grows above it (figures, open editors)
+// does not move it. The plain y is the fallback.
+const SCROLL_KEY = 'asciia-study-places';
+interface Place {
+  anchor?: string;
+  offset?: number;
+  y: number;
+}
+function readPlaces(): Record<string, Place> {
   try {
-    const v = JSON.parse(sessionStorage.getItem(SCROLL_KEY) ?? 'null') as { route?: unknown; y?: unknown } | null;
-    return v && typeof v.route === 'string' && typeof v.y === 'number' ? { route: v.route, y: v.y } : null;
+    const v = JSON.parse(sessionStorage.getItem(SCROLL_KEY) ?? '{}') as unknown;
+    return v && typeof v === 'object' ? (v as Record<string, Place>) : {};
   } catch {
-    return null;
+    return {};
   }
 }
-const savedScroll = readScroll();
+// the first anchor that starts in the window; else the innermost one across its top edge
+function placeNow(): Place {
+  const y = Math.round(window.scrollY);
+  let best: { el: Element; top: number } | null = null;
+  let across: { el: Element; top: number } | null = null;
+  for (const el of document.querySelectorAll('[data-anchor]')) {
+    const r = el.getBoundingClientRect();
+    if (r.bottom <= 0 || r.top >= window.innerHeight || !r.height) continue;
+    if (r.top >= 0) {
+      if (!best || r.top < best.top) best = { el, top: r.top };
+    } else across = { el, top: r.top };
+  }
+  const pick = best ?? across;
+  return pick ? { anchor: pick.el.getAttribute('data-anchor') ?? undefined, offset: Math.round(pick.top), y } : { y };
+}
+function savePlace(route: string) {
+  try {
+    sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ ...readPlaces(), [route]: placeNow() }));
+  } catch {
+    // (not remembered)
+  }
+}
+const firstRoute = window.location.hash;
 
 export default function StudyApp() {
   const study = useStudy();
@@ -114,17 +143,48 @@ export default function StudyApp() {
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, [lang]);
-  // a sub-page that is a section: scroll to it (not on a reload that restores its place)
-  const restoring = useRef(!!savedScroll && savedScroll.route === window.location.hash && savedScroll.y > 0);
-  useEffect(() => {
-    if (restoring.current) return;
-    const p = PAGES.find((x) => x.id === page);
-    if (sub && p?.sub?.find((s) => s.id === sub)?.anchor) window.setTimeout(() => document.getElementById(sub)?.scrollIntoView({ block: 'start' }), 50);
-    else window.scrollTo(0, 0);
-  }, [page, sub]);
-
   // remember the place (from when the page is shown, so the loading screen's 0 never counts)
   const ready = study.state === 'ready';
+  const restoring = useRef(false);
+  const route = useRef(window.location.hash);
+  const firstLoad = useRef(true);
+  // back to a saved place: the figures and data grow after the first paint, so the
+  // anchor is put back in place on every frame for a while (any input stops it)
+  const restore = (pl: Place) => {
+    restoring.current = true;
+    const until = Date.now() + 1800;
+    const stop = () => {
+      restoring.current = false;
+      for (const t of ['wheel', 'touchstart', 'keydown', 'mousedown']) window.removeEventListener(t, stop);
+    };
+    for (const t of ['wheel', 'touchstart', 'keydown', 'mousedown']) window.addEventListener(t, stop, { passive: true });
+    const step = () => {
+      if (!restoring.current) return;
+      const el = pl.anchor ? document.querySelector(`[data-anchor="${CSS.escape(pl.anchor)}"]`) : null;
+      const target = el ? window.scrollY + el.getBoundingClientRect().top - (pl.offset ?? 0) : pl.y;
+      if (Math.abs(window.scrollY - target) >= 1) window.scrollTo(0, target);
+      if (Date.now() > until) stop();
+      else requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  // a new page: its saved place; a sub-page that is a section: that section (when
+  // chosen in the menu); otherwise the top. A reload comes back to where it was.
+  useEffect(() => {
+    if (!ready) return;
+    const hash = window.location.hash;
+    // (the first showing after loading the tab: a reload, the place comes back even for a section)
+    const reload = firstLoad.current && hash === firstRoute;
+    firstLoad.current = false;
+    route.current = hash;
+    const pl = readPlaces()[hash];
+    const p = PAGES.find((x) => x.id === page);
+    const section = sub && p?.sub?.find((s) => s.id === sub)?.anchor;
+    if (pl && (reload || !section)) return restore(pl);
+    restoring.current = false;
+    if (section) window.setTimeout(() => document.getElementById(sub)?.scrollIntoView({ block: 'start' }), 50);
+    else window.scrollTo(0, 0);
+  }, [page, sub, ready]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!ready) return;
     try {
@@ -134,40 +194,29 @@ export default function StudyApp() {
     }
     let frame = 0;
     const save = () => {
-      if (restoring.current) return;
-      try {
-        sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ route: window.location.hash, y: Math.round(window.scrollY) }));
-      } catch {
-        // (not remembered)
-      }
+      if (!restoring.current) savePlace(route.current);
     };
     const onScroll = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(save);
     };
-    // back to the saved place: the figures grow after the first paint, so try until it fits
-    if (restoring.current && savedScroll) {
-      const target = savedScroll.y;
-      const until = Date.now() + 1500;
-      const stop = () => {
-        restoring.current = false;
-        for (const t of ['wheel', 'touchstart', 'keydown']) window.removeEventListener(t, stop);
-      };
-      for (const t of ['wheel', 'touchstart', 'keydown']) window.addEventListener(t, stop, { passive: true });
-      const step = () => {
-        if (!restoring.current) return;
-        window.scrollTo(0, target);
-        if (Math.abs(window.scrollY - target) < 2 || Date.now() > until) stop();
-        else requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    }
+    // (leaving a page: its place is kept under its own route)
+    const onHash = () => {
+      cancelAnimationFrame(frame);
+      // (only while the old page is still shown; React may have switched already)
+      if (route.current === window.location.hash) return;
+      if (!restoring.current) savePlace(route.current);
+      // (no saving until the new page has taken its place)
+      restoring.current = true;
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('pagehide', save);
+    window.addEventListener('hashchange', onHash);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('pagehide', save);
+      window.removeEventListener('hashchange', onHash);
     };
   }, [ready]);
 

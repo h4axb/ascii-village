@@ -66,7 +66,7 @@ export default function People() {
         )}
         <div className="st-people">
           {shown.map((p) => (
-            <article key={p.id} className={`st-person${p.excluded ? ' is-excluded' : ''}`}>
+            <article key={p.id} data-anchor={`tn-${p.id}`} className={`st-person${p.excluded ? ' is-excluded' : ''}`}>
               <header>
                 <h3>{p.id}</h3>
                 <span className="st-muted">{fmtDate(p.date)}</span>

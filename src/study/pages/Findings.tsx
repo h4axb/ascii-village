@@ -7,7 +7,7 @@ import { useState } from 'react';
 import type { FindingDoc, ItemDoc } from '../types';
 import { SECTION_LABEL } from '../types';
 import { Bars } from '../charts';
-import { distinctPersons, type Slice } from '../model';
+import { distinctPersons, findingsOf, setFindings, withFinding, withoutFinding, type Slice } from '../model';
 import { csv, Empty, Fig, LazyArea, logChange, useCtx } from '../ui';
 import { itemText, useContentView } from '../translations';
 import { FindingsReview, findingId, type Proposal } from '../FindingsReview';
@@ -23,8 +23,8 @@ export default function Findings() {
   const total = model.included.length;
   const findings = Object.values(study.docs.findings);
   const live = model.allItems.filter((i) => i.status !== 'removed');
-  const members = (f: FindingDoc) => slice.items.filter((i) => i.finding === f.id);
-  const proposed = (f: FindingDoc) => live.filter((i) => i.suggestedFinding === f.id && i.finding !== f.id);
+  const members = (f: FindingDoc) => slice.items.filter((i) => findingsOf(i).includes(f.id));
+  const proposed = (f: FindingDoc) => live.filter((i) => i.suggestedFinding === f.id && !findingsOf(i).includes(f.id));
   const rows = findings.map((f) => ({ f, items: members(f), persons: distinctPersons(members(f)) })).sort((a, b) => b.persons - a.persons || a.f.name.localeCompare(b.f.name));
   // (the figure's own slice: the participants left out there are not counted)
   const rowsOf = (s: Slice) => rows.map((r) => ({ ...r, items: r.items.filter((i) => s.persons.some((p) => p.id === i.person)) })).map((r) => ({ ...r, persons: distinctPersons(r.items) }));
@@ -33,7 +33,7 @@ export default function Findings() {
 
   // the AI's proposed new findings (from the tag suggestions), grouped by name
   const fresh = new Map<string, ItemDoc[]>();
-  for (const i of live) if (i.suggestedNewFinding && !i.finding) fresh.set(i.suggestedNewFinding.trim(), [...(fresh.get(i.suggestedNewFinding.trim()) ?? []), i]);
+  for (const i of live) if (i.suggestedNewFinding) fresh.set(i.suggestedNewFinding.trim(), [...(fresh.get(i.suggestedNewFinding.trim()) ?? []), i]);
 
   const create = (n: string, items: ItemDoc[] = []) => {
     const id = findingId();
@@ -151,21 +151,20 @@ function FindingCard({
   // statements that could be added: not in this finding, found by text or ID
   const hits = q.trim()
     ? model.items
-        .filter((i) => i.finding !== f.id && `${i.person} ${i.link ?? ''} ${i.text} ${i.de ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()))
+        .filter((i) => !findingsOf(i).includes(f.id) && `${i.person} ${i.link ?? ''} ${i.text} ${i.de ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()))
         .slice(0, 12)
     : [];
   const add = (i: ItemDoc) => {
-    const other = i.finding ? study.docs.findings[i.finding]?.name : null;
-    if (other && !confirm(`Diese Aussage gehört zu „${other}“. Zu „${f.name}“ verschieben?`)) return;
-    save([{ ...i, finding: f.id, suggestedFinding: null }]);
-    logChange(study, `Befund „${f.name}“: Aussage von ${i.person} hinzugefügt${other ? ` (von „${other}“)` : ''}`);
+    // (a statement can belong to several findings: it stays in its others)
+    save([withFinding(i, f.id)]);
+    logChange(study, `Befund „${f.name}“: Aussage von ${i.person} hinzugefügt`);
   };
   const takeOut = (i: ItemDoc) => {
-    save([{ ...i, finding: null }]);
+    save([withoutFinding(i, f.id)]);
     logChange(study, `Befund „${f.name}“: Aussage von ${i.person} entfernt`);
   };
   return (
-    <details className="st-section st-finding">
+    <details className="st-section st-finding" data-anchor={`f-${f.id}`}>
       <summary>
         <span className="st-finding-name" data-notr>
           {f.name}
@@ -218,7 +217,7 @@ function FindingCard({
                 <p data-notr>{itemText(view, i)}</p>
               </div>
               <span className="st-inline">
-                <button type="button" onClick={() => save([{ ...i, finding: f.id, suggestedFinding: null }])}>
+                <button type="button" onClick={() => save([withFinding(i, f.id)])}>
                   Zuordnen
                 </button>
                 <button type="button" onClick={() => save([{ ...i, suggestedFinding: null }])}>
@@ -236,7 +235,7 @@ function FindingCard({
                 <li key={i.id}>
                   <button type="button" onClick={() => add(i)}>
                     <span className="st-pid">{i.link ?? i.person}</span> <span data-notr>{itemText(view, i)}</span>
-                    {i.finding && <span className="st-flag">{`in „${study.docs.findings[i.finding]?.name ?? '?'}“`}</span>}
+                    {findingsOf(i).length > 0 && <span className="st-flag">{`auch in „${findingsOf(i).map((x) => study.docs.findings[x]?.name ?? '?').join('“, „')}“`}</span>}
                   </button>
                 </li>
               ))}
@@ -251,7 +250,7 @@ function FindingCard({
             onChange={(e) => {
               const into = e.target.value;
               if (!into) return;
-              const moved = live.filter((i) => i.finding === f.id || i.suggestedFinding === f.id).map((i) => ({ ...i, finding: i.finding === f.id ? into : i.finding, suggestedFinding: i.suggestedFinding === f.id ? into : i.suggestedFinding }));
+              const moved = live.filter((i) => findingsOf(i).includes(f.id) || i.suggestedFinding === f.id).map((i) => ({ ...setFindings(i, findingsOf(i).map((x) => (x === f.id ? into : x))), suggestedFinding: i.suggestedFinding === f.id ? into : i.suggestedFinding }));
               study.commit(moved.map((i) => ({ coll: 'items' as const, id: i.id, data: i })), [{ coll: 'findings', id: f.id }]);
               logChange(study, `Befund „${f.name}“ zusammengeführt mit „${study.docs.findings[into]?.name}“`);
             }}
@@ -269,7 +268,7 @@ function FindingCard({
             type="button"
             onClick={() => {
               if (!confirm(`Befund „${f.name}“ löschen? Die Aussagen bleiben erhalten.`)) return;
-              const freed = live.filter((i) => i.finding === f.id || i.suggestedFinding === f.id).map((i) => ({ ...i, finding: i.finding === f.id ? null : i.finding, suggestedFinding: i.suggestedFinding === f.id ? null : i.suggestedFinding }));
+              const freed = live.filter((i) => findingsOf(i).includes(f.id) || i.suggestedFinding === f.id).map((i) => ({ ...withoutFinding(i, f.id), suggestedFinding: i.suggestedFinding === f.id ? null : i.suggestedFinding }));
               study.commit(freed.map((i) => ({ coll: 'items' as const, id: i.id, data: i })), [{ coll: 'findings', id: f.id }]);
               logChange(study, `Befund „${f.name}“ gelöscht`);
             }}

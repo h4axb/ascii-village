@@ -11,6 +11,7 @@ import type { Put } from './store';
 import { diffWords } from './changes';
 import { Words } from './ChangeModal';
 import { logChange } from './ui';
+import { findingsOf, setFindings } from './model';
 
 type Pick = 'alt' | 'neu';
 interface Row {
@@ -304,19 +305,19 @@ export function RewriteReview({ study, items, rewrites, criteria, onClose }: { s
 export interface TagProposal {
   id: string;
   chips: string[]; // the whole set it would carry
-  finding: string | null;
+  findings: string[]; // the recurring findings it would belong to (its own plus the suggested one)
   newFinding: string | null;
 }
 export function TagReview({ study, tags, items, proposals, onClose }: { study: Study; tags: TagGroup[]; items: Map<string, ItemDoc>; proposals: TagProposal[]; onClose: (msg?: string) => void }) {
   const list = proposals.filter((p) => items.has(p.id));
-  const [sets, setSets] = useState<Record<string, { chips: string[]; finding: string | null }>>(() => Object.fromEntries(list.map((p) => [p.id, { chips: p.chips, finding: p.finding }])));
+  const [sets, setSets] = useState<Record<string, { chips: string[]; findings: string[] }>>(() => Object.fromEntries(list.map((p) => [p.id, { chips: p.chips, findings: p.findings }])));
   const [picks, setPicks] = useState<Record<string, Pick>>(() => Object.fromEntries(list.map((p) => [p.id, 'neu' as Pick])));
   const [busy, setBusy] = useState<string | null>(null);
   const setPick = (id: string, p: Pick) => setPicks((x) => ({ ...x, [id]: p }));
   const findings = Object.values(study.docs.findings).sort((a, b) => a.name.localeCompare(b.name));
   const groupOf = (c: string) => tags.find((g) => g.chips.some((x) => x.id === c));
   const label = (c: string) => tags.flatMap((g) => g.chips).find((x) => x.id === c)?.label ?? c;
-  const edit = (id: string, f: (s: { chips: string[]; finding: string | null }) => { chips: string[]; finding: string | null }) => {
+  const edit = (id: string, f: (s: { chips: string[]; findings: string[] }) => { chips: string[]; findings: string[] }) => {
     setSets((x) => ({ ...x, [id]: f(x[id]) }));
     setPick(id, 'neu');
   };
@@ -338,7 +339,7 @@ export function TagReview({ study, tags, items, proposals, onClose }: { study: S
       .map((p) => {
         const i = study.latest().items[p.id] ?? items.get(p.id)!;
         const s = sets[p.id];
-        return { coll: 'items' as const, id: p.id, data: { ...i, chips: s.chips, suggested: i.suggested.filter((c) => !s.chips.includes(c)), finding: s.finding, suggestedFinding: null, suggestedNewFinding: p.newFinding ?? i.suggestedNewFinding ?? null } };
+        return { coll: 'items' as const, id: p.id, data: { ...setFindings(i, s.findings), chips: s.chips, suggested: i.suggested.filter((c) => !s.chips.includes(c)), suggestedFinding: null, suggestedNewFinding: p.newFinding ?? i.suggestedNewFinding ?? null } };
       });
     void store(study, put, 'KI-Tags', `KI-Tags: ${put.length} Aussagen übernommen`)
       .then(() => onClose(`Tags für ${put.length} Aussagen übernommen.`))
@@ -375,7 +376,7 @@ export function TagReview({ study, tags, items, proposals, onClose }: { study: S
                 <div className="st-tagrev">
                   {i.chips.length ? i.chips.map((c) => <span key={c} className="st-chip is-on is-small" title={groupOf(c)?.name}>{label(c)}</span>) : <span className="st-muted">keine Tags</span>}
                 </div>
-                <p className="st-muted st-tagrev-finding">{`Befund: ${i.finding ? (study.docs.findings[i.finding]?.name ?? '?') : '–'}`}</p>
+                <p className="st-muted st-tagrev-finding">{`Befund: ${findingsOf(i).map((f) => study.docs.findings[f]?.name ?? '?').join('; ') || '–'}`}</p>
               </div>
               <div className={`st-pane is-incoming${on === 'neu' ? ' is-chosen' : ' is-dropped'}`}>
                 <div className="st-pane-head">Neu (bearbeitbar)</div>
@@ -405,17 +406,29 @@ export function TagReview({ study, tags, items, proposals, onClose }: { study: S
                     </select>
                   )}
                 </div>
-                <label className="st-tagrev-finding">
-                  <span className="st-muted">Befund</span>{' '}
-                  <select value={s.finding ?? ''} onChange={(e) => edit(id, (x) => ({ ...x, finding: e.target.value || null }))} aria-label="Befund">
-                    <option value="">–</option>
-                    {findings.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="st-tagrev st-tagrev-finding">
+                  <span className="st-muted">Befund</span>
+                  {s.findings.map((f) => (
+                    <span key={f} className={`st-chip is-finding is-small${findingsOf(i).includes(f) ? '' : ' is-added'}`}>
+                      {study.docs.findings[f]?.name ?? '?'}
+                      <button type="button" className="st-chip-x" onClick={() => edit(id, (x) => ({ ...x, findings: x.findings.filter((y) => y !== f) }))} aria-label={`Befund ${study.docs.findings[f]?.name ?? ''} entfernen`}>
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {findings.some((f) => !s.findings.includes(f.id)) && (
+                    <select className="st-chip-add" value="" onChange={(e) => e.target.value && edit(id, (x) => ({ ...x, findings: [...x.findings, e.target.value] }))} aria-label="Befund hinzufügen">
+                      <option value="">+ Befund</option>
+                      {findings
+                        .filter((f) => !s.findings.includes(f.id))
+                        .map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </div>
                 {p.newFinding && <p className="st-muted">{`Vorschlag neuer Befund: „${p.newFinding}“ (unter Wiederkehrende Befunde anlegen)`}</p>}
               </div>
             </div>

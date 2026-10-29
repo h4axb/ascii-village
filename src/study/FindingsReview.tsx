@@ -7,6 +7,7 @@ import type { FindingDoc, ItemDoc } from './types';
 import { SECTION_LABEL } from './types';
 import type { Study } from './store';
 import { logChange } from './ui';
+import { findingsOf, withFinding } from './model';
 
 export interface Proposal {
   name: string;
@@ -68,7 +69,8 @@ export function FindingsReview({ study, proposals, items, text, onClose }: { stu
         put.push({ coll: 'findings', id, data: { ...(old ?? {}), id, name: d.name.trim(), description: description || undefined, descriptionAuto: description ? (old?.description === description ? old.descriptionAuto : description === p.description) : undefined, auto: old ? old.auto : true } satisfies FindingDoc });
         for (const iid of d.members) {
           const it = study.latest().items[iid];
-          if (it) put.push({ coll: 'items', id: iid, data: { ...it, finding: id, suggestedFinding: null, suggestedNewFinding: null } });
+          // (added to the findings it already has)
+          if (it) put.push({ coll: 'items', id: iid, data: { ...withFinding(it, id), suggestedFinding: null, suggestedNewFinding: null } });
         }
       }
       study.commit(put);
@@ -155,7 +157,10 @@ export function FindingsReview({ study, proposals, items, text, onClose }: { stu
                   </label>
                   <ul className="st-fstmts">
                     {stmts[k].map((i) => {
-                      const other = i.finding && i.finding !== p.finding ? findings[i.finding]?.name : null;
+                      const other = findingsOf(i)
+                        .filter((x) => x !== p.finding)
+                        .map((x) => findings[x]?.name ?? '?')
+                        .join('“, „');
                       return (
                         <li key={i.id} className={d.members.has(i.id) ? '' : 'is-off'}>
                           <label className="st-check">
@@ -166,7 +171,7 @@ export function FindingsReview({ study, proposals, items, text, onClose }: { stu
                             <div className="st-muted st-fstmt-meta">
                               {SECTION_LABEL[i.section]}
                               {i.question ? ` · „${i.question}“` : ''}
-                              {other ? <span className="st-flag">{`verschiebt von „${other}“`}</span> : null}
+                              {other ? <span className="st-flag">{`auch in „${other}“`}</span> : null}
                             </div>
                             <p data-notr>{text(i)}</p>
                           </div>

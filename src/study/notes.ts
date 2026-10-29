@@ -16,7 +16,7 @@
 // The same id twice (one block per link) is one participant.
 import type { ItemDoc, NotesMeta, Section, StudyDocs } from './types';
 import type { Change } from './changes';
-import type { Model } from './model';
+import { findingsOf, type Model } from './model';
 
 export interface Parsed {
   meta: NotesMeta[]; // in file order
@@ -247,7 +247,7 @@ export function planNotes(parsed: Parsed, docs: StudyDocs, tags: (id: string) =>
   // (a statement whose section was set by hand is found in either section, and keeps its own)
   const sameSec = (i: ItemDoc, st: { section: ItemDoc['section'] }) => i.section === st.section || (!!i.sectionOwn && st.section !== 'survey');
   const same = (i: ItemDoc, text: string) => norm(i.text) === norm(text) || (!!i.original && norm(i.original) === norm(text));
-  const note = (i: ItemDoc) => [i.chips.map(tags).filter(Boolean).join(', '), i.de ? `DE: ${i.de}` : '', i.finding ? 'mit Befund' : ''].filter(Boolean).join(' · ') || undefined;
+  const note = (i: ItemDoc) => [i.chips.map(tags).filter(Boolean).join(', '), i.de ? `DE: ${i.de}` : '', findingsOf(i).length ? 'mit Befund' : ''].filter(Boolean).join(' · ') || undefined;
   const freshItem = (st: Parsed['statements'][number]): ItemDoc => ({ ...st, id: `n-${st.person}-${hash(`${st.section}|${norm(st.text)}|${st.order}|${Date.now()}|${Math.random()}`)}`, original: st.text, chips: [], suggested: [], status: firstImport ? undefined : 'new' });
   const put = (w: StudyDocs, i: ItemDoc) => {
     w.items[i.id] = i;
@@ -312,7 +312,9 @@ export function planNotes(parsed: Parsed, docs: StudyDocs, tags: (id: string) =>
               deStale: !!de,
               interpretation: cur.map((i) => i.interpretation).filter(Boolean).join(' · ') || undefined,
               addition: cur.map((i) => i.addition).filter(Boolean).join(' · ') || undefined,
-              finding: cur.find((i) => i.finding)?.finding ?? null,
+              // (all findings of the combined points)
+              finding: cur.flatMap(findingsOf)[0] ?? null,
+              moreFindings: [...new Set(cur.flatMap(findingsOf))].slice(1).length ? [...new Set(cur.flatMap(findingsOf))].slice(1) : undefined,
               confirmed: false,
               status: 'changed',
             });

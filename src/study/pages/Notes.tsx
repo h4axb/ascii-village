@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } from '../types';
 import { CATEGORY, hintOf, SECTION_LABEL } from '../types';
-import { distinctPersons, itemsWithRole, linkKeyOf, type Model, type Person } from '../model';
+import { distinctPersons, findingsOf, itemsWithRole, linkKeyOf, setFindings, withFinding, withoutFinding, type Model, type Person } from '../model';
 import { linkLabelOf, parseNotes, planNotes } from '../notes';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
@@ -68,10 +68,12 @@ export async function suggestFor(ctx: Ctx, items: ItemDoc[], onProgress?: (done:
         const had = cur.chips.some((c) => tg.chips.some((x) => x.id === c));
         for (const c of g.multi ? picked : had ? [] : picked.slice(0, 1)) if (!cur.chips.includes(c)) add.push(c);
       }
-      const finding = !cur.finding && s.finding && findingIds.has(s.finding) ? s.finding : null;
-      const newFinding = !cur.finding && !finding && s.newFinding ? String(s.newFinding).slice(0, 120) : null;
+      // (a suggested finding joins the ones it already has)
+      const own = findingsOf(cur);
+      const finding = s.finding && findingIds.has(s.finding) && !own.includes(s.finding) ? s.finding : null;
+      const newFinding = !finding && s.newFinding ? String(s.newFinding).slice(0, 120) : null;
       if (!add.length && !finding && !newFinding) continue;
-      out.push({ id: it.id, chips: [...cur.chips, ...add], finding: cur.finding ?? finding, newFinding });
+      out.push({ id: it.id, chips: [...cur.chips, ...add], findings: finding ? [...own, finding] : own, newFinding });
     }
     done += batch.length;
     onProgress?.(done, items.length);
@@ -361,6 +363,26 @@ function PersonInfo({ pid, meta, person }: { pid: string; meta?: NotesMeta; pers
   );
 }
 
+const EDITORS_KEY = 'asciia-study-tag-editors';
+function openEditors(): Set<string> {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(EDITORS_KEY) ?? '[]') as unknown;
+    return new Set(Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+function rememberEditor(id: string, open: boolean) {
+  try {
+    const s = openEditors();
+    if (open) s.add(id);
+    else s.delete(id);
+    sessionStorage.setItem(EDITORS_KEY, JSON.stringify([...s]));
+  } catch {
+    // (not remembered)
+  }
+}
+
 function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, many }: { item: ItemDoc; model: Model; save: (i: ItemDoc) => void; remove: (i: ItemDoc) => void; fresh?: boolean; selected?: boolean; onSelect?: (shift: boolean) => void; onTag?: (g: TagGroup, chip: string) => void; many?: number }) {
   const { study } = useCtx();
   const view = useContentView();
@@ -380,7 +402,14 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
   }, [editOrig]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showInt, setShowInt] = useState(!!item.interpretation);
   const [showAdd, setShowAdd] = useState(!!item.addition);
-  const [tagsOpen, setTagsOpen] = useState(false);
+  // (open editors are remembered for the tab, so a reload comes back to the same page height)
+  const [tagsOpen, setTagsOpenState] = useState(() => openEditors().has(item.id));
+  const setTagsOpen = (f: (x: boolean) => boolean) =>
+    setTagsOpenState((x) => {
+      const v = f(x);
+      rememberEditor(item.id, v);
+      return v;
+    });
   // the statement before "Geprüft", for undoing it
   const before = useRef<ItemDoc | null>(null);
   const tagIt = (g: TagGroup, chip: string) => (onTag ? onTag(g, chip) : save(toggleChip(item, g, chip)));
@@ -458,7 +487,7 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
     </div>
   );
   return (
-    <div ref={rowRef} className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}${fresh ? ' is-fresh' : ''}${selected ? ' is-selected' : ''}`}>
+    <div ref={rowRef} data-anchor={`i-${item.id}`} className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}${fresh ? ' is-fresh' : ''}${selected ? ' is-selected' : ''}`}>
       <div className="st-item-text">
         <div className="st-item-meta">
           {onSelect && <input type="checkbox" className="st-item-sel" checked={!!selected} onChange={() => undefined} onClick={(e) => onSelect(e.shiftKey)} aria-label="Auswählen (Umschalt: Bereich)" title="Auswählen (Umschalt: Bereich)" />}
@@ -543,13 +572,15 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
               {c.label}
             </button>
           ))}
-          {item.finding && <span className="st-chip is-finding is-small">{`Befund: ${study.docs.findings[item.finding]?.name ?? '?'}`}</span>}
+          {findingsOf(item).map((f) => (
+            <span key={f} className="st-chip is-finding is-small">{`Befund: ${study.docs.findings[f]?.name ?? '?'}`}</span>
+          ))}
           {sf && (
-            <button type="button" className="st-chip is-suggested is-small" title="Befund-Vorschlag: klicken zum Übernehmen" onClick={() => save({ ...item, finding: sf.id, suggestedFinding: null })}>
+            <button type="button" className="st-chip is-suggested is-small" title="Befund-Vorschlag: klicken zum Übernehmen" onClick={() => save(withFinding(item, sf.id))}>
               {`Befund: ${sf.name}`}
             </button>
           )}
-          {!onChips.length && !sugChips.length && !item.finding && <span className="st-muted">noch keine Tags</span>}
+          {!onChips.length && !sugChips.length && !findingsOf(item).length && <span className="st-muted">noch keine Tags</span>}
           {(sugChips.length > 0 || sf) && <span className="st-muted st-sughint">Vorschläge anklicken, um sie zu übernehmen</span>}
           <button type="button" className="st-linkbtn st-tagtoggle" aria-expanded={tagsOpen} onClick={() => setTagsOpen((x) => !x)}>
             {tagsOpen ? 'Tags schließen' : many ? `Tags für ${many} ausgewählte` : 'Tags bearbeiten'}
@@ -568,7 +599,7 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
             // again: undone; the suggestions it dropped come back (while the page stays open)
             const b = before.current;
             before.current = null;
-            save({ ...item, confirmed: b?.confirmed ?? false, ...(b ? { status: b.status, suggested: b.suggested.filter((c) => !item.chips.includes(c)), suggestedFinding: item.finding ? null : b.suggestedFinding } : {}) });
+            save({ ...item, confirmed: b?.confirmed ?? false, ...(b ? { status: b.status, suggested: b.suggested.filter((c) => !item.chips.includes(c)), suggestedFinding: b.suggestedFinding && !findingsOf(item).includes(b.suggestedFinding) ? b.suggestedFinding : null } : {}) });
           }}
           title={item.confirmed && !open ? 'Geprüft. Nochmal klicken: rückgängig' : 'Als geprüft markieren. Nur angeklickte Tags zählen; nicht angeklickte Vorschläge werden verworfen.'}
         >
@@ -603,15 +634,30 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
               <span className="st-muted">Wiederkehrender Befund, zu dem die Aussage gehört (Seite „Wiederkehrende Befunde“).</span>
             </div>
             <div className="st-cell">
-              {!sf && item.suggestedNewFinding && !item.finding && <span className="st-chip is-suggested is-new" title="neuer Befund vorgeschlagen (unter „Befunde“ anlegen)">{item.suggestedNewFinding}</span>}
-              <select value={item.finding ?? ''} onChange={(e) => save({ ...item, finding: e.target.value || null, suggestedFinding: null })} aria-label="Befund">
-                <option value="">–</option>
-                {findings.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
+              {/* (several possible: a click on one takes it off) */}
+              {findingsOf(item).map((f) => (
+                <button key={f} type="button" className="st-chip is-finding" title="Klicken: Befund entfernen" onClick={() => save(withoutFinding(item, f))}>
+                  {study.docs.findings[f]?.name ?? '?'}
+                </button>
+              ))}
+              {sf && (
+                <button type="button" className="st-chip is-suggested" title="Befund-Vorschlag: klicken zum Übernehmen" onClick={() => save(withFinding(item, sf.id))}>
+                  {sf.name}
+                </button>
+              )}
+              {!sf && item.suggestedNewFinding && <span className="st-chip is-suggested is-new" title="neuer Befund vorgeschlagen (unter „Befunde“ anlegen)">{item.suggestedNewFinding}</span>}
+              {findings.some((f) => !findingsOf(item).includes(f.id)) && (
+                <select className="st-chip-add" value="" onChange={(e) => e.target.value && save(withFinding(item, e.target.value))} aria-label="Befund hinzufügen">
+                  <option value="">+</option>
+                  {findings
+                    .filter((f) => !findingsOf(item).includes(f.id))
+                    .map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                </select>
+              )}
             </div>
           </div>
         </div>
@@ -744,7 +790,7 @@ export default function Notes() {
   const forTags = selShown.length ? selShown : open;
   const forRewrite = selShown.length ? selShown : shown;
   // the selection bar's own actions: on every selected statement at once
-  const [bulk, setBulk] = useState<null | 'frage' | 'befund'>(null);
+  const [bulk, setBulk] = useState<null | 'frage' | 'befund' | 'befund-weg'>(null);
   const [bulkQ, setBulkQ] = useState('');
   const putAll = (items: ItemDoc[], what: string) => {
     if (!items.length) return;
@@ -935,7 +981,7 @@ export default function Notes() {
         const mine = mineOf(pid);
         const person = model.persons.find((p) => p.id === pid);
         return (
-          <section key={pid} className="st-section st-notes-person">
+          <section key={pid} className="st-section st-notes-person" data-anchor={`p-${pid}`}>
             <header className="st-notes-head">
               <PersonInfo pid={pid} meta={meta} person={person} />
               <div className="st-notes-actions">
@@ -999,6 +1045,7 @@ export default function Notes() {
               ['Bereich: Beobachtung', () => bulkSection('during')],
               ['Bereich: Nachgespräch', () => bulkSection('followup')],
               ['Befund zuordnen …', () => setBulk('befund')],
+              ['Befund entfernen …', () => setBulk('befund-weg')],
               ['Löschen', () => void bulkDelete(), true],
             ]}
           />
@@ -1024,19 +1071,46 @@ export default function Notes() {
                 onChange={(e) => {
                   const v = e.target.value;
                   if (!v) return;
-                  const f = v === '-' ? null : v;
-                  putAll(selShown.map((i) => ({ ...i, finding: f, suggestedFinding: null })), f ? `Befund „${study.docs.findings[f]?.name}“ zugeordnet` : 'Befund entfernt');
+                  // (added to the ones they have; "keiner" takes all off)
+                  putAll(selShown.map((i) => (v === '-' ? setFindings(i, []) : withFinding(i, v))), v === '-' ? 'Alle Befunde entfernt' : `Befund „${study.docs.findings[v]?.name}“ zugeordnet`);
                   setBulk(null);
                 }}
                 aria-label="Befund für alle ausgewählten"
               >
-                <option value="">Befund wählen …</option>
-                <option value="-">kein Befund</option>
+                <option value="">Befund hinzufügen …</option>
+                <option value="-">alle Befunde entfernen</option>
                 {findingList.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name}
                   </option>
                 ))}
+              </select>
+              <button type="button" className="st-linkbtn" onClick={() => setBulk(null)}>
+                Abbrechen
+              </button>
+            </span>
+          )}
+          {bulk === 'befund-weg' && (
+            <span className="st-selbar-form">
+              <select
+                value=""
+                autoFocus
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  putAll(selShown.map((i) => withoutFinding(i, v)), `Befund „${study.docs.findings[v]?.name}“ entfernt`);
+                  setBulk(null);
+                }}
+                aria-label="Befund bei allen ausgewählten entfernen"
+              >
+                <option value="">Befund entfernen …</option>
+                {findingList
+                  .filter((f) => selShown.some((i) => findingsOf(i).includes(f.id)))
+                  .map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
               </select>
               <button type="button" className="st-linkbtn" onClick={() => setBulk(null)}>
                 Abbrechen
@@ -1155,7 +1229,10 @@ function ItemList({ items, model }: { items: ItemDoc[]; model: Model }) {
               .map((c) => model.chipLabel.get(c))
               .filter(Boolean)
               .join(' · ')}
-            {i.finding && study.docs.findings[i.finding] ? ` · ${study.docs.findings[i.finding].name}` : ''}
+            {findingsOf(i)
+              .filter((f) => study.docs.findings[f])
+              .map((f) => ` · ${study.docs.findings[f].name}`)
+              .join('')}
           </span>
         </li>
       ))}
@@ -1282,7 +1359,9 @@ export function FeedbackLists() {
     const items = itemsWithRole(slice.items, model, role);
     const groups = new Map<string, ItemDoc[]>();
     for (const i of items) {
-      const k = i.finding && study.docs.findings[i.finding] ? `f:${i.finding}` : `i:${i.id}`;
+      // (grouped under its first finding)
+      const f0 = findingsOf(i).find((f) => study.docs.findings[f]);
+      const k = f0 ? `f:${f0}` : `i:${i.id}`;
       groups.set(k, [...(groups.get(k) ?? []), i]);
     }
     const rows = [...groups].map(([k, list]) => ({ k, title: k.startsWith('f:') ? study.docs.findings[k.slice(2)].name : itemText(view, list[0]), list, persons: distinctPersons(list) })).sort((a, b) => b.persons - a.persons || a.title.localeCompare(b.title));

@@ -9,7 +9,7 @@
 import { fmtBerlin } from './match';
 import { studyFiles, zip } from '../feedback/studyExport';
 import type { Model } from './model';
-import { gameRatings, RATING_LABEL } from './model';
+import { findingsOf, gameRatings, RATING_LABEL } from './model';
 import { UEQS_SCALE_ITEMS, mean, type UeqScale } from './stats';
 import type { ItemDoc, NotesMeta, StudyDocs, GameData } from './types';
 import { csv } from './ui';
@@ -82,7 +82,7 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
       chipsOf(i, 'prioritaet'),
       chipsOf(i, 'thema'),
       chipsOf(i, 'moderation'),
-      i.finding ? (docs.findings[i.finding]?.name ?? '') : '',
+      findingsOf(i).map((f) => docs.findings[f]?.name ?? '').filter(Boolean).join('; '),
       i.confirmed ? 'ja' : '',
       i.chips.some((c) => model.chipRole.get(c) === 'rejected') ? 'verworfen' : '',
     ]),

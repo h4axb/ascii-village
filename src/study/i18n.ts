@@ -367,6 +367,14 @@ const EN: Record<string, string> = {
   'Klicken: bearbeiten': 'Click: edit',
   '+ Deutsche Fassung': '+ German version',
   // design rollout: figures, tiles, empty states, timing
+  '+ Befund': '+ Finding',
+  'Befund bei allen ausgewählten entfernen': 'Remove the finding from all selected',
+  'Klicken: Befund entfernen': 'Click: remove the finding',
+  'Alle Befunde entfernt': 'All findings removed',
+  'alle Befunde entfernen': 'remove all findings',
+  'Befund hinzufügen': 'Add finding',
+  'Befund hinzufügen …': 'Add finding …',
+  'Befund entfernen …': 'Remove finding …',
   'Versuche & Zeiten': 'Attempts & times',
   'unter Teilnehmende & Sessions': 'under Participants & sessions',
   'PNG herunterladen': 'Download PNG',
@@ -1036,6 +1044,9 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^auch in „(.+)“$/, 'also in “$1”'],
+  [/^Befund „(.+)“ entfernt$/, 'Finding “$1” removed'],
+  [/^Befund (.+) entfernen$/, 'Remove finding $1'],
   [/^(\d+) Versuche$/, '$1 attempts'],
   [/^Gemessen: (.+?), n = (\d+)\/(\d+)\. Mit Schätzungen: (.+?), n = (\d+)\/(\d+) \((\d+) geschätzt\)\.$/, 'Measured: $1, n = $2/$3. With estimates: $4, n = $5/$6 ($7 estimated).'],
   [/^mit Schätzungen: (.+?) · n = (\d+)\/(\d+) \((\d+) geschätzt\)$/, 'with estimates: $1 · n = $2/$3 ($4 estimated)'],

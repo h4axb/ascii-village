@@ -462,7 +462,7 @@ export function Figure({
   const done = () => menu.current && (menu.current.open = false);
   // (four rows: title, tabs, the chart's box, caption – in a grid of figures they line up across the row)
   return (
-    <figure className={`st-figure${tabs ? ' has-tabs' : ''}`}>
+    <figure className={`st-figure${tabs ? ' has-tabs' : ''}`} data-anchor={`fig-${n}`}>
       <figcaption className="st-figtitle">
         <span>
           <span className="st-fignum">Abb. {n}</span> {title}

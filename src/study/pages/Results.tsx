@@ -9,6 +9,7 @@ import { getLang } from '../i18n';
 import { analysisExport, rawExport } from '../exports';
 import { download } from '../charts';
 import { detectableEffect, fmt, fmtP, signTestThreshold, wilson } from '../stats';
+import { findingsOf } from '../model';
 import { csv, Empty, figNumber, FIGURES, LazyInput, Section, useCtx } from '../ui';
 import { studyFiles, zip } from '../../feedback/studyExport';
 
@@ -227,7 +228,7 @@ export default function Results() {
               dl(
                 [
                   ['Teilnehmende', 'Link', 'Abschnitt', 'Frage', 'Aussage', 'Tags', 'Befund', 'geprüft'],
-                  ...model.items.map((i) => [i.person, i.link ?? '', i.section, i.question ?? '', i.text, i.chips.map((c) => model.chipLabel.get(c)).join(', '), i.finding ? (study.docs.findings[i.finding]?.name ?? '') : '', i.confirmed ? 'ja' : 'nein']),
+                  ...model.items.map((i) => [i.person, i.link ?? '', i.section, i.question ?? '', i.text, i.chips.map((c) => model.chipLabel.get(c)).join(', '), findingsOf(i).map((f) => study.docs.findings[f]?.name ?? '').filter(Boolean).join('; '), i.confirmed ? 'ja' : 'nein']),
                 ],
                 'Aussagen.csv',
               )

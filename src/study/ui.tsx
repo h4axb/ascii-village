@@ -94,7 +94,7 @@ export function Fig({ id, sub, title, children, table, tabs, valid }: { id: stri
 // a section as one card: its title inside, at the top, above a thin line
 export function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return (
-    <section className="st-section st-csection" id={id}>
+    <section className="st-section st-csection" id={id} data-anchor={`s-${id ?? title}`}>
       <h2>{title}</h2>
       <div className="st-csection-body">{children}</div>
     </section>

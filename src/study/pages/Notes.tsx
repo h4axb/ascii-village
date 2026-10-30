@@ -1655,16 +1655,14 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
     if (x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
   };
   return (
-    // (one checkbox: unticked = always shown; ticking it unfolds the condition)
+    // (one checkbox, ticked by default: "Immer anzeigen"; unticking it unfolds the condition on a darker ground)
     <div className={`st-tgsection st-vis${always ? '' : ' is-open'}`}>
-      <div className="st-vis-head">
-        <span className="st-tglabel">Sichtbarkeit</span>
-        <span className="st-vis-sum" data-notr>{!always && first ? `Nur anzeigen, wenn ${first.g.name} = ${first.c.label}${more > 1 ? ` (+ ${more - 1})` : ''}` : 'Immer anzeigen'}</span>
-      </div>
+      <span className="st-tglabel">Sichtbarkeit</span>
       <label className="st-check st-vis-when">
-        <input type="checkbox" checked={!always} onChange={(e) => (e.target.checked ? onlyWhen() : set(undefined, 'immer anzeigen'))} />
-        Nur anzeigen, wenn …
+        <input type="checkbox" checked={always} onChange={(e) => (e.target.checked ? set(undefined, 'immer anzeigen') : onlyWhen())} />
+        Immer anzeigen
       </label>
+      {!always && <span className="st-vis-label">Nur anzeigen, wenn …</span>}
       {cond.length > 0 && (
         <div className="st-vis-cond">
           <select

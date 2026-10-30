@@ -3427,3 +3427,7 @@ body:has(.st-root) {
 .st-vis-when {
   align-self: flex-start;
 }
+.st-vis-label {
+  font-size: 13px;
+  margin-top: 2px;
+}

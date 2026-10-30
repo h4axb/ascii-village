@@ -3229,3 +3229,146 @@ body:has(.st-root) {
     grid-column: 1;
   }
 }
+/* Tags page: a category card – name with icons, description, visibility, tags, more settings */
+.st-root section.st-tgcard {
+  gap: 14px;
+}
+.st-tgcard-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.st-tgcard-head .st-groupname {
+  width: 100%;
+  min-width: 0;
+}
+.st-root .st-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  color: var(--st-muted);
+  border-radius: 8px;
+}
+.st-root .st-iconbtn:hover,
+.st-root .st-iconbtn:focus-visible {
+  background: var(--st-soft);
+  color: var(--st-ink);
+}
+.st-root .st-iconbtn.is-danger:hover,
+.st-root .st-iconbtn.is-danger:focus-visible {
+  color: var(--st-warn, #b5432a);
+}
+.st-iconbtn[aria-expanded='true'] {
+  color: var(--st-ink);
+}
+.st-tglabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--st-ink);
+}
+.st-tgfield {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.st-tgfield input {
+  width: 100%;
+  min-width: 0;
+}
+.st-tgsection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--st-line);
+}
+.st-tgsection-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.st-tgsection-head .st-muted {
+  font-size: 12.5px;
+}
+.st-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.st-radio input {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--st-ink);
+}
+.st-vis-cond {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: 24px;
+}
+.st-vis-cond select {
+  width: 100%;
+  min-width: 0;
+}
+.st-vis-eq {
+  color: var(--st-muted);
+  padding-left: 4px;
+}
+.st-vis-cond p {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+}
+.st-root .st-taggroup .st-chipedit-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 200px) 34px auto;
+  gap: 8px;
+  align-items: center;
+}
+.st-root .st-taggroup .st-chipedit-row > input,
+.st-root .st-taggroup .st-chipedit-row > select {
+  width: 100%;
+  min-width: 0;
+}
+.st-tguses {
+  font-size: 12.5px;
+  text-align: right;
+}
+.st-root .st-tgadd {
+  width: 100%;
+  margin-top: 4px;
+  background: var(--st-paper);
+  border: 1px solid var(--st-line);
+}
+.st-root .st-tgadd:hover {
+  background: var(--st-soft);
+}
+@media (max-width: 700px) {
+  .st-root .st-taggroup .st-chipedit-row {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+  .st-root .st-taggroup .st-chipedit-row > input {
+    grid-column: 2 / -1;
+  }
+  .st-root .st-taggroup .st-chipedit-row > select {
+    grid-column: 2;
+  }
+  .st-vis-cond {
+    margin-left: 0;
+  }
+}
+.st-tgfield textarea.st-autogrow {
+  width: 100%;
+  min-width: 0;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  line-height: 1.45;
+}

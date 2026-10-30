@@ -367,6 +367,23 @@ const EN: Record<string, string> = {
   'Klicken: bearbeiten': 'Click: edit',
   '+ Deutsche Fassung': '+ German version',
   // design rollout: figures, tiles, empty states, timing
+  Beschreibung: 'Description',
+  'Wofür steht diese Kategorie? (beim Taggen sichtbar)': 'What does this category stand for? (shown when tagging)',
+  Sichtbarkeit: 'Visibility',
+  'Immer anzeigen': 'Always show',
+  'Nur anzeigen, wenn …': 'Only show when …',
+  'Kategorie der Bedingung': 'Category of the condition',
+  'Tag der Bedingung': 'Tag of the condition',
+  'Beim Wechsel werden nicht mehr zutreffende Tags dieser Kategorie entfernt; bis dahin zählen sie nicht.': 'On a change, tags of this category that no longer apply are removed; until then they do not count.',
+  'Weitere Einstellungen': 'More settings',
+  'Mehrere Tags pro Aussage erlauben': 'Allow several tags per statement',
+  '+ Tag hinzufügen': '+ Add tag',
+  'Einstellungen zeigen': 'Show settings',
+  'Einstellungen ausblenden': 'Hide settings',
+  'Tag löschen': 'Delete tag',
+  '– keine Bedeutung': '– no meaning',
+  'Bedeutung in der Auswertung': 'Meaning in the analysis',
+  Sonstige: 'Other',
   'Welcher Teil des Spiels betroffen ist (mehrere möglich).': 'Which part of the game is affected (several possible).',
   'Weitere Details ausblenden': 'Hide further details',
   'Welche Crafting-Variante gemeint ist.': 'Which crafting variant is meant.',
@@ -1091,6 +1108,11 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^(\d+) Einträge?$/, '$1 entries'],
+  [/^Kategorie (.+) löschen$/, 'Delete category $1'],
+  [/^Tag (.+) löschen$/, 'Delete tag $1'],
+  [/^bei (\d+) Aussagen$/, 'on $1 statements'],
+  [/^\(\+ (\d+) weitere\)$/, '(+ $1 more)'],
   [/^Weitere Details: (.+)$/, 'Further details: $1'],
   [/^(.+) wählen$/, 'Choose $1'],
   [/^(.+) ändern$/, 'Change $1'],
@@ -1378,6 +1400,8 @@ function translateText(t: Node) {
 }
 // a node and everything below it (content marked [data-notr] left out)
 function translateNode(n: Node) {
+  // (a text field: its placeholder and title, never what is typed in it)
+  if (n.nodeType === 1 && (n as Element).tagName === 'TEXTAREA' && !(n as Element).closest('[data-notr]')) return translateAttrs(n as Element);
   if (skip(n)) return;
   if (n.nodeType === 3) return translateText(n);
   if (n.nodeType !== 1) return;
@@ -1389,6 +1413,7 @@ function translateNode(n: Node) {
     if (cur.nodeType === 3) translateText(cur);
     else translateAttrs(cur as Element);
   }
+  if (n.nodeType === 1) for (const t of (n as Element).querySelectorAll('textarea')) if (!t.closest('[data-notr]')) translateAttrs(t);
 }
 // keeps everything under `root` in English while the language is English
 export function useTranslator(root: React.RefObject<HTMLElement>, l: Lang, mounted?: unknown) {

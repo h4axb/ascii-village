@@ -1357,6 +1357,27 @@ export function Tags() {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'tag';
 
+  // categories shown compact (only description and tags), remembered for the tab
+  const [compact, setCompact] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(sessionStorage.getItem('asciia-study-tag-compact') ?? '[]') as string[]);
+    } catch {
+      return new Set();
+    }
+  });
+  const toggleCompact = (id: string) =>
+    setCompact((x) => {
+      const n = new Set(x);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      try {
+        sessionStorage.setItem('asciia-study-tag-compact', JSON.stringify([...n]));
+      } catch {
+        // (not remembered)
+      }
+      return n;
+    });
+
   // ---- the order: categories and tags ----
   const [drag, setDrag] = useState<Drag | null>(null);
   const [drop, setDrop] = useState<Drop | null>(null);
@@ -1490,75 +1511,107 @@ export function Tags() {
         {model.tags.map((g, gi) => (
           <div key={g.id}>
             {drag?.kind === 'group' && drop?.kind === 'group' && drop.index === model.tags.filter((x) => x.id !== drag.id).findIndex((x) => x.id === g.id) && line}
-            <section data-gid={g.id} className={`st-section st-taggroup${drag?.kind === 'group' && drag.id === g.id ? ' is-dragging' : ''}`}>
-              <header className="st-notes-head st-taggroup-head">
+            <section data-gid={g.id} className={`st-section st-taggroup st-tgcard${drag?.kind === 'group' && drag.id === g.id ? ' is-dragging' : ''}`}>
+              <header className="st-tgcard-head">
                 {handle({ kind: 'group', id: g.id }, `Kategorie ${g.name}`)}
                 <input className="st-groupname" defaultValue={g.name} onBlur={(e) => e.target.value !== g.name && saveGroup({ ...g, name: e.target.value })} aria-label="Name der Kategorie" />
-                <label className="st-check">
-                  <input type="checkbox" checked={g.multi} onChange={(e) => saveGroup({ ...g, multi: e.target.checked })} />
-                  mehrere je Aussage
-                </label>
+                <button type="button" className="st-iconbtn" aria-expanded={!compact.has(g.id)} onClick={() => toggleCompact(g.id)} aria-label={compact.has(g.id) ? 'Einstellungen zeigen' : 'Einstellungen ausblenden'} title={compact.has(g.id) ? 'Einstellungen zeigen' : 'Einstellungen ausblenden'}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+                    <circle cx="16" cy="7" r="2" />
+                    <circle cx="10" cy="17" r="2" />
+                  </svg>
+                </button>
                 <button
                   type="button"
+                  className="st-iconbtn is-danger"
+                  aria-label={`Kategorie ${g.name} löschen`}
+                  title="Kategorie löschen"
                   onClick={() => {
                     if (!confirm(`Kategorie „${g.name}“ mit allen Tags löschen? Die Tags werden von allen Aussagen entfernt.`)) return;
                     study.commit(dropChips(g.chips.map((c) => c.id)), [{ coll: 'tags', id: g.id }]);
                   }}
                 >
-                  Kategorie löschen
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                  </svg>
                 </button>
               </header>
-              <label className="st-fprop-field st-taghint">
-                <span className="st-cell-label">Erklärung (beim Taggen sichtbar)</span>
-                <input defaultValue={hintOf(g)} placeholder="Wofür steht diese Kategorie?" onBlur={(e) => e.target.value.trim() !== hintOf(g) && saveGroup({ ...g, hint: e.target.value.trim() || undefined })} />
-              </label>
-              <ShowIf g={g} save={saveGroup} />
-              <div className="st-chipedit" data-chips-of={g.id}>
-                {g.chips.map((c: Chip) => {
-                  const others = g.chips.filter((x) => !(drag?.kind === 'chip' && x.id === drag.id));
-                  const here = drag?.kind === 'chip' && drop?.kind === 'chip' && drop.group === g.id && drop.index === others.findIndex((x) => x.id === c.id);
-                  return (
-                    <div key={c.id}>
-                      {here && line}
-                      <div data-cid={c.id} className={`st-chipedit-row${drag?.kind === 'chip' && drag.id === c.id ? ' is-dragging' : ''}`}>
-                        {handle({ kind: 'chip', id: c.id, from: g.id }, `Tag ${c.label}`)}
-                        <input defaultValue={c.label} onBlur={(e) => e.target.value !== c.label && saveGroup({ ...g, chips: g.chips.map((x) => (x.id === c.id ? { ...x, label: e.target.value } : x)) })} aria-label="Tag" />
-                        <select value={c.role ?? ''} onChange={(e) => saveGroup({ ...g, chips: g.chips.map((x) => (x.id === c.id ? { ...x, role: (e.target.value || undefined) as ChipRole } : x)) })} aria-label="Bedeutung">
-                          <option value="">–</option>
-                          {model.meanings.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.label}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="st-muted">{uses(c.id)}×</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (uses(c.id) && !confirm(`„${c.label}“ von ${uses(c.id)} Aussagen entfernen?`)) return;
-                            study.commit([{ coll: 'tags', id: g.id, data: { ...g, chips: g.chips.filter((x) => x.id !== c.id) } }, ...dropChips([c.id])]);
-                          }}
-                        >
-                          Löschen
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-                {drag?.kind === 'chip' && drop?.kind === 'chip' && drop.group === g.id && drop.index >= g.chips.filter((x) => x.id !== drag.id).length && line}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const label = prompt('Neuer Tag');
-                    if (!label?.trim()) return;
-                    let id = slug(label);
-                    while (model.chipLabel.has(id)) id += '-2';
-                    saveGroup({ ...g, chips: [...g.chips, { id, label: label.trim() }] });
+              <label className="st-tgfield">
+                <span className="st-tglabel">Beschreibung</span>
+                <textarea
+                  className="st-autogrow"
+                  rows={1}
+                  defaultValue={hintOf(g)}
+                  placeholder="Wofür steht diese Kategorie? (beim Taggen sichtbar)"
+                  ref={(el) => {
+                    if (el) (el.style.height = 'auto'), (el.style.height = `${el.scrollHeight + 2}px`);
                   }}
-                >
-                  + Tag
-                </button>
+                  onInput={(e) => ((e.currentTarget.style.height = 'auto'), (e.currentTarget.style.height = `${e.currentTarget.scrollHeight + 2}px`))}
+                  onBlur={(e) => e.target.value.trim() !== hintOf(g) && saveGroup({ ...g, hint: e.target.value.trim() || undefined })}
+                />
+              </label>
+              {!compact.has(g.id) && <Visibility g={g} save={saveGroup} />}
+              <div className="st-tgsection">
+                <div className="st-tgsection-head">
+                  <span className="st-tglabel">Tags</span>
+                  <span className="st-muted">{`${g.chips.length} ${g.chips.length === 1 ? 'Eintrag' : 'Einträge'}`}</span>
+                </div>
+                <div className="st-chipedit" data-chips-of={g.id}>
+                  {g.chips.map((c: Chip) => {
+                    const others = g.chips.filter((x) => !(drag?.kind === 'chip' && x.id === drag.id));
+                    const here = drag?.kind === 'chip' && drop?.kind === 'chip' && drop.group === g.id && drop.index === others.findIndex((x) => x.id === c.id);
+                    return (
+                      <div key={c.id}>
+                        {here && line}
+                        <div data-cid={c.id} className={`st-chipedit-row${drag?.kind === 'chip' && drag.id === c.id ? ' is-dragging' : ''}`}>
+                          {handle({ kind: 'chip', id: c.id, from: g.id }, `Tag ${c.label}`)}
+                          <input defaultValue={c.label} onBlur={(e) => e.target.value !== c.label && saveGroup({ ...g, chips: g.chips.map((x) => (x.id === c.id ? { ...x, label: e.target.value } : x)) })} aria-label="Tag" />
+                          <MeaningSelect value={c.role} onChange={(role) => saveGroup({ ...g, chips: g.chips.map((x) => (x.id === c.id ? { ...x, role } : x)) })} />
+                          <span className="st-muted st-tguses" title={`bei ${uses(c.id)} Aussagen`}>{uses(c.id)}×</span>
+                          <button
+                            type="button"
+                            className="st-iconbtn"
+                            aria-label={`Tag ${c.label} löschen`}
+                            title="Tag löschen"
+                            onClick={() => {
+                              if (uses(c.id) && !confirm(`„${c.label}“ von ${uses(c.id)} Aussagen entfernen?`)) return;
+                              study.commit([{ coll: 'tags', id: g.id, data: { ...g, chips: g.chips.filter((x) => x.id !== c.id) } }, ...dropChips([c.id])]);
+                            }}
+                          >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                              <path d="M6 6l12 12M18 6L6 18" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {drag?.kind === 'chip' && drop?.kind === 'chip' && drop.group === g.id && drop.index >= g.chips.filter((x) => x.id !== drag.id).length && line}
+                  <button
+                    type="button"
+                    className="st-tgadd"
+                    onClick={() => {
+                      const label = prompt('Neuer Tag');
+                      if (!label?.trim()) return;
+                      let id = slug(label);
+                      while (model.chipLabel.has(id)) id += '-2';
+                      saveGroup({ ...g, chips: [...g.chips, { id, label: label.trim() }] });
+                    }}
+                  >
+                    + Tag hinzufügen
+                  </button>
+                </div>
               </div>
+              {!compact.has(g.id) && (
+                <div className="st-tgsection">
+                  <span className="st-tglabel">Weitere Einstellungen</span>
+                  <label className="st-check">
+                    <input type="checkbox" checked={g.multi} onChange={(e) => saveGroup({ ...g, multi: e.target.checked })} />
+                    Mehrere Tags pro Aussage erlauben
+                  </label>
+                </div>
+              )}
             </section>
             {gi === model.tags.length - 1 && drag?.kind === 'group' && drop?.kind === 'group' && drop.index >= model.tags.length - 1 && line}
           </div>
@@ -1580,49 +1633,105 @@ export function Tags() {
   );
 }
 
-// ---- when a category applies: only for statements with one of the chosen tags ----
-// (a condition can also name a meaning, e.g. "problem": then every tag with it counts)
-function ShowIf({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
+// ---- when a category applies: always, or only when another category has a tag ----
+// (stored as TagGroup.showIf; a meaning there, e.g. "problem", stands for the tags with it)
+function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
   const { model, study } = useCtx();
   const cond = g.showIf ?? [];
-  const on = (c: Chip) => cond.includes(c.id) || (!!c.role && cond.includes(c.role));
   const others = model.tags.filter((x) => x.id !== g.id && x.chips.length);
-  const chosen = others.flatMap((x) => x.chips.filter(on));
-  const toggle = (c: Chip) => {
-    let next: string[];
-    if (on(c)) {
-      // (on through its meaning: the meaning's other tags stay chosen one by one)
-      const viaRole = c.role && cond.includes(c.role) ? c.role : null;
-      next = cond.filter((x) => x !== c.id && x !== viaRole);
-      if (viaRole) next.push(...others.flatMap((x) => x.chips.filter((y) => y.role === viaRole && y.id !== c.id).map((y) => y.id)));
-    } else next = [...cond, c.id];
-    save({ ...g, showIf: next.length ? next : undefined });
-    logChange(study, `Kategorie „${g.name}“: anzeigen ${next.length ? `nur bei ${others.flatMap((x) => x.chips.filter((y) => next.includes(y.id) || (!!y.role && next.includes(y.role)))).map((y) => y.label).join(', ')}` : 'immer'}`);
+  const matches = (c: Chip) => cond.includes(c.id) || (!!c.role && cond.includes(c.role));
+  // the condition as "category = tag" (the first one, if several are stored)
+  const first = others.flatMap((x) => x.chips.filter(matches).map((c) => ({ g: x, c })))[0];
+  const [pickG, setPickG] = useState(first?.g.id ?? others[0]?.id ?? '');
+  const groupNow = others.find((x) => x.id === (first?.g.id ?? pickG));
+  const set = (ids: string[] | undefined, log: string) => {
+    save({ ...g, showIf: ids?.length ? ids : undefined });
+    logChange(study, `Kategorie „${g.name}“: ${log}`);
   };
+  const more = others.flatMap((x) => x.chips.filter(matches)).length;
   return (
-    <details className="st-showif">
-      <summary>
-        <span className="st-cell-label">Anzeigen</span> <span data-notr>{chosen.length ? `nur bei: ${chosen.map((c) => c.label).join(', ')}` : 'immer'}</span>
-      </summary>
-      <p className="st-muted">Die Kategorie erscheint nur bei Aussagen mit einem der gewählten Tags und zählt nur dort. Wechselt die Aussage z. B. von „Problem“ zu „Anmerkung“, wird ihr Tag aus dieser Kategorie entfernt. Nichts gewählt = immer.</p>
-      {others.map((x) => (
-        <div key={x.id} className="st-showif-row">
-          <span className="st-cell-label">{x.name}</span>
-          <span className="st-showif-chips">
-            {x.chips.map((c) => (
-              <button key={c.id} type="button" className={`st-chip is-small${on(c) ? ' is-on' : ''}`} aria-pressed={on(c)} onClick={() => toggle(c)}>
-                {c.label}
-              </button>
-            ))}
-          </span>
-        </div>
-      ))}
+    <div className="st-tgsection">
+      <span className="st-tglabel">Sichtbarkeit</span>
+      <label className="st-radio">
+        <input type="radio" name={`vis-${g.id}`} checked={!cond.length} onChange={() => set(undefined, 'immer anzeigen')} />
+        Immer anzeigen
+      </label>
+      <label className="st-radio">
+        <input
+          type="radio"
+          name={`vis-${g.id}`}
+          checked={!!cond.length}
+          onChange={() => {
+            const x = groupNow ?? others[0];
+            if (x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
+          }}
+        />
+        Nur anzeigen, wenn …
+      </label>
       {cond.length > 0 && (
-        <button type="button" className="st-linkbtn" onClick={() => (save({ ...g, showIf: undefined }), logChange(study, `Kategorie „${g.name}“: anzeigen immer`))}>
-          immer anzeigen
-        </button>
+        <div className="st-vis-cond">
+          <select
+            value={groupNow?.id ?? ''}
+            aria-label="Kategorie der Bedingung"
+            onChange={(e) => {
+              const x = others.find((y) => y.id === e.target.value);
+              setPickG(e.target.value);
+              if (x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
+            }}
+          >
+            {others.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
+          <span className="st-vis-eq" aria-hidden="true">
+            =
+          </span>
+          <select
+            value={groupNow?.chips.find(matches)?.id ?? ''}
+            aria-label="Tag der Bedingung"
+            onChange={(e) => {
+              const c = groupNow?.chips.find((y) => y.id === e.target.value);
+              if (c) set([c.id], `nur bei „${c.label}“`);
+            }}
+          >
+            {groupNow?.chips.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          {more > 1 && <span className="st-muted">{`(+ ${more - 1} weitere)`}</span>}
+          <p className="st-muted">Beim Wechsel werden nicht mehr zutreffende Tags dieser Kategorie entfernt; bis dahin zählen sie nicht.</p>
+        </div>
       )}
-    </details>
+    </div>
+  );
+}
+
+// the meaning of a tag: grouped by kind ("Priorität"), each by its short name ("Essenziell")
+function MeaningSelect({ value, onChange }: { value?: ChipRole; onChange: (v: ChipRole | undefined) => void }) {
+  const { model } = useCtx();
+  const groups = new Map<string, { id: ChipRole; short: string }[]>();
+  for (const m of model.meanings) {
+    const k = m.label.indexOf(': ');
+    const head = k > 0 ? m.label.slice(0, k) : 'Sonstige';
+    groups.set(head, [...(groups.get(head) ?? []), { id: m.id, short: k > 0 ? m.label.slice(k + 2) : m.label }]);
+  }
+  return (
+    <select className="st-meaningsel" value={value ?? ''} onChange={(e) => onChange((e.target.value || undefined) as ChipRole | undefined)} aria-label="Bedeutung" title="Bedeutung in der Auswertung">
+      <option value="">– keine Bedeutung</option>
+      {[...groups].map(([head, list]) => (
+        <optgroup key={head} label={head}>
+          {list.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.short}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
   );
 }
 

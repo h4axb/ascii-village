@@ -3372,3 +3372,25 @@ body:has(.st-root) {
   font: inherit;
   line-height: 1.45;
 }
+/* "Nur anzeigen, wenn …": category = tag in one row */
+.st-root .st-vis-cond {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) auto minmax(0, 220px) auto;
+  justify-content: start;
+  align-items: center;
+  gap: 6px 10px;
+}
+.st-root .st-vis-cond .st-vis-eq {
+  padding: 0;
+}
+.st-root .st-vis-cond > p {
+  grid-column: 1 / -1;
+}
+@media (max-width: 700px) {
+  .st-root .st-vis-cond {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+  .st-root .st-vis-cond > .st-muted:not(p) {
+    grid-column: 1 / -1;
+  }
+}

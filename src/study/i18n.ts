@@ -367,6 +367,18 @@ const EN: Record<string, string> = {
   'Klicken: bearbeiten': 'Click: edit',
   '+ Deutsche Fassung': '+ German version',
   // design rollout: figures, tiles, empty states, timing
+  'Wie dringend ein Problem ist (fließt in „Nach Priorität“).': 'How urgent a problem is (goes into “By priority”).',
+  immer: 'always',
+  'immer anzeigen': 'always show',
+  'Die Kategorie erscheint nur bei Aussagen mit einem der gewählten Tags und zählt nur dort. Wechselt die Aussage z. B. von „Problem“ zu „Anmerkung“, wird ihr Tag aus dieser Kategorie entfernt. Nichts gewählt = immer.':
+    'The category appears only for statements with one of the chosen tags and counts only there. If a statement changes e.g. from “Problem” to “Remark”, its tag in this category is removed. Nothing chosen = always.',
+  'Keine Tags in nicht zutreffenden Kategorien': 'No tags in categories that do not apply',
+  Urheber: 'Author',
+  'Wer die Anmerkung gemacht hat.': 'Who made the remark.',
+  Testperson: 'Participant',
+  Testleitung: 'Test lead',
+  'Was für eine Rückmeldung es ist: ein Problem, etwas Positives, eine Überraschung oder eine Anmerkung. Anmerkung: ergänzende Information oder Vorschlag; eine konkrete Schwierigkeit ist ein Problem, auch wenn die Testleitung sie notiert.':
+    'What kind of feedback it is: a problem, something positive, a surprise or a remark. Remark: additional information or a suggestion; a concrete difficulty is a problem, even when the test lead notes it.',
   Bedeutungen: 'Meanings',
   'Jeder Tag kann eine Bedeutung haben. Die vorgegebenen zählen in der Auswertung (Übersicht Abb. 6 und ihre Listen, „Nach Priorität“, „verworfen“, die Prüfungen) und lassen sich umbenennen. Eigene Bedeutungen sind zunächst nur Beschriftungen; mit „als eigene Kategorie zählen“ bekommen sie eine eigene Zeile in Abb. 6 und eine eigene Liste in der Übersicht.':
     'Every tag can have a meaning. The given ones count in the analysis (Overview Fig. 6 and its lists, “By priority”, “rejected”, the checks) and can be renamed. Own meanings are labels at first; with “count as a category of its own” they get their own row in Fig. 6 and their own list in the Overview.',
@@ -1054,6 +1066,8 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^nur bei: (.+)$/, 'only with: $1'],
+  [/^(.+): zählen dort nicht mit – unter Qualitatives Feedback öffnen und neu taggen$/, '$1: not counted there – open under Qualitative feedback and re-tag'],
   [/^\((\d+)\) – wofür ein Tag in der Auswertung zählt$/, '($1) – what a tag counts for in the analysis'],
   [/^(\d+) Tags?$/, '$1 tag(s)'],
   [/^Kategorie (.+) verschieben \(Pfeiltasten\)$/, 'Move category $1 (arrow keys)'],

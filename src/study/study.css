@@ -2984,3 +2984,107 @@ body:has(.st-root) {
 .st-taghint .st-cell-label {
   width: auto;
 }
+/* Tags page and tag editor: one even spacing inside every card */
+.st-root section.st-taggroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+.st-root section.st-taggroup > .st-notes-head {
+  margin: 0;
+  gap: 10px;
+}
+.st-root .st-taggroup .st-taghint {
+  margin: 0;
+  gap: 4px;
+}
+.st-root .st-taggroup .st-chipedit {
+  gap: 8px;
+}
+.st-root .st-taggroup .st-chipedit > button {
+  margin-top: 4px;
+}
+.st-root details.st-taggroup {
+  padding: 16px 18px;
+}
+.st-meanings > summary + .st-note {
+  margin: 12px 0 0;
+}
+.st-showif > summary {
+  cursor: pointer;
+  font-size: 13px;
+  list-style-position: inside;
+}
+.st-showif > summary .st-cell-label {
+  width: auto;
+  margin-right: 4px;
+}
+.st-showif[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--st-soft);
+  border-radius: 10px;
+}
+.st-showif > p {
+  margin: 0;
+  font-size: 12.5px;
+}
+.st-showif-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: start;
+}
+.st-showif-row > .st-cell-label {
+  padding-top: 3px;
+}
+.st-showif-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.st-showif-row > .st-cell-label {
+  width: auto;
+}
+.st-root .st-tageditor {
+  gap: 12px;
+  padding: 14px 16px;
+}
+.st-root .st-tagrow {
+  gap: 6px 16px;
+}
+.st-root .st-tagrow-head {
+  gap: 3px;
+}
+@media (max-width: 700px) {
+  .st-root section.st-taggroup,
+  .st-root details.st-taggroup {
+    padding: 14px;
+  }
+  .st-showif-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  /* a tag row: handle + name on top, meaning, count and delete below it */
+  .st-root .st-chipedit-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: 6px 8px;
+    align-items: center;
+  }
+  .st-root .st-chipedit-row > input {
+    grid-column: 2 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+  .st-root .st-chipedit-row > select {
+    grid-column: 2;
+    width: 100%;
+    min-width: 0;
+  }
+}

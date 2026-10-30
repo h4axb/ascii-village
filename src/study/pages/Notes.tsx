@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } from '../types';
 import { CATEGORY, hintOf, ROLE_NAME, SECTION_LABEL, type BuiltinRole, type CategoryRole, type MeaningsSetting } from '../types';
-import { categoryMeanings, distinctPersons, findingsOf, itemsWithRole, linkKeyOf, meaningsSetting, setFindings, shortName, withFinding, withoutFinding, type Model, type Person } from '../model';
+import { categoryMeanings, distinctPersons, effectiveChips, findingsOf, groupActive, itemsWithRole, linkKeyOf, meaningsSetting, setFindings, shortName, withFinding, withoutFinding, type Model, type Person } from '../model';
 import { linkLabelOf, parseNotes, planNotes } from '../notes';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
@@ -23,6 +23,14 @@ export function toggleChip(item: ItemDoc, g: TagGroup, chip: string): ItemDoc {
   const chips = g.multi ? [...item.chips, chip] : [...item.chips.filter((c) => !inGroup.has(c)), chip];
   const suggested = g.multi ? item.suggested.filter((c) => c !== chip) : item.suggested.filter((c) => !inGroup.has(c));
   return { ...item, chips, suggested };
+}
+// the tags of categories that no longer apply leave the statement (hidden is not
+// kept: e.g. "Problem" → "Anmerkung" drops the priority, it never counts unseen)
+export function pruneHidden(item: ItemDoc, tags: TagGroup[]): ItemDoc {
+  const role = new Map(tags.flatMap((g) => g.chips.map((c) => [c.id, c.role] as const)));
+  const chips = effectiveChips(item.chips, tags, role);
+  const suggested = item.suggested.filter((c) => effectiveChips([...chips, c], tags, role).includes(c));
+  return chips.length === item.chips.length && suggested.length === item.suggested.length ? item : { ...item, chips, suggested };
 }
 // add a tag (several statements at once): never takes one off; in a
 // single-choice group it replaces the group's other tag
@@ -73,7 +81,8 @@ export async function suggestFor(ctx: Ctx, items: ItemDoc[], onProgress?: (done:
       const finding = s.finding && findingIds.has(s.finding) && !own.includes(s.finding) ? s.finding : null;
       const newFinding = !finding && s.newFinding ? String(s.newFinding).slice(0, 120) : null;
       if (!add.length && !finding && !newFinding) continue;
-      out.push({ id: it.id, chips: [...cur.chips, ...add], findings: finding ? [...own, finding] : own, newFinding });
+      // (no tags of categories that would not apply, e.g. a priority for a remark)
+      out.push({ id: it.id, chips: effectiveChips([...cur.chips, ...add], model.tags, model.chipRole), findings: finding ? [...own, finding] : own, newFinding });
     }
     done += batch.length;
     onProgress?.(done, items.length);
@@ -234,7 +243,8 @@ function TallyFreeText() {
 // ---- one statement, Excel-like: text | a cell of chips per tag group | finding ----
 // (onTag: a click that sets or removes the tag on all selected statements at once)
 function ChipCell({ item, g, onChange, labelOnly, onTag, many }: { item: ItemDoc; g: TagGroup; onChange: (i: ItemDoc) => void; labelOnly?: boolean; onTag?: (g: TagGroup, chip: string) => void; many?: number }) {
-  const tag = (chip: string) => (onTag ? onTag(g, chip) : onChange(toggleChip(item, g, chip)));
+  const { model } = useCtx();
+  const tag = (chip: string) => (onTag ? onTag(g, chip) : onChange(pruneHidden(toggleChip(item, g, chip), model.tags)));
   const shown = g.multi || g.chips.length > 5 ? g.chips.filter((c) => item.chips.includes(c.id) || item.suggested.includes(c.id)) : g.chips;
   const rest = g.chips.filter((c) => !shown.includes(c));
   return (
@@ -412,8 +422,10 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
     });
   // the statement before "Geprüft", for undoing it
   const before = useRef<ItemDoc | null>(null);
-  const tagIt = (g: TagGroup, chip: string) => (onTag ? onTag(g, chip) : save(toggleChip(item, g, chip)));
-  const chipsOf = (ids: string[]) => model.tags.flatMap((g) => g.chips.filter((c) => ids.includes(c.id)).map((c) => ({ g, c })));
+  const tagIt = (g: TagGroup, chip: string) => (onTag ? onTag(g, chip) : save(pruneHidden(toggleChip(item, g, chip), model.tags)));
+  // (a category that does not apply to this statement is hidden, e.g. Priorität without "Problem")
+  const applies = (g: TagGroup) => groupActive(g, item.chips.filter((c) => !g.chips.some((x) => x.id === c)), model.chipRole);
+  const chipsOf = (ids: string[]) => model.tags.filter(applies).flatMap((g) => g.chips.filter((c) => ids.includes(c.id)).map((c) => ({ g, c })));
   const onChips = chipsOf(item.chips);
   const sugChips = chipsOf(item.suggested.filter((c) => !item.chips.includes(c)));
   const findings = Object.values(study.docs.findings).sort((a, b) => a.name.localeCompare(b.name));
@@ -619,7 +631,7 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
       {tagsOpen && (
         <div className="st-tageditor">
           {many && <p className="st-note">{`Jeder Klick gilt für alle ${many} ausgewählten Aussagen; ein schon gesetzter Tag wird bei allen entfernt.`}</p>}
-          {model.tags.map((g) => (
+          {model.tags.filter((g) => many || applies(g)).map((g) => (
             <div key={g.id} className="st-tagrow">
               <div className="st-tagrow-head">
                 <strong>{g.name}</strong>
@@ -777,7 +789,7 @@ export default function Notes() {
   const applyTag = (add: boolean) => {
     const g = model.tags.find((x) => x.chips.some((c) => c.id === pickTag));
     if (!g) return;
-    const put = selShown.map((i) => (add ? setChip(i, g, pickTag) : { ...i, chips: i.chips.filter((c) => c !== pickTag) })).filter((n, k) => n.chips.join() !== selShown[k].chips.join());
+    const put = selShown.map((i) => pruneHidden(add ? setChip(i, g, pickTag) : { ...i, chips: i.chips.filter((c) => c !== pickTag) }, model.tags)).filter((n, k) => n.chips.join() !== selShown[k].chips.join());
     if (put.length) study.commit(put.map((p) => ({ coll: 'items' as const, id: p.id, data: p })));
   };
 
@@ -820,7 +832,7 @@ export default function Notes() {
   // a tag clicked on one of several selected statements: set on all of them, or (already on the clicked one) taken off all
   const tagSelected = (clicked: ItemDoc, g: TagGroup, chip: string) => {
     const on = !clicked.chips.includes(chip);
-    const put = selShown.map((i) => (on ? setChip(i, g, chip) : { ...i, chips: i.chips.filter((c) => c !== chip) })).filter((n, k) => n.chips.join() !== selShown[k].chips.join());
+    const put = selShown.map((i) => pruneHidden(on ? setChip(i, g, chip) : { ...i, chips: i.chips.filter((c) => c !== chip) }, model.tags)).filter((n, k) => n.chips.join() !== selShown[k].chips.join());
     if (!put.length) return;
     study.commit(put.map((p) => ({ coll: 'items' as const, id: p.id, data: p })));
     logChange(study, `Tag „${model.chipLabel.get(chip) ?? chip}“ ${on ? 'gesetzt' : 'entfernt'}: ${put.length} ausgewählte Aussagen`);
@@ -1425,6 +1437,7 @@ export function Tags() {
                 <span className="st-cell-label">Erklärung (beim Taggen sichtbar)</span>
                 <input defaultValue={hintOf(g)} placeholder="Wofür steht diese Kategorie?" onBlur={(e) => e.target.value.trim() !== hintOf(g) && saveGroup({ ...g, hint: e.target.value.trim() || undefined })} />
               </label>
+              <ShowIf g={g} save={saveGroup} />
               <div className="st-chipedit" data-chips-of={g.id}>
                 {g.chips.map((c: Chip) => {
                   const others = g.chips.filter((x) => !(drag?.kind === 'chip' && x.id === drag.id));
@@ -1489,6 +1502,52 @@ export function Tags() {
         + Kategorie
       </button>
     </>
+  );
+}
+
+// ---- when a category applies: only for statements with one of the chosen tags ----
+// (a condition can also name a meaning, e.g. "problem": then every tag with it counts)
+function ShowIf({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
+  const { model, study } = useCtx();
+  const cond = g.showIf ?? [];
+  const on = (c: Chip) => cond.includes(c.id) || (!!c.role && cond.includes(c.role));
+  const others = model.tags.filter((x) => x.id !== g.id && x.chips.length);
+  const chosen = others.flatMap((x) => x.chips.filter(on));
+  const toggle = (c: Chip) => {
+    let next: string[];
+    if (on(c)) {
+      // (on through its meaning: the meaning's other tags stay chosen one by one)
+      const viaRole = c.role && cond.includes(c.role) ? c.role : null;
+      next = cond.filter((x) => x !== c.id && x !== viaRole);
+      if (viaRole) next.push(...others.flatMap((x) => x.chips.filter((y) => y.role === viaRole && y.id !== c.id).map((y) => y.id)));
+    } else next = [...cond, c.id];
+    save({ ...g, showIf: next.length ? next : undefined });
+    logChange(study, `Kategorie „${g.name}“: anzeigen ${next.length ? `nur bei ${others.flatMap((x) => x.chips.filter((y) => next.includes(y.id) || (!!y.role && next.includes(y.role)))).map((y) => y.label).join(', ')}` : 'immer'}`);
+  };
+  return (
+    <details className="st-showif">
+      <summary>
+        <span className="st-cell-label">Anzeigen</span> <span data-notr>{chosen.length ? `nur bei: ${chosen.map((c) => c.label).join(', ')}` : 'immer'}</span>
+      </summary>
+      <p className="st-muted">Die Kategorie erscheint nur bei Aussagen mit einem der gewählten Tags und zählt nur dort. Wechselt die Aussage z. B. von „Problem“ zu „Anmerkung“, wird ihr Tag aus dieser Kategorie entfernt. Nichts gewählt = immer.</p>
+      {others.map((x) => (
+        <div key={x.id} className="st-showif-row">
+          <span className="st-cell-label">{x.name}</span>
+          <span className="st-showif-chips">
+            {x.chips.map((c) => (
+              <button key={c.id} type="button" className={`st-chip is-small${on(c) ? ' is-on' : ''}`} aria-pressed={on(c)} onClick={() => toggle(c)}>
+                {c.label}
+              </button>
+            ))}
+          </span>
+        </div>
+      ))}
+      {cond.length > 0 && (
+        <button type="button" className="st-linkbtn" onClick={() => (save({ ...g, showIf: undefined }), logChange(study, `Kategorie „${g.name}“: anzeigen immer`))}>
+          immer anzeigen
+        </button>
+      )}
+    </details>
   );
 }
 

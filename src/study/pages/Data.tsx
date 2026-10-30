@@ -1,7 +1,7 @@
 // Daten & Validierung: the imports, the data sources, the checks (missing
 // values, conflicts, open work), the matching rules, and the change log.
 import type { ColumnRole, StudyDocs } from '../types';
-import { GAP_MIN, MATCH_ORDER_LABEL, matchOptions, personIdOf, type MatchOrder } from '../model';
+import { effectiveChips, GAP_MIN, MATCH_ORDER_LABEL, matchOptions, personIdOf, type MatchOrder } from '../model';
 import { fmtBerlin, MATCH_STEPS, STEP_LABEL, ZONE_LABEL, type MatchStep, type TallyZone } from '../match';
 import { planAssign, planFreeText, planPairing, planRematch } from '../tallyPlan';
 
@@ -149,6 +149,9 @@ export function useChecks(): Check[] {
   add('Notizen', 'Geprüfte Aussagen mit „Art“', !noKind.length, noKind.length ? `${noKind.length} ohne Art` : '');
   const problemsNoPrio = live.filter((i) => i.chips.some((c) => model.chipRole.get(c) === 'problem') && !i.chips.some((c) => ['essential', 'tbd', 'nice'].includes(model.chipRole.get(c) ?? '')));
   add('Notizen', 'Probleme mit Priorität', !problemsNoPrio.length, problemsNoPrio.length ? `${problemsNoPrio.length} ohne Priorität` : '');
+  // tags of a category that does not apply (e.g. a priority left from an earlier "Problem"): not counted
+  const hidden = live.filter((i) => effectiveChips(i.chips, model.tags, model.chipRole).length < i.chips.length);
+  add('Notizen', 'Keine Tags in nicht zutreffenden Kategorien', !hidden.length, hidden.length ? `${hidden.map((i) => i.link ?? i.person).join(', ')}: zählen dort nicht mit – unter Qualitatives Feedback öffnen und neu taggen` : '');
   return out;
 }
 

@@ -11,7 +11,7 @@ import type { Put } from './store';
 import { diffWords } from './changes';
 import { Words } from './ChangeModal';
 import { logChange } from './ui';
-import { findingsOf, setFindings } from './model';
+import { effectiveChips, findingsOf, setFindings } from './model';
 
 type Pick = 'alt' | 'neu';
 interface Row {
@@ -339,7 +339,9 @@ export function TagReview({ study, tags, items, proposals, onClose }: { study: S
       .map((p) => {
         const i = study.latest().items[p.id] ?? items.get(p.id)!;
         const s = sets[p.id];
-        return { coll: 'items' as const, id: p.id, data: { ...setFindings(i, s.findings), chips: s.chips, suggested: i.suggested.filter((c) => !s.chips.includes(c)), suggestedFinding: null, suggestedNewFinding: p.newFinding ?? i.suggestedNewFinding ?? null } };
+        // (tags of categories that do not apply are not stored)
+        const chips = effectiveChips(s.chips, tags, new Map(tags.flatMap((g) => g.chips.map((c) => [c.id, c.role] as const))));
+        return { coll: 'items' as const, id: p.id, data: { ...setFindings(i, s.findings), chips, suggested: i.suggested.filter((c) => !chips.includes(c)), suggestedFinding: null, suggestedNewFinding: p.newFinding ?? i.suggestedNewFinding ?? null } };
       });
     void store(study, put, 'KI-Tags', `KI-Tags: ${put.length} Aussagen übernommen`)
       .then(() => onClose(`Tags für ${put.length} Aussagen übernommen.`))

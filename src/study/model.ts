@@ -390,7 +390,13 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
       chipLabel.set(c.id, c.label);
     }
   const allItems = Object.values(docs.items).sort((a, b) => a.person.localeCompare(b.person) || a.order - b.order);
-  const items = allItems.filter((i) => incIds.has(i.person) && i.status !== 'removed' && !i.chips.some((c) => chipRole.get(c) === 'rejected'));
+  // (for the analysis: the tags of categories that do not apply are left out, e.g. a priority left from an earlier "Problem")
+  const items = allItems
+    .filter((i) => incIds.has(i.person) && i.status !== 'removed' && !i.chips.some((c) => chipRole.get(c) === 'rejected'))
+    .map((i) => {
+      const chips = effectiveChips(i.chips, tags, chipRole);
+      return chips.length === i.chips.length ? i : { ...i, chips };
+    });
 
   return {
     persons,
@@ -538,6 +544,23 @@ export function craftStats(events: RunEvent[], feedback: FeedbackRecord[]) {
 }
 
 // statements by the role of their confirmed chips
+// ---- categories that apply only sometimes (TagGroup.showIf) ----
+// a condition matches a tag by its id or by its meaning
+export function groupActive(g: TagGroup, chips: string[], chipRole: Map<string, ChipRole | undefined>): boolean {
+  if (!g.showIf?.length) return true;
+  return chips.some((c) => g.showIf!.includes(c) || g.showIf!.includes(chipRole.get(c) ?? ''));
+}
+// the tags that count: without those of categories whose condition is not met
+// (conditions read the other categories' tags only, never their own)
+export function effectiveChips(chips: string[], tags: TagGroup[], chipRole: Map<string, ChipRole | undefined>): string[] {
+  const groupOf = (c: string) => tags.find((g) => g.chips.some((x) => x.id === c));
+  return chips.filter((c) => {
+    const g = groupOf(c);
+    if (!g) return true;
+    return groupActive(g, chips.filter((x) => groupOf(x) !== g), chipRole);
+  });
+}
+
 // ---- tag meanings ----
 // the built-in ones (named as the user named them) and the user's own; a meaning
 // with a category is counted as one (Übersicht Abb. 6 and its lists)

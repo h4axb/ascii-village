@@ -117,6 +117,7 @@ export function useStudy() {
       const later: Record<string, (t: TagGroup[]) => boolean> = {
         moderation: (t) => t.some((g) => g.chips.some((c) => c.role === 'intervention')),
         code: (t) => t.some((g) => g.id === 'code'),
+        urheber: (t) => t.some((g) => g.id === 'urheber'),
       };
       const missing = DEFAULT_TAGS.filter((g) => later[g.id] && !added.includes(g.id) && !later[g.id](Object.values(d.tags)));
       if (missing.length) {
@@ -127,6 +128,18 @@ export function useStudy() {
           headers: { 'Content-Type': 'application/json', ...auth(p) },
           body: JSON.stringify({ put: [...missing.map((g) => ({ coll: 'tags', id: g.id, data: d.tags[g.id] })), { coll: 'settings', id: 'tagsAdded', data: d.settings.tagsAdded }] }),
         });
+      }
+      // categories shown only when they apply, once (a later "immer" stays): Priorität only for a problem
+      if (!(d.settings.conditionsAdded as { done?: boolean } | undefined)?.done) {
+        const prio = Object.values(d.tags).find((g) => g.id === 'prioritaet' || g.chips.some((c) => c.role === 'essential'));
+        const put: { coll: string; id: string; data: unknown }[] = [];
+        if (prio && !prio.showIf?.length) {
+          d.tags = { ...d.tags, [prio.id]: { ...prio, showIf: ['problem'] } };
+          put.push({ coll: 'tags', id: prio.id, data: d.tags[prio.id] });
+        }
+        d.settings = { ...d.settings, conditionsAdded: { done: true } };
+        put.push({ coll: 'settings', id: 'conditionsAdded', data: d.settings.conditionsAdded });
+        void fetch('/api/study/batch', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(p) }, body: JSON.stringify({ put }) });
       }
       // (once: choice questions in Teil 2/3 were counted as A/B comparisons; now single choice)
       const t = d.tally.main;

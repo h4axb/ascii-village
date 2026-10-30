@@ -170,6 +170,9 @@ export interface TagGroup {
   multi: boolean;
   order: number;
   chips: Chip[];
+  // shown and counted only for statements with one of these: a tag id, or a
+  // meaning (any tag with that meaning); unset or empty = always
+  showIf?: string[];
 }
 
 export interface FindingDoc {
@@ -249,6 +252,7 @@ export const DEFAULT_TAGS: TagGroup[] = [
     name: 'Priorität',
     multi: false,
     order: 2,
+    showIf: ['problem'],
     chips: [
       { id: 'essenziell', label: 'Essenziell', role: 'essential' },
       { id: 'offen', label: 'Offen (t.b.d.)', role: 'tbd' },
@@ -288,19 +292,32 @@ export const DEFAULT_TAGS: TagGroup[] = [
       { id: 'c-positiv', label: 'Positives Erlebnis' },
     ],
   },
+  // who made a remark (only for an "Anmerkung")
+  {
+    id: 'urheber',
+    name: 'Urheber',
+    hint: 'Wer die Anmerkung gemacht hat.',
+    multi: false,
+    order: 5,
+    showIf: ['remark'],
+    chips: [
+      { id: 'testperson', label: 'Testperson' },
+      { id: 'testleitung', label: 'Testleitung' },
+    ],
+  },
   // the moderator had to step in (combinable with any "Art")
   {
     id: 'moderation',
     name: 'Moderation',
     multi: false,
-    order: 5,
+    order: 6,
     chips: [{ id: 'eingriff', label: 'Eingriff', role: 'intervention' }],
   },
   {
     id: 'gueltigkeit',
     name: 'Gültigkeit',
     multi: false,
-    order: 6,
+    order: 7,
     chips: [{ id: 'verworfen', label: 'Verworfen', role: 'rejected' }],
   },
 ];
@@ -308,7 +325,7 @@ export const DEFAULT_TAGS: TagGroup[] = [
 // what each default group means, when the group has no own hint
 export const DEFAULT_HINTS: Record<string, string> = {
   bereich: 'Worauf sich die Aussage bezieht: das Spiel, die Umfrage oder den Testablauf.',
-  art: 'Was für eine Rückmeldung es ist: ein Problem, etwas Positives, eine Überraschung oder eine Anmerkung.',
+  art: 'Was für eine Rückmeldung es ist: ein Problem, etwas Positives, eine Überraschung oder eine Anmerkung. Anmerkung: ergänzende Information oder Vorschlag; eine konkrete Schwierigkeit ist ein Problem, auch wenn die Testleitung sie notiert.',
   prioritaet: 'Wie dringend ein Problem ist (fließt in „Nach Priorität“).',
   thema: 'Welcher Teil des Spiels betroffen ist (mehrere möglich).',
   code: 'Qualitative Codes für die Auswertung (mehrere möglich; Seite „Codes“).',

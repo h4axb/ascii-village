@@ -1649,32 +1649,22 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
     logChange(study, `Kategorie „${g.name}“: ${log}`);
   };
   const more = others.flatMap((x) => x.chips.filter(matches)).length;
-  const [open, setOpen] = useState(false);
   const always = !cond.length;
   const onlyWhen = () => {
     const x = groupNow ?? others[0];
     if (x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
   };
   return (
-    // (folded: what applies; unfolded: the two choices as chips on a darker ground)
-    <div className={`st-tgsection st-vis${open ? ' is-open' : ''}`}>
-      <button type="button" className="st-vis-head" aria-expanded={open} onClick={() => setOpen((x) => !x)}>
+    // (one checkbox: unticked = always shown; ticking it unfolds the condition)
+    <div className={`st-tgsection st-vis${always ? '' : ' is-open'}`}>
+      <div className="st-vis-head">
         <span className="st-tglabel">Sichtbarkeit</span>
         <span className="st-vis-sum" data-notr>{!always && first ? `Nur anzeigen, wenn ${first.g.name} = ${first.c.label}${more > 1 ? ` (+ ${more - 1})` : ''}` : 'Immer anzeigen'}</span>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-      {open && (
-        <>
-      <div className="st-vis-choice" role="group" aria-label="Sichtbarkeit">
-        <button type="button" className={`st-chip${always ? ' is-on' : ''}`} aria-pressed={always} onClick={() => !always && set(undefined, 'immer anzeigen')}>
-          Immer anzeigen
-        </button>
-        <button type="button" className={`st-chip${!always ? ' is-on' : ''}`} aria-pressed={!always} onClick={() => always && onlyWhen()}>
-          Nur anzeigen, wenn …
-        </button>
       </div>
+      <label className="st-check st-vis-when">
+        <input type="checkbox" checked={!always} onChange={(e) => (e.target.checked ? onlyWhen() : set(undefined, 'immer anzeigen'))} />
+        Nur anzeigen, wenn …
+      </label>
       {cond.length > 0 && (
         <div className="st-vis-cond">
           <select
@@ -1712,8 +1702,6 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
           {more > 1 && <span className="st-muted">{`(+ ${more - 1} weitere)`}</span>}
           <p className="st-muted">Beim Wechsel werden nicht mehr zutreffende Tags dieser Kategorie entfernt; bis dahin zählen sie nicht.</p>
         </div>
-      )}
-        </>
       )}
     </div>
   );

@@ -3423,34 +3423,7 @@ body:has(.st-root) {
   font-size: 13px;
   color: var(--st-muted);
 }
-.st-root button.st-vis-head {
-  all: unset;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  box-sizing: border-box;
-  width: 100%;
-}
-.st-root button.st-vis-head:focus-visible {
-  outline: 2px solid var(--st-accent);
-  outline-offset: 3px;
-  border-radius: 6px;
-}
-.st-vis-head svg {
-  flex: none;
-  color: var(--st-muted);
-  transform: rotate(-90deg);
-  transition: transform 0.15s;
-}
-.st-vis-head[aria-expanded='true'] svg {
-  transform: none;
-}
-.st-vis-choice {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.st-vis-choice .st-chip:not(.is-on) {
-  background: #fff;
+
+.st-vis-when {
+  align-self: flex-start;
 }

@@ -3394,3 +3394,13 @@ body:has(.st-root) {
     grid-column: 1 / -1;
   }
 }
+/* the visibility choice: a dropdown on a slightly darker ground */
+.st-root select.st-vis-mode {
+  align-self: flex-start;
+  width: min(320px, 100%);
+  background-color: #ececef;
+  border-color: #e0e0e4;
+}
+.st-root .st-vis-cond {
+  margin-left: 0;
+}

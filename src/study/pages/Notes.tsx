@@ -1652,22 +1652,19 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
   return (
     <div className="st-tgsection">
       <span className="st-tglabel">Sichtbarkeit</span>
-      <label className="st-radio">
-        <input type="radio" name={`vis-${g.id}`} checked={!cond.length} onChange={() => set(undefined, 'immer anzeigen')} />
-        Immer anzeigen
-      </label>
-      <label className="st-radio">
-        <input
-          type="radio"
-          name={`vis-${g.id}`}
-          checked={!!cond.length}
-          onChange={() => {
-            const x = groupNow ?? others[0];
-            if (x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
-          }}
-        />
-        Nur anzeigen, wenn …
-      </label>
+      <select
+        className="st-vis-mode"
+        value={cond.length ? 'wenn' : 'immer'}
+        aria-label="Sichtbarkeit"
+        onChange={(e) => {
+          if (e.target.value === 'immer') return set(undefined, 'immer anzeigen');
+          const x = groupNow ?? others[0];
+          if (x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
+        }}
+      >
+        <option value="immer">Immer anzeigen</option>
+        <option value="wenn">Nur anzeigen, wenn …</option>
+      </select>
       {cond.length > 0 && (
         <div className="st-vis-cond">
           <select

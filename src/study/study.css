@@ -3395,16 +3395,7 @@ body:has(.st-root) {
   }
 }
 /* the visibility block: a box on a slightly darker ground, its dropdowns white */
-.st-root .st-tgsection.st-vis.is-open {
-  background: #f0f0f2;
-  border-top: 0;
-  border-radius: 12px;
-  padding: 12px 14px 14px;
-}
-.st-root .st-tgsection.st-vis.is-open + .st-tgsection {
-  border-top: 0;
-  padding-top: 0;
-}
+
 .st-root .st-vis select {
   background-color: #fff;
 }
@@ -3429,5 +3420,12 @@ body:has(.st-root) {
 }
 .st-vis-label {
   font-size: 13px;
+  margin-top: 2px;
+}
+/* only the options that open (the condition) sit on the darker ground */
+.st-root .st-vis .st-vis-cond {
+  background: #f0f0f2;
+  border-radius: 12px;
+  padding: 12px 14px;
   margin-top: 2px;
 }

@@ -1650,7 +1650,7 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
   };
   const more = others.flatMap((x) => x.chips.filter(matches)).length;
   return (
-    <div className="st-tgsection">
+    <div className="st-tgsection st-vis">
       <span className="st-tglabel">Sichtbarkeit</span>
       <select
         className="st-vis-mode"

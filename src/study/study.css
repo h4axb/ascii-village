@@ -3394,12 +3394,23 @@ body:has(.st-root) {
     grid-column: 1 / -1;
   }
 }
-/* the visibility choice: a dropdown on a slightly darker ground */
+/* the visibility block: a box on a slightly darker ground, its dropdowns white */
+.st-root .st-tgsection.st-vis {
+  background: #f0f0f2;
+  border-top: 0;
+  border-radius: 12px;
+  padding: 12px 14px 14px;
+}
+.st-root .st-tgsection.st-vis + .st-tgsection {
+  border-top: 0;
+  padding-top: 0;
+}
+.st-root .st-vis select {
+  background-color: #fff;
+}
 .st-root select.st-vis-mode {
   align-self: flex-start;
   width: min(320px, 100%);
-  background-color: #ececef;
-  border-color: #e0e0e4;
 }
 .st-root .st-vis-cond {
   margin-left: 0;

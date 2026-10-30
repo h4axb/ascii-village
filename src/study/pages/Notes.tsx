@@ -1650,6 +1650,8 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
   };
   const more = others.flatMap((x) => x.chips.filter(matches)).length;
   const always = !cond.length;
+  // (the condition folds open with the arrow; ticking "Nur anzeigen, wenn …" opens it too)
+  const [open, setOpen] = useState(!always);
   const onlyWhen = () => {
     const x = groupNow ?? others[0];
     if (x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
@@ -1660,14 +1662,21 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
     <div className={`st-tgsection st-vis${always ? '' : ' is-open'}`}>
       <span className="st-tglabel">Sichtbarkeit</span>
       <label className="st-check st-vis-when">
-        <input type="checkbox" checked={always} onChange={(e) => (e.target.checked ? set(undefined, 'immer anzeigen') : onlyWhen())} />
+        <input type="checkbox" checked={always} onChange={(e) => (e.target.checked ? (set(undefined, 'immer anzeigen'), setOpen(false)) : (onlyWhen(), setOpen(true)))} />
         Immer anzeigen
       </label>
-      <label className="st-check st-vis-when">
-        <input type="checkbox" checked={!always} onChange={(e) => (e.target.checked ? onlyWhen() : set(undefined, 'immer anzeigen'))} />
-        Nur anzeigen, wenn …
-      </label>
-      {cond.length > 0 && (
+      <div className="st-vis-whenrow">
+        <label className="st-check st-vis-when">
+          <input type="checkbox" checked={!always} onChange={(e) => (e.target.checked ? (onlyWhen(), setOpen(true)) : (set(undefined, 'immer anzeigen'), setOpen(false)))} />
+          Nur anzeigen, wenn …
+        </label>
+        <button type="button" className="st-iconbtn st-vis-arrow" aria-expanded={open} onClick={() => setOpen((x) => !x)} aria-label={open ? 'Bedingung zuklappen' : 'Bedingung aufklappen'} title={open ? 'Zuklappen' : 'Aufklappen'}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+      </div>
+      {open && (
         <div className="st-vis-cond">
           <select
             value={groupNow?.id ?? ''}
@@ -1675,7 +1684,8 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
             onChange={(e) => {
               const x = others.find((y) => y.id === e.target.value);
               setPickG(e.target.value);
-              if (x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
+              // (while "Immer anzeigen" holds, choosing the category alone changes nothing yet)
+              if (!always && x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
             }}
           >
             {others.map((x) => (
@@ -1688,13 +1698,14 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
             =
           </span>
           <select
-            value={groupNow?.chips.find(matches)?.id ?? ''}
+            value={always ? '' : (groupNow?.chips.find(matches)?.id ?? '')}
             aria-label="Tag der Bedingung"
             onChange={(e) => {
               const c = groupNow?.chips.find((y) => y.id === e.target.value);
               if (c) set([c.id], `nur bei „${c.label}“`);
             }}
           >
+            {always && <option value="">Tag wählen …</option>}
             {groupNow?.chips.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.label}

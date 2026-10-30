@@ -367,6 +367,10 @@ const EN: Record<string, string> = {
   'Klicken: bearbeiten': 'Click: edit',
   '+ Deutsche Fassung': '+ German version',
   // design rollout: figures, tiles, empty states, timing
+  'Bedingung aufklappen': 'Unfold the condition',
+  'Bedingung zuklappen': 'Fold the condition',
+  Aufklappen: 'Unfold',
+  Zuklappen: 'Fold',
   'Sichtbarkeit bearbeiten': 'Edit visibility',
   'Sichtbarkeit fertig': 'Visibility done',
   Bearbeiten: 'Edit',

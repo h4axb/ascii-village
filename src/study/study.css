@@ -3429,3 +3429,19 @@ body:has(.st-root) {
   padding: 12px 14px;
   margin-top: 2px;
 }
+.st-vis-whenrow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.st-root .st-vis-arrow {
+  width: 28px;
+  height: 28px;
+}
+.st-vis-arrow svg {
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+.st-vis-arrow[aria-expanded='true'] svg {
+  transform: none;
+}

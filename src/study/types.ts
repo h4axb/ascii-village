@@ -134,7 +134,30 @@ export interface ItemDoc {
   manual?: boolean; // added by hand (kept on re-import)
 }
 
-export type ChipRole = 'game' | 'survey' | 'process' | 'problem' | 'positive' | 'surprise' | 'remark' | 'intervention' | 'essential' | 'tbd' | 'nice' | 'rejected';
+export type BuiltinRole = 'game' | 'survey' | 'process' | 'problem' | 'positive' | 'surprise' | 'remark' | 'intervention' | 'essential' | 'tbd' | 'nice' | 'rejected';
+// a tag's meaning: one the analysis knows, or one of the user's own (m-…)
+export type ChipRole = BuiltinRole | `m-${string}`;
+// the meanings, as the user named them (settings/meanings); unset = the defaults below
+export interface MeaningsSetting {
+  names?: Partial<Record<BuiltinRole, string>>; // a built-in meaning renamed
+  categories?: Partial<Record<CategoryRole, string>>; // the title in figures and lists
+  custom?: { id: `m-${string}`; label: string; category?: string }[]; // with category: counted as a category of its own
+}
+export type CategoryRole = 'essential' | 'positive' | 'surprise' | 'intervention';
+export const ROLE_NAME: Record<BuiltinRole, string> = {
+  game: 'Bereich: Spiel',
+  survey: 'Bereich: Umfrage',
+  process: 'Bereich: Ablauf',
+  problem: 'Art: Problem',
+  positive: 'Art: Positiv',
+  surprise: 'Art: Überraschung',
+  remark: 'Art: Anmerkung',
+  intervention: 'Moderation: Eingriff',
+  essential: 'Priorität: essenziell',
+  tbd: 'Priorität: offen',
+  nice: 'Priorität: nice-to-have',
+  rejected: 'verworfen (zählt nicht)',
+};
 export interface Chip {
   id: string;
   label: string;

@@ -4,7 +4,7 @@
 import { Bars, SERIES, INK, Segments } from '../charts';
 import { PRECISION_LABEL, SOURCE_LABEL, timingSummary, type TimingStat } from '../timing';
 import { fmtBerlin } from '../match';
-import { distinctPersons, findingsOf, itemsWithRole, type Model, type Slice } from '../model';
+import { categoryMeanings, distinctPersons, findingsOf, itemsWithRole, type Model, type Slice } from '../model';
 import { part4, type P4Field } from '../analysis';
 import { useState } from 'react';
 import { describe, fmt } from '../stats';
@@ -36,10 +36,8 @@ function agesOf(s: Slice) {
 }
 const groupsOf = (s: Slice) => ({ AB: s.persons.filter((p) => p.group === 'AB').length, BA: s.persons.filter((p) => p.group === 'BA').length });
 const catsOf = (s: Slice, model: Model) => [
-  { label: CATEGORY.essential, items: itemsWithRole(s.items, model, 'essential') },
-  { label: CATEGORY.positive, items: itemsWithRole(s.items, model, 'positive') },
-  { label: CATEGORY.surprise, items: itemsWithRole(s.items, model, 'surprise') },
-  { label: CATEGORY.intervention, items: itemsWithRole(s.items, model, 'intervention') },
+  // (the counted meanings, as the user named them; their own ones too)
+  ...categoryMeanings(model).map((m) => ({ label: m.category!, items: itemsWithRole(s.items, model, m.id) })),
   { label: CATEGORY.recurring, items: s.items.filter((i) => findingsOf(i).length > 0) },
 ];
 

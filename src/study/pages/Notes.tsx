@@ -4,8 +4,8 @@
 // of the Übersicht.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } from '../types';
-import { CATEGORY, hintOf, SECTION_LABEL } from '../types';
-import { distinctPersons, findingsOf, itemsWithRole, linkKeyOf, setFindings, withFinding, withoutFinding, type Model, type Person } from '../model';
+import { CATEGORY, hintOf, ROLE_NAME, SECTION_LABEL, type BuiltinRole, type CategoryRole, type MeaningsSetting } from '../types';
+import { categoryMeanings, distinctPersons, findingsOf, itemsWithRole, linkKeyOf, meaningsSetting, setFindings, shortName, withFinding, withoutFinding, type Model, type Person } from '../model';
 import { linkLabelOf, parseNotes, planNotes } from '../notes';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
@@ -1184,9 +1184,9 @@ const sectionRank = (s: Sec) => ({ during: 0, followup: 1, survey: 2 })[s];
 export function Priority() {
   const { model, slice } = useCtx();
   const roles: [ChipRole, string][] = [
-    ['essential', 'Essenziell'],
-    ['tbd', 'Offen (t.b.d.)'],
-    ['nice', 'Nice-to-have'],
+    ['essential', shortName(model, 'essential', 'Essenziell')],
+    ['tbd', shortName(model, 'tbd', 'Offen (t.b.d.)')],
+    ['nice', shortName(model, 'nice', 'Nice-to-have')],
   ];
   const none = slice.items.filter((i) => !i.chips.some((c) => ['essential', 'tbd', 'nice'].includes(model.chipRole.get(c) ?? '')));
   return (
@@ -1240,7 +1240,19 @@ function ItemList({ items, model }: { items: ItemDoc[]; model: Model }) {
   );
 }
 
-// ---- Tags: groups and chips, editable ----
+// ---- Tags: groups and chips, editable; both in an order set by drag and drop ----
+// (a drag runs on pointer events, so it works with a mouse and on touch screens)
+type Drag = { kind: 'group'; id: string } | { kind: 'chip'; id: string; from: string };
+type Drop = { kind: 'group'; index: number } | { kind: 'chip'; group: string; index: number };
+// where a drag at height y lands among the elements (their middles decide)
+const indexAt = (els: Element[], y: number) => {
+  let k = 0;
+  for (const el of els) {
+    const r = el.getBoundingClientRect();
+    if (y > r.top + r.height / 2) k++;
+  }
+  return k;
+};
 export function Tags() {
   const { study, model } = useCtx();
   const saveGroup = (g: TagGroup) => study.commit([{ coll: 'tags', id: g.id, data: g }]);
@@ -1250,21 +1262,6 @@ export function Tags() {
       .filter((i) => i.chips.some((c) => ids.includes(c)) || i.suggested.some((c) => ids.includes(c)))
       .map((i) => ({ coll: 'items' as const, id: i.id, data: { ...i, chips: i.chips.filter((c) => !ids.includes(c)), suggested: i.suggested.filter((c) => !ids.includes(c)) } }));
   const uses = (id: string) => model.allItems.filter((i) => i.chips.includes(id)).length;
-  const ROLES: [ChipRole | '', string][] = [
-    ['', '–'],
-    ['game', 'Bereich: Spiel'],
-    ['survey', 'Bereich: Umfrage'],
-    ['process', 'Bereich: Ablauf'],
-    ['problem', 'Art: Problem'],
-    ['positive', 'Art: Positiv'],
-    ['surprise', 'Art: Überraschung'],
-    ['remark', 'Art: Anmerkung'],
-    ['intervention', 'Moderation: Eingriff'],
-    ['essential', 'Priorität: essenziell'],
-    ['tbd', 'Priorität: offen'],
-    ['nice', 'Priorität: nice-to-have'],
-    ['rejected', 'verworfen (zählt nicht)'],
-  ];
   const slug = (s: string) =>
     s
       .toLowerCase()
@@ -1272,68 +1269,213 @@ export function Tags() {
       .replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'tag';
+
+  // ---- the order: categories and tags ----
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const [drop, setDrop] = useState<Drop | null>(null);
+  const dropRef = useRef<Drop | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const reorderGroups = (id: string, index: number) => {
+    const rest = model.tags.filter((g) => g.id !== id);
+    const moved = model.tags.find((g) => g.id === id);
+    if (!moved) return;
+    const next = [...rest.slice(0, index), moved, ...rest.slice(index)];
+    if (next.every((g, k) => g.id === model.tags[k].id)) return;
+    study.commit(next.map((g, k) => ({ coll: 'tags' as const, id: g.id, data: { ...g, order: k } })));
+    logChange(study, `Reihenfolge der Kategorien: ${next.map((g) => g.name).join(', ')}`);
+  };
+  const moveChip = (id: string, from: string, to: string, index: number) => {
+    const src = model.tags.find((g) => g.id === from);
+    const dst = model.tags.find((g) => g.id === to);
+    const chip = src?.chips.find((c) => c.id === id);
+    if (!src || !dst || !chip) return;
+    if (from === to) {
+      const rest = src.chips.filter((c) => c.id !== id);
+      const chips = [...rest.slice(0, index), chip, ...rest.slice(index)];
+      if (chips.every((c, k) => c.id === src.chips[k].id)) return;
+      saveGroup({ ...src, chips });
+      logChange(study, `Tag „${chip.label}“ in „${src.name}“ verschoben`);
+      return;
+    }
+    // (a single-choice category: statements could end up with two of its tags)
+    if (!dst.multi) {
+      const both = model.allItems.filter((i) => i.chips.includes(id) && i.chips.some((c) => dst.chips.some((x) => x.id === c))).length;
+      if (both && !confirm(`${both} Aussagen haben dann zwei Tags in „${dst.name}“ (nur einer je Aussage vorgesehen). Trotzdem verschieben?`)) return;
+    }
+    study.commit([
+      { coll: 'tags', id: src.id, data: { ...src, chips: src.chips.filter((c) => c.id !== id) } },
+      { coll: 'tags', id: dst.id, data: { ...dst, chips: [...dst.chips.slice(0, index), chip, ...dst.chips.slice(index)] } },
+    ]);
+    logChange(study, `Tag „${chip.label}“ von „${src.name}“ nach „${dst.name}“ verschoben`);
+  };
+  const finish = (d: Drag, to: Drop | null) => {
+    if (!to) return;
+    if (d.kind === 'group' && to.kind === 'group') reorderGroups(d.id, to.index);
+    if (d.kind === 'chip' && to.kind === 'chip') moveChip(d.id, d.from, to.group, to.index);
+  };
+  // the place under the pointer (the dragged element itself left out)
+  const placeAt = (d: Drag, x: number, y: number): Drop | null => {
+    const root = listRef.current;
+    if (!root) return null;
+    if (d.kind === 'group') {
+      const cards = [...root.querySelectorAll('[data-gid]')].filter((el) => el.getAttribute('data-gid') !== d.id);
+      return { kind: 'group', index: indexAt(cards, y) };
+    }
+    const lists = [...root.querySelectorAll('[data-chips-of]')];
+    // the category under the pointer, else the nearest one
+    let best: Element | null = null;
+    let dist = Infinity;
+    for (const el of lists) {
+      const r = el.closest('[data-gid]')!.getBoundingClientRect();
+      const dd = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+      if (dd < dist) (dist = dd), (best = el);
+    }
+    if (!best) return null;
+    void x;
+    const rows = [...best.querySelectorAll('[data-cid]')].filter((el) => el.getAttribute('data-cid') !== d.id);
+    return { kind: 'chip', group: best.getAttribute('data-chips-of')!, index: indexAt(rows, y) };
+  };
+  const startDrag = (d: Drag) => (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    setDrag(d);
+    dropRef.current = null;
+    let lastY = e.clientY;
+    // (near the window's edge the page scrolls along)
+    const timer = window.setInterval(() => {
+      const edge = 70;
+      const v = lastY < edge ? -(edge - lastY) / 3 : lastY > window.innerHeight - edge ? (lastY - (window.innerHeight - edge)) / 3 : 0;
+      if (v) window.scrollBy(0, v);
+    }, 16);
+    const move = (ev: PointerEvent) => {
+      lastY = ev.clientY;
+      const to = placeAt(d, ev.clientX, ev.clientY);
+      dropRef.current = to;
+      setDrop(to);
+    };
+    const end = (ev: Event) => {
+      window.clearInterval(timer);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      window.removeEventListener('keydown', esc);
+      const to = ev.type === 'pointerup' ? dropRef.current : null;
+      setDrag(null);
+      setDrop(null);
+      finish(d, to);
+    };
+    const esc = (ev: KeyboardEvent) => ev.key === 'Escape' && end(ev);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    window.addEventListener('keydown', esc);
+  };
+  // the keyboard: ↑/↓ moves one place; Alt+↑/↓ moves a tag to the category before / after
+  const keyMove = (d: Drag) => (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    const up = e.key === 'ArrowUp';
+    if (d.kind === 'group') {
+      const k = model.tags.findIndex((g) => g.id === d.id);
+      const to = up ? k - 1 : k + 1;
+      if (to >= 0 && to < model.tags.length) reorderGroups(d.id, to);
+      return;
+    }
+    const gk = model.tags.findIndex((g) => g.id === d.from);
+    const g = model.tags[gk];
+    const k = g.chips.findIndex((c) => c.id === d.id);
+    if (e.altKey) {
+      const other = model.tags[up ? gk - 1 : gk + 1];
+      if (other) moveChip(d.id, d.from, other.id, up ? other.chips.length : 0);
+    } else if (up ? k > 0 : k < g.chips.length - 1) moveChip(d.id, d.from, d.from, up ? k - 1 : k + 1);
+  };
+  const handle = (d: Drag, label: string) => (
+    <button type="button" className="st-draghandle" onPointerDown={startDrag(d)} onKeyDown={keyMove(d)} aria-label={`${label} verschieben (Pfeiltasten)`} title="Ziehen zum Verschieben · Pfeiltasten ↑/↓">
+      ⠿
+    </button>
+  );
+  const line = <div className="st-dropline" aria-hidden="true" />;
+
   return (
     <>
-      {model.tags.map((g) => (
-        <section key={g.id} className="st-section st-taggroup">
-          <header className="st-notes-head">
-            <input className="st-groupname" defaultValue={g.name} onBlur={(e) => e.target.value !== g.name && saveGroup({ ...g, name: e.target.value })} aria-label="Name der Kategorie" />
-            <label className="st-check">
-              <input type="checkbox" checked={g.multi} onChange={(e) => saveGroup({ ...g, multi: e.target.checked })} />
-              mehrere je Aussage
-            </label>
-            <button
-              type="button"
-              onClick={() => {
-                if (!confirm(`Kategorie „${g.name}“ mit allen Tags löschen? Die Tags werden von allen Aussagen entfernt.`)) return;
-                study.commit(dropChips(g.chips.map((c) => c.id)), [{ coll: 'tags', id: g.id }]);
-              }}
-            >
-              Kategorie löschen
-            </button>
-          </header>
-          <label className="st-fprop-field st-taghint">
-            <span className="st-cell-label">Erklärung (beim Taggen sichtbar)</span>
-            <input defaultValue={hintOf(g)} placeholder="Wofür steht diese Kategorie?" onBlur={(e) => e.target.value.trim() !== hintOf(g) && saveGroup({ ...g, hint: e.target.value.trim() || undefined })} />
-          </label>
-          <div className="st-chipedit">
-            {g.chips.map((c: Chip) => (
-              <div key={c.id} className="st-chipedit-row">
-                <input defaultValue={c.label} onBlur={(e) => e.target.value !== c.label && saveGroup({ ...g, chips: g.chips.map((x) => (x.id === c.id ? { ...x, label: e.target.value } : x)) })} aria-label="Tag" />
-                <select value={c.role ?? ''} onChange={(e) => saveGroup({ ...g, chips: g.chips.map((x) => (x.id === c.id ? { ...x, role: (e.target.value || undefined) as ChipRole } : x)) })} aria-label="Bedeutung">
-                  {ROLES.map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-                <span className="st-muted">{uses(c.id)}×</span>
+      <Meanings />
+      <div ref={listRef} className={drag ? 'st-sorting' : undefined}>
+        {model.tags.map((g, gi) => (
+          <div key={g.id}>
+            {drag?.kind === 'group' && drop?.kind === 'group' && drop.index === model.tags.filter((x) => x.id !== drag.id).findIndex((x) => x.id === g.id) && line}
+            <section data-gid={g.id} className={`st-section st-taggroup${drag?.kind === 'group' && drag.id === g.id ? ' is-dragging' : ''}`}>
+              <header className="st-notes-head st-taggroup-head">
+                {handle({ kind: 'group', id: g.id }, `Kategorie ${g.name}`)}
+                <input className="st-groupname" defaultValue={g.name} onBlur={(e) => e.target.value !== g.name && saveGroup({ ...g, name: e.target.value })} aria-label="Name der Kategorie" />
+                <label className="st-check">
+                  <input type="checkbox" checked={g.multi} onChange={(e) => saveGroup({ ...g, multi: e.target.checked })} />
+                  mehrere je Aussage
+                </label>
                 <button
                   type="button"
                   onClick={() => {
-                    if (uses(c.id) && !confirm(`„${c.label}“ von ${uses(c.id)} Aussagen entfernen?`)) return;
-                    study.commit([{ coll: 'tags', id: g.id, data: { ...g, chips: g.chips.filter((x) => x.id !== c.id) } }, ...dropChips([c.id])]);
+                    if (!confirm(`Kategorie „${g.name}“ mit allen Tags löschen? Die Tags werden von allen Aussagen entfernt.`)) return;
+                    study.commit(dropChips(g.chips.map((c) => c.id)), [{ coll: 'tags', id: g.id }]);
                   }}
                 >
-                  Löschen
+                  Kategorie löschen
+                </button>
+              </header>
+              <label className="st-fprop-field st-taghint">
+                <span className="st-cell-label">Erklärung (beim Taggen sichtbar)</span>
+                <input defaultValue={hintOf(g)} placeholder="Wofür steht diese Kategorie?" onBlur={(e) => e.target.value.trim() !== hintOf(g) && saveGroup({ ...g, hint: e.target.value.trim() || undefined })} />
+              </label>
+              <div className="st-chipedit" data-chips-of={g.id}>
+                {g.chips.map((c: Chip) => {
+                  const others = g.chips.filter((x) => !(drag?.kind === 'chip' && x.id === drag.id));
+                  const here = drag?.kind === 'chip' && drop?.kind === 'chip' && drop.group === g.id && drop.index === others.findIndex((x) => x.id === c.id);
+                  return (
+                    <div key={c.id}>
+                      {here && line}
+                      <div data-cid={c.id} className={`st-chipedit-row${drag?.kind === 'chip' && drag.id === c.id ? ' is-dragging' : ''}`}>
+                        {handle({ kind: 'chip', id: c.id, from: g.id }, `Tag ${c.label}`)}
+                        <input defaultValue={c.label} onBlur={(e) => e.target.value !== c.label && saveGroup({ ...g, chips: g.chips.map((x) => (x.id === c.id ? { ...x, label: e.target.value } : x)) })} aria-label="Tag" />
+                        <select value={c.role ?? ''} onChange={(e) => saveGroup({ ...g, chips: g.chips.map((x) => (x.id === c.id ? { ...x, role: (e.target.value || undefined) as ChipRole } : x)) })} aria-label="Bedeutung">
+                          <option value="">–</option>
+                          {model.meanings.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.label}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="st-muted">{uses(c.id)}×</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (uses(c.id) && !confirm(`„${c.label}“ von ${uses(c.id)} Aussagen entfernen?`)) return;
+                            study.commit([{ coll: 'tags', id: g.id, data: { ...g, chips: g.chips.filter((x) => x.id !== c.id) } }, ...dropChips([c.id])]);
+                          }}
+                        >
+                          Löschen
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {drag?.kind === 'chip' && drop?.kind === 'chip' && drop.group === g.id && drop.index >= g.chips.filter((x) => x.id !== drag.id).length && line}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const label = prompt('Neuer Tag');
+                    if (!label?.trim()) return;
+                    let id = slug(label);
+                    while (model.chipLabel.has(id)) id += '-2';
+                    saveGroup({ ...g, chips: [...g.chips, { id, label: label.trim() }] });
+                  }}
+                >
+                  + Tag
                 </button>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => {
-                const label = prompt('Neuer Tag');
-                if (!label?.trim()) return;
-                let id = slug(label);
-                while (model.chipLabel.has(id)) id += '-2';
-                saveGroup({ ...g, chips: [...g.chips, { id, label: label.trim() }] });
-              }}
-            >
-              + Tag
-            </button>
+            </section>
+            {gi === model.tags.length - 1 && drag?.kind === 'group' && drop?.kind === 'group' && drop.index >= model.tags.length - 1 && line}
           </div>
-        </section>
-      ))}
+        ))}
+      </div>
       <button
         type="button"
         onClick={() => {
@@ -1347,6 +1489,121 @@ export function Tags() {
         + Kategorie
       </button>
     </>
+  );
+}
+
+// ---- the meanings a tag can have: the analysis' own (renamable) and the user's ----
+function Meanings() {
+  const { study, model } = useCtx();
+  const ms = meaningsSetting(study.docs);
+  const save = (next: MeaningsSetting, log: string) => {
+    study.commit([{ coll: 'settings', id: 'meanings', data: next as unknown as Record<string, unknown> }]);
+    logChange(study, log);
+  };
+  const chipsWith = (id: string) => model.tags.flatMap((g) => g.chips.filter((c) => c.role === id));
+  const count = (id: string) => chipsWith(id).length;
+  const setName = (id: BuiltinRole, v: string) => {
+    const names = { ...ms.names };
+    if (!v.trim() || v.trim() === ROLE_NAME[id]) delete names[id];
+    else names[id] = v.trim();
+    save({ ...ms, names }, `Bedeutung „${ROLE_NAME[id]}“ → „${v.trim() || ROLE_NAME[id]}“`);
+  };
+  const setCategory = (id: CategoryRole, v: string) => {
+    const categories = { ...ms.categories };
+    if (!v.trim() || v.trim() === CATEGORY[id]) delete categories[id];
+    else categories[id] = v.trim();
+    save({ ...ms, categories }, `Titel „${CATEGORY[id]}“ → „${v.trim() || CATEGORY[id]}“`);
+  };
+  const custom = ms.custom ?? [];
+  const setCustom = (id: string, patch: Partial<{ label: string; category?: string }>, log: string) => save({ ...ms, custom: custom.map((c) => (c.id === id ? { ...c, ...patch } : c)) }, log);
+  const isCat = (id: string): id is CategoryRole => ['essential', 'positive', 'surprise', 'intervention'].includes(id);
+  return (
+    <details className="st-section st-taggroup st-meanings">
+      <summary>
+        <strong>Bedeutungen</strong> <span className="st-muted">{`(${model.meanings.length}) – wofür ein Tag in der Auswertung zählt`}</span>
+      </summary>
+      <p className="st-note">
+        Jeder Tag kann eine Bedeutung haben. Die vorgegebenen zählen in der Auswertung (Übersicht Abb. 6 und ihre Listen, „Nach Priorität“, „verworfen“, die Prüfungen) und lassen sich umbenennen. Eigene Bedeutungen sind zunächst nur Beschriftungen; mit „als eigene Kategorie zählen“ bekommen sie eine eigene Zeile in Abb. 6 und eine eigene Liste in der Übersicht.
+      </p>
+      <div className="st-meaning-list">
+        {model.meanings.map((m) => {
+          const own = custom.find((c) => c.id === m.id);
+          return (
+            <div key={`${m.id}-${m.label}-${m.category ?? ''}`} className="st-meaning-row">
+              <input defaultValue={m.label} onBlur={(e) => e.target.value.trim() !== m.label && (own ? e.target.value.trim() && setCustom(own.id, { label: e.target.value.trim() }, `Bedeutung „${own.label}“ → „${e.target.value.trim()}“`) : setName(m.id as BuiltinRole, e.target.value))} aria-label="Name der Bedeutung" />
+              {m.builtin && isCat(m.id) && (
+                <label className="st-meaning-cat">
+                  <span className="st-cell-label">Titel in Abbildungen</span>
+                  <input defaultValue={m.category} onBlur={(e) => e.target.value.trim() !== m.category && setCategory(m.id as CategoryRole, e.target.value)} aria-label="Titel in Abbildungen" />
+                </label>
+              )}
+              {own && (
+                <label className="st-check">
+                  <input type="checkbox" checked={!!own.category} onChange={(e) => setCustom(own.id, { category: e.target.checked ? own.label : undefined }, `Bedeutung „${own.label}“: ${e.target.checked ? 'zählt als Kategorie' : 'zählt nicht mehr als Kategorie'}`)} />
+                  als eigene Kategorie zählen
+                </label>
+              )}
+              {own?.category !== undefined && own.category && (
+                <label className="st-meaning-cat">
+                  <span className="st-cell-label">Titel in Abbildungen</span>
+                  <input defaultValue={own.category} onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== own.category && setCustom(own.id, { category: e.target.value.trim() }, `Titel „${own.category}“ → „${e.target.value.trim()}“`)} aria-label="Titel in Abbildungen" />
+                </label>
+              )}
+              <span className="st-muted">{`${count(m.id)} ${count(m.id) === 1 ? 'Tag' : 'Tags'}`}</span>
+              {m.builtin && m.renamed && (
+                <button
+                  type="button"
+                  className="st-linkbtn"
+                  onClick={() => {
+                    const names = { ...ms.names };
+                    const categories = { ...ms.categories };
+                    delete names[m.id as BuiltinRole];
+                    if (isCat(m.id)) delete categories[m.id];
+                    save({ ...ms, names, categories }, `Bedeutung „${m.label}“ zurückgesetzt`);
+                  }}
+                >
+                  zurücksetzen
+                </button>
+              )}
+              {own && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const n = count(own.id);
+                    if (n && !confirm(`Bedeutung „${own.label}“ löschen? ${n} Tags verlieren sie (die Tags selbst bleiben).`)) return;
+                    study.commit([
+                      { coll: 'settings', id: 'meanings', data: { ...ms, custom: custom.filter((c) => c.id !== own.id) } as unknown as Record<string, unknown> },
+                      ...model.tags.filter((g) => g.chips.some((c) => c.role === own.id)).map((g) => ({ coll: 'tags' as const, id: g.id, data: { ...g, chips: g.chips.map((c) => (c.role === own.id ? { ...c, role: undefined } : c)) } })),
+                    ]);
+                    logChange(study, `Bedeutung „${own.label}“ gelöscht`);
+                  }}
+                >
+                  Löschen
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          const label = prompt('Neue Bedeutung (z. B. „Art: Bug“)');
+          if (!label?.trim()) return;
+          const base = `m-${label
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '') || 'eigen'}` as `m-${string}`;
+          let id = base;
+          while (model.meanings.some((m) => m.id === id)) id = `${id}-2` as `m-${string}`;
+          save({ ...ms, custom: [...custom, { id, label: label.trim() }] }, `Bedeutung „${label.trim()}“ angelegt`);
+        }}
+      >
+        + Bedeutung
+      </button>
+    </details>
   );
 }
 
@@ -1397,10 +1654,7 @@ export function FeedbackLists() {
   };
   return (
     <>
-      {block('essential', CATEGORY.essential)}
-      {block('positive', CATEGORY.positive)}
-      {block('surprise', CATEGORY.surprise)}
-      {block('intervention', CATEGORY.intervention)}
+      {categoryMeanings(model).map((m) => block(m.id, m.category!))}
     </>
   );
 }

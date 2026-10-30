@@ -2911,3 +2911,76 @@ body:has(.st-root) {
 .st-figmenu[open] .st-figmenu-caret {
   transform: rotate(180deg);
 }
+/* Tags page: drag handles, the drop line, the meanings */
+.st-root .st-draghandle {
+  touch-action: none;
+  cursor: grab;
+  background: transparent;
+  color: var(--st-muted);
+  padding: 4px 6px;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 6px;
+}
+.st-root .st-draghandle:hover,
+.st-root .st-draghandle:focus-visible {
+  background: var(--st-soft);
+  color: var(--st-ink);
+}
+.st-sorting,
+.st-sorting * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+.is-dragging {
+  opacity: 0.4;
+}
+.st-dropline {
+  height: 3px;
+  margin: 3px 0;
+  border-radius: 2px;
+  background: var(--st-accent);
+}
+.st-taggroup-head {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.st-meanings > summary {
+  cursor: pointer;
+  list-style-position: inside;
+}
+.st-meaning-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+.st-meaning-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+}
+.st-meaning-row > input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.st-meaning-cat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.st-meaning-cat input {
+  flex: 1;
+  min-width: 0;
+}
+.st-meaning-cat .st-cell-label {
+  width: auto;
+  white-space: nowrap;
+}
+.st-taghint .st-cell-label {
+  width: auto;
+}

@@ -6,7 +6,8 @@ import { designOf, type FeedbackRecord } from '../feedback/schema';
 import { attemptTiming, timingOf, type Timing } from './timing';
 import type { RunEvent } from '../quest/runlog';
 import { endOf, linkLabels } from '../feedback/studyExport';
-import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, NotesMeta, PersonDoc, StudyDocs, TagGroup, ChipRole } from './types';
+import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, NotesMeta, PersonDoc, StudyDocs, TagGroup, ChipRole, BuiltinRole, CategoryRole, MeaningsSetting } from './types';
+import { CATEGORY, ROLE_NAME } from './types';
 import { detectZone, matchRows, withHand, parseTallyTime, SUBMIT_AFTER, SUBMIT_BEFORE, type MatchOptions, type MatchStep, type MatchVia, type TallyZone, type ZoneGuess } from './match';
 import { optionChosen, partOf } from './tally';
 
@@ -96,6 +97,7 @@ export interface Model {
   allItems: ItemDoc[];
   tags: TagGroup[];
   chipRole: Map<string, ChipRole | undefined>;
+  meanings: Meaning[]; // every tag meaning, as named by the user
   chipLabel: Map<string, string>;
 }
 
@@ -411,6 +413,7 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
     tags,
     chipRole,
     chipLabel,
+    meanings: meaningsOf(docs),
   };
 }
 
@@ -535,6 +538,38 @@ export function craftStats(events: RunEvent[], feedback: FeedbackRecord[]) {
 }
 
 // statements by the role of their confirmed chips
+// ---- tag meanings ----
+// the built-in ones (named as the user named them) and the user's own; a meaning
+// with a category is counted as one (Übersicht Abb. 6 and its lists)
+export interface Meaning {
+  id: ChipRole;
+  label: string;
+  category?: string;
+  builtin: boolean;
+  renamed?: boolean;
+}
+const CATEGORY_ROLES: CategoryRole[] = ['essential', 'positive', 'surprise', 'intervention'];
+export const meaningsSetting = (docs: StudyDocs) => (docs.settings.meanings ?? {}) as MeaningsSetting;
+export function meaningsOf(docs: StudyDocs): Meaning[] {
+  const s = meaningsSetting(docs);
+  const builtin = (Object.keys(ROLE_NAME) as BuiltinRole[]).map((id) => {
+    const name = s.names?.[id]?.trim();
+    const cat = (CATEGORY_ROLES as string[]).includes(id) ? s.categories?.[id as CategoryRole]?.trim() || CATEGORY[id as CategoryRole] : undefined;
+    return { id, label: name || ROLE_NAME[id], category: cat, builtin: true, renamed: !!name || (cat !== undefined && cat !== CATEGORY[id as CategoryRole]) };
+  });
+  return [...builtin, ...(s.custom ?? []).map((c) => ({ id: c.id, label: c.label, category: c.category?.trim() || undefined, builtin: false }))];
+}
+// the counted categories, in order: the built-in four, then the user's own
+export const categoryMeanings = (m: Model) => [
+  ...CATEGORY_ROLES.map((id) => m.meanings.find((x) => x.id === id)!).filter((x) => x?.category),
+  ...m.meanings.filter((x) => !x.builtin && x.category),
+];
+// a priority's short name (the part after "Priorität: ")
+export const shortName = (m: Model, id: ChipRole, fallback: string) => {
+  const x = m.meanings.find((y) => y.id === id);
+  return x && x.label !== ROLE_NAME[id as BuiltinRole] ? x.label.replace(/^[^:]+:\s*/, '') : fallback;
+};
+
 export function itemsWithRole(items: ItemDoc[], m: Model, role: ChipRole) {
   return items.filter((i) => i.chips.some((c) => m.chipRole.get(c) === role));
 }

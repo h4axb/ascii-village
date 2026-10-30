@@ -367,6 +367,16 @@ const EN: Record<string, string> = {
   'Klicken: bearbeiten': 'Click: edit',
   '+ Deutsche Fassung': '+ German version',
   // design rollout: figures, tiles, empty states, timing
+  Bedeutungen: 'Meanings',
+  'Jeder Tag kann eine Bedeutung haben. Die vorgegebenen zählen in der Auswertung (Übersicht Abb. 6 und ihre Listen, „Nach Priorität“, „verworfen“, die Prüfungen) und lassen sich umbenennen. Eigene Bedeutungen sind zunächst nur Beschriftungen; mit „als eigene Kategorie zählen“ bekommen sie eine eigene Zeile in Abb. 6 und eine eigene Liste in der Übersicht.':
+    'Every tag can have a meaning. The given ones count in the analysis (Overview Fig. 6 and its lists, “By priority”, “rejected”, the checks) and can be renamed. Own meanings are labels at first; with “count as a category of its own” they get their own row in Fig. 6 and their own list in the Overview.',
+  'Name der Bedeutung': 'Name of the meaning',
+  'Titel in Abbildungen': 'Title in figures',
+  'als eigene Kategorie zählen': 'count as a category of its own',
+  zurücksetzen: 'reset',
+  '+ Bedeutung': '+ Meaning',
+  'Neue Bedeutung (z. B. „Art: Bug“)': 'New meaning (e.g. “Type: bug”)',
+  'Ziehen zum Verschieben · Pfeiltasten ↑/↓': 'Drag to move · arrow keys ↑/↓',
   '+ Befund': '+ Finding',
   'Befund bei allen ausgewählten entfernen': 'Remove the finding from all selected',
   'Klicken: Befund entfernen': 'Click: remove the finding',
@@ -1044,6 +1054,10 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^\((\d+)\) – wofür ein Tag in der Auswertung zählt$/, '($1) – what a tag counts for in the analysis'],
+  [/^(\d+) Tags?$/, '$1 tag(s)'],
+  [/^Kategorie (.+) verschieben \(Pfeiltasten\)$/, 'Move category $1 (arrow keys)'],
+  [/^Tag (.+) verschieben \(Pfeiltasten\)$/, 'Move tag $1 (arrow keys)'],
   [/^auch in „(.+)“$/, 'also in “$1”'],
   [/^Befund „(.+)“ entfernt$/, 'Finding “$1” removed'],
   [/^Befund (.+) entfernen$/, 'Remove finding $1'],

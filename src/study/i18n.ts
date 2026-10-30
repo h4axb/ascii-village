@@ -367,6 +367,10 @@ const EN: Record<string, string> = {
   'Klicken: bearbeiten': 'Click: edit',
   '+ Deutsche Fassung': '+ German version',
   // design rollout: figures, tiles, empty states, timing
+  'Sichtbarkeit bearbeiten': 'Edit visibility',
+  'Sichtbarkeit fertig': 'Visibility done',
+  Bearbeiten: 'Edit',
+  Fertig: 'Done',
   Beschreibung: 'Description',
   'Wofür steht diese Kategorie? (beim Taggen sichtbar)': 'What does this category stand for? (shown when tagging)',
   Sichtbarkeit: 'Visibility',
@@ -1108,6 +1112,7 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^Nur anzeigen, wenn (.+) = (.+)$/, 'Only show when $1 = $2'],
   [/^(\d+) Einträge?$/, '$1 entries'],
   [/^Kategorie (.+) löschen$/, 'Delete category $1'],
   [/^Tag (.+) löschen$/, 'Delete tag $1'],

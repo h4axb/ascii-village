@@ -3395,13 +3395,13 @@ body:has(.st-root) {
   }
 }
 /* the visibility block: a box on a slightly darker ground, its dropdowns white */
-.st-root .st-tgsection.st-vis {
+.st-root .st-tgsection.st-vis.is-editing {
   background: #f0f0f2;
   border-top: 0;
   border-radius: 12px;
   padding: 12px 14px 14px;
 }
-.st-root .st-tgsection.st-vis + .st-tgsection {
+.st-root .st-tgsection.st-vis.is-editing + .st-tgsection {
   border-top: 0;
   padding-top: 0;
 }
@@ -3414,4 +3414,19 @@ body:has(.st-root) {
 }
 .st-root .st-vis-cond {
   margin-left: 0;
+}
+/* visibility: a summary line with a pen; editing shows the options on a darker ground */
+.st-vis-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.st-vis-sum {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--st-muted);
+}
+.st-vis-head .st-iconbtn {
+  margin: -6px -6px -6px 0;
 }

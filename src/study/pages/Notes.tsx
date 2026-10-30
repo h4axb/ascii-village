@@ -1649,9 +1649,21 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
     logChange(study, `Kategorie „${g.name}“: ${log}`);
   };
   const more = others.flatMap((x) => x.chips.filter(matches)).length;
+  const [editing, setEditing] = useState(false);
   return (
-    <div className="st-tgsection st-vis">
-      <span className="st-tglabel">Sichtbarkeit</span>
+    // (a summary line; the pen opens the options on a darker ground)
+    <div className={`st-tgsection st-vis${editing ? ' is-editing' : ''}`}>
+      <div className="st-vis-head">
+        <span className="st-tglabel">Sichtbarkeit</span>
+        <span className="st-vis-sum" data-notr>{cond.length && first ? `Nur anzeigen, wenn ${first.g.name} = ${first.c.label}${more > 1 ? ` (+ ${more - 1})` : ''}` : 'Immer anzeigen'}</span>
+        <button type="button" className="st-iconbtn" aria-expanded={editing} onClick={() => setEditing((x) => !x)} aria-label={editing ? 'Sichtbarkeit fertig' : 'Sichtbarkeit bearbeiten'} title={editing ? 'Fertig' : 'Bearbeiten'}>
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4" />
+          </svg>
+        </button>
+      </div>
+      {editing && (
+        <>
       <select
         className="st-vis-mode"
         value={cond.length ? 'wenn' : 'immer'}
@@ -1702,6 +1714,8 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
           {more > 1 && <span className="st-muted">{`(+ ${more - 1} weitere)`}</span>}
           <p className="st-muted">Beim Wechsel werden nicht mehr zutreffende Tags dieser Kategorie entfernt; bis dahin zählen sie nicht.</p>
         </div>
+      )}
+        </>
       )}
     </div>
   );

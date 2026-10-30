@@ -91,12 +91,49 @@ export function Fig({ id, sub, title, children, table, tabs, valid }: { id: stri
   );
 }
 
+// sections inside this provider can be folded (the Übersicht); folded ones are remembered
+export const FoldSections = createContext(false);
+const FOLD_KEY = 'asciia-study-folded';
+const readFolded = (): string[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(FOLD_KEY) ?? '[]') as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
 // a section as one card: its title inside, at the top, above a thin line
 export function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
+  const foldable = useContext(FoldSections);
+  // (remembered by the section's id or, without one, its title without the count "(3)")
+  const key = id ?? title.replace(/\s*\(\d+\)$/, '');
+  const [folded, setFolded] = useState(() => foldable && readFolded().includes(key));
+  const toggle = () =>
+    setFolded((f) => {
+      try {
+        const rest = readFolded().filter((x) => x !== key);
+        localStorage.setItem(FOLD_KEY, JSON.stringify(f ? rest : [...rest, key]));
+      } catch {
+        // (not remembered)
+      }
+      return !f;
+    });
   return (
-    <section className="st-section st-csection" id={id} data-anchor={`s-${id ?? title}`}>
-      <h2>{title}</h2>
-      <div className="st-csection-body">{children}</div>
+    <section className={`st-section st-csection${folded ? ' is-folded' : ''}`} id={id} data-anchor={`s-${id ?? title}`}>
+      {foldable ? (
+        <h2>
+          <button type="button" className="st-foldbtn" aria-expanded={!folded} onClick={toggle}>
+            <span>{title}</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        </h2>
+      ) : (
+        <h2>{title}</h2>
+      )}
+      {!folded && <div className="st-csection-body">{children}</div>}
     </section>
   );
 }

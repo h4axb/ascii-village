@@ -129,6 +129,29 @@ export function useStudy() {
           body: JSON.stringify({ put: [...missing.map((g) => ({ coll: 'tags', id: g.id, data: d.tags[g.id] })), { coll: 'settings', id: 'tagsAdded', data: d.settings.tagsAdded }] }),
         });
       }
+      // the variant as its own category under "Crafting" (A / B / Beides), once: the
+      // tags Variante A/B move there with their statements (same ids)
+      if (!(d.settings.varianteAdded as { done?: boolean } | undefined)?.done) {
+        const put: { coll: string; id: string; data: unknown }[] = [];
+        if (!d.tags.variante) {
+          const all = Object.values(d.tags);
+          const own = all.flatMap((g) => g.chips.filter((c) => c.id === 'variante-a' || c.id === 'variante-b'));
+          const from = all.filter((g) => g.chips.some((c) => c.id === 'variante-a' || c.id === 'variante-b'));
+          for (const g of from) {
+            d.tags = { ...d.tags, [g.id]: { ...g, chips: g.chips.filter((c) => c.id !== 'variante-a' && c.id !== 'variante-b') } };
+            put.push({ coll: 'tags', id: g.id, data: d.tags[g.id] });
+          }
+          const def = DEFAULT_TAGS.find((g) => g.id === 'variante')!;
+          const thema = all.find((g) => g.chips.some((c) => c.id === 'crafting'));
+          const chips = [...def.chips.map((c) => own.find((o) => o.id === c.id) ?? c)];
+          const group: TagGroup = { ...def, chips, order: thema ? thema.order + 0.5 : all.length, showIf: thema ? ['crafting'] : undefined };
+          d.tags = { ...d.tags, variante: group };
+          put.push({ coll: 'tags', id: 'variante', data: group });
+        }
+        d.settings = { ...d.settings, varianteAdded: { done: true } };
+        put.push({ coll: 'settings', id: 'varianteAdded', data: d.settings.varianteAdded });
+        void fetch('/api/study/batch', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(p) }, body: JSON.stringify({ put }) });
+      }
       // categories shown only when they apply, once (a later "immer" stays): Priorität only for a problem
       if (!(d.settings.conditionsAdded as { done?: boolean } | undefined)?.done) {
         const prio = Object.values(d.tags).find((g) => g.id === 'prioritaet' || g.chips.some((c) => c.role === 'essential'));

@@ -142,7 +142,8 @@ export function buildClaims(m: Model, s: Slice, findings: Record<string, Finding
     const items = s.items.filter((i) => findingsOf(i).includes(f.id));
     const n = distinctPersons(items);
     if (!n) continue;
-    const designs = new Set(items.flatMap((i) => i.chips.filter((c) => c === 'variante-a' || c === 'variante-b')));
+    // ("Beides" names both variants)
+    const designs = new Set(items.flatMap((i) => i.chips.flatMap((c) => (c === 'variante-beides' ? ['variante-a', 'variante-b'] : c === 'variante-a' || c === 'variante-b' ? [c] : []))));
     out.push({
       id: `f:${f.id}`,
       method: 'Notizen',

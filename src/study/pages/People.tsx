@@ -2,6 +2,7 @@
 // answers and game events, and the corrections per participant. Each applies everywhere:
 // excluded from the analysis, Teil 1 answers swapped, the run-time rule for
 // several links, the Tally row, the test group, the age.
+import { gameStats, GameStatsView } from '../gameStats';
 import type { PersonDoc } from '../types';
 import { personIdOf, type Person } from '../model';
 import { fmtDate, fmtMin, LazyInput, logChange, Section, useCtx } from '../ui';
@@ -147,8 +148,15 @@ function PersonDetails({ p }: { p: Person }) {
   const evs = game.events.filter((e) => e.participant === p.id).sort((a, b) => a.at - b.at);
   const label = (at: number, key?: string) => p.links.find((l) => (key ? l.key === key : l.started && at >= l.started - 60000 && (l.end == null || at <= l.end + 60000)))?.label ?? '';
   const counts = Object.entries(evs.reduce<Record<string, number>>((a, e) => ((a[e.type] = (a[e.type] ?? 0) + 1), a), {}));
+  const fb = game.feedback.filter((r) => r.participant === p.id);
   return (
     <>
+      {(evs.length > 0 || fb.length > 0) && (
+        <details className="st-details">
+          <summary>Spielverhalten (Bewertungen, Hinweise, Fehler, Vorab-Klärung)</summary>
+          <GameStatsView s={gameStats(evs, fb)} />
+        </details>
+      )}
       {row && tally && (
         <details className="st-details">
           <summary>Rohantworten (Tally-Zeile {p.tallyRow! + 1})</summary>

@@ -498,6 +498,103 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
       )}
     </div>
   );
+  // ---- the tag editor: the main categories first, the rest under "Weitere Details";
+  // a category that depends on a tag (e.g. Priorität on "Problem") opens in a darker
+  // box right under that tag's row until one is chosen, then sits in the row ----
+  const isSub = (g: TagGroup) => !!g.showIf?.length;
+  const mainIds = ['bereich', 'art', 'thema'];
+  const plain = model.tags.filter((g) => !isSub(g));
+  const mainGroups = plain.some((g) => mainIds.includes(g.id)) ? plain.filter((g) => mainIds.includes(g.id)) : plain.slice(0, 3);
+  const restGroups = plain.filter((g) => !mainGroups.includes(g));
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [editingSub, setEditingSub] = useState<string | null>(null);
+  // the row a dependent category belongs under: the category of the tag that opened it
+  const parentOf = (c: TagGroup) => model.tags.find((g) => g.chips.some((x) => item.chips.includes(x.id) && (c.showIf!.includes(x.id) || c.showIf!.includes(x.role ?? ''))))?.id;
+  const subsOf = (g: TagGroup) => model.tags.filter((c) => isSub(c) && applies(c) && parentOf(c) === g.id);
+  const head = (g: TagGroup) => (
+    <div className="st-tagrow-head">
+      <strong>{g.name}</strong>
+      {hintOf(g) && <span className="st-muted">{hintOf(g)}</span>}
+    </div>
+  );
+  const plainRow = (g: TagGroup) => (
+    <div key={g.id} className="st-tagrow">
+      {head(g)}
+      <ChipCell item={item} g={g} onChange={save} onTag={onTag} many={many} />
+    </div>
+  );
+  const tagRow = (g: TagGroup) => {
+    const subs = subsOf(g);
+    return (
+      <div key={g.id} className="st-tagrow">
+        {head(g)}
+        <div className="st-tagrow-main">
+          <ChipCell item={item} g={g} onChange={save} />
+          {/* (a dependent category already chosen: part of the row, a click changes it) */}
+          {subs
+            .filter((c) => editingSub !== c.id && c.chips.some((x) => item.chips.includes(x.id)))
+            .map((c) => (
+              <button key={c.id} type="button" className="st-subchosen" title={`${c.name} ändern`} onClick={() => setEditingSub(c.id)}>
+                <span className="st-muted">{c.name}:</span> {c.chips.filter((x) => item.chips.includes(x.id)).map((x) => x.label).join(', ')}
+              </button>
+            ))}
+        </div>
+        {subs
+          .filter((c) => editingSub === c.id || !c.chips.some((x) => item.chips.includes(x.id)))
+          .map((c) => (
+            <div key={c.id} className="st-subbox" role="group" aria-label={c.name}>
+              <div className="st-subbox-head">
+                <strong>{`${c.name} wählen`}</strong>
+                {hintOf(c) && <span>{hintOf(c)}</span>}
+              </div>
+              <ChipCell
+                item={item}
+                g={c}
+                onChange={(i) => {
+                  save(i);
+                  // (chosen: the box closes and the choice joins the row)
+                  if (c.chips.some((x) => i.chips.includes(x.id))) setEditingSub(null);
+                }}
+              />
+            </div>
+          ))}
+      </div>
+    );
+  };
+  const findingRow = (
+    <div className="st-tagrow">
+      <div className="st-tagrow-head">
+        <strong>Befund</strong>
+        <span className="st-muted">Wiederkehrender Befund, zu dem die Aussage gehört (Seite „Wiederkehrende Befunde“).</span>
+      </div>
+      <div className="st-cell">
+        {/* (several possible: a click on one takes it off) */}
+        {findingsOf(item).map((f) => (
+          <button key={f} type="button" className="st-chip is-finding" title="Klicken: Befund entfernen" onClick={() => save(withoutFinding(item, f))}>
+            {study.docs.findings[f]?.name ?? '?'}
+          </button>
+        ))}
+        {sf && (
+          <button type="button" className="st-chip is-suggested" title="Befund-Vorschlag: klicken zum Übernehmen" onClick={() => save(withFinding(item, sf.id))}>
+            {sf.name}
+          </button>
+        )}
+        {!sf && item.suggestedNewFinding && <span className="st-chip is-suggested is-new" title="neuer Befund vorgeschlagen (unter „Befunde“ anlegen)">{item.suggestedNewFinding}</span>}
+        {findings.some((f) => !findingsOf(item).includes(f.id)) && (
+          <select className="st-chip-add" value="" onChange={(e) => e.target.value && save(withFinding(item, e.target.value))} aria-label="Befund hinzufügen">
+            <option value="">+</option>
+            {findings
+              .filter((f) => !findingsOf(item).includes(f.id))
+              .map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+          </select>
+        )}
+      </div>
+    </div>
+  );
   return (
     <div ref={rowRef} data-anchor={`i-${item.id}`} className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}${fresh ? ' is-fresh' : ''}${selected ? ' is-selected' : ''}`}>
       <div className="st-item-text">
@@ -631,47 +728,25 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
       {tagsOpen && (
         <div className="st-tageditor">
           {many && <p className="st-note">{`Jeder Klick gilt für alle ${many} ausgewählten Aussagen; ein schon gesetzter Tag wird bei allen entfernt.`}</p>}
-          {model.tags.filter((g) => many || applies(g)).map((g) => (
-            <div key={g.id} className="st-tagrow">
-              <div className="st-tagrow-head">
-                <strong>{g.name}</strong>
-                {hintOf(g) && <span className="st-muted">{hintOf(g)}</span>}
-              </div>
-              <ChipCell item={item} g={g} onChange={save} onTag={onTag} many={many} />
-            </div>
-          ))}
-          <div className="st-tagrow">
-            <div className="st-tagrow-head">
-              <strong>Befund</strong>
-              <span className="st-muted">Wiederkehrender Befund, zu dem die Aussage gehört (Seite „Wiederkehrende Befunde“).</span>
-            </div>
-            <div className="st-cell">
-              {/* (several possible: a click on one takes it off) */}
-              {findingsOf(item).map((f) => (
-                <button key={f} type="button" className="st-chip is-finding" title="Klicken: Befund entfernen" onClick={() => save(withoutFinding(item, f))}>
-                  {study.docs.findings[f]?.name ?? '?'}
-                </button>
-              ))}
-              {sf && (
-                <button type="button" className="st-chip is-suggested" title="Befund-Vorschlag: klicken zum Übernehmen" onClick={() => save(withFinding(item, sf.id))}>
-                  {sf.name}
-                </button>
+          {many ? (
+            <>
+              {model.tags.map((g) => plainRow(g))}
+              {findingRow}
+            </>
+          ) : (
+            <>
+              {mainGroups.map((g) => tagRow(g))}
+              <button type="button" className="st-linkbtn st-moretoggle" aria-expanded={moreOpen} onClick={() => setMoreOpen((x) => !x)}>
+                {moreOpen ? 'Weitere Details ausblenden' : `Weitere Details: ${[...restGroups.map((g) => g.name), 'Befund'].join(', ')}`}
+              </button>
+              {moreOpen && (
+                <>
+                  {restGroups.map((g) => tagRow(g))}
+                  {findingRow}
+                </>
               )}
-              {!sf && item.suggestedNewFinding && <span className="st-chip is-suggested is-new" title="neuer Befund vorgeschlagen (unter „Befunde“ anlegen)">{item.suggestedNewFinding}</span>}
-              {findings.some((f) => !findingsOf(item).includes(f.id)) && (
-                <select className="st-chip-add" value="" onChange={(e) => e.target.value && save(withFinding(item, e.target.value))} aria-label="Befund hinzufügen">
-                  <option value="">+</option>
-                  {findings
-                    .filter((f) => !findingsOf(item).includes(f.id))
-                    .map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                </select>
-              )}
-            </div>
-          </div>
+            </>
+          )}
         </div>
       )}
     </div>

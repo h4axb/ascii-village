@@ -266,13 +266,25 @@ export const DEFAULT_TAGS: TagGroup[] = [
     order: 3,
     chips: [
       { id: 'crafting', label: 'Crafting' },
-      { id: 'variante-a', label: 'Variante A' },
-      { id: 'variante-b', label: 'Variante B' },
       { id: 'steuerung', label: 'Steuerung' },
       { id: 'quests', label: 'Quests & Hinweise' },
       { id: 'dialoge', label: 'Dialoge' },
       { id: 'darstellung', label: 'Darstellung' },
       { id: 'technik', label: 'Technik' },
+    ],
+  },
+  // which crafting variant a statement is about (only with "Crafting")
+  {
+    id: 'variante',
+    name: 'Variante',
+    hint: 'Welche Crafting-Variante gemeint ist.',
+    multi: false,
+    order: 3.5,
+    showIf: ['crafting'],
+    chips: [
+      { id: 'variante-a', label: 'Variante A' },
+      { id: 'variante-b', label: 'Variante B' },
+      { id: 'variante-beides', label: 'Beides' },
     ],
   },
   // the qualitative codes: what a statement is about (several per statement)

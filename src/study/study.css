@@ -3088,3 +3088,144 @@ body:has(.st-root) {
     min-width: 0;
   }
 }
+/* game behaviour: compact blocks of key/value lists */
+.st-gamestats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 14px 22px;
+  margin-top: 8px;
+}
+.st-gs-wide {
+  grid-column: 1 / -1;
+}
+.st-gs-block h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.st-gs-block p {
+  margin: 0;
+}
+.st-gskv {
+  margin: 0;
+  display: grid;
+  gap: 3px;
+}
+.st-gskv > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  border-bottom: 1px dashed var(--st-line);
+  padding-bottom: 2px;
+}
+.st-gskv dt {
+  color: var(--st-muted);
+  min-width: 0;
+}
+.st-gskv dd {
+  margin: 0;
+  white-space: nowrap;
+}
+.st-gs-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  display: grid;
+  gap: 3px;
+}
+.st-gs-list .st-pid {
+  margin: 0 6px;
+}
+/* a foldable section title (Übersicht) */
+.st-root .st-csection > h2 .st-foldbtn {
+  all: unset;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  font: inherit;
+  box-sizing: border-box;
+}
+.st-root .st-csection > h2 .st-foldbtn:focus-visible {
+  outline: 2px solid var(--st-accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.st-foldbtn svg {
+  color: var(--st-muted);
+  transition: transform 0.15s;
+  flex: none;
+}
+.st-foldbtn[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+}
+.st-csection.is-folded > h2 {
+  border-bottom: 0;
+}
+/* tag editor: a dependent category opens in a darker box under its tag's row */
+.st-tagrow-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+}
+.st-subbox {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-top: 2px;
+  background: #e2e2e7;
+  border-radius: 10px;
+  position: relative;
+}
+/* (a small notch pointing up at the row) */
+.st-subbox::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 18px;
+  border: 6px solid transparent;
+  border-top: 0;
+  border-bottom-color: #e2e2e7;
+}
+.st-subbox-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+.st-subbox-head span {
+  color: var(--st-muted);
+  font-size: 11.5px;
+}
+.st-subbox .st-chip:not(.is-on) {
+  background: #fff;
+}
+.st-root .st-subchosen {
+  font-size: 12.5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #d4d4da;
+}
+.st-root .st-subchosen:hover {
+  background: #fff;
+  border-color: var(--st-ink);
+}
+.st-root .st-moretoggle {
+  justify-self: start;
+  font-size: 13px;
+  text-align: left;
+}
+@media (max-width: 700px) {
+  .st-subbox {
+    grid-column: 1;
+  }
+}

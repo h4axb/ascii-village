@@ -1,6 +1,7 @@
 // Übersicht: the participants' profile, the core quantitative results, and
 // the most frequent UX problems, positive and unexpected observations (from
 // the confirmed tags). Opens on the whole sample.
+import { gameStats, GameStatsView } from '../gameStats';
 import { Bars, SERIES, INK, Segments } from '../charts';
 import { PRECISION_LABEL, SOURCE_LABEL, timingSummary, type TimingStat } from '../timing';
 import { fmtBerlin } from '../match';
@@ -9,7 +10,7 @@ import { part4, type P4Field } from '../analysis';
 import { useState } from 'react';
 import { describe, fmt } from '../stats';
 import { CATEGORY } from '../types';
-import { csv, Empty, Fig, fmtDate, Section, Stat, useCtx } from '../ui';
+import { csv, Empty, Fig, FoldSections, fmtDate, Section, Stat, useCtx } from '../ui';
 import { SurveySummary, TrackingSummary } from './Survey';
 import { useSurveyText } from '../translations';
 import { CraftLog, GameFlow } from './Flow';
@@ -95,6 +96,8 @@ export default function Overview() {
         />
       </div>
 
+      {/* (from here on every section can be folded) */}
+      <FoldSections.Provider value={true}>
       <Section title="Teilnehmerprofil">
         <div className="st-grid">
           <Fig id="alter" valid={(s) => agesOf(s).ages.length} table={(s) => csv([['Alter', 'Anzahl'], ...agesOf(s).bins.map((b) => [b.label, b.values[0]])])}>
@@ -232,9 +235,13 @@ export default function Overview() {
 
       <SurveySummary />
       <TrackingSummary />
+      <Section title="Spielverhalten">
+        <GameStatsView s={gameStats(slice.events, slice.feedback)} persons />
+      </Section>
       <CraftLog />
       <GameFlow />
       <FeedbackLists />
+      </FoldSections.Provider>
     </>
   );
 }

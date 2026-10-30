@@ -1649,34 +1649,32 @@ function Visibility({ g, save }: { g: TagGroup; save: (g: TagGroup) => void }) {
     logChange(study, `Kategorie „${g.name}“: ${log}`);
   };
   const more = others.flatMap((x) => x.chips.filter(matches)).length;
-  const [editing, setEditing] = useState(false);
+  const [open, setOpen] = useState(false);
+  const always = !cond.length;
+  const onlyWhen = () => {
+    const x = groupNow ?? others[0];
+    if (x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
+  };
   return (
-    // (a summary line; the pen opens the options on a darker ground)
-    <div className={`st-tgsection st-vis${editing ? ' is-editing' : ''}`}>
-      <div className="st-vis-head">
+    // (folded: what applies; unfolded: the two choices as chips on a darker ground)
+    <div className={`st-tgsection st-vis${open ? ' is-open' : ''}`}>
+      <button type="button" className="st-vis-head" aria-expanded={open} onClick={() => setOpen((x) => !x)}>
         <span className="st-tglabel">Sichtbarkeit</span>
-        <span className="st-vis-sum" data-notr>{cond.length && first ? `Nur anzeigen, wenn ${first.g.name} = ${first.c.label}${more > 1 ? ` (+ ${more - 1})` : ''}` : 'Immer anzeigen'}</span>
-        <button type="button" className="st-iconbtn" aria-expanded={editing} onClick={() => setEditing((x) => !x)} aria-label={editing ? 'Sichtbarkeit fertig' : 'Sichtbarkeit bearbeiten'} title={editing ? 'Fertig' : 'Bearbeiten'}>
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4" />
-          </svg>
+        <span className="st-vis-sum" data-notr>{!always && first ? `Nur anzeigen, wenn ${first.g.name} = ${first.c.label}${more > 1 ? ` (+ ${more - 1})` : ''}` : 'Immer anzeigen'}</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <>
+      <div className="st-vis-choice" role="group" aria-label="Sichtbarkeit">
+        <button type="button" className={`st-chip${always ? ' is-on' : ''}`} aria-pressed={always} onClick={() => !always && set(undefined, 'immer anzeigen')}>
+          Immer anzeigen
+        </button>
+        <button type="button" className={`st-chip${!always ? ' is-on' : ''}`} aria-pressed={!always} onClick={() => always && onlyWhen()}>
+          Nur anzeigen, wenn …
         </button>
       </div>
-      {editing && (
-        <>
-      <select
-        className="st-vis-mode"
-        value={cond.length ? 'wenn' : 'immer'}
-        aria-label="Sichtbarkeit"
-        onChange={(e) => {
-          if (e.target.value === 'immer') return set(undefined, 'immer anzeigen');
-          const x = groupNow ?? others[0];
-          if (x?.chips[0]) set([x.chips[0].id], `nur bei „${x.chips[0].label}“`);
-        }}
-      >
-        <option value="immer">Immer anzeigen</option>
-        <option value="wenn">Nur anzeigen, wenn …</option>
-      </select>
       {cond.length > 0 && (
         <div className="st-vis-cond">
           <select

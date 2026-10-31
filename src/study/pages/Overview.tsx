@@ -63,7 +63,7 @@ export default function Overview() {
 
   return (
     <>
-      <div className="st-stats">
+      <div className="st-stats" data-nav="Kennzahlen">
         <Stat
           label="Teilnehmende"
           value={n}

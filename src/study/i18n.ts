@@ -44,6 +44,28 @@ export function useLang(): Lang {
 
 // ---- the English dictionary (German interface text → English) ----
 const EN: Record<string, string> = {
+  // the Qualitatives Feedback overview and the section links
+  Kennzahlen: 'Key figures',
+  Überblick: 'Overview',
+  Ungeprüft: 'Unchecked',
+  Probleme: 'Problems',
+  'Probleme nach': 'Problems by',
+  'Anklicken zum Filtern': 'Click to filter',
+  'Überblick und Filter': 'Overview and filters',
+  'Zur Aussage springen': 'Jump to the statement',
+  'Gefilterte Beobachtungen:': 'Filtered observations:',
+  'Keine Aussage passt zu den Filtern.': 'No statement matches the filters.',
+  'Probleme je Teilnehmende': 'Problems per participant',
+  Abschnitte: 'Sections',
+  'keine Daten': 'no data',
+  'Keine Kategorie': 'No category',
+  'Mehr anzeigen': 'Show more',
+  'Weniger anzeigen': 'Show less',
+  'Weitere Auswertungen': 'More analyses',
+  'Aussagen mit der Art „Problem“ – anklicken zum Filtern': 'Statements of the type “Problem” – click to filter',
+  'Probleme mit der Priorität „Essenziell“ – anklicken zum Filtern': 'Problems with the priority “Essential” – click to filter',
+  'Probleme, deren Priorität noch offen ist – anklicken zum Filtern': 'Problems whose priority is still open – click to filter',
+  'Noch nicht geprüfte Aussagen oder solche mit offenen KI-Vorschlägen – anklicken zum Filtern': 'Statements not yet checked or with open AI suggestions – click to filter',
   // navigation and frame
   Übersicht: 'Overview',
   'Quantitative Analyse': 'Quantitative analysis',
@@ -1116,6 +1138,12 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^von (\d+) Aussagen$/, 'of $1 statements'],
+  [/^(\d+) von (\d+)$/, '$1 of $2'],
+  [/^Probleme nach (.+)$/, 'Problems by $1'],
+  [/^Aussagen nach (.+)$/, 'Statements by $1'],
+  [/^Alle (\d+) unten anzeigen$/, 'Show all $1 below'],
+  [/^Filter (.+) entfernen$/, 'Remove filter $1'],
   [/^Nur anzeigen, wenn (.+) = (.+)$/, 'Only show when $1 = $2'],
   [/^(\d+) Einträge?$/, '$1 entries'],
   [/^Kategorie (.+) löschen$/, 'Delete category $1'],

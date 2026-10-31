@@ -15,6 +15,7 @@ import People from './pages/People';
 import Data from './pages/Data';
 import Results from './pages/Results';
 import { GameReview } from './GameReview';
+import { SectionNav, useStickyHead } from './sectionNav';
 import './study.css';
 
 interface Page {
@@ -136,6 +137,9 @@ export default function StudyApp() {
   const rootRef = useRef<HTMLDivElement>(null);
   // (starts once the page is there: while loading or locked there is no root yet)
   useTranslator(rootRef, lang, study.state);
+  const mainRef = useRef<HTMLElement>(null);
+  const headRef = useRef<HTMLDivElement>(null);
+  const stuck = useStickyHead(headRef, rootRef, [study.state, !!study.viewing, lang]);
 
   useEffect(() => {
     document.title = lang === 'en' ? 'User test evaluation' : 'Auswertung Usertest';
@@ -370,8 +374,8 @@ export default function StudyApp() {
           </div>
         </nav>
         {drawer && <div className="st-scrim" onClick={() => setDrawer(false)} />}
-        <main className="st-main">
-          <div className="st-pagehead">
+        <main className="st-main" ref={mainRef}>
+          <div className={`st-pagehead${stuck ? ' is-stuck' : ''}`} ref={headRef}>
             <h1>
               {current.title}
               {subTitle && <span className="st-subtitle"> · {subTitle}</span>}
@@ -380,6 +384,7 @@ export default function StudyApp() {
             <ContentSwitch />
             <ScopePicker model={model} scope={scope} omitted={omitted} onScope={setScope} onOmit={setOmit} />
             </div>
+            <SectionNav main={mainRef} route={`${page}/${sub ?? ''}`} />
           </div>
           <GameReview />
           {body}

@@ -14,6 +14,7 @@ import { planFreeText } from '../tallyPlan';
 import { designOfItem } from './Codes';
 import { itemText, setContentView, translateNotes, useContentView, type ContentView } from '../translations';
 import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
+import { matchDash, NO_DASH, NotesDashboard, type DashFilter } from '../notesDashboard';
 
 // ---- chip logic ----
 const groupOfChip = (tags: TagGroup[], chip: string) => tags.find((g) => g.chips.some((c) => c.id === chip));
@@ -811,6 +812,8 @@ export default function Notes() {
   const { study, model, scope, omitted } = ctx;
   const [filter, setFilter] = useState<'all' | 'open' | 'changed'>('all');
   const [q, setQ] = useState('');
+  const [dash, setDash] = useState<DashFilter>(NO_DASH);
+  const view = useContentView();
   const [fresh, setFresh] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const metas = (study.docs.settings.notesMeta ?? {}) as Record<string, NotesMeta>;
@@ -826,7 +829,8 @@ export default function Notes() {
   const shown = live.filter(
     (i) =>
       (filter === 'all' || (filter === 'open' ? !i.confirmed || i.suggested.length > 0 : i.status === 'changed' || i.status === 'new')) &&
-      (!q || `${i.text} ${i.de ?? ''}`.toLowerCase().includes(q.toLowerCase())),
+      (!q || `${i.text} ${i.de ?? ''}`.toLowerCase().includes(q.toLowerCase())) &&
+      matchDash(model, i, dash),
   );
   const byPerson = [...new Set(shown.map((i) => i.person))].sort();
   const open = live.filter((i) => !i.confirmed);
@@ -951,6 +955,7 @@ export default function Notes() {
     );
   return (
     <>
+      <NotesDashboard model={model} live={live} shown={shown} f={dash} setF={setDash} view={view} />
       <PageIntro />
       <div className="st-toolbar st-notes-bar">
         <div className="st-barpart" role="group" aria-label="Anzeigen">
@@ -1068,7 +1073,7 @@ export default function Notes() {
         const mine = mineOf(pid);
         const person = model.persons.find((p) => p.id === pid);
         return (
-          <section key={pid} className="st-section st-notes-person" data-anchor={`p-${pid}`}>
+          <section key={pid} className="st-section st-notes-person" data-anchor={`p-${pid}`} data-nav={pid}>
             <header className="st-notes-head">
               <PersonInfo pid={pid} meta={meta} person={person} />
               <div className="st-notes-actions">
@@ -1866,7 +1871,7 @@ export function FeedbackLists() {
   const { model, slice, study } = useCtx();
   const view = useContentView();
   const total = model.included.length;
-  const block = (role: ChipRole, title: string) => {
+  const block = (role: ChipRole, title: string, first: boolean) => {
     const items = itemsWithRole(slice.items, model, role);
     const groups = new Map<string, ItemDoc[]>();
     for (const i of items) {
@@ -1877,7 +1882,7 @@ export function FeedbackLists() {
     }
     const rows = [...groups].map(([k, list]) => ({ k, title: k.startsWith('f:') ? study.docs.findings[k.slice(2)].name : itemText(view, list[0]), list, persons: distinctPersons(list) })).sort((a, b) => b.persons - a.persons || a.title.localeCompare(b.title));
     return (
-      <Section key={role} title={`${title} (${items.length})`}>
+      <Section key={role} title={`${title} (${items.length})`} nav={first ? 'Qualitatives Feedback' : false}>
         {rows.length ? (
           <ol className="st-findings">
             {rows.map((r) => (
@@ -1908,7 +1913,7 @@ export function FeedbackLists() {
   };
   return (
     <>
-      {categoryMeanings(model).map((m) => block(m.id, m.category!))}
+      {categoryMeanings(model).map((m, k) => block(m.id, m.category!, k === 0))}
     </>
   );
 }

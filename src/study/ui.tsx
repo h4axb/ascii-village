@@ -104,7 +104,8 @@ const readFolded = (): string[] => {
 };
 
 // a section as one card: its title inside, at the top, above a thin line
-export function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
+// nav: its name in the page head's section links (false: not listed; default: the title without its count)
+export function Section({ title, children, id, nav }: { title: string; children: ReactNode; id?: string; nav?: string | false }) {
   const foldable = useContext(FoldSections);
   // (remembered by the section's id or, without one, its title without the count "(3)")
   const key = id ?? title.replace(/\s*\(\d+\)$/, '');
@@ -120,7 +121,7 @@ export function Section({ title, children, id }: { title: string; children: Reac
       return !f;
     });
   return (
-    <section className={`st-section st-csection${folded ? ' is-folded' : ''}`} id={id} data-anchor={`s-${id ?? title}`}>
+    <section className={`st-section st-csection${folded ? ' is-folded' : ''}`} id={id} data-anchor={`s-${id ?? title}`} data-nav={nav === false ? undefined : (nav ?? title.replace(/\s*\([^)]*\)$/, ''))}>
       {foldable ? (
         <h2>
           <button type="button" className="st-foldbtn" aria-expanded={!folded} onClick={toggle}>

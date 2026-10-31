@@ -3574,3 +3574,87 @@ body:has(.st-root) {
   white-space: normal;
   text-align: left;
 }
+
+/* ---- page head: the participants picker always in the top right corner ---- */
+.st-root .st-pagehead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: 'title switch scope';
+  align-items: center;
+  gap: 10px 14px;
+}
+.st-root .st-pagehead > h1 {
+  grid-area: title;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.st-root .st-pagehead .st-pagetools {
+  display: contents;
+}
+.st-root .st-pagehead .st-pagetools > .st-seg {
+  grid-area: switch;
+}
+.st-root .st-pagehead .st-pagetools > .st-scope {
+  grid-area: scope;
+  justify-self: end;
+  flex-wrap: nowrap;
+}
+/* (the menu opens from the button's right edge, below the corner) */
+.st-root .st-pagehead .st-scope-menu {
+  left: auto;
+  right: 0;
+  max-width: calc(100vw - 32px);
+}
+/* narrower: title and picker share the first row, the text version goes below */
+@media (max-width: 1100px) {
+  .st-root .st-pagehead {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title scope'
+      'switch switch';
+  }
+  .st-root .st-pagehead .st-pagetools > .st-seg {
+    justify-self: start;
+  }
+}
+@media (max-width: 700px) {
+  /* (on a phone the word "Teilnehmende" gives way to the button itself) */
+  .st-root .st-pagehead .st-scope > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .st-root .st-pagehead .st-scope-btn {
+    min-width: 0;
+  }
+}
+/* (a title over two lines: the picker stays level with its first line) */
+.st-root .st-pagehead {
+  align-items: start;
+}
+.st-root .st-pagehead > h1 {
+  align-self: center;
+}
+@media (max-width: 1100px) {
+  .st-root .st-pagehead > h1 {
+    align-self: start;
+    padding-top: 4px;
+  }
+}
+.st-root .st-pagehead .st-pagetools > .st-scope,
+.st-root .st-pagehead .st-pagetools > .st-seg {
+  align-self: start;
+}
+@media (max-width: 1100px) and (pointer: coarse), (max-width: 834px) {
+  .st-root .st-scope-row input[type='checkbox'] {
+    width: 24px;
+    height: 24px;
+  }
+  .st-root .st-scope-row {
+    min-height: 40px;
+  }
+}

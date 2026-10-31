@@ -3578,8 +3578,8 @@ body:has(.st-root) {
 /* ---- page head: the participants picker always in the top right corner ---- */
 .st-root .st-pagehead {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-areas: 'title switch scope';
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'title scope';
   align-items: center;
   gap: 10px 14px;
 }
@@ -3592,9 +3592,6 @@ body:has(.st-root) {
 .st-root .st-pagehead .st-pagetools {
   display: contents;
 }
-.st-root .st-pagehead .st-pagetools > .st-seg {
-  grid-area: switch;
-}
 .st-root .st-pagehead .st-pagetools > .st-scope {
   grid-area: scope;
   justify-self: end;
@@ -3605,18 +3602,6 @@ body:has(.st-root) {
   left: auto;
   right: 0;
   max-width: calc(100vw - 32px);
-}
-/* narrower: title and picker share the first row, the text version goes below */
-@media (max-width: 1100px) {
-  .st-root .st-pagehead {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'title scope'
-      'switch switch';
-  }
-  .st-root .st-pagehead .st-pagetools > .st-seg {
-    justify-self: start;
-  }
 }
 @media (max-width: 700px) {
   /* (on a phone the word "Teilnehmende" gives way to the button itself) */
@@ -3645,8 +3630,7 @@ body:has(.st-root) {
     padding-top: 4px;
   }
 }
-.st-root .st-pagehead .st-pagetools > .st-scope,
-.st-root .st-pagehead .st-pagetools > .st-seg {
+.st-root .st-pagehead .st-pagetools > .st-scope {
   align-self: start;
 }
 @media (max-width: 1100px) and (pointer: coarse), (max-width: 834px) {
@@ -3900,8 +3884,8 @@ body:has(.st-root) {
   top: var(--st-stick-top, 0px);
   z-index: 15;
   grid-template-areas:
-    'title switch scope'
-    'nav nav nav';
+    'title scope'
+    'nav nav';
   margin: -26px -36px 22px;
   padding: 20px 36px 12px;
   background: var(--st-bg);
@@ -3959,14 +3943,9 @@ body:has(.st-root) {
   .st-root .st-pagehead {
     grid-template-areas:
       'title scope'
-      'switch switch'
       'nav nav';
     margin: -22px -22px 20px;
     padding: 16px 22px 10px;
-  }
-  /* (scrolled: the text version gives its row to the page) */
-  .st-root .st-pagehead.is-stuck .st-pagetools > .st-seg {
-    display: none;
   }
 }
 @media (max-width: 700px) {

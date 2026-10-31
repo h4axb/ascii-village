@@ -12,7 +12,7 @@ import { applyChanges, ChangeModal } from '../ChangeModal';
 import { RewriteReview, TagReview, workingText, type Rewrite, type TagProposal } from '../AiReview';
 import { planFreeText } from '../tallyPlan';
 import { designOfItem } from './Codes';
-import { itemText, setContentView, translateNotes, useContentView, type ContentView } from '../translations';
+import { itemText, translateNotes, useContentView } from '../translations';
 import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
 import { matchDash, NO_DASH, NotesDashboard, type DashFilter } from '../notesDashboard';
 
@@ -788,24 +788,6 @@ function MoreMenu({ actions, up, label = 'Bearbeiten ⋯' }: { actions: [string,
 }
 
 // Deutsch / Original / Beides: which text of notes and survey the dashboard shows
-export function ContentSwitch() {
-  const v = useContentView();
-  const OPTS: [ContentView, string][] = [
-    ['de', 'Deutsch'],
-    ['orig', 'Original'],
-    ['both', 'Beides'],
-  ];
-  return (
-    <div className="st-seg" role="group" aria-label="Textfassung">
-      {OPTS.map(([k, l]) => (
-        <button key={k} type="button" className={v === k ? 'is-on' : ''} onClick={() => setContentView(k)}>
-          {l}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ---- the page ----
 export default function Notes() {
   const ctx = useCtx();
@@ -1251,7 +1233,7 @@ function PageIntro() {
       <summary>So funktioniert diese Seite</summary>
       <ol>
         <li>
-          <strong>Aussagen lesen:</strong> je Testperson die Beobachtungen, das Nachgespräch und die Umfrage-Freitexte. Oben rechts wählst du Deutsch, Original oder beides.
+          <strong>Aussagen lesen:</strong> je Testperson die Beobachtungen, das Nachgespräch und die Umfrage-Freitexte. Angezeigt wird die deutsche Fassung (sonst das Original); das Original korrigierst du unter „Bearbeiten …“.
         </li>
         <li>
           <strong>Tags setzen:</strong> unter jeder Aussage stehen ihre Tags in einer Zeile; „Tags bearbeiten“ öffnet alle Gruppen mit Erklärung. Gestrichelte Tags sind Vorschläge: anklicken übernimmt sie.

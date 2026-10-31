@@ -10,14 +10,14 @@ import type { Study } from './store';
 // ---- which text the dashboard shows: the German version, the original, or both ----
 export type ContentView = 'de' | 'orig' | 'both';
 const VIEW_KEY = 'asciia-study-content';
-let view: ContentView = (() => {
-  try {
-    const v = localStorage.getItem(VIEW_KEY);
-    return v === 'orig' || v === 'both' ? v : 'de';
-  } catch {
-    return 'de';
-  }
-})();
+// (the switch was removed: always the German version, else the original; an
+// old choice still stored is cleared)
+let view: ContentView = 'de';
+try {
+  localStorage.removeItem(VIEW_KEY);
+} catch {
+  // (nothing stored)
+}
 const listeners = new Set<(v: ContentView) => void>();
 export function setContentView(v: ContentView) {
   view = v;

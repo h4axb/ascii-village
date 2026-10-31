@@ -518,7 +518,7 @@ const EN: Record<string, string> = {
   'Zeiten bearbeiten': 'Edit times',
   // notes page help
   'Aussagen lesen:': 'Reading statements:',
-  'je Testperson die Beobachtungen, das Nachgespräch und die Umfrage-Freitexte. Oben rechts wählst du Deutsch, Original oder beides.': 'per participant the observations, the debriefing and the survey free texts. At the top right you choose German, original or both.',
+  'je Testperson die Beobachtungen, das Nachgespräch und die Umfrage-Freitexte. Angezeigt wird die deutsche Fassung (sonst das Original); das Original korrigierst du unter „Bearbeiten …“.': 'per participant the observations, the debriefing and the survey free texts. The German version is shown (else the original); you correct the original under “Bearbeiten …”.',
   'unter jeder Aussage stehen ihre Tags in einer Zeile; „Tags bearbeiten“ öffnet alle Gruppen mit Erklärung. Gestrichelte Tags sind Vorschläge: anklicken übernimmt sie.': 'under each statement its tags sit in one line; “Edit tags” opens all groups with an explanation. Dashed tags are suggestions: a click takes them over.',
   'Prüfen:': 'Checking:',
   '„Geprüft?“ markiert eine Aussage als geprüft; es zählen nur die angeklickten Tags, nicht angeklickte Vorschläge werden dabei verworfen. Nochmal klicken macht es rückgängig. Weitere Aktionen (Deutsch, Original korrigieren, Frage, Löschen) unter „Bearbeiten ⋯“.': '“Checked?” marks a statement as checked; only the clicked tags count, suggestions not clicked are dropped. Clicking it again undoes it. More actions (German, correct original, question, delete) under “Edit ⋯”.',

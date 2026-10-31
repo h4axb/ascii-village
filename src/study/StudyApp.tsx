@@ -8,7 +8,7 @@ import { useStudy } from './store';
 import { StudyCtx } from './ui';
 import Overview from './pages/Overview';
 import Survey from './pages/Survey';
-import Notes, { ContentSwitch, Priority, Tags } from './pages/Notes';
+import Notes, { Priority, Tags } from './pages/Notes';
 import Findings from './pages/Findings';
 import Codes from './pages/Codes';
 import People from './pages/People';
@@ -381,7 +381,6 @@ export default function StudyApp() {
               {subTitle && <span className="st-subtitle"> · {subTitle}</span>}
             </h1>
             <div className="st-pagetools">
-            <ContentSwitch />
             <ScopePicker model={model} scope={scope} omitted={omitted} onScope={setScope} onOmit={setOmit} />
             </div>
             <SectionNav main={mainRef} route={`${page}/${sub ?? ''}`} />

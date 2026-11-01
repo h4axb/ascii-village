@@ -1003,13 +1003,6 @@ export default function Notes() {
           {busy && <span className="st-muted">{busy}</span>}
         </div>
         <div className="st-lc-filters">
-          <div className="st-lc-seg" role="tablist" aria-label="Anzeigen">
-            {tabs.map(([k, l, n]) => (
-              <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)}>
-                {`${l} (${n})`}
-              </button>
-            ))}
-          </div>
         <div className="st-lc-sel">
           <label className="st-lc-selall">
             <input type="checkbox" className="st-round" checked={allSel} disabled={!shown.length} onChange={() => (allSel ? setSel(new Set()) : selectAll(shown))} />
@@ -1057,7 +1050,14 @@ export default function Notes() {
           )}
           <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Aussagen durchsuchen …" aria-label="Aussagen durchsuchen" />
         </div>
-        <div className="st-lc-panel">
+        <div className="st-tabs st-lc-tabs" role="tablist" aria-label="Anzeigen">
+          {tabs.map(([k, l, n]) => (
+            <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)}>
+              {`${l} (${n})`}
+            </button>
+          ))}
+        </div>
+        <div className="st-tabpanel st-lc-panel" role="tabpanel">
           {!shown.length && <p className="st-muted st-lc-empty">Keine Aussage passt zu Suche und Filtern.</p>}
           {onePid
             ? rows(mineOf(onePid))

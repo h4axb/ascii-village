@@ -4805,3 +4805,23 @@ body:has(.st-root) {
     background-image: linear-gradient(to right, transparent 171px, #ececef 171px, #ececef 172px, transparent 172px);
   }
 }
+/* Alle / Ungeprüft / Geprüft: folder tabs right above the statements, like
+   the Spieldauer figure on the Übersicht; the statements sit in the panel */
+.st-root .st-lcard .st-lc-tabs {
+  margin-top: 6px;
+}
+.st-root .st-lcard .st-lc-panel {
+  border: 1px solid var(--st-line);
+  border-radius: 0 12px 12px 12px;
+  background: var(--st-paper);
+  padding: 0 14px;
+}
+.st-root .st-lc-filters .st-lc-sel {
+  flex: 1 1 100%;
+  justify-content: space-between;
+}
+@media (max-width: 700px) {
+  .st-root .st-lcard .st-lc-panel {
+    padding: 0 10px;
+  }
+}

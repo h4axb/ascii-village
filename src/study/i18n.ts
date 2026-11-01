@@ -45,6 +45,10 @@ export function useLang(): Lang {
 // ---- the English dictionary (German interface text → English) ----
 const EN: Record<string, string> = {
   // Qualitatives Feedback: participant card and statement list
+  'Als ungeprüft markieren': 'Mark as unchecked',
+  'Erst Aussagen auswählen': 'Select statements first',
+  'Ausgewählte als geprüft markieren': 'Mark selected as checked',
+  'Ausgewählte als ungeprüft markieren': 'Mark selected as unchecked',
   Umformulieren: 'Reword',
   'Tags vorschlagen': 'Suggest tags',
   'Weitere Angaben': 'More details',
@@ -1177,7 +1181,7 @@ const PATTERNS: [RegExp, string][] = [
   [/^Ungeprüft: (\d+)$/, 'Unchecked: $1'],
   [/^Geprüft: (\d+)$/, 'Checked: $1'],
   [/^Alle: (\d+)$/, 'All: $1'],
-  [/^Alle angezeigten als geprüft markieren \((\d+)\)$/, 'Mark all shown as checked ($1)'],
+  [/^Ausgewählte als ungeprüft markieren \((\d+)\)$/, 'Mark selected as unchecked ($1)'],
   [/^Ausgewählte als geprüft markieren \((\d+)\)$/, 'Mark selected as checked ($1)'],
   [/^Aussage für (.+)$/, 'Statement for $1'],
   [/^(\d+) ungespeicherte Änderungen?: (.+)$/, '$1 unsaved changes: $2'],

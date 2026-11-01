@@ -660,7 +660,8 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
 }
 
 // "Bearbeiten ⋯": the rarer actions of a statement, out of the way until needed
-function MoreMenu({ actions, up, label = 'Bearbeiten ⋯', title, icon, className }: { actions: [string, () => unknown, boolean?][]; up?: boolean; label?: React.ReactNode; title?: string; icon?: boolean; className?: string }) {
+// (an action: label, what it does, red for danger, greyed out when it cannot run now; a note: muted text in the list)
+function MoreMenu({ actions, up, label = 'Bearbeiten ⋯', title, icon, className, note }: { actions: [string, () => unknown, boolean?, boolean?][]; up?: boolean; label?: React.ReactNode; title?: string; icon?: boolean; className?: string; note?: string }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -675,11 +676,13 @@ function MoreMenu({ actions, up, label = 'Bearbeiten ⋯', title, icon, classNam
         {label}
       </summary>
       <div className="st-more-list" role="menu">
-        {actions.map(([label, run, danger]) => (
+        {note && <p className="st-more-note">{note}</p>}
+        {actions.map(([label, run, danger, disabled]) => (
           <button
             key={label}
             type="button"
             role="menuitem"
+            disabled={disabled}
             className={danger ? 'is-danger' : undefined}
             onClick={() => {
               if (ref.current) ref.current.open = false;
@@ -772,6 +775,8 @@ export default function Notes() {
   // the selection bar's own actions: on every selected statement at once
   const [bulk, setBulk] = useState<null | 'frage' | 'befund' | 'befund-weg'>(null);
   const [bulkQ, setBulkQ] = useState('');
+  // back to unchecked: the tags and findings stay
+  const uncheck = (i: ItemDoc): ItemDoc => ({ ...i, confirmed: false });
   const putAll = (items: ItemDoc[], what: string) => {
     if (!items.length) return;
     study.commit(items.map((i) => ({ coll: 'items' as const, id: i.id, data: i })));
@@ -1021,10 +1026,10 @@ export default function Notes() {
             }
             className="st-lc-actions"
             actions={[
-              [`Alle angezeigten als geprüft markieren (${shown.length})`, () => putAll(shown.map((i) => confirmItem(i, model.tags)), 'Als geprüft markiert')],
               ...(selShown.length
                 ? ([
                     [`Ausgewählte als geprüft markieren (${selShown.length})`, () => putAll(selShown.map((i) => confirmItem(i, model.tags)), 'Als geprüft markiert')],
+                    [`Ausgewählte als ungeprüft markieren (${selShown.length})`, () => putAll(selShown.filter((i) => i.confirmed).map(uncheck), 'Als ungeprüft markiert')],
                     ['Frage setzen …', () => setBulk('frage')],
                     ['Abschnitt: Beobachtung', () => bulkSection('during')],
                     ['Abschnitt: Nachgespräch', () => bulkSection('followup')],
@@ -1033,8 +1038,12 @@ export default function Notes() {
                     ['Auswahl aufheben', () => setSel(new Set())],
                     ['Ausgewählte löschen', () => void bulkDelete(), true],
                   ] as [string, () => unknown, boolean?][])
-                : []),
+                : ([
+                    ['Ausgewählte als geprüft markieren', () => undefined, false, true],
+                    ['Ausgewählte als ungeprüft markieren', () => undefined, false, true],
+                  ] as [string, () => unknown, boolean?, boolean?][])),
             ]}
+            note={selShown.length ? undefined : 'Erst Aussagen auswählen'}
           />
         </div>
         </div>
@@ -1089,6 +1098,7 @@ export default function Notes() {
             label="Ausgewählte bearbeiten ⋯"
             actions={[
               ['Als geprüft markieren', () => putAll(selShown.map((i) => confirmItem(i, model.tags)), 'Als geprüft markiert')],
+              ['Als ungeprüft markieren', () => putAll(selShown.filter((i) => i.confirmed).map(uncheck), 'Als ungeprüft markiert')],
               ['Frage setzen …', () => setBulk('frage')],
               ['Bereich: Beobachtung', () => bulkSection('during')],
               ['Bereich: Nachgespräch', () => bulkSection('followup')],

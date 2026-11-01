@@ -4771,3 +4771,22 @@ body:has(.st-root) {
     margin-left: auto;
   }
 }
+/* a menu entry that cannot run now, and a short note above the entries */
+.st-root .st-more-list button:disabled {
+  color: #b4b4ba;
+  background: transparent;
+  cursor: default;
+}
+.st-more-note {
+  margin: 4px 10px 6px;
+  font-size: 12.5px;
+  color: var(--st-muted);
+}
+/* the Aktionen menu above the sticky selection bar, wide enough for its entries */
+.st-root .st-lc-filters {
+  position: relative;
+  z-index: 8;
+}
+.st-root .st-lc-actions .st-more-list {
+  min-width: 300px;
+}

@@ -20,7 +20,7 @@ if (!inDir || !outDir) {
 }
 const DEVICE = { desktop: ['Desktop', 1300], tablet: ['Tablet', 834], mobile: ['Mobile', 390] };
 const VERSION = { aktuell: 'Aktuell', neu: 'Neu' };
-const STATE = { default: 'Standard', bearbeiten: 'Bearbeiten', 'vor-speichern': 'Vor dem Speichern', 'filter-ungeprueft': 'Filter Ungeprüft', auswahl: 'Auswahl', 'aussagen-karte': 'Aussagen-Karte' };
+const STATE = { default: 'Standard', bearbeiten: 'Bearbeiten', 'vor-speichern': 'Vor dem Speichern', 'filter-ungeprueft': 'Filter Ungeprüft', auswahl: 'Auswahl', 'aussagen-karte': 'Aussagen-Karte', 'menue-ohne-auswahl': 'Aktionen ohne Auswahl', 'menue-auswahl': 'Aktionen mit Auswahl', 'nach-ungeprueft': 'Nach „ungeprüft markieren“' };
 const font = fs.readFileSync(path.join(__dirname, '../public/fonts/inter-latin-wght-normal.woff2')).toString('base64');
 
 (async () => {

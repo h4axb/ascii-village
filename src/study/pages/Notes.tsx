@@ -963,7 +963,7 @@ export default function Notes() {
       <section className="st-lcard" data-nav="Aussagen" aria-label="Aussagen">
         <div className="st-lc-title">
           <h2>
-            Aussagen <span className="st-lc-count">{live.length}</span>
+            Aussagen <span className="st-lc-count">{`(${live.length})`}</span>
           </h2>
           <span className="st-muted">{onePid ? (scope.kind === 'link' ? scope.id : onePid) : `Alle (${allPersons.length})`}</span>
         </div>
@@ -976,7 +976,7 @@ export default function Notes() {
             title={`Die KI schlägt passende Tags und einen Befund vor – für ${selShown.length ? 'die ausgewählten' : 'alle ungeprüften'} Aussagen. Du prüfst und änderst alles im Fenster, bevor etwas gespeichert wird.\nBeispiel: „Crafting-Menü schwer zu finden“ → Bereich: Spiel · Art: Problem · Thema: Crafting.`}
           >
             {spark}
-            Tags vorschlagen
+            {`Tags vorschlagen (${forTags.length})`}
           </button>
           <button
             type="button"
@@ -986,7 +986,7 @@ export default function Notes() {
             title={`Die KI formuliert ${selShown.length ? 'die ausgewählten' : 'die angezeigten'} Aussagen nach deinen Kriterien neu (Bedeutung bleibt gleich). Du vergleichst alt und neu im Fenster und kannst jeden Vorschlag selbst anpassen. Die Originalnotiz bleibt erhalten.\nBeispiel: „menü crafting nich gefunden, hat lange gesucht“ → „Die Testperson fand das Crafting-Menü nicht und suchte lange danach.“`}
           >
             {wand}
-            Umformulieren
+            {`Umformulieren (${forRewrite.length})`}
           </button>
           <button type="button" className="st-linkbtn" aria-expanded={showCriteria} onClick={() => setShowCriteria((x) => !x)} title="Festlegen, wie die KI umformulieren soll (z. B. sachlich, Präsens, vollständige Sätze).">
             Kriterien
@@ -994,15 +994,12 @@ export default function Notes() {
           {busy && <span className="st-muted">{busy}</span>}
         </div>
         <div className="st-lc-filters">
-          <div className="st-lc-filt">
-            <div className="st-lc-seg" role="tablist" aria-label="Anzeigen">
-              {tabs.map(([k, l, n]) => (
-                <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)} title={`${l}: ${n}`}>
-                  {l}
-                </button>
-              ))}
-            </div>
-            <span className="st-muted">{`${shown.length} ${shown.length === 1 ? 'Eintrag' : 'Einträge'}`}</span>
+          <div className="st-lc-seg" role="tablist" aria-label="Anzeigen">
+            {tabs.map(([k, l, n]) => (
+              <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)}>
+                {`${l} (${n})`}
+              </button>
+            ))}
           </div>
         <div className="st-lc-sel">
           <label className="st-lc-selall">

@@ -4741,3 +4741,48 @@ body:has(.st-root) {
     min-height: 36px;
   }
 }
+/* filter and selection actions on one line; the search keeps its own row */
+.st-root .st-lc-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+.st-root .st-lc-filters .st-lc-sel {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: 8px 14px;
+}
+/* the overview: three problem figures, then (apart) the review progress */
+.st-root .st-dash-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 8px minmax(0, 1fr);
+}
+.st-root .st-dash-kpis > .st-dash-kpi:nth-child(4) {
+  grid-column: 5;
+  background: #f7f7f8;
+  border-style: dashed;
+  border-color: #dcdce0;
+  box-shadow: none;
+}
+.st-root .st-dash-kpis > .st-dash-kpi:nth-child(4).is-on {
+  background: var(--st-ink);
+  border-style: solid;
+  border-color: var(--st-ink);
+}
+@media (max-width: 700px) {
+  .st-root .st-dash-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .st-root .st-dash-kpis > .st-dash-kpi:nth-child(4) {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+  }
+  .st-root .st-dash-kpi {
+    padding: 10px 12px;
+  }
+  .st-root .st-lc-filters .st-lc-sel {
+    justify-content: space-between;
+    flex-basis: 100%;
+  }
+}

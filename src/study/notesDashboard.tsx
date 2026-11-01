@@ -140,6 +140,7 @@ export function NotesDashboard({ model, live, shown, f, setF, view }: { model: M
         {tile('problem', kpiName.problem, 'Aussagen mit der Art „Problem“ – anklicken zum Filtern')}
         {tile('essential', kpiName.essential, 'Probleme mit der Priorität „Essenziell“ – anklicken zum Filtern')}
         {tile('tbd', kpiName.tbd, 'Probleme, deren Priorität noch offen ist – anklicken zum Filtern')}
+        {/* (the review progress, set apart from the three problem figures) */}
         {tile('unchecked', kpiName.unchecked, 'Noch nicht geprüfte Aussagen oder solche mit offenen KI-Vorschlägen – anklicken zum Filtern')}
       </div>
 

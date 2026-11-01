@@ -45,6 +45,8 @@ export function useLang(): Lang {
 // ---- the English dictionary (German interface text → English) ----
 const EN: Record<string, string> = {
   // Qualitatives Feedback: participant card and statement list
+  Umformulieren: 'Reword',
+  'Tags vorschlagen': 'Suggest tags',
   'Weitere Angaben': 'More details',
   Testlink: 'Test link',
   Beruf: 'Occupation',
@@ -1170,6 +1172,11 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^(\d+) Einträge$/, '$1 entries'],
+  [/^(\d+) Eintrag$/, '$1 entry'],
+  [/^Ungeprüft: (\d+)$/, 'Unchecked: $1'],
+  [/^Geprüft: (\d+)$/, 'Checked: $1'],
+  [/^Alle: (\d+)$/, 'All: $1'],
   [/^Alle angezeigten als geprüft markieren \((\d+)\)$/, 'Mark all shown as checked ($1)'],
   [/^Ausgewählte als geprüft markieren \((\d+)\)$/, 'Mark selected as checked ($1)'],
   [/^Aussage für (.+)$/, 'Statement for $1'],

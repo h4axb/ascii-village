@@ -520,9 +520,7 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
       )}
       <div className="st-item-text">
         <div className="st-item-meta">
-          <span className="st-item-section">{SECTION_LABEL[item.section]}</span>
-          {item.link && item.link !== item.person && <span>{item.link}</span>}
-          {d && <span>{`Variante ${d}`}</span>}
+          {/* (the section and the person now stand under the text) */}
           {item.status === 'changed' && <span className="st-flag">geändert – prüfen</span>}
           {item.status === 'new' && <span className="st-flag">neu</span>}
         </div>
@@ -570,6 +568,7 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
             <LazyArea value={item.addition ?? ''} onSave={(v) => save({ ...item, addition: v.trim() || undefined })} autoFocus={!item.addition} />
           </label>
         )}
+        <div className="st-item-sub">{[SECTION_LABEL[item.section], item.link ?? item.person, d ? `Variante ${d}` : ''].filter(Boolean).join(' · ')}</div>
         {/* the tags in one line; the full editor only on request */}
         <div className="st-tagline">
           {onChips.map(({ g, c }) => (
@@ -866,6 +865,12 @@ export default function Notes() {
       <path d="M12 5v14M5 12h14" />
     </svg>
   );
+  const wand = (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m15 4 5 5L8 21l-5-5zM12 7l5 5" />
+      <path d="M5 3v3M3.5 4.5h3M19 15v3M17.5 16.5h3" />
+    </svg>
+  );
   const spark = (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
@@ -957,7 +962,9 @@ export default function Notes() {
 
       <section className="st-lcard" data-nav="Aussagen" aria-label="Aussagen">
         <div className="st-lc-title">
-          <h2>Qualitatives Feedback</h2>
+          <h2>
+            Aussagen <span className="st-lc-count">{live.length}</span>
+          </h2>
           <span className="st-muted">{onePid ? (scope.kind === 'link' ? scope.id : onePid) : `Alle (${allPersons.length})`}</span>
         </div>
         <div className="st-lc-row st-lc-ai">
@@ -969,7 +976,7 @@ export default function Notes() {
             title={`Die KI schlägt passende Tags und einen Befund vor – für ${selShown.length ? 'die ausgewählten' : 'alle ungeprüften'} Aussagen. Du prüfst und änderst alles im Fenster, bevor etwas gespeichert wird.\nBeispiel: „Crafting-Menü schwer zu finden“ → Bereich: Spiel · Art: Problem · Thema: Crafting.`}
           >
             {spark}
-            {`Tags vorschlagen (${forTags.length})`}
+            Tags vorschlagen
           </button>
           <button
             type="button"
@@ -978,15 +985,26 @@ export default function Notes() {
             onClick={() => void rewriteShown()}
             title={`Die KI formuliert ${selShown.length ? 'die ausgewählten' : 'die angezeigten'} Aussagen nach deinen Kriterien neu (Bedeutung bleibt gleich). Du vergleichst alt und neu im Fenster und kannst jeden Vorschlag selbst anpassen. Die Originalnotiz bleibt erhalten.\nBeispiel: „menü crafting nich gefunden, hat lange gesucht“ → „Die Testperson fand das Crafting-Menü nicht und suchte lange danach.“`}
           >
-            {spark}
-            {`Aussagen umformulieren (${forRewrite.length})`}
+            {wand}
+            Umformulieren
           </button>
           <button type="button" className="st-linkbtn" aria-expanded={showCriteria} onClick={() => setShowCriteria((x) => !x)} title="Festlegen, wie die KI umformulieren soll (z. B. sachlich, Präsens, vollständige Sätze).">
             Kriterien
           </button>
           {busy && <span className="st-muted">{busy}</span>}
         </div>
-        <div className="st-lc-row st-lc-sel">
+        <div className="st-lc-filters">
+          <div className="st-lc-filt">
+            <div className="st-lc-seg" role="tablist" aria-label="Anzeigen">
+              {tabs.map(([k, l, n]) => (
+                <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)} title={`${l}: ${n}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <span className="st-muted">{`${shown.length} ${shown.length === 1 ? 'Eintrag' : 'Einträge'}`}</span>
+          </div>
+        <div className="st-lc-sel">
           <label className="st-lc-selall">
             <input type="checkbox" className="st-round" checked={allSel} disabled={!shown.length} onChange={() => (allSel ? setSel(new Set()) : selectAll(shown))} />
             {selShown.length ? `${selShown.length} ausgewählt` : 'Alle auswählen'}
@@ -1018,9 +1036,6 @@ export default function Notes() {
             ]}
           />
         </div>
-        <div className="st-lc-head">
-          <h3>Aussagenliste</h3>
-          <span className="st-muted">{`${shown.length} ${shown.length === 1 ? 'Treffer' : 'Treffer'}`}</span>
         </div>
         <div className="st-lc-search">
           {onePid ? (
@@ -1032,14 +1047,7 @@ export default function Notes() {
           )}
           <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Aussagen durchsuchen …" aria-label="Aussagen durchsuchen" />
         </div>
-        <div className="st-tabs st-lc-tabs" role="tablist" aria-label="Anzeigen">
-          {tabs.map(([k, l, n]) => (
-            <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)}>
-              {`${l} (${n})`}
-            </button>
-          ))}
-        </div>
-        <div className="st-tabpanel st-lc-panel" role="tabpanel">
+        <div className="st-lc-panel">
           {!shown.length && <p className="st-muted st-lc-empty">Keine Aussage passt zu Suche und Filtern.</p>}
           {onePid
             ? rows(mineOf(onePid))

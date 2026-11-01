@@ -4659,3 +4659,85 @@ body:has(.st-root) {
   box-shadow: none;
   padding: 0;
 }
+/* ---- the statements card after the second reference ---- */
+.st-lc-count {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--st-muted);
+  margin-left: 4px;
+}
+.st-lc-filters {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0 14px;
+  border-bottom: 1px solid var(--st-line);
+}
+.st-lc-filt,
+.st-lc-sel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.st-lc-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: #ececef;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.st-root .st-lc-seg button {
+  min-height: 32px;
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--st-muted);
+  white-space: nowrap;
+}
+.st-root .st-lc-seg button:hover {
+  background: transparent;
+  color: var(--st-ink);
+}
+.st-root .st-lc-seg button.is-on {
+  background: #fff;
+  color: var(--st-ink);
+  box-shadow: 0 1px 3px rgba(20, 20, 30, 0.12);
+}
+.st-lc-search {
+  padding-top: 14px;
+  padding-bottom: 6px;
+}
+.st-root .st-lc-add,
+.st-root .st-lc-add > summary {
+  border-radius: 50%;
+}
+.st-root details.st-lc-add {
+  border-radius: 0;
+}
+.st-root .st-lc-panel {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.st-item-sub {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--st-muted);
+}
+.st-root .st-lc-panel .st-item-meta:empty {
+  display: none;
+}
+@media (max-width: 700px) {
+  .st-root .st-lc-panel {
+    padding: 0;
+  }
+  .st-root .st-lc-seg button {
+    min-height: 36px;
+  }
+}

@@ -4825,3 +4825,37 @@ body:has(.st-root) {
     padding: 0 10px;
   }
 }
+/* phones: the page title lives in the top bar; the page head keeps the
+   participants picker and the section links (the title stays for screen readers) */
+@media (max-width: 700px) {
+  .st-topbar-title {
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+  .st-topbar-title .st-subtitle {
+    font-weight: 400;
+    color: var(--st-muted);
+  }
+  .st-root .st-pagehead > h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .st-root .st-pagehead,
+  .st-root .st-pagehead.is-stuck {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'nav scope';
+    align-items: center;
+  }
+  .st-root .st-pagehead .st-pagetools > .st-scope {
+    align-self: center;
+  }
+}

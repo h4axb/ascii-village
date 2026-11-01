@@ -315,7 +315,10 @@ export default function StudyApp() {
           <button type="button" className="st-menu" onClick={() => setDrawer((d) => !d)} aria-expanded={drawer} aria-controls="st-nav">
             Menü
           </button>
-          <span>{current.title}</span>
+          <span className="st-topbar-title">
+            {current.title}
+            {subTitle && <span className="st-subtitle"> · {subTitle}</span>}
+          </span>
         </header>
         <nav id="st-nav" className="st-nav" aria-label="Auswertung Usertest">
           <ul>

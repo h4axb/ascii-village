@@ -4477,8 +4477,8 @@ body:has(.st-root) {
 }
 /* the statements inside the panel: a round pick, the text, two icons */
 .st-root .st-lc-panel .st-item {
-  grid-template-columns: 26px minmax(0, 1fr) auto;
-  gap: 4px 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 14px;
   padding: 14px 0;
   border: 0;
   border-radius: 0;
@@ -4504,12 +4504,7 @@ body:has(.st-root) {
   cursor: pointer;
 }
 .st-root .st-lc-panel .st-tageditor {
-  grid-column: 2 / -1;
-}
-.st-root .st-lc-panel .st-item-side {
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 2px;
+  grid-column: 1 / -1;
 }
 .st-root .st-lc-panel .st-item-side > .st-iconbtn,
 .st-root .st-more.is-icon > summary {
@@ -4584,10 +4579,7 @@ body:has(.st-root) {
     padding: 0 10px;
   }
   .st-root .st-lc-panel .st-item {
-    grid-template-columns: 26px minmax(0, 1fr) auto;
-  }
-  .st-root .st-lc-panel .st-item-side {
-    flex-direction: row;
+    grid-template-columns: minmax(0, 1fr);
   }
   .st-root .st-lc-panel .st-tageditor {
     grid-column: 1 / -1;
@@ -4618,14 +4610,7 @@ body:has(.st-root) {
 .st-root .st-pc-fold:hover {
   background: transparent;
 }
-/* the section of a statement: quiet text, no box */
-.st-root .st-lc-panel .st-item-section {
-  border: 0;
-  padding: 0;
-  background: none;
-  font-size: 12.5px;
-  color: var(--st-muted);
-}
+
 /* menus opened from the right edge stay on the screen */
 .st-root .st-lc-actions .st-more-list,
 .st-root .st-more.is-icon:not(.st-lc-add) .st-more-list {
@@ -4637,15 +4622,7 @@ body:has(.st-root) {
   white-space: normal;
 }
 /* the round pick: a full touch target on tablets and phones */
-@media (max-width: 1100px) and (pointer: coarse), (max-width: 834px) {
-  .st-root .st-lc-panel .st-item {
-    grid-template-columns: 36px minmax(0, 1fr) auto;
-    gap: 4px 8px;
-  }
-  .st-item-pick {
-    min-width: 36px;
-  }
-}
+
 /* the search field and link fields keep their pill shape over the general input style */
 .st-root .st-lc-search input[type='search']:not([type='checkbox']) {
   border-radius: 999px;
@@ -4730,9 +4707,7 @@ body:has(.st-root) {
   font-size: 12.5px;
   color: var(--st-muted);
 }
-.st-root .st-lc-panel .st-item-meta:empty {
-  display: none;
-}
+
 @media (max-width: 700px) {
   .st-root .st-lc-panel {
     padding: 0;

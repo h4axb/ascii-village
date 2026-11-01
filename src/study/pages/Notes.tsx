@@ -373,6 +373,10 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
         <p data-notr onClick={() => setEditDe(true)} title="Klicken: bearbeiten">
           {item.de}
         </p>
+      ) : !showInt ? (
+        <button type="button" className="st-linkbtn" onClick={() => setShowInt(true)}>
+          + Interpretation hinzufügen
+        </button>
       ) : null}
       {item.de && (item.deAuto || item.deStale) && (
         <div className="st-item-meta">
@@ -463,20 +467,6 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
       </div>
     );
   };
-  const toggleChecked = () => {
-    if (!(item.confirmed && !open)) {
-      before.current = item;
-      return save(confirmItem(item, model.tags));
-    }
-    // again: undone; the suggestions it dropped come back (while the page stays open)
-    const b = before.current;
-    before.current = null;
-    save({ ...item, confirmed: b?.confirmed ?? false, ...(b ? { status: b.status, suggested: b.suggested.filter((c) => !item.chips.includes(c)), suggestedFinding: b.suggestedFinding && !findingsOf(item).includes(b.suggestedFinding) ? b.suggestedFinding : null } : {}) });
-  };
-  const moveSection = (section: 'during' | 'followup') => {
-    logChange(study, `${item.person}: Bereich „${SECTION_LABEL[item.section]}“ → „${SECTION_LABEL[section]}“ (${item.text.slice(0, 40)}${item.text.length > 40 ? ' …' : ''})`);
-    save({ ...item, section, sectionOwn: true });
-  };
   const findingRow = (
     <div className="st-tagrow">
       <div className="st-tagrow-head">
@@ -513,14 +503,31 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
   );
   return (
     <div ref={rowRef} data-anchor={`i-${item.id}`} className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}${fresh ? ' is-fresh' : ''}${selected ? ' is-selected' : ''}`}>
-      {onSelect && (
-        <label className="st-item-pick" title="Auswählen (Umschalt: Bereich)">
-          <input type="checkbox" className="st-round" checked={!!selected} onChange={() => undefined} onClick={(e) => onSelect(e.shiftKey)} aria-label="Auswählen (Umschalt: Bereich)" />
-        </label>
-      )}
       <div className="st-item-text">
         <div className="st-item-meta">
-          {/* (the section and the person now stand under the text) */}
+          {onSelect && <input type="checkbox" className="st-item-sel" checked={!!selected} onChange={() => undefined} onClick={(e) => onSelect(e.shiftKey)} aria-label="Auswählen (Umschalt: Bereich)" title="Auswählen (Umschalt: Bereich)" />}
+          <span className="st-pid">
+            {item.link ?? item.person}
+            {d ? ` · ${d}` : ''}
+          </span>
+          {item.section === 'survey' ? (
+            <span>{SECTION_LABEL[item.section]}</span>
+          ) : (
+            <select
+              className="st-item-section"
+              value={item.section}
+              onChange={(e) => {
+                const section = e.target.value as 'during' | 'followup';
+                logChange(study, `${item.person}: Bereich „${SECTION_LABEL[item.section]}“ → „${SECTION_LABEL[section]}“ (${item.text.slice(0, 40)}${item.text.length > 40 ? ' …' : ''})`);
+                save({ ...item, section, sectionOwn: true });
+              }}
+              aria-label="Bereich"
+              title="Bereich: woher die Aussage stammt (bleibt beim Neu-Import erhalten)"
+            >
+              <option value="during">{SECTION_LABEL.during}</option>
+              <option value="followup">{SECTION_LABEL.followup}</option>
+            </select>
+          )}
           {item.status === 'changed' && <span className="st-flag">geändert – prüfen</span>}
           {item.status === 'new' && <span className="st-flag">neu</span>}
         </div>
@@ -568,7 +575,6 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
             <LazyArea value={item.addition ?? ''} onSave={(v) => save({ ...item, addition: v.trim() || undefined })} autoFocus={!item.addition} />
           </label>
         )}
-        <div className="st-item-sub">{[SECTION_LABEL[item.section], item.link ?? item.person, d ? `Variante ${d}` : ''].filter(Boolean).join(' · ')}</div>
         {/* the tags in one line; the full editor only on request */}
         <div className="st-tagline">
           {onChips.map(({ g, c }) => (
@@ -591,36 +597,34 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
           )}
           {!onChips.length && !sugChips.length && !findingsOf(item).length && <span className="st-muted">noch keine Tags</span>}
           {(sugChips.length > 0 || sf) && <span className="st-muted st-sughint">Vorschläge anklicken, um sie zu übernehmen</span>}
-        </div>
-        {/* checked or not: one click toggles it */}
-        <div className="st-item-status">
-          <button
-            type="button"
-            className={item.confirmed && !open ? 'st-status is-ok' : 'st-status'}
-            onClick={toggleChecked}
-            title={item.confirmed && !open ? 'Geprüft. Klicken: rückgängig' : 'Als geprüft markieren. Nur angeklickte Tags zählen; nicht angeklickte Vorschläge werden verworfen.'}
-          >
-            {item.confirmed && !open ? '✓ Geprüft' : 'Als geprüft markieren'}
+          <button type="button" className="st-linkbtn st-tagtoggle" aria-expanded={tagsOpen} onClick={() => setTagsOpen((x) => !x)}>
+            {tagsOpen ? 'Tags schließen' : many ? `Tags für ${many} ausgewählte` : 'Tags bearbeiten'}
           </button>
         </div>
       </div>
       <div className="st-item-side">
-        <button type="button" className={`st-iconbtn st-tagtoggle${tagsOpen ? ' is-on' : ''}`} aria-expanded={tagsOpen} onClick={() => setTagsOpen((x) => !x)} aria-label={tagsOpen ? 'Tags schließen' : many ? `Tags für ${many} ausgewählte` : 'Tags bearbeiten'} title={tagsOpen ? 'Tags schließen' : many ? `Tags für ${many} ausgewählte` : 'Tags bearbeiten'}>
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z" />
-            <circle cx="7.5" cy="7.5" r="1.5" />
-          </svg>
+        <button
+          type="button"
+          className={item.confirmed && !open ? 'is-on' : ''}
+          onClick={() => {
+            if (!(item.confirmed && !open)) {
+              before.current = item;
+              return save(confirmItem(item, model.tags));
+            }
+            // again: undone; the suggestions it dropped come back (while the page stays open)
+            const b = before.current;
+            before.current = null;
+            save({ ...item, confirmed: b?.confirmed ?? false, ...(b ? { status: b.status, suggested: b.suggested.filter((c) => !item.chips.includes(c)), suggestedFinding: b.suggestedFinding && !findingsOf(item).includes(b.suggestedFinding) ? b.suggestedFinding : null } : {}) });
+          }}
+          title={item.confirmed && !open ? 'Geprüft. Nochmal klicken: rückgängig' : 'Als geprüft markieren. Nur angeklickte Tags zählen; nicht angeklickte Vorschläge werden verworfen.'}
+        >
+          {item.confirmed && !open ? 'Geprüft ✓' : 'Geprüft?'}
         </button>
         <MoreMenu
-          label="⋯"
-          title="Weitere Aktionen"
-          icon
           actions={[
-            [item.confirmed && !open ? 'Prüfung aufheben' : 'Als geprüft markieren', toggleChecked],
             ['Deutsch bearbeiten', () => setEditDe(true)],
             ['Original korrigieren', () => setEditOrig(true)],
             [item.question ? 'Frage bearbeiten' : 'Frage hinzufügen', () => (setQOnlyThis(false), setEditQ(true))],
-            ...(item.section !== 'survey' ? [[`Abschnitt: ${SECTION_LABEL[item.section === 'during' ? 'followup' : 'during']}`, () => moveSection(item.section === 'during' ? 'followup' : 'during')] as [string, () => void]] : []),
             ...(!showInt ? [['Interpretation hinzufügen', () => setShowInt(true)] as [string, () => void]] : []),
             ...(!showAdd ? [['Nachträgliche Ergänzung', () => setShowAdd(true)] as [string, () => void]] : []),
             ['Löschen', () => confirm('Aussage löschen?') && remove(item), true],

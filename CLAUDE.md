@@ -18,14 +18,15 @@ implementing it (from a mockup) and again after it (from the real app):
   (raw files named `aktuell|neu-desktop|tablet|mobile-<n>-<state>.png`).
 - Take the "Aktuell" screenshots from the app **before** changing the code.
 
-## Qualitatives Feedback: keep the statement rows' editing UI
+## Qualitatives Feedback: keep the statement rows as they are
 
-The statement rows keep their working tools when the layout changes:
-- tag chips with suggestions to click;
-- the tag editor behind the tag icon;
-- the "Als geprüft markieren" / "✓ Geprüft" toggle;
-- the "⋯" menu (Deutsch, Original, Frage, Abschnitt, Interpretation, Löschen);
-- the round selection.
+The statement rows keep their original UI/UX when the page layout around them
+changes (restored on request after a redesign):
+- the square checkbox;
+- the P-ID badge and the Abschnitt dropdown (Beobachtung / Nachgespräch);
+- "+ Interpretation hinzufügen";
+- the tag chips (suggestions to click) and the "Tags bearbeiten" link that opens the tag editor;
+- on the right, "Geprüft?" / "Geprüft ✓" and "Bearbeiten ⋯".
 
-A reference image that shows only text and a status is about the layout
-around the rows, not a reason to drop these.
+Reference images that show simpler rows are about the layout around the
+rows (card, filters, search), not a reason to change the rows themselves.

@@ -4859,3 +4859,62 @@ body:has(.st-root) {
     align-self: center;
   }
 }
+/* the search right under the AI actions, above "Alle auswählen" */
+.st-root .st-lcard .st-lc-search {
+  padding: 14px 0 2px;
+}
+/* ---- phones: one title row (menu icon, page title, participants picker) ---- */
+.st-topbar-scope {
+  display: none;
+}
+@media (max-width: 700px) {
+  .st-root .st-topbar {
+    gap: 10px;
+    padding: 8px 12px 8px 8px;
+    align-items: center;
+  }
+  .st-root .st-topbar .st-menu {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    border-radius: 10px;
+  }
+  .st-root .st-topbar-title {
+    flex: 1;
+    font-size: clamp(16px, 4.6vw, 19px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+  }
+  .st-topbar-scope {
+    display: flex;
+    flex: none;
+    position: relative;
+  }
+  .st-topbar-scope .st-scope > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .st-root .st-topbar-scope .st-scope-menu {
+    left: auto;
+    right: 0;
+    max-width: calc(100vw - 24px);
+  }
+  /* (the page head keeps only the section links) */
+  .st-root .st-pagehead .st-pagetools > .st-scope {
+    display: none;
+  }
+  .st-root .st-pagehead,
+  .st-root .st-pagehead.is-stuck {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'nav';
+  }
+}

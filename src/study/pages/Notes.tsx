@@ -1002,6 +1002,16 @@ export default function Notes() {
           </button>
           {busy && <span className="st-muted">{busy}</span>}
         </div>
+        <div className="st-lc-search">
+          {onePid ? (
+            <button type="button" className="st-lc-add" onClick={() => addFor(onePid)} aria-label="Aussage hinzufügen" title="Aussage hinzufügen">
+              {plus}
+            </button>
+          ) : (
+            <MoreMenu label={plus} title="Aussage hinzufügen" icon className="st-lc-add" actions={allPersons.map((pid) => [`Aussage für ${pid}`, () => addFor(pid)] as [string, () => unknown])} />
+          )}
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Aussagen durchsuchen …" aria-label="Aussagen durchsuchen" />
+        </div>
         <div className="st-lc-filters">
         <div className="st-lc-sel">
           <label className="st-lc-selall">
@@ -1039,16 +1049,6 @@ export default function Notes() {
             note={selShown.length ? undefined : 'Erst Aussagen auswählen'}
           />
         </div>
-        </div>
-        <div className="st-lc-search">
-          {onePid ? (
-            <button type="button" className="st-lc-add" onClick={() => addFor(onePid)} aria-label="Aussage hinzufügen" title="Aussage hinzufügen">
-              {plus}
-            </button>
-          ) : (
-            <MoreMenu label={plus} title="Aussage hinzufügen" icon className="st-lc-add" actions={allPersons.map((pid) => [`Aussage für ${pid}`, () => addFor(pid)] as [string, () => unknown])} />
-          )}
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Aussagen durchsuchen …" aria-label="Aussagen durchsuchen" />
         </div>
         <div className="st-tabs st-lc-tabs" role="tablist" aria-label="Anzeigen">
           {tabs.map(([k, l, n]) => (

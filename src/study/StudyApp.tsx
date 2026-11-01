@@ -312,13 +312,19 @@ export default function StudyApp() {
           </div>
         )}
         <header className="st-topbar">
-          <button type="button" className="st-menu" onClick={() => setDrawer((d) => !d)} aria-expanded={drawer} aria-controls="st-nav">
-            Menü
+          <button type="button" className="st-menu" onClick={() => setDrawer((d) => !d)} aria-expanded={drawer} aria-controls="st-nav" aria-label="Menü" title="Menü">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
           </button>
           <span className="st-topbar-title">
             {current.title}
             {subTitle && <span className="st-subtitle"> · {subTitle}</span>}
           </span>
+          {/* (on phones the participants picker sits in the title row) */}
+          <div className="st-topbar-scope">
+            <ScopePicker model={model} scope={scope} omitted={omitted} onScope={setScope} onOmit={setOmit} />
+          </div>
         </header>
         <nav id="st-nav" className="st-nav" aria-label="Auswertung Usertest">
           <ul>

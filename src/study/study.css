@@ -4761,3 +4761,13 @@ body:has(.st-root) {
     flex-basis: 100%;
   }
 }
+/* phones: both AI buttons the same size, one under the other; Kriterien below */
+@media (max-width: 700px) {
+  .st-root .st-lc-ai .st-lc-pill {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+  .st-root .st-lc-ai .st-linkbtn {
+    margin-left: auto;
+  }
+}

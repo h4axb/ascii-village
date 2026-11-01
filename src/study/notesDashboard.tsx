@@ -31,6 +31,7 @@ export function matchDash(m: Model, i: ItemDoc, f: DashFilter, skip?: 'kpi' | 'p
 
 const PICK_KEY = 'asciia-study-dash-group';
 const MORE_KEY = 'asciia-study-dash-more';
+const EVID_KEY = 'asciia-study-dash-evidence';
 const read = (k: string) => {
   try {
     return localStorage.getItem(k);
@@ -72,6 +73,7 @@ export function NotesDashboard({ model, live, shown, f, setF, view }: { model: M
   const groups = model.tags.filter((g) => g !== artGroup && g !== prioGroup && g.chips.length);
   const [pick, setPick] = useState(() => read(PICK_KEY) ?? '');
   const [more, setMore] = useState(() => read(MORE_KEY) === '1');
+  const [evOpen, setEvOpen] = useState(() => read(EVID_KEY) === '1');
   const group: TagGroup | undefined = groups.find((g) => g.id === pick) ?? groups.find((g) => g.id === 'thema') ?? groups[0];
 
   const tile = (k: Kpi, label: string, hint: string) => {
@@ -132,7 +134,8 @@ export function NotesDashboard({ model, live, shown, f, setF, view }: { model: M
   };
 
   return (
-    <section className="st-dash" aria-label="Überblick und Filter" data-nav="Überblick">
+    <>
+    <section className="st-dash" aria-label="Probleme" data-nav="Probleme">
       <div className="st-dash-kpis">
         {tile('problem', kpiName.problem, 'Aussagen mit der Art „Problem“ – anklicken zum Filtern')}
         {tile('essential', kpiName.essential, 'Probleme mit der Priorität „Essenziell“ – anklicken zum Filtern')}
@@ -140,7 +143,6 @@ export function NotesDashboard({ model, live, shown, f, setF, view }: { model: M
         {tile('unchecked', kpiName.unchecked, 'Noch nicht geprüfte Aussagen oder solche mit offenen KI-Vorschlägen – anklicken zum Filtern')}
       </div>
 
-      <div className="st-dash-main">
         <div className="st-dash-card">
           <div className="st-dash-cardhead">
             <h3>
@@ -197,17 +199,31 @@ export function NotesDashboard({ model, live, shown, f, setF, view }: { model: M
           )}
         </div>
 
-        <div className="st-dash-card st-dash-evidence">
-          <div className="st-dash-cardhead">
-            <h3>
-              Gefilterte Beobachtungen: <span className="st-dash-count">{`${shown.length} von ${live.length}`}</span>
-            </h3>
-            {active && (
-              <button type="button" className="st-linkbtn" onClick={() => setF(NO_DASH)}>
-                Zurücksetzen
-              </button>
-            )}
-          </div>
+    </section>
+        <details
+          className="st-dash-card st-dash-evidence"
+          data-nav="Beobachtungen"
+          open={evOpen}
+          onToggle={(e) => {
+            const o = (e.target as HTMLDetailsElement).open;
+            setEvOpen(o);
+            write(EVID_KEY, o ? '1' : '0');
+          }}
+        >
+          <summary className="st-dash-evsum">
+            <span>
+              <b>Gefilterte Beobachtungen:</b> <span className="st-dash-count">{`${shown.length} von ${live.length}`}</span>
+              {active && <span className="st-muted">{` · ${[f.kpi, f.person, ...Object.keys(f.tags)].filter(Boolean).length} Filter aktiv`}</span>}
+            </span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </summary>
+          {active && (
+            <button type="button" className="st-linkbtn st-dash-reset" onClick={() => setF(NO_DASH)}>
+              Zurücksetzen
+            </button>
+          )}
           {active && (
             <div className="st-dash-active">
               {f.kpi && (
@@ -248,12 +264,11 @@ export function NotesDashboard({ model, live, shown, f, setF, view }: { model: M
             <p className="st-muted">Keine Aussage passt zu den Filtern.</p>
           )}
           {shown.length > evidence.length && (
-            <button type="button" className="st-linkbtn" onClick={() => jump('.st-notes-bar', 'start')}>
+            <button type="button" className="st-linkbtn" onClick={() => jump('.st-lcard', 'start')}>
               {`Alle ${shown.length} unten anzeigen`}
             </button>
           )}
-        </div>
-      </div>
-    </section>
+        </details>
+    </>
   );
 }

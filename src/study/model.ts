@@ -10,6 +10,7 @@ import type { ColumnRole, Design, Side, GameData, Invite, ItemDoc, NotesMeta, Pe
 import { CATEGORY, ROLE_NAME } from './types';
 import { detectZone, matchRows, withHand, parseTallyTime, SUBMIT_AFTER, SUBMIT_BEFORE, type MatchOptions, type MatchStep, type MatchVia, type TallyZone, type ZoneGuess } from './match';
 import { optionChosen, partOf } from './tally';
+import { orderOfText } from './profile';
 
 // ---- the scope filter: everyone, one person, or one of their links ----
 export type Scope = { kind: 'all' } | { kind: 'person'; id: string } | { kind: 'link'; id: string; key: string };
@@ -227,7 +228,7 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
       .map(linkInfo)
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
     const trackedGroup = links.find((l) => l.order)?.order ?? asOrder(game.events.find((e) => e.participant === id && inRun(e))?.order) ?? asOrder(game.feedback.find((r) => r.participant === id && inRun(r))?.order);
-    const notesGroup = notesMeta[id]?.group?.toUpperCase().replace(/[^AB]/g, '') || null;
+    const notesGroup = orderOfText(notesMeta[id]?.group);
     // several links: their times added up, or the main link's only
     const main = links.find((l) => l.key === doc.mainLink) ?? [...links].sort((a, b) => (b.linkMinutes ?? 0) - (a.linkMinutes ?? 0))[0];
     const agg = (f: (l: LinkInfo) => number | null) => {
@@ -368,6 +369,8 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
     if (person) {
       const age = docs.people[person]?.age;
       if (age != null) out.info.Alter = String(age);
+      const job = docs.people[person]?.job?.trim();
+      if (job) out.info.Beruf = job;
     }
     survey.push(out);
   });

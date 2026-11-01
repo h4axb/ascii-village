@@ -5,7 +5,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Chip, ChipRole, ItemDoc, NotesMeta, Section as Sec, TagGroup } from '../types';
 import { CATEGORY, hintOf, ROLE_NAME, SECTION_LABEL, type BuiltinRole, type CategoryRole, type MeaningsSetting } from '../types';
-import { categoryMeanings, distinctPersons, effectiveChips, findingsOf, groupActive, itemsWithRole, linkKeyOf, meaningsSetting, setFindings, shortName, withFinding, withoutFinding, type Model, type Person } from '../model';
+import { categoryMeanings, distinctPersons, effectiveChips, findingsOf, groupActive, itemsWithRole, meaningsSetting, setFindings, shortName, withFinding, withoutFinding, type Model } from '../model';
+import { PersonCard } from '../personCard';
 import { linkLabelOf, parseNotes, planNotes } from '../notes';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
@@ -278,102 +279,6 @@ function ChipCell({ item, g, onChange, labelOnly, onTag, many }: { item: ItemDoc
 
 // ---- a participant's header: name, links, slot, group; editable, links can be added ----
 // (each link with a ?k= key counts as this participant's run, so all their runs are tracked)
-function PersonInfo({ pid, meta, person }: { pid: string; meta?: NotesMeta; person?: Person }) {
-  const { study } = useCtx();
-  const [edit, setEdit] = useState(false);
-  const blank: NotesMeta = { id: pid, name: '', link: '', slot: '', group: '' };
-  const [draft, setDraft] = useState<NotesMeta>(meta ?? blank);
-  const links = (m: NotesMeta) => [m.link, ...(m.links ?? [])].filter((l) => l.trim());
-  const shown = links(meta ?? blank);
-  // a link the game knows: its label (P005.2); otherwise not found
-  const tracked = (l: string) => {
-    const k = linkKeyOf(l);
-    return k ? person?.links.find((x) => x.key === k)?.label ?? null : null;
-  };
-  const open = () => {
-    const m = meta ?? blank;
-    setDraft({ ...m, links: m.links ?? [] });
-    setEdit(true);
-  };
-  const saveIt = () => {
-    const ls = links(draft).map((l) => l.trim());
-    const next: NotesMeta = { ...draft, id: pid, name: draft.name.trim(), slot: draft.slot.trim(), group: draft.group.trim(), link: ls[0] ?? '', links: ls.slice(1) };
-    const all = { ...((study.latest().settings.notesMeta ?? {}) as Record<string, NotesMeta>), [pid]: next };
-    study.commit([{ coll: 'settings', id: 'notesMeta', data: all }]);
-    logChange(study, `${pid}: Profil bearbeitet (${[next.name && 'Name', 'Links', next.slot && 'Termin', next.group && 'Gruppe'].filter(Boolean).join(', ')})`);
-    setEdit(false);
-  };
-  if (edit) {
-    const ls = [draft.link, ...(draft.links ?? [])];
-    const setLink = (k: number, v: string) => {
-      const n = [...ls];
-      n[k] = v;
-      setDraft({ ...draft, link: n[0] ?? '', links: n.slice(1) });
-    };
-    return (
-      <div className="st-pinfo-edit">
-        <h2>{pid}</h2>
-        <label>
-          <span className="st-cell-label">Name (nur hier sichtbar)</span>
-          <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-        </label>
-        <label>
-          <span className="st-cell-label">Termin</span>
-          <input value={draft.slot} onChange={(e) => setDraft({ ...draft, slot: e.target.value })} placeholder="11:00-12:00 (21.10.26)" />
-        </label>
-        <label>
-          <span className="st-cell-label">Gruppe</span>
-          <input value={draft.group} onChange={(e) => setDraft({ ...draft, group: e.target.value })} />
-        </label>
-        <div className="st-pinfo-links">
-          <span className="st-cell-label">Links (je Durchlauf einer)</span>
-          {ls.map((l, k) => (
-            <div key={k} className="st-pinfo-link">
-              <span className="st-muted">{`Link ${k + 1}`}</span>
-              <input value={l} onChange={(e) => setLink(k, e.target.value)} placeholder="https://…/intro/1?k=…" aria-label={`Link ${k + 1}`} />
-              <span className="st-pinfo-state">{l.trim() && (tracked(l) ? <span className="st-badge">{`getrackt als ${tracked(l)}`}</span> : linkKeyOf(l) ? <span className="st-muted">wird nach dem Speichern zugeordnet</span> : <span className="st-flag">kein ?k=-Schlüssel</span>)}</span>
-              <button type="button" className="st-linkbtn" onClick={() => setDraft({ ...draft, link: k === 0 ? (ls[1] ?? '') : draft.link, links: k === 0 ? ls.slice(2) : ls.slice(1).filter((_, j) => j !== k - 1) })} aria-label={`Link ${k + 1} entfernen`}>
-                entfernen
-              </button>
-            </div>
-          ))}
-          <button type="button" className="st-linkbtn" onClick={() => setDraft({ ...draft, links: [...(draft.links ?? []), ''] })}>
-            + Link
-          </button>
-        </div>
-        <div className="st-pinfo-foot">
-          <button type="button" onClick={() => setEdit(false)}>
-            Abbrechen
-          </button>
-          <button type="button" className="is-primary" onClick={saveIt}>
-            Speichern
-          </button>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="st-pinfo" onClick={open} title="Klicken: Angaben bearbeiten, Links hinzufügen">
-      <h2>{pid}</h2>
-      {meta?.name && <span className="st-name" data-notr>{meta.name}</span>}
-      {shown.map((l, k) => (
-        <span key={k} className="st-muted" data-notr>
-          {shown.length > 1 && !/^link\s*\d/i.test(l) ? `Link ${k + 1}: ${l}` : l}
-          {linkKeyOf(l) && !tracked(l) && <span className="st-flag">nicht im Spiel gefunden</span>}
-        </span>
-      ))}
-      {meta?.slot && <span className="st-muted" data-notr>{meta.slot}</span>}
-      {meta?.group && <span className="st-muted">Gruppe {meta.group}</span>}
-      {person?.groupMismatch && <span className="st-flag">Tracking: {person.trackedGroup}</span>}
-      {person?.excluded && <span className="st-flag">ausgeschlossen</span>}
-      {!!person?.links.length && <span className="st-muted">{`getrackt: ${person.links.map((x) => x.label).join(', ')}`}</span>}
-      <button type="button" className="st-linkbtn" onClick={(e) => (e.stopPropagation(), open())}>
-        bearbeiten · + Link
-      </button>
-    </div>
-  );
-}
-
 const EDITORS_KEY = 'asciia-study-tag-editors';
 function openEditors(): Set<string> {
   try {
@@ -468,10 +373,6 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
         <p data-notr onClick={() => setEditDe(true)} title="Klicken: bearbeiten">
           {item.de}
         </p>
-      ) : !showInt ? (
-        <button type="button" className="st-linkbtn" onClick={() => setShowInt(true)}>
-          + Interpretation hinzufügen
-        </button>
       ) : null}
       {item.de && (item.deAuto || item.deStale) && (
         <div className="st-item-meta">
@@ -562,6 +463,20 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
       </div>
     );
   };
+  const toggleChecked = () => {
+    if (!(item.confirmed && !open)) {
+      before.current = item;
+      return save(confirmItem(item, model.tags));
+    }
+    // again: undone; the suggestions it dropped come back (while the page stays open)
+    const b = before.current;
+    before.current = null;
+    save({ ...item, confirmed: b?.confirmed ?? false, ...(b ? { status: b.status, suggested: b.suggested.filter((c) => !item.chips.includes(c)), suggestedFinding: b.suggestedFinding && !findingsOf(item).includes(b.suggestedFinding) ? b.suggestedFinding : null } : {}) });
+  };
+  const moveSection = (section: 'during' | 'followup') => {
+    logChange(study, `${item.person}: Bereich „${SECTION_LABEL[item.section]}“ → „${SECTION_LABEL[section]}“ (${item.text.slice(0, 40)}${item.text.length > 40 ? ' …' : ''})`);
+    save({ ...item, section, sectionOwn: true });
+  };
   const findingRow = (
     <div className="st-tagrow">
       <div className="st-tagrow-head">
@@ -598,31 +513,16 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
   );
   return (
     <div ref={rowRef} data-anchor={`i-${item.id}`} className={`st-item${item.confirmed ? ' is-confirmed' : ''}${item.status ? ` is-${item.status}` : ''}${fresh ? ' is-fresh' : ''}${selected ? ' is-selected' : ''}`}>
+      {onSelect && (
+        <label className="st-item-pick" title="Auswählen (Umschalt: Bereich)">
+          <input type="checkbox" className="st-round" checked={!!selected} onChange={() => undefined} onClick={(e) => onSelect(e.shiftKey)} aria-label="Auswählen (Umschalt: Bereich)" />
+        </label>
+      )}
       <div className="st-item-text">
         <div className="st-item-meta">
-          {onSelect && <input type="checkbox" className="st-item-sel" checked={!!selected} onChange={() => undefined} onClick={(e) => onSelect(e.shiftKey)} aria-label="Auswählen (Umschalt: Bereich)" title="Auswählen (Umschalt: Bereich)" />}
-          <span className="st-pid">
-            {item.link ?? item.person}
-            {d ? ` · ${d}` : ''}
-          </span>
-          {item.section === 'survey' ? (
-            <span>{SECTION_LABEL[item.section]}</span>
-          ) : (
-            <select
-              className="st-item-section"
-              value={item.section}
-              onChange={(e) => {
-                const section = e.target.value as 'during' | 'followup';
-                logChange(study, `${item.person}: Bereich „${SECTION_LABEL[item.section]}“ → „${SECTION_LABEL[section]}“ (${item.text.slice(0, 40)}${item.text.length > 40 ? ' …' : ''})`);
-                save({ ...item, section, sectionOwn: true });
-              }}
-              aria-label="Bereich"
-              title="Bereich: woher die Aussage stammt (bleibt beim Neu-Import erhalten)"
-            >
-              <option value="during">{SECTION_LABEL.during}</option>
-              <option value="followup">{SECTION_LABEL.followup}</option>
-            </select>
-          )}
+          <span className="st-item-section">{SECTION_LABEL[item.section]}</span>
+          {item.link && item.link !== item.person && <span>{item.link}</span>}
+          {d && <span>{`Variante ${d}`}</span>}
           {item.status === 'changed' && <span className="st-flag">geändert – prüfen</span>}
           {item.status === 'new' && <span className="st-flag">neu</span>}
         </div>
@@ -692,34 +592,36 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
           )}
           {!onChips.length && !sugChips.length && !findingsOf(item).length && <span className="st-muted">noch keine Tags</span>}
           {(sugChips.length > 0 || sf) && <span className="st-muted st-sughint">Vorschläge anklicken, um sie zu übernehmen</span>}
-          <button type="button" className="st-linkbtn st-tagtoggle" aria-expanded={tagsOpen} onClick={() => setTagsOpen((x) => !x)}>
-            {tagsOpen ? 'Tags schließen' : many ? `Tags für ${many} ausgewählte` : 'Tags bearbeiten'}
+        </div>
+        {/* checked or not: one click toggles it */}
+        <div className="st-item-status">
+          <button
+            type="button"
+            className={item.confirmed && !open ? 'st-status is-ok' : 'st-status'}
+            onClick={toggleChecked}
+            title={item.confirmed && !open ? 'Geprüft. Klicken: rückgängig' : 'Als geprüft markieren. Nur angeklickte Tags zählen; nicht angeklickte Vorschläge werden verworfen.'}
+          >
+            {item.confirmed && !open ? '✓ Geprüft' : 'Als geprüft markieren'}
           </button>
         </div>
       </div>
       <div className="st-item-side">
-        <button
-          type="button"
-          className={item.confirmed && !open ? 'is-on' : ''}
-          onClick={() => {
-            if (!(item.confirmed && !open)) {
-              before.current = item;
-              return save(confirmItem(item, model.tags));
-            }
-            // again: undone; the suggestions it dropped come back (while the page stays open)
-            const b = before.current;
-            before.current = null;
-            save({ ...item, confirmed: b?.confirmed ?? false, ...(b ? { status: b.status, suggested: b.suggested.filter((c) => !item.chips.includes(c)), suggestedFinding: b.suggestedFinding && !findingsOf(item).includes(b.suggestedFinding) ? b.suggestedFinding : null } : {}) });
-          }}
-          title={item.confirmed && !open ? 'Geprüft. Nochmal klicken: rückgängig' : 'Als geprüft markieren. Nur angeklickte Tags zählen; nicht angeklickte Vorschläge werden verworfen.'}
-        >
-          {item.confirmed && !open ? 'Geprüft ✓' : 'Geprüft?'}
+        <button type="button" className={`st-iconbtn st-tagtoggle${tagsOpen ? ' is-on' : ''}`} aria-expanded={tagsOpen} onClick={() => setTagsOpen((x) => !x)} aria-label={tagsOpen ? 'Tags schließen' : many ? `Tags für ${many} ausgewählte` : 'Tags bearbeiten'} title={tagsOpen ? 'Tags schließen' : many ? `Tags für ${many} ausgewählte` : 'Tags bearbeiten'}>
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z" />
+            <circle cx="7.5" cy="7.5" r="1.5" />
+          </svg>
         </button>
         <MoreMenu
+          label="⋯"
+          title="Weitere Aktionen"
+          icon
           actions={[
+            [item.confirmed && !open ? 'Prüfung aufheben' : 'Als geprüft markieren', toggleChecked],
             ['Deutsch bearbeiten', () => setEditDe(true)],
             ['Original korrigieren', () => setEditOrig(true)],
             [item.question ? 'Frage bearbeiten' : 'Frage hinzufügen', () => (setQOnlyThis(false), setEditQ(true))],
+            ...(item.section !== 'survey' ? [[`Abschnitt: ${SECTION_LABEL[item.section === 'during' ? 'followup' : 'during']}`, () => moveSection(item.section === 'during' ? 'followup' : 'during')] as [string, () => void]] : []),
             ...(!showInt ? [['Interpretation hinzufügen', () => setShowInt(true)] as [string, () => void]] : []),
             ...(!showAdd ? [['Nachträgliche Ergänzung', () => setShowAdd(true)] as [string, () => void]] : []),
             ['Löschen', () => confirm('Aussage löschen?') && remove(item), true],
@@ -755,7 +657,7 @@ function ItemRow({ item, model, save, remove, fresh, selected, onSelect, onTag, 
 }
 
 // "Bearbeiten ⋯": the rarer actions of a statement, out of the way until needed
-function MoreMenu({ actions, up, label = 'Bearbeiten ⋯' }: { actions: [string, () => unknown, boolean?][]; up?: boolean; label?: string }) {
+function MoreMenu({ actions, up, label = 'Bearbeiten ⋯', title, icon, className }: { actions: [string, () => unknown, boolean?][]; up?: boolean; label?: React.ReactNode; title?: string; icon?: boolean; className?: string }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -765,8 +667,10 @@ function MoreMenu({ actions, up, label = 'Bearbeiten ⋯' }: { actions: [string,
     return () => document.removeEventListener('click', close);
   }, []);
   return (
-    <details ref={ref} className={`st-more${up ? ' is-up' : ''}`}>
-      <summary>{label}</summary>
+    <details ref={ref} className={`st-more${up ? ' is-up' : ''}${icon ? ' is-icon' : ''}${className ? ` ${className}` : ''}`}>
+      <summary aria-label={title} title={title}>
+        {label}
+      </summary>
       <div className="st-more-list" role="menu">
         {actions.map(([label, run, danger]) => (
           <button
@@ -792,7 +696,7 @@ function MoreMenu({ actions, up, label = 'Bearbeiten ⋯' }: { actions: [string,
 export default function Notes() {
   const ctx = useCtx();
   const { study, model, scope, omitted } = ctx;
-  const [filter, setFilter] = useState<'all' | 'open' | 'changed'>('all');
+  const [filter, setFilter] = useState<'all' | 'open' | 'checked' | 'changed'>('all');
   const [q, setQ] = useState('');
   const [dash, setDash] = useState<DashFilter>(NO_DASH);
   const view = useContentView();
@@ -808,12 +712,12 @@ export default function Notes() {
   }, [model.allItems, model.links, scope, omitted]);
   const removed = scoped.filter((i) => i.status === 'removed');
   const live = scoped.filter((i) => i.status !== 'removed');
-  const shown = live.filter(
-    (i) =>
-      (filter === 'all' || (filter === 'open' ? !i.confirmed || i.suggested.length > 0 : i.status === 'changed' || i.status === 'new')) &&
-      (!q || `${i.text} ${i.de ?? ''}`.toLowerCase().includes(q.toLowerCase())) &&
-      matchDash(model, i, dash),
-  );
+  const isOpen = (i: ItemDoc) => !i.confirmed || i.suggested.length > 0;
+  const isChangedItem = (i: ItemDoc) => i.status === 'changed' || i.status === 'new';
+  const inTab = (i: ItemDoc, f: typeof filter) => f === 'all' || (f === 'open' ? isOpen(i) : f === 'checked' ? !isOpen(i) : isChangedItem(i));
+  // (search and the overview's filters; the tabs count against these)
+  const found = live.filter((i) => (!q || `${i.text} ${i.de ?? ''}`.toLowerCase().includes(q.toLowerCase())) && matchDash(model, i, dash));
+  const shown = found.filter((i) => inTab(i, filter));
   const byPerson = [...new Set(shown.map((i) => i.person))].sort();
   const open = live.filter((i) => !i.confirmed);
   const mineOf = (pid: string) => shown.filter((i) => i.person === pid).sort((a, b) => sectionRank(a.section) - sectionRank(b.section) || a.order - b.order);
@@ -935,44 +839,45 @@ export default function Notes() {
         Noch keine Notizen. Unter <a href="#daten">Daten &amp; Validierung → Hochladen</a> einlesen.
       </Empty>
     );
+  // one participant chosen above: their profile first, before everything else
+  const onePid = scope.kind === 'all' ? null : scope.kind === 'link' ? (model.links.find((l) => l.key === scope.key)?.person ?? null) : scope.id;
+  const card = (pid: string) => <PersonCard pid={pid} meta={metas[pid]} person={model.persons.find((p) => p.id === pid)} />;
+  const addFor = (pid: string) => {
+    const id = `m-${pid}-${Date.now().toString(36)}`;
+    // (shown at once, opened for typing; filters that would hide it are reset)
+    setFilter('all');
+    setQ('');
+    setDash(NO_DASH);
+    setFresh(id);
+    save({ id, person: pid, section: 'during', text: '', order: Math.max(0, ...live.filter((x) => x.person === pid).map((x) => x.order)) + 1, chips: [], suggested: [], manual: true });
+  };
+  const allPersons = [...new Set(live.map((i) => i.person))].sort();
+  const allSel = shown.length > 0 && shown.every((i) => sel.has(i.id));
+  const tabs: [typeof filter, string, number][] = [
+    ['all', 'Alle', found.length],
+    ['open', 'Ungeprüft', found.filter(isOpen).length],
+    ['checked', 'Geprüft', found.filter((i) => !isOpen(i)).length],
+    ...(found.some(isChangedItem) || filter === 'changed' ? [['changed', 'Geändert / neu', found.filter(isChangedItem).length] as [typeof filter, string, number]] : []),
+  ];
+  const rows = (items: ItemDoc[]) =>
+    items.map((i) => <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} fresh={i.id === fresh} selected={sel.has(i.id)} onSelect={(shift) => select(i.id, shift)} {...(sel.has(i.id) && selShown.length > 1 ? { onTag: (g: TagGroup, chip: string) => tagSelected(i, g, chip), many: selShown.length } : {})} />);
+  const plus = (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+  const spark = (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+      <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
+    </svg>
+  );
+
   return (
     <>
-      <NotesDashboard model={model} live={live} shown={shown} f={dash} setF={setDash} view={view} />
       <PageIntro />
-      <div className="st-toolbar st-notes-bar">
-        <div className="st-barpart" role="group" aria-label="Anzeigen">
-          <span className="st-barlabel">Anzeigen</span>
-          <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Anzeige">
-            <option value="all">Alle Aussagen ({live.length})</option>
-            <option value="open">Ungeprüft ({open.length})</option>
-            <option value="changed">Geändert / neu ({live.filter((i) => i.status).length})</option>
-          </select>
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Suchen in Aussagen" />
-        </div>
-        <div className="st-barpart" role="group" aria-label="KI">
-          <span className="st-barlabel">KI</span>
-          <button
-            type="button"
-            disabled={!forTags.length || !!busy?.endsWith('…')}
-            onClick={() => void suggestOpen()}
-            title={`Die KI schlägt passende Tags und einen Befund vor – für ${selShown.length ? 'die ausgewählten' : 'alle ungeprüften'} Aussagen. Du prüfst und änderst alles im Fenster, bevor etwas gespeichert wird.\nBeispiel: „Crafting-Menü schwer zu finden“ → Bereich: Spiel · Art: Problem · Thema: Crafting.`}
-          >
-            {`KI: Tags vorschlagen (${forTags.length})`}
-          </button>
-          <button
-            type="button"
-            disabled={!forRewrite.length || !!busy?.endsWith('…')}
-            onClick={() => void rewriteShown()}
-            title={`Die KI formuliert ${selShown.length ? 'die ausgewählten' : 'die angezeigten'} Aussagen nach deinen Kriterien neu (Bedeutung bleibt gleich). Du vergleichst alt und neu im Fenster und kannst jeden Vorschlag selbst anpassen. Die Originalnotiz bleibt erhalten.\nBeispiel: „menü crafting nich gefunden, hat lange gesucht“ → „Die Testperson fand das Crafting-Menü nicht und suchte lange danach.“`}
-          >
-            {`KI: Aussagen umformulieren (${forRewrite.length})`}
-          </button>
-          <button type="button" className="st-linkbtn" aria-expanded={showCriteria} onClick={() => setShowCriteria((x) => !x)} title="Festlegen, wie die KI umformulieren soll (z. B. sachlich, Präsens, vollständige Sätze).">
-            Kriterien
-          </button>
-        </div>
-        {busy && <span className="st-muted">{busy}</span>}
-      </div>
+      {onePid && <div data-nav="Profil">{card(onePid)}</div>}
+      <NotesDashboard model={model} live={live} shown={shown} f={dash} setF={setDash} view={view} />
       {showCriteria && (
         <div className="st-criteria">
           <label className="st-fprop-field">
@@ -1050,42 +955,102 @@ export default function Notes() {
         </div>
       )}
 
-      {byPerson.map((pid) => {
-        const meta = metas[pid];
-        const mine = mineOf(pid);
-        const person = model.persons.find((p) => p.id === pid);
-        return (
-          <section key={pid} className="st-section st-notes-person" data-anchor={`p-${pid}`} data-nav={pid}>
-            <header className="st-notes-head">
-              <PersonInfo pid={pid} meta={meta} person={person} />
-              <div className="st-notes-actions">
-              <button type="button" onClick={() => study.commit(mine.map((i) => ({ coll: 'items' as const, id: i.id, data: confirmItem(i, model.tags) })))}>
-                Alle als geprüft markieren
-              </button>
-              <button type="button" onClick={() => selectAll(mine)}>
-                Alle auswählen
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const id = `m-${pid}-${Date.now().toString(36)}`;
-                  // (shown at once, opened for typing; filters that would hide it are reset)
-                  setFilter('all');
-                  setQ('');
-                  setFresh(id);
-                  save({ id, person: pid, section: 'during', text: '', order: Math.max(0, ...mine.map((x) => x.order)) + 1, chips: [], suggested: [], manual: true });
-                }}
-              >
-                + Aussage
-              </button>
-              </div>
-            </header>
-            {mine.map((i) => (
-              <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} fresh={i.id === fresh} selected={sel.has(i.id)} onSelect={(shift) => select(i.id, shift)} {...(sel.has(i.id) && selShown.length > 1 ? { onTag: (g: TagGroup, chip: string) => tagSelected(i, g, chip), many: selShown.length } : {})} />
-            ))}
-          </section>
-        );
-      })}
+      <section className="st-lcard" data-nav="Aussagen" aria-label="Aussagen">
+        <div className="st-lc-title">
+          <h2>Qualitatives Feedback</h2>
+          <span className="st-muted">{onePid ? (scope.kind === 'link' ? scope.id : onePid) : `Alle (${allPersons.length})`}</span>
+        </div>
+        <div className="st-lc-row st-lc-ai">
+          <button
+            type="button"
+            className="st-lc-pill"
+            disabled={!forTags.length || !!busy?.endsWith('…')}
+            onClick={() => void suggestOpen()}
+            title={`Die KI schlägt passende Tags und einen Befund vor – für ${selShown.length ? 'die ausgewählten' : 'alle ungeprüften'} Aussagen. Du prüfst und änderst alles im Fenster, bevor etwas gespeichert wird.\nBeispiel: „Crafting-Menü schwer zu finden“ → Bereich: Spiel · Art: Problem · Thema: Crafting.`}
+          >
+            {spark}
+            {`Tags vorschlagen (${forTags.length})`}
+          </button>
+          <button
+            type="button"
+            className="st-lc-pill"
+            disabled={!forRewrite.length || !!busy?.endsWith('…')}
+            onClick={() => void rewriteShown()}
+            title={`Die KI formuliert ${selShown.length ? 'die ausgewählten' : 'die angezeigten'} Aussagen nach deinen Kriterien neu (Bedeutung bleibt gleich). Du vergleichst alt und neu im Fenster und kannst jeden Vorschlag selbst anpassen. Die Originalnotiz bleibt erhalten.\nBeispiel: „menü crafting nich gefunden, hat lange gesucht“ → „Die Testperson fand das Crafting-Menü nicht und suchte lange danach.“`}
+          >
+            {spark}
+            {`Aussagen umformulieren (${forRewrite.length})`}
+          </button>
+          <button type="button" className="st-linkbtn" aria-expanded={showCriteria} onClick={() => setShowCriteria((x) => !x)} title="Festlegen, wie die KI umformulieren soll (z. B. sachlich, Präsens, vollständige Sätze).">
+            Kriterien
+          </button>
+          {busy && <span className="st-muted">{busy}</span>}
+        </div>
+        <div className="st-lc-row st-lc-sel">
+          <label className="st-lc-selall">
+            <input type="checkbox" className="st-round" checked={allSel} disabled={!shown.length} onChange={() => (allSel ? setSel(new Set()) : selectAll(shown))} />
+            {selShown.length ? `${selShown.length} ausgewählt` : 'Alle auswählen'}
+          </label>
+          <MoreMenu
+            label={
+              <>
+                Aktionen
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </>
+            }
+            className="st-lc-actions"
+            actions={[
+              [`Alle angezeigten als geprüft markieren (${shown.length})`, () => putAll(shown.map((i) => confirmItem(i, model.tags)), 'Als geprüft markiert')],
+              ...(selShown.length
+                ? ([
+                    [`Ausgewählte als geprüft markieren (${selShown.length})`, () => putAll(selShown.map((i) => confirmItem(i, model.tags)), 'Als geprüft markiert')],
+                    ['Frage setzen …', () => setBulk('frage')],
+                    ['Abschnitt: Beobachtung', () => bulkSection('during')],
+                    ['Abschnitt: Nachgespräch', () => bulkSection('followup')],
+                    ['Befund zuordnen …', () => setBulk('befund')],
+                    ['Befund entfernen …', () => setBulk('befund-weg')],
+                    ['Auswahl aufheben', () => setSel(new Set())],
+                    ['Ausgewählte löschen', () => void bulkDelete(), true],
+                  ] as [string, () => unknown, boolean?][])
+                : []),
+            ]}
+          />
+        </div>
+        <div className="st-lc-head">
+          <h3>Aussagenliste</h3>
+          <span className="st-muted">{`${shown.length} ${shown.length === 1 ? 'Treffer' : 'Treffer'}`}</span>
+        </div>
+        <div className="st-lc-search">
+          {onePid ? (
+            <button type="button" className="st-lc-add" onClick={() => addFor(onePid)} aria-label="Aussage hinzufügen" title="Aussage hinzufügen">
+              {plus}
+            </button>
+          ) : (
+            <MoreMenu label={plus} title="Aussage hinzufügen" icon className="st-lc-add" actions={allPersons.map((pid) => [`Aussage für ${pid}`, () => addFor(pid)] as [string, () => unknown])} />
+          )}
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Aussagen durchsuchen …" aria-label="Aussagen durchsuchen" />
+        </div>
+        <div className="st-tabs st-lc-tabs" role="tablist" aria-label="Anzeigen">
+          {tabs.map(([k, l, n]) => (
+            <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)}>
+              {`${l} (${n})`}
+            </button>
+          ))}
+        </div>
+        <div className="st-tabpanel st-lc-panel" role="tabpanel">
+          {!shown.length && <p className="st-muted st-lc-empty">Keine Aussage passt zu Suche und Filtern.</p>}
+          {onePid
+            ? rows(mineOf(onePid))
+            : byPerson.map((pid) => (
+                <section key={pid} className="st-notes-person" data-anchor={`p-${pid}`} data-nav={pid}>
+                  {card(pid)}
+                  {rows(mineOf(pid))}
+                </section>
+              ))}
+        </div>
+      </section>
 
       {selShown.length > 0 && (
         <div className="st-selbar" role="region" aria-label="Auswahl">
@@ -1211,9 +1176,9 @@ const INTRO_KEY = 'asciia-study-notes-intro';
 function PageIntro() {
   const [open, setOpen] = useState(() => {
     try {
-      return localStorage.getItem(INTRO_KEY) !== 'closed';
+      return localStorage.getItem(INTRO_KEY) === 'open';
     } catch {
-      return true;
+      return false;
     }
   });
   return (

@@ -14,7 +14,7 @@ import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
 
 export const VIA: Record<string, string> = { manuell: 'manuell', id: 'nach ID', zeit: 'nach Zeit', reihenfolge: 'nach Reihenfolge' };
-const CHANGE_NAME: Record<string, string> = { minutes: 'Dauer manuell (min)', excluded: 'ausgeschlossen', reason: 'Grund', swapP1: 'Teil 1 vertauscht', runtime: 'Dauer aus', mainLink: 'Hauptlink', tallyRow: 'Tally-Zeile', group: 'Testgruppe', age: 'Alter' };
+const CHANGE_NAME: Record<string, string> = { minutes: 'Dauer manuell (min)', excluded: 'ausgeschlossen', reason: 'Grund', swapP1: 'Teil 1 vertauscht', runtime: 'Dauer aus', mainLink: 'Hauptlink', tallyRow: 'Tally-Zeile', group: 'Testgruppe', age: 'Alter', job: 'Beruf' };
 
 export default function People() {
   const { model, study, scope, omitted, resetFilter } = useCtx();

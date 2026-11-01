@@ -54,6 +54,7 @@ export interface PersonDoc {
   tallyRow?: number | null; // the Tally row (index), null = none; undefined = matched automatically
   group?: 'AB' | 'BA'; // test group, when it differs from what was tracked
   age?: number | null; // overrides the Tally answer
+  job?: string | null; // Beruf; overrides a Tally answer
   minutes?: number | null; // (older: the active time set by hand; read as timing.activeMin)
   // several links = several attempts of one participant: per link (invite key)
   // what was checked by hand; anything unset is taken from the tracking
@@ -102,7 +103,8 @@ export interface NotesMeta {
   link: string;
   links?: string[]; // further links, added by hand (participants with several runs)
   slot: string;
-  group: string;
+  group: string; // the order (AB / BA); older notes may hold a group of players here
+  testgroup?: string; // the group of players, e.g. Hobby Gamer
 }
 export type Section = 'during' | 'followup' | 'survey';
 export const SECTION_LABEL: Record<Section, string> = { during: 'Beobachtung', followup: 'Nachgespräch', survey: 'Umfrage (Freitext)' };

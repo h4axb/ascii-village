@@ -15,6 +15,7 @@
 // (headings with any number of #; "Follow Up", "Follow-up – Fragen", … all count)
 // The same id twice (one block per link) is one participant.
 import type { ItemDoc, NotesMeta, Section, StudyDocs } from './types';
+import { orderOfText } from './profile';
 import type { Change } from './changes';
 import { findingsOf, type Model } from './model';
 
@@ -55,16 +56,17 @@ function idOf(raw: string, inSection: boolean): { id: string; sub?: string; rest
   return { id: pid(m[1]), sub: m[2], rest: m[3] ?? '' };
 }
 
-type Field = 'name' | 'link' | 'slot' | 'group';
+type Field = 'name' | 'link' | 'slot' | 'group' | 'testgroup';
 function fieldOf(label: string): Field {
   const k = label.toLowerCase();
-  return k === 'name' ? 'name' : k === 'link' ? 'link' : /gruppe|group|reihenfolge|order/.test(k) ? 'group' : 'slot';
+  return k === 'name' ? 'name' : k === 'link' ? 'link' : /test ?gruppe|test ?group/.test(k) ? 'testgroup' : /gruppe|group|reihenfolge|order/.test(k) ? 'group' : 'slot';
 }
 // a labelled field inside a section only counts when its value looks like one
 function plausible(f: Field, v: string): boolean {
   if (f === 'group') return GROUP.test(v.trim()) || /^(AB|BA)$/i.test(v.trim());
   if (f === 'link') return LINKLIKE.test(v.trim()) || /^\d$/.test(v.trim());
   if (f === 'slot') return /\d/.test(v);
+  if (f === 'testgroup') return v.trim().length <= 40;
   return v.length <= 40 && !/[.!?]$/.test(v);
 }
 const groupOf = (v: string) => {
@@ -91,7 +93,9 @@ export function parseNotes(text: string): Parsed {
   let lastIndent = 0;
   let order = 0;
 
-  const setField = (b: Block, f: Field, v: string) => {
+  const setField = (b: Block, field: Field, v: string) => {
+    // ("Gruppe: Hobby Gamer" is a group of players, not the order)
+    const f: Field = field === 'group' && !orderOfText(v) && !GROUP.test(v.trim()) ? 'testgroup' : field;
     const val = f === 'group' ? groupOf(v) : v.trim();
     if (!val) return;
     if (f === 'link') b.link ||= val;
@@ -186,7 +190,7 @@ export function parseNotes(text: string): Parsed {
       else left.push(l);
     }
     for (const l of left) {
-      const f = (['name', 'link', 'slot', 'group'] as Field[]).find((x) => !b.meta[x] && (x !== 'link' || !b.link));
+      const f = (['name', 'link', 'slot', 'testgroup'] as Field[]).find((x) => !b.meta[x] && (x !== 'link' || !b.link));
       if (f) setField(b, f, l);
     }
     // a block's statements carry its link (resolved to P009.2 on import)
@@ -390,7 +394,8 @@ export function planNotes(parsed: Parsed, docs: StudyDocs, tags: (id: string) =>
     ['name', 'Name'],
     ['link', 'Link'],
     ['slot', 'Termin'],
-    ['group', 'Gruppe'],
+    ['group', 'Reihenfolge'],
+    ['testgroup', 'Testgruppe'],
   ];
   for (const m of parsed.meta) {
     const old = metas[m.id];

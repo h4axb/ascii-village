@@ -4790,3 +4790,18 @@ body:has(.st-root) {
 .st-root .st-lc-actions .st-more-list {
   min-width: 300px;
 }
+/* the sidebar's line runs the whole page height (not only one screen high) */
+@media (min-width: 701px) {
+  .st-root.st-app {
+    background-image: linear-gradient(to right, transparent 231px, #ececef 231px, #ececef 232px, transparent 232px);
+    background-repeat: no-repeat;
+  }
+  .st-root .st-nav {
+    border-right-color: transparent;
+  }
+}
+@media (min-width: 701px) and (max-width: 1100px) {
+  .st-root.st-app {
+    background-image: linear-gradient(to right, transparent 171px, #ececef 171px, #ececef 172px, transparent 172px);
+  }
+}

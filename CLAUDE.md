@@ -17,6 +17,9 @@ implementing it (from a mockup) and again after it (from the real app):
   Frame them with `node scripts/portfolio-frame.cjs <in-dir> <out-dir>`
   (raw files named `aktuell|neu-desktop|tablet|mobile-<n>-<state>.png`).
 - Take the "Aktuell" screenshots from the app **before** changing the code.
+- Take each screenshot as a **viewport shot after scrolling** to the part shown
+  (not a cut from a full-page capture). That way the sidebar is always complete,
+  from "Übersicht" down to "Ergebnisse & Export", and so is the sticky page head.
 
 ## Qualitatives Feedback: keep the statement rows as they are
 

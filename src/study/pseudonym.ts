@@ -15,15 +15,19 @@ export const personalColumns = (headers: string[]) => headers.flatMap((h, i) => 
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// placeholders typed into a name field instead of a name ("Test", "anonym", "-"):
+// never treated as names, or every "Tests" in the notes would become "[Name]"
+const NOT_A_NAME = /^(test(er|ing|person)?\s*\d*|tp\s*\d*|p\d+|anonym(ous)?|keine?r?|kein name|none|no|nein|ja|yes|n\.?\s?a\.?|x+|-+|\?+|\.+|spieler(in)?|player\s*\d*|user\s*\d*|name)$/i;
+
 // the names to remove, longest first (so "Anna Berg" goes before "Anna")
 export function knownNames(docs: StudyDocs): string[] {
   const out = new Set<string>();
   const add = (v: unknown) => {
     const n = String(v ?? '').trim();
-    if (n.length < 2) return;
+    if (n.length < 2 || NOT_A_NAME.test(n)) return;
     out.add(n);
     // the parts of a full name; short ones ("Li", "von") would hit ordinary words
-    for (const p of n.split(/[\s,;/]+/)) if (p.length >= 3 && !/^(von|van|der|den|de|du|la|le|zu)$/i.test(p)) out.add(p);
+    for (const p of n.split(/[\s,;/]+/)) if (p.length >= 3 && !/^(von|van|der|den|de|du|la|le|zu)$/i.test(p) && !NOT_A_NAME.test(p)) out.add(p);
   };
   for (const m of Object.values((docs.settings.notesMeta ?? {}) as Record<string, NotesMeta>)) add(m.name);
   for (const t of Object.values(docs.tally)) {

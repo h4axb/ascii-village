@@ -308,7 +308,16 @@ export interface TagProposal {
   findings: string[]; // the recurring findings it would belong to (its own plus the suggested one)
   newFinding: string | null;
 }
-export function TagReview({ study, tags, items, proposals, onClose }: { study: Study; tags: TagGroup[]; items: Map<string, ItemDoc>; proposals: TagProposal[]; onClose: (msg?: string) => void }) {
+// the review window for tags: the AI's suggestions, or a coding file (source
+// 'file': its own title and intro, the file's review note per statement, and a
+// statement marked "Prüfung erforderlich" is set back to unchecked)
+export interface TagSource {
+  title: string;
+  intro: string;
+  reason: string; // the version saved before ("vor …") and the log line
+  notes: Record<string, { review: boolean; reason: string | null }>;
+}
+export function TagReview({ study, tags, items, proposals, onClose, source }: { study: Study; tags: TagGroup[]; items: Map<string, ItemDoc>; proposals: TagProposal[]; onClose: (msg?: string) => void; source?: TagSource }) {
   const list = proposals.filter((p) => items.has(p.id));
   const [sets, setSets] = useState<Record<string, { chips: string[]; findings: string[] }>>(() => Object.fromEntries(list.map((p) => [p.id, { chips: p.chips, findings: p.findings }])));
   const [picks, setPicks] = useState<Record<string, Pick>>(() => Object.fromEntries(list.map((p) => [p.id, 'neu' as Pick])));
@@ -341,25 +350,27 @@ export function TagReview({ study, tags, items, proposals, onClose }: { study: S
         const s = sets[p.id];
         // (tags of categories that do not apply are not stored)
         const chips = effectiveChips(s.chips, tags, new Map(tags.flatMap((g) => g.chips.map((c) => [c.id, c.role] as const))));
-        return { coll: 'items' as const, id: p.id, data: { ...setFindings(i, s.findings), chips, suggested: i.suggested.filter((c) => !chips.includes(c)), suggestedFinding: null, suggestedNewFinding: p.newFinding ?? i.suggestedNewFinding ?? null } };
+        const recheck = source?.notes[p.id]?.review;
+        return { coll: 'items' as const, id: p.id, data: { ...setFindings(i, s.findings), chips, suggested: i.suggested.filter((c) => !chips.includes(c)), suggestedFinding: null, suggestedNewFinding: p.newFinding ?? i.suggestedNewFinding ?? null, ...(recheck ? { confirmed: false } : {}) } };
       });
-    void store(study, put, 'KI-Tags', `KI-Tags: ${put.length} Aussagen übernommen`)
-      .then(() => onClose(`Tags für ${put.length} Aussagen übernommen.`))
+    const reason = source?.reason ?? 'KI-Tags';
+    void store(study, put, reason, `${reason}: ${put.length} Aussagen übernommen`)
+      .then(() => onClose(`Tags für ${put.length} ${put.length === 1 ? 'Aussage' : 'Aussagen'} übernommen.`))
       .catch((e) => setBusy(`Nicht übernommen: ${String((e as Error).message)}`));
   };
   if (!list.length) {
-    queueMicrotask(() => onClose('KI: keine neuen Tags vorgeschlagen.'));
+    queueMicrotask(() => onClose(source ? 'Tag-Datei: keine abweichenden Tags.' : 'KI: keine neuen Tags vorgeschlagen.'));
     return null;
   }
   return (
     <Shell
-      title={`KI-Tags prüfen (${list.length} Aussagen)`}
-      intro="Links die jetzigen Tags, rechts der Vorschlag der KI (neu hinzukommende hervorgehoben). Rechts lässt sich alles anpassen: × entfernt einen Tag, „+ Tag“ fügt einen hinzu, der Befund ist wählbar. Alle Vorschläge sind vorausgewählt; „Aktuell behalten“, wo nichts geändert werden soll."
+      title={source ? `${source.title} (${list.length} ${list.length === 1 ? 'Aussage' : 'Aussagen'})` : `KI-Tags prüfen (${list.length} Aussagen)`}
+      intro={source?.intro ?? 'Links die jetzigen Tags, rechts der Vorschlag der KI (neu hinzukommende hervorgehoben). Rechts lässt sich alles anpassen: × entfernt einen Tag, „+ Tag“ fügt einen hinzu, der Befund ist wählbar. Alle Vorschläge sind vorausgewählt; „Aktuell behalten“, wo nichts geändert werden soll.'}
       rows={rows}
       picks={picks}
       setPick={setPick}
       busy={busy}
-      onCancel={() => onClose('KI-Tags verworfen: nichts übernommen.')}
+      onCancel={() => onClose(source ? 'Tag-Datei verworfen: nichts übernommen.' : 'KI-Tags verworfen: nichts übernommen.')}
       onApply={apply}
       render={(id) => {
         const i = items.get(id)!;
@@ -372,6 +383,13 @@ export function TagReview({ study, tags, items, proposals, onClose }: { study: S
             <p className="st-pane-text st-tagrev-text" data-notr>
               {workingText(i)}
             </p>
+            {source?.notes[id] && (
+              <p className={`st-tagrev-note${source.notes[id].review ? ' is-review' : ''}`}>
+                <strong>{source.notes[id].review ? 'Prüfung erforderlich' : 'Sicher'}</strong>
+                {source.notes[id].review ? ' · wird beim Übernehmen auf „ungeprüft“ gesetzt' : ''}
+                {source.notes[id].reason && <span data-notr>{` – ${source.notes[id].reason}`}</span>}
+              </p>
+            )}
             <div className="st-panes">
               <div className={`st-pane is-current${on === 'alt' ? ' is-chosen' : ' is-dropped'}`}>
                 <div className="st-pane-head">Aktuell</div>

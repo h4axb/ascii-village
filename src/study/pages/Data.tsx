@@ -14,6 +14,9 @@ import { applyChanges, ChangeModal } from '../ChangeModal';
 import { csv, DurationSelect, fmtMin, logChange, Section, useCtx, type LogEntry } from '../ui';
 import Import from './Import';
 import Translations from './Translations';
+import { TagReview, type TagSource } from '../AiReview';
+import type { TagProposal } from '../AiReview';
+import { readCoding } from '../tagImport';
 import { VIA } from './People';
 
 interface Check {
@@ -281,8 +284,53 @@ function Uploads({ failed }: { failed: number }) {
   const tally = study.docs.tally.main;
   const notes = study.docs.notes.main;
   const when = (t: number) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  // a coding file: read, then every differing statement in the review window
+  const [codes, setCodes] = useState<{ proposals: TagProposal[]; source: TagSource; skipped: string[] } | null>(null);
+  const [codesMsg, setCodesMsg] = useState<string | null>(null);
+  async function readTags(f: File) {
+    try {
+      const r = readCoding(await f.text(), study.docs.items, model.tags);
+      const skipped = [
+        r.unchanged ? `${r.unchanged} unverändert` : '',
+        r.unknownStatements.length ? `${r.unknownStatements.length} Aussage-IDs nicht im Dashboard` : '',
+        r.unknownTags.length ? `unbekannte Tags ausgelassen: ${r.unknownTags.join(', ')}` : '',
+      ].filter(Boolean);
+      setCodesMsg(skipped.length ? `${f.name}: ${skipped.join(' · ')}` : null);
+      if (!r.proposals.length) {
+        setCodesMsg(`${f.name}: keine abweichenden Tags${skipped.length ? ` (${skipped.join(' · ')})` : ''}.`);
+        return;
+      }
+      setCodes({
+        proposals: r.proposals,
+        source: {
+          title: `Tag-Datei prüfen${r.version ? ` · Fassung ${r.version}` : ''}`,
+          intro:
+            'Links die Tags im Dashboard, rechts die aus der Datei (neu hinzukommende hervorgehoben) – rechts frei bearbeitbar. Alle abweichenden Aussagen sind vorausgewählt; „Aktuell behalten“, wo nichts geändert werden soll. Aussagen mit „Prüfung erforderlich“ werden beim Übernehmen auf „ungeprüft“ gesetzt. Vor dem Übernehmen wird der ganze Stand als Version gesichert.',
+          reason: `Tag-Datei ${f.name}`,
+          notes: r.notes,
+        },
+        skipped,
+      });
+    } catch (e) {
+      setCodesMsg(`${f.name}: ${String((e as Error).message)}`);
+    }
+  }
   return (
     <Section title="Daten hochladen">
+      {codes && (
+        <TagReview
+          study={study}
+          tags={model.tags}
+          items={new Map(model.allItems.map((i) => [i.id, i]))}
+          proposals={codes.proposals}
+          source={codes.source}
+          onClose={(m) => {
+            // the outcome, and what the file had that was not offered
+            setCodesMsg([m, ...codes.skipped].filter(Boolean).join(' · ') || null);
+            setCodes(null);
+          }}
+        />
+      )}
       <p className="st-note st-page-hint">
         Hier kommen die Daten ins Dashboard. Vor dem Speichern zeigt jedes Hochladen, was neu ist und was sich ändert; nichts wird ungefragt überschrieben.
         {failed > 0 && (
@@ -312,6 +360,24 @@ function Uploads({ failed }: { failed: number }) {
           <button type="button" className="st-linkbtn" onClick={() => document.getElementById('st-notes-detail')?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>
             oder Text einfügen ↓
           </button>
+        </div>
+        <div className="st-upload">
+          <h3>Tag-Codierung</h3>
+          <p className="st-muted">Tags je Aussage als JSON. Abweichungen werden vor dem Speichern gezeigt.</p>
+          <label className="st-file is-primary">
+            Tag-Datei hochladen (.json)
+            <input
+              id="st-codes-file"
+              type="file"
+              accept=".json,application/json"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (f) void readTags(f);
+              }}
+            />
+          </label>
+          {codesMsg && <p className="st-muted" role="status">{codesMsg}</p>}
         </div>
         <div className="st-upload">
           <h3>Spieldaten</h3>

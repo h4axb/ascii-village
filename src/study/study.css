@@ -4918,3 +4918,23 @@ body:has(.st-root) {
     grid-template-areas: 'nav';
   }
 }
+/* Hochladen: four sources – four columns on wide screens, 2 × 2 on tablets, one on phones */
+@media (min-width: 1200px) {
+  .st-root .st-uploads {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 600px) and (max-width: 1199px) {
+  .st-root .st-uploads {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* the review note of a coding file, above a statement's tags */
+.st-tagrev-note {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--st-muted);
+}
+.st-tagrev-note.is-review strong {
+  color: var(--st-warn, #b45309);
+}

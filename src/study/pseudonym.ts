@@ -1,6 +1,6 @@
 // Pseudonymising the exports: every file the dashboard hands out goes through
 // here, so no participant's name leaves it. Names are known from the notes
-// header (NotesMeta.name) and from the survey's name columns; each one, and
+// header (NotesMeta.name); each one, and
 // each of its parts (first name, surname), is replaced by "[Name]" wherever it
 // appears: statements, interpretations, survey answers, game records, file
 // names. Free-text fields that hold who someone is (an invite's note, the
@@ -9,7 +9,7 @@ import type { NotesMeta, StudyDocs, TallyDoc } from './types';
 
 export const NAME_MARK = '[Name]';
 
-// survey columns that identify a person
+// survey columns that identify a person (emptied in exports)
 const PERSONAL_COLUMN = /\b(vor-?|nach-?|full\s*|first\s*|last\s*|sur)?name\b|wie hei(ß|ss)t du|e-?mail|telefon|phone|handy|kontakt|contact|adresse|address/i;
 export const personalColumns = (headers: string[]) => headers.flatMap((h, i) => (PERSONAL_COLUMN.test(h) ? [i] : []));
 
@@ -30,11 +30,9 @@ export function knownNames(docs: StudyDocs): string[] {
     for (const p of n.split(/[\s,;/]+/)) if (p.length >= 3 && !/^(von|van|der|den|de|du|la|le|zu)$/i.test(p) && !NOT_A_NAME.test(p)) out.add(p);
   };
   for (const m of Object.values((docs.settings.notesMeta ?? {}) as Record<string, NotesMeta>)) add(m.name);
-  for (const t of Object.values(docs.tally)) {
-    // only a short name question's answers count as names (not "Kontakt" or an item's name)
-    const cols = personalColumns(t.headers).filter((i) => t.headers[i].length <= 40 && !/mail|telefon|phone|handy|kontakt|contact|adresse|address|item|objekt|gegenstand/i.test(t.headers[i]));
-    for (const r of t.rows) for (const i of cols) add(r[i]);
-  }
+  // the survey's name column is emptied (scrubTally), but its answers are not
+  // taken as names: people type placeholders there ("Test", "Gamer"), and each
+  // would replace an ordinary word everywhere ("HOBBY GAMER" → "HOBBY [Name]")
   return [...out].sort((a, b) => b.length - a.length);
 }
 

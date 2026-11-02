@@ -151,16 +151,21 @@ export function MdEditor({ value, onChange, rows = 6, preview, setPreview, label
 
 export function Modal({ title, onClose, children, footer, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  // the latest onClose, without re-running the effect: a new onClose every
+  // render used to move the focus back to the dialog after each keystroke
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close.current();
     window.addEventListener('keydown', onKey);
     document.body.classList.add('jr-noscroll');
-    ref.current?.focus();
+    // focus the dialog once, on opening, unless a field asked for it (autoFocus)
+    if (!ref.current?.contains(document.activeElement)) ref.current?.focus();
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.classList.remove('jr-noscroll');
     };
-  }, [onClose]);
+  }, []);
   return (
     <div className="jr-modal-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`jr-modal${wide ? ' is-wide' : ''}`} role="dialog" aria-modal="true" tabIndex={-1} ref={ref}>

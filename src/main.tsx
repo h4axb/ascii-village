@@ -14,6 +14,9 @@ const DASHBOARD = import.meta.env.VITE_APP_MODE !== 'review' && /^\/2\/feedback\
 // on demand and never in the review build
 const StudyApp = import.meta.env.VITE_APP_MODE === 'review' ? () => null : lazy(() => import('./study/StudyApp'));
 const STUDY = import.meta.env.VITE_APP_MODE !== 'review' && /^\/feedback\/?$/.test(window.location.pathname);
+// /journal is the project journal (src/journal/), on demand, never in the review build
+const JournalApp = import.meta.env.VITE_APP_MODE === 'review' ? () => null : lazy(() => import('./journal/JournalApp'));
+const JOURNAL = import.meta.env.VITE_APP_MODE !== 'review' && /^\/journal(\/|$)/.test(window.location.pathname);
 
 const rootEl = document.getElementById('root')!;
 
@@ -25,6 +28,10 @@ function mount(font: FontLoad) {
     STUDY ? (
       <Suspense fallback={null}>
         <StudyApp />
+      </Suspense>
+    ) : JOURNAL ? (
+      <Suspense fallback={null}>
+        <JournalApp />
       </Suspense>
     ) : DASHBOARD ? (
       <Suspense fallback={null}>
@@ -52,6 +59,7 @@ async function start() {
   // (the crafted sprites on /feedback are drawn in the game font)
   if (STUDY) return mount(await loadGameFont());
   if (DASHBOARD) return mount(await loadGameFont());
+  if (JOURNAL) return mount('ok');
   rootEl.innerHTML = '<div class="font-gate"><p>loading…</p></div>';
   const r = await loadGameFont();
   if (r === 'ok') return mount(r);

@@ -14,6 +14,7 @@ import { handleParticipant } from '../functions/api/participant';
 import { dbOf, ensureSchema, gateLlm, handleAdmin, handleSession } from '../functions/api/session';
 import { handleEvents } from '../functions/api/events';
 import { handleStudy } from '../functions/api/study';
+import { handleJournal } from '../functions/api/journal';
 import { cookieOf, handleUnlock, isStaticFile, isUnlocked, loginPage } from './lock';
 
 interface Env extends FeedbackEnv {
@@ -62,6 +63,8 @@ async function route(request: Request, env: Env): Promise<Response> {
   if (pathname.startsWith('/api/admin/')) return handleAdmin(request, env);
   // the study dashboard's data (/feedback) — see functions/api/study.ts
   if (pathname === '/api/study' || pathname.startsWith('/api/study/')) return handleStudy(request, env);
+  // the project journal (/journal) — see functions/api/journal.ts
+  if (pathname === '/api/journal' || pathname.startsWith('/api/journal/')) return handleJournal(request, env);
   if (pathname.startsWith('/api/')) return new Response('Not Found', { status: 404 });
   return env.ASSETS.fetch(request);
 }
@@ -106,7 +109,7 @@ export default {
       // the dashboard asks with its password (Authorization), checked by its routes
       const admin = !!(request.headers.get('Authorization') ?? '').replace(/^Bearer\s*/i, '').trim();
       const participantApi = pathname.startsWith('/api/session/') || pathname === '/api/events' || pathname.startsWith('/api/feedback') || pathname === '/api/chat/completions';
-      if ((participantApi && (await knownKey(env, key))) || (admin && (pathname.startsWith('/api/admin/') || pathname.startsWith('/api/study') || request.method === 'GET'))) {
+      if ((participantApi && (await knownKey(env, key))) || (admin && (pathname.startsWith('/api/admin/') || pathname.startsWith('/api/study') || pathname.startsWith('/api/journal') || request.method === 'GET'))) {
         // a key only from the cookie: the handlers read it from the header
         if (!request.headers.get('X-Test-Key') && key) {
           const headers = new Headers(request.headers);

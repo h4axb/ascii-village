@@ -5,6 +5,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { docHash } from './src/editor/docHash';
 import { handleFeedback, type FeedbackEnv } from './functions/api/feedback';
+import { handleJournal } from './functions/api/journal';
 import { handleParticipant } from './functions/api/participant';
 import { gateLlm, handleAdmin, handleSession, type SessionEnv } from './functions/api/session';
 import { handleEvents } from './functions/api/events';
@@ -281,7 +282,7 @@ function workerApiDevPlugin(): Plugin {
     return env;
   }
   const route = (p: string) =>
-    p === '/api/feedback' || p === '/api/feedback/tags' || p === '/api/participant' || p === '/api/events' || p === '/api/chat/completions' || p.startsWith('/api/session/') || p.startsWith('/api/admin/') || p.startsWith('/api/study');
+    p === '/api/feedback' || p === '/api/feedback/tags' || p === '/api/participant' || p === '/api/events' || p === '/api/chat/completions' || p.startsWith('/api/session/') || p.startsWith('/api/admin/') || p.startsWith('/api/study') || p.startsWith('/api/journal');
   const handler: Connect.NextHandleFunction = (req, res, next) => {
     const url = new URL(req.originalUrl ?? req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
     if (!route(url.pathname)) return next();
@@ -302,6 +303,7 @@ function workerApiDevPlugin(): Plugin {
         else if (p === '/api/events') out = await handleEvents(request, e);
         else if (p.startsWith('/api/session/')) out = await handleSession(request, e);
         else if (p.startsWith('/api/study')) out = await handleStudy(request, e as never);
+        else if (p.startsWith('/api/journal')) out = await handleJournal(request, e);
         else out = await handleAdmin(request, e);
         res.statusCode = out.status;
         out.headers.forEach((v, k) => res.setHeader(k, v));

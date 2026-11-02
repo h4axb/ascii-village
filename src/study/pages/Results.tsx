@@ -12,6 +12,7 @@ import { detectableEffect, fmt, fmtP, signTestThreshold, wilson } from '../stats
 import { findingsOf } from '../model';
 import { csv, Empty, figNumber, FIGURES, LazyInput, Section, useCtx } from '../ui';
 import { studyFiles, zip } from '../../feedback/studyExport';
+import { knownNames, namePattern, pseudonymDocs, scrubFiles, scrubText, withoutNote } from '../pseudonym';
 
 export default function Results() {
   const { model, slice, study } = useCtx();
@@ -25,7 +26,8 @@ export default function Results() {
   const groups = { AB: model.included.filter((p) => p.group === 'AB').length, BA: model.included.filter((p) => p.group === 'BA').length };
   const k = signTestThreshold(nAll);
   const halfCI = nAll ? (wilson(Math.round(nAll / 2), nAll)[1] - wilson(Math.round(nAll / 2), nAll)[0]) / 2 : NaN;
-  const dl = (rows: (string | number | null | undefined)[][], name: string) => download(new Blob(['\uFEFF' + csv(rows)], { type: 'text/csv;charset=utf-8' }), name);
+  // every CSV pseudonymised: no participant's name in it
+  const dl = (rows: (string | number | null | undefined)[][], name: string) => download(new Blob(['\uFEFF' + scrubText(csv(rows), namePattern(knownNames(study.docs)))], { type: 'text/csv;charset=utf-8' }), name);
 
   return (
     <>
@@ -253,14 +255,15 @@ export default function Results() {
           <button
             type="button"
             onClick={() => {
-              // everything, pseudonymised: the names from the notes left out
-              const { notesMeta, ...settings } = study.docs.settings as Record<string, unknown>;
-              const meta = Object.fromEntries(Object.entries((notesMeta ?? {}) as Record<string, Record<string, unknown>>).map(([id, m]) => [id, { ...m, name: undefined }]));
-              const { notes: _raw, ...docs } = study.docs;
-              const files = [
-                { name: 'studie.json', text: JSON.stringify({ exportedAt: new Date().toISOString(), ...docs, settings: { ...settings, notesMeta: meta } }, null, 1) },
-                ...studyFiles(study.game.events, study.game.feedback, study.game.invites).map((f) => ({ ...f, name: `spiel/${f.name}` })),
-              ];
+              // everything, pseudonymised: no notes, no names (header, survey, statements, game records), no invite notes
+              const re = namePattern(knownNames(study.docs));
+              const files = scrubFiles(
+                [
+                  { name: 'studie.json', text: JSON.stringify({ exportedAt: new Date().toISOString(), ...pseudonymDocs(study.docs, re) }, null, 1) },
+                  ...studyFiles(study.game.events, study.game.feedback, study.game.invites.map(withoutNote)).map((f) => ({ ...f, name: `spiel/${f.name}` })),
+                ],
+                re,
+              );
               download(zip(files), 'Studie.zip');
             }}
           >

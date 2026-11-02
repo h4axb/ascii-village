@@ -14,6 +14,7 @@ import { UEQS_SCALE_ITEMS, mean, type UeqScale } from './stats';
 import type { ItemDoc, NotesMeta, StudyDocs, GameData } from './types';
 import { csv } from './ui';
 import { designOfItem } from './pages/Codes';
+import { knownNames, namePattern, scrubFiles, scrubTally, withoutNote } from './pseudonym';
 
 // lines of the notes that carry a participant's name
 function withoutNames(text: string, metas: NotesMeta[]): string {
@@ -49,10 +50,10 @@ export function rawExport(docs: StudyDocs, game: GameData): Blob {
           ...items.map((i) => [i.person, i.link ?? '', meta(i.person)?.slot ?? '', meta(i.person)?.group ?? '', i.section, i.question ?? '', i.original ?? i.text, i.text, i.manual ? 'ja' : '']),
         ]),
     },
-    ...(docs.tally.main ? [{ name: 'umfrage-original.csv', text: '﻿' + csvComma([docs.tally.main.headers, ...docs.tally.main.rows]) }] : []),
-    ...studyFiles(game.events, game.feedback, game.invites).map((f) => ({ ...f, name: `spiel/${f.name}` })),
+    ...(docs.tally.main ? [{ name: 'umfrage-original.csv', text: '﻿' + csvComma([docs.tally.main.headers, ...scrubTally(docs.tally.main).rows]) }] : []),
+    ...studyFiles(game.events, game.feedback, game.invites.map(withoutNote)).map((f) => ({ ...f, name: `spiel/${f.name}` })),
   ];
-  return zip(files);
+  return zip(scrubFiles(files, namePattern(knownNames(docs))));
 }
 
 export function analysisExport(docs: StudyDocs, model: Model): Blob {
@@ -166,7 +167,7 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
       ];
     }),
   ]);
-  return zip([
+  return zip(scrubFiles([
     { name: 'LIESMICH.txt', text: 'Analysedaten der Nutzerstudie.\naussagen-analyse.csv – Aussagen mit deutscher Fassung, Interpretation, Ergänzung, Codes, Befund\nteilnehmende-messwerte.csv – je Teilnehmer die quantitativen Werte je Variante (Teil 1–3, Bewertungen im Spiel) und die Zeiten (aktiv, verstrichen, sauber; leer = kein gültiger Wert)\nversuche.csv – je Versuch (Testlink) Start, Ende, aktive Minuten, Ausgang, Quelle, Genauigkeit\nNur bestätigte Tags; ausgeschlossene Teilnehmende sind in den Messwerten nicht enthalten.\n' },
     { name: 'aussagen-analyse.csv', text: '﻿' + statements },
     { name: 'teilnehmende-messwerte.csv', text: '﻿' + quant },
@@ -198,5 +199,5 @@ export function analysisExport(docs: StudyDocs, model: Model): Blob {
           ),
         ]),
     },
-  ]);
+  ], namePattern(knownNames(docs))));
 }

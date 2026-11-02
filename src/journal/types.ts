@@ -76,13 +76,22 @@ export interface Milestone {
   visibility: Visibility;
 }
 
+// a deadline moved to another date: when, from, to, and why (one short sentence)
+export interface DeadlineChange {
+  at: number;
+  from: string; // ISO
+  to: string;
+  reason: string;
+}
 export interface Deadline {
   id: string;
   label: string;
   date: string; // ISO
   dateEnd?: string | null;
   done: boolean;
+  changes?: DeadlineChange[]; // oldest first
 }
+export const REASON_MAX = 140;
 
 // a section of the Overview page: free Markdown text, or one of the lists
 export type OverviewKind = 'text' | 'milestones' | 'deadlines' | 'attachments';

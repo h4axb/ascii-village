@@ -4,13 +4,15 @@
 //   ## Next Deadline: Feedback auswerten 03.11.26      → an open deadline
 //   ~~Feedback auswerten 29.10.26~~                     → a deadline that is done
 //   ~~Playtesting!! 20.10.-23.10.26~~                   → … with a span
+//   ~~Feedback auswerten 29.10.26~~ – reason            → with the title of an open one: an
+//                                                         earlier date of it, moved for that reason
 //   ### [x] Bachelorantrag & Exposé                     → an entry, done
 //   ### [pass] Character customization (21.09.26)       → passed, dated
 //   ### [ ] … / ### Title                               → open / no status
 //   (everything up to the next ### or ## heading)       → the entry's Markdown
 //
 // Only proposals: the journal shows them before anything is stored.
-import { ENTRY_STATUS, newId, type Deadline, type Entry, type EntryStatus } from './types';
+import { ENTRY_STATUS, newId, type Deadline, type DeadlineChange, type Entry, type EntryStatus } from './types';
 
 const yearOf = (y: string | undefined, fallback: number) => (y ? (y.length === 2 ? 2000 + Number(y) : Number(y)) : fallback);
 const iso = (d: string, m: string, y: number) => `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
@@ -74,10 +76,10 @@ export function readLog(md: string, year = new Date().getFullYear()): LogImport 
       deadlines.push({ id: newId('d'), label: rest, date: date ?? '', dateEnd, done: false });
       continue;
     }
-    const struck = /^\s*~~(.+?)~~\s*$/.exec(line);
+    const struck = /^\s*~~(.+?)~~\s*(?:[–—-]\s*(.*))?$/.exec(line);
     if (struck && !cur) {
       const { date, dateEnd, rest } = datesIn(struck[1], year);
-      deadlines.push({ id: newId('d'), label: rest, date: date ?? '', dateEnd, done: true });
+      deadlines.push({ id: newId('d'), label: rest, date: date ?? '', dateEnd, done: true, ...(struck[2]?.trim() ? { note: struck[2].trim() } : {}) } as Deadline & { note?: string });
       continue;
     }
     const h = /^###\s+(.*)$/.exec(line);
@@ -94,7 +96,24 @@ export function readLog(md: string, year = new Date().getFullYear()): LogImport 
     if (cur) cur.body.push(line);
   }
   flush();
-  return { entries, deadlines };
+  return { entries, deadlines: mergeMoves(deadlines) };
+}
+
+// struck-through dates with the title of a deadline that is still open are
+// that deadline's earlier dates: kept as its changes (oldest first)
+function mergeMoves(list: (Deadline & { note?: string })[]): Deadline[] {
+  const key = (d: Deadline) => d.label.trim().toLowerCase();
+  const out: Deadline[] = [];
+  const used = new Set<Deadline>();
+  for (const open of list.filter((d) => !d.done)) {
+    const old = list.filter((d) => d.done && d.date && key(d) === key(open)).sort((a, b) => a.date.localeCompare(b.date));
+    old.forEach((d) => used.add(d));
+    const dates = [...old.map((d) => d.date), open.date];
+    const changes: DeadlineChange[] = old.map((d, i) => ({ at: Date.now(), from: d.date, to: dates[i + 1], reason: d.note ?? '' }));
+    out.push({ id: open.id, label: open.label, date: open.date, dateEnd: open.dateEnd, done: false, ...(changes.length ? { changes } : {}) });
+  }
+  for (const d of list) if (d.done && !used.has(d)) out.push({ id: d.id, label: d.label, date: d.date, dateEnd: d.dateEnd, done: true });
+  return out;
 }
 
 // ---- back to Markdown, in the same layout ----
@@ -105,9 +124,11 @@ export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: 
   const out: string[] = [];
   const open = deadlines.filter((d) => !d.done).sort((a, b) => a.date.localeCompare(b.date));
   const done = deadlines.filter((d) => d.done).sort((a, b) => b.date.localeCompare(a.date));
-  if (open[0]) out.push(`## Next Deadline: ${open[0].label} ${shortSpan(open[0].date, open[0].dateEnd)}`.trim());
-  for (const d of open.slice(1)) out.push(`Deadline: ${d.label} ${shortSpan(d.date, d.dateEnd)}`.trim());
-  for (const d of done) out.push(`~~${d.label} ${shortSpan(d.date, d.dateEnd)}~~`.replace(' ~~', '~~'));
+  // a deadline's earlier dates follow it, struck through, with the reason it moved
+  const moves = (d: Deadline) => [...(d.changes ?? [])].reverse().map((c) => `~~${d.label} ${short(c.from)}~~${c.reason ? ` – ${c.reason}` : ''}`);
+  if (open[0]) out.push(`## Next Deadline: ${open[0].label} ${shortSpan(open[0].date, open[0].dateEnd)}`.trim(), ...moves(open[0]));
+  for (const d of open.slice(1)) out.push(`Deadline: ${d.label} ${shortSpan(d.date, d.dateEnd)}`.trim(), ...moves(d));
+  for (const d of done) out.push(`~~${d.label} ${shortSpan(d.date, d.dateEnd)}~~`.replace(' ~~', '~~'), ...moves(d));
   if (out.length) out.push('');
   for (const e of [...entries].sort((a, b) => (a.date || '9').localeCompare(b.date || '9'))) {
     const mark = ENTRY_STATUS.find((s) => s.id === e.status)?.md;

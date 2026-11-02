@@ -1262,3 +1262,64 @@ h3.jr-inline {
 .jr-field > .jr-vis {
   justify-self: start;
 }
+/* a deadline, its "why did it move?" line and the changes kept */
+.jr-deadlines li.jr-dl {
+  display: grid;
+  gap: 4px;
+}
+.jr-dl-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.jr-deadlines li.is-done .jr-dl-row .jr-inline-btn {
+  text-decoration: line-through;
+  color: var(--jr-muted);
+}
+.jr-dl-why {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-left: 26px;
+  padding: 8px 10px;
+  background: var(--jr-accent-soft);
+  border-radius: 8px;
+}
+.jr-dl-why input {
+  flex: 1 1 240px;
+}
+.jr-dl-why-actions {
+  display: flex;
+  gap: 6px;
+}
+.jr-deadlines ul.jr-dl-changes {
+  margin: 0 0 4px 26px;
+  gap: 2px;
+}
+.jr-dl-changes li {
+  display: flex !important;
+  gap: 8px;
+  font-size: 13px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+@media (max-width: 640px) {
+  .jr-dl-row {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .jr-dl-row .jr-dl-label {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .jr-dl-row input[type='date'] {
+    flex: none;
+    width: 136px;
+  }
+  .jr-dl-why,
+  .jr-deadlines ul.jr-dl-changes {
+    margin-left: 0;
+  }
+}

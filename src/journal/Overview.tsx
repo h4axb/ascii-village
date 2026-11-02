@@ -1,9 +1,9 @@
 // The Overview: a homepage kept by hand. Its sections (text, milestones,
 // deadlines, attachments) can be renamed, reordered, hidden, deleted and added;
 // milestones and deadlines are maintained here, never inferred.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { JournalStore, Put } from './store';
-import { fmtDate, MILESTONE_STATUS, newId, type Deadline, type Milestone, type OverviewSection } from './types';
+import { fmtDate, MILESTONE_STATUS, newId, REASON_MAX, type Deadline, type Milestone, type OverviewSection } from './types';
 import { Attachments, Icon, IconBtn, InlineText, MdField, VisibilitySwitch } from './ui';
 import { PageHead } from './pages';
 
@@ -183,23 +183,106 @@ function Deadlines({ store }: { store: JournalStore }) {
           <span className="jr-muted">Next deadline</span>
           <strong>{next.label}</strong>
           {next.date && <span>{fmtDate(next.date, next.dateEnd)}</span>}
+          {next.changes?.length ? <span className="jr-muted jr-small">{`moved ${next.changes.length}× · last: ${next.changes[next.changes.length - 1].reason || 'no reason given'}`}</span> : null}
         </p>
       ) : (
         <p className="jr-muted">No open deadline.</p>
       )}
       <ul>
         {list.map((d) => (
-          <li key={d.id} className={d.done ? 'is-done' : ''}>
-            <input type="checkbox" checked={d.done} aria-label={`${d.label} done`} onChange={(e) => save({ ...d, done: e.target.checked })} />
-            <InlineText value={d.label} label="Deadline" onSave={(v) => save({ ...d, label: v || d.label })} className="jr-dl-label" />
-            <input type="date" value={d.date} aria-label="Date" onChange={(e) => save({ ...d, date: e.target.value })} />
-            <IconBtn icon="trash" label="Delete deadline" danger onClick={() => confirm(`Delete the deadline “${d.label}”?`) && void store.commit([], [{ coll: 'deadlines', id: d.id }])} />
-          </li>
+          <DeadlineRow key={d.id} d={d} save={save} remove={() => confirm(`Delete the deadline “${d.label}”?`) && void store.commit([], [{ coll: 'deadlines', id: d.id }])} />
         ))}
       </ul>
       <button type="button" className="jr-linkbtn" onClick={() => save({ id: newId('d'), label: 'New deadline', date: '', done: false })}>
         <Icon name="plus" /> Add deadline
       </button>
     </div>
+  );
+}
+
+// one deadline; a new date for one that had a date asks why, in one short
+// sentence, before it is stored (kept with the old and new date)
+function DeadlineRow({ d, save, remove }: { d: Deadline; save: (d: Deadline) => void; remove: () => void }) {
+  const [date, setDate] = useState(d.date);
+  const [reason, setReason] = useState('');
+  const [all, setAll] = useState(false);
+  useEffect(() => setDate(d.date), [d.date]);
+  const moving = !!d.date && !!date && date !== d.date;
+  const commit = () => {
+    const change = { at: Date.now(), from: d.date, to: date, reason: reason.trim().slice(0, REASON_MAX) };
+    save({ ...d, date, changes: [...(d.changes ?? []), change] });
+    setReason('');
+  };
+  const cancel = () => {
+    setDate(d.date);
+    setReason('');
+  };
+  const changes = d.changes ?? [];
+  const shown = all ? [...changes].reverse() : changes.slice(-1);
+  return (
+    <li className={`jr-dl${d.done ? ' is-done' : ''}`}>
+      <div className="jr-dl-row">
+        <input type="checkbox" checked={d.done} aria-label={`${d.label} done`} onChange={(e) => save({ ...d, done: e.target.checked })} />
+        <InlineText value={d.label} label="Deadline" onSave={(v) => save({ ...d, label: v || d.label })} className="jr-dl-label" />
+        <input
+          type="date"
+          value={date}
+          aria-label="Date"
+          onChange={(e) => {
+            const v = e.target.value;
+            setDate(v);
+            // a first date, or one cleared: nothing to explain
+            if (!d.date || !v) save({ ...d, date: v });
+          }}
+        />
+        <IconBtn icon="trash" label="Delete deadline" danger onClick={remove} />
+      </div>
+      {moving && (
+        <form
+          className="jr-dl-why"
+          onSubmit={(e) => {
+            e.preventDefault();
+            commit();
+          }}
+        >
+          <span className="jr-small">{`${fmtDate(d.date)} → ${fmtDate(date)}. Why did it move?`}</span>
+          <input
+            autoFocus
+            value={reason}
+            maxLength={REASON_MAX}
+            placeholder="One short sentence, e.g. More time needed to code the interviews."
+            aria-label="Why the deadline moved"
+            onChange={(e) => setReason(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && cancel()}
+          />
+          <span className="jr-dl-why-actions">
+            <button type="button" onClick={cancel}>
+              Cancel
+            </button>
+            <button type="submit" className="is-primary" disabled={!reason.trim()}>
+              Save
+            </button>
+          </span>
+        </form>
+      )}
+      {changes.length > 0 && !moving && (
+        <ul className="jr-dl-changes">
+          {shown.map((c) => (
+            <li key={c.at}>
+              <span className="jr-muted">{`${fmtDate(c.from)} → ${fmtDate(c.to)}`}</span>
+              <span>{c.reason || <span className="jr-muted">no reason given</span>}</span>
+              <span className="jr-muted jr-small">{new Date(c.at).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' })}</span>
+            </li>
+          ))}
+          {changes.length > 1 && (
+            <li>
+              <button type="button" className="jr-linkbtn" onClick={() => setAll(!all)}>
+                {all ? 'Show only the last change' : `All ${changes.length} changes`}
+              </button>
+            </li>
+          )}
+        </ul>
+      )}
+    </li>
   );
 }

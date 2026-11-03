@@ -355,7 +355,7 @@ async function suggest(request: Request, env: StudyEnv): Promise<Response> {
   if (!key && env.STUDY_FAKE_AI !== '1') return json(503, { error: 'no AI key on the server' });
   const body = (await request.json().catch(() => null)) as {
     items?: { id: string; text: string; section?: string; question?: string }[];
-    groups?: { id: string; name: string; multi?: boolean; chips: { id: string; label: string }[] }[];
+    groups?: { id: string; name: string; hint?: string; multi?: boolean; chips: { id: string; label: string; bedeutung?: string }[] }[];
     findings?: { id: string; name: string }[];
   } | null;
   if (!body?.items?.length || !body.groups) return json(400, { error: 'items and groups required' });
@@ -371,7 +371,7 @@ async function suggest(request: Request, env: StudyEnv): Promise<Response> {
     'Schlage für neue, eindeutig benennbare Befunde einen kurzen neutralen Namen vor (newFinding), sonst null.';
   const ask = async (part: typeof items): Promise<{ ok: true; list: unknown[] } | { ok: false; res: Response }> => {
     const user = JSON.stringify({
-      kategorien: groups.map((g) => ({ id: g.id, name: g.name, multi: !!g.multi, chips: g.chips })),
+      kategorien: groups.map((g) => ({ id: g.id, name: g.name, ...(g.hint ? { hinweis: g.hint } : {}), multi: !!g.multi, chips: g.chips })),
       befunde: body.findings ?? [],
       aussagen: part.map((i) => ({ id: i.id, text: i.text.slice(0, 1500), abschnitt: i.section, frage: i.question })),
       format: { aussagen: [{ id: 'string', chips: { '<kategorie-id>': ['<chip-id>'] }, finding: '<befund-id> | null', newFinding: 'string | null' }] },

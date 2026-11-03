@@ -60,6 +60,18 @@ export interface PersonDoc {
   // what was checked by hand; anything unset is taken from the tracking
   attempts?: Record<string, AttemptDoc>;
   timing?: TimingDoc;
+  craftingUx?: CraftingUxDoc;
+}
+
+// the participant's biggest Crafting UX problem, as decided by hand (Crafting UX
+// page): a recurring finding (or one statement, when not grouped yet), or one
+// of the special cases; unset = not decided (the page may propose one)
+export interface CraftingUxDoc {
+  finding?: string | null;
+  item?: string | null;
+  special?: 'none' | 'multiple' | 'insufficient' | null;
+  reason?: string;
+  at?: number;
 }
 
 // how a duration was found, and how exact it is
@@ -136,7 +148,9 @@ export interface ItemDoc {
   manual?: boolean; // added by hand (kept on re-import)
 }
 
-export type BuiltinRole = 'game' | 'survey' | 'process' | 'problem' | 'positive' | 'surprise' | 'remark' | 'intervention' | 'essential' | 'tbd' | 'nice' | 'rejected';
+export type BuiltinRole = 'game' | 'survey' | 'process' | 'problem' | 'positive' | 'surprise' | 'remark' | 'intervention' | 'essential' | 'tbd' | 'nice' | 'rejected' | CraftRole;
+// the Crafting-Bezug of a statement (Crafting UX page): which system it concerns
+export type CraftRole = 'cx-core' | 'cx-integration' | 'cx-game' | 'cx-unclear';
 // a tag's meaning: one the analysis knows, or one of the user's own (m-…)
 export type ChipRole = BuiltinRole | `m-${string}`;
 // the meanings, as the user named them (settings/meanings); unset = the defaults below
@@ -159,6 +173,10 @@ export const ROLE_NAME: Record<BuiltinRole, string> = {
   tbd: 'Priorität: offen',
   nice: 'Priorität: nice-to-have',
   rejected: 'verworfen (zählt nicht)',
+  'cx-core': 'Crafting-Bezug: Generator & Interface',
+  'cx-integration': 'Crafting-Bezug: Crafting–Spiel-Integration',
+  'cx-game': 'Crafting-Bezug: Nur Spiel',
+  'cx-unclear': 'Crafting-Bezug: Unklar',
 };
 export interface Chip {
   id: string;
@@ -327,6 +345,21 @@ export const DEFAULT_TAGS: TagGroup[] = [
     order: 6,
     chips: [{ id: 'eingriff', label: 'Eingriff', role: 'intervention' }],
   },
+  // which system a statement concerns: the generative crafting itself, its use
+  // in the game, or only the game (Crafting UX page); unset = not yet classified
+  {
+    id: 'craftbezug',
+    name: 'Crafting-Bezug',
+    hint: 'Welches System die Aussage betrifft: Generator & Interface (Prompt, Pre-Clarification, Post-Feedback, KI-Ergebnis), Crafting–Spiel-Integration (das generierte Objekt im Spiel: platzieren, nutzen), Nur Spiel (Quests, Bewegung, Dialoge) oder Unklar.',
+    multi: false,
+    order: 6.5,
+    chips: [
+      { id: 'cb-kern', label: 'Generator & Interface', role: 'cx-core' },
+      { id: 'cb-integration', label: 'Crafting–Spiel-Integration', role: 'cx-integration' },
+      { id: 'cb-spiel', label: 'Nur Spiel', role: 'cx-game' },
+      { id: 'cb-unklar', label: 'Unklar', role: 'cx-unclear' },
+    ],
+  },
   {
     id: 'gueltigkeit',
     name: 'Gültigkeit',
@@ -344,6 +377,7 @@ export const DEFAULT_HINTS: Record<string, string> = {
   thema: 'Welcher Teil des Spiels betroffen ist (mehrere möglich).',
   code: 'Qualitative Codes für die Auswertung (mehrere möglich; Seite „Codes“).',
   moderation: 'Die Testleitung musste eingreifen.',
+  craftbezug: 'Welches System die Aussage betrifft (Seite „Crafting UX“). Ohne Tag gilt sie als noch nicht eingeordnet.',
   gueltigkeit: '„Verworfen“: die Aussage zählt nirgends mit.',
 };
 export const hintOf = (g: TagGroup) => g.hint ?? DEFAULT_HINTS[g.id] ?? '';

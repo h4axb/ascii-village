@@ -10,6 +10,7 @@ import Overview from './pages/Overview';
 import Survey from './pages/Survey';
 import Notes, { Priority, Tags } from './pages/Notes';
 import Findings from './pages/Findings';
+import CraftingUx from './pages/CraftingUx';
 import Codes from './pages/Codes';
 import People from './pages/People';
 import Data from './pages/Data';
@@ -42,6 +43,7 @@ const PAGES: Page[] = [
       { id: 'prioritaet', title: 'Nach Priorität' },
       { id: 'codes', title: 'Codes' },
       { id: 'befunde', title: 'Wiederkehrende Befunde' },
+      { id: 'crafting', title: 'Crafting UX' },
       { id: 'tags', title: 'Tags' },
     ],
   },
@@ -282,7 +284,7 @@ export default function StudyApp() {
       case 'quantitativ':
         return <Survey />;
       case 'qualitativ':
-        return sub === 'prioritaet' ? <Priority /> : sub === 'befunde' ? <Findings /> : sub === 'codes' ? <Codes /> : sub === 'tags' ? <Tags /> : <Notes />;
+        return sub === 'prioritaet' ? <Priority /> : sub === 'befunde' ? <Findings /> : sub === 'codes' ? <Codes /> : sub === 'tags' ? <Tags /> : sub === 'crafting' ? <CraftingUx /> : <Notes />;
       case 'teilnehmende':
         return <People />;
       case 'daten':

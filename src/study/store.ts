@@ -118,6 +118,7 @@ export function useStudy() {
         moderation: (t) => t.some((g) => g.chips.some((c) => c.role === 'intervention')),
         code: (t) => t.some((g) => g.id === 'code'),
         urheber: (t) => t.some((g) => g.id === 'urheber'),
+        craftbezug: (t) => t.some((g) => g.id === 'craftbezug' || g.chips.some((c) => c.role === 'cx-core')),
       };
       const missing = DEFAULT_TAGS.filter((g) => later[g.id] && !added.includes(g.id) && !later[g.id](Object.values(d.tags)));
       if (missing.length) {

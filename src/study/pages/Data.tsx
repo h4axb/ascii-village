@@ -1,5 +1,6 @@
 // Daten & Validierung: the imports, the data sources, the checks (missing
 // values, conflicts, open work), the matching rules, and the change log.
+import { candidatesOf, craftGroup, craftProblems, mainOf, relOf } from '../crafting';
 import type { ColumnRole, StudyDocs } from '../types';
 import { effectiveChips, GAP_MIN, MATCH_ORDER_LABEL, matchOptions, personIdOf, type MatchOrder } from '../model';
 import { fmtBerlin, MATCH_STEPS, STEP_LABEL, ZONE_LABEL, type MatchStep, type TallyZone } from '../match';
@@ -155,6 +156,14 @@ export function useChecks(): Check[] {
   // tags of a category that does not apply (e.g. a priority left from an earlier "Problem"): not counted
   const hidden = live.filter((i) => effectiveChips(i.chips, model.tags, model.chipRole).length < i.chips.length);
   add('Notizen', 'Keine Tags in nicht zutreffenden Kategorien', !hidden.length, hidden.length ? `${hidden.map((i) => i.link ?? i.person).join(', ')}: zählen dort nicht mit – unter Qualitatives Feedback öffnen und neu taggen` : '');
+  // Crafting UX: every statement classified; a main problem still backed by the person's own crafting problems
+  if (craftGroup(model)) {
+    const noRel = model.items.filter((i) => relOf(model, i) === 'open');
+    add('Crafting UX', 'Aussagen mit Crafting-Bezug', !noRel.length, noRel.length ? `${noRel.length} von ${model.items.length} noch nicht eingeordnet (Crafting UX → Klassifizierung)` : `${model.items.length} eingeordnet`);
+    const probs = craftProblems(model, model.items, 'extended');
+    const bad = model.included.filter((p) => mainOf(p, candidatesOf(model, p.id, probs, study.docs.findings), study.docs.findings, study.docs.items).status === 'invalid');
+    add('Crafting UX', 'Hauptprobleme durch eigene Aussagen belegt', !bad.length, bad.length ? `${bad.map((p) => p.id).join(', ')}: gewählter Befund gehört nicht mehr zu einem eigenen Crafting-Problem` : '');
+  }
   return out;
 }
 

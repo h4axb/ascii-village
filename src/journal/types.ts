@@ -94,7 +94,15 @@ export interface Deadline {
 export const REASON_MAX = 140;
 
 // a section of the Overview page: free Markdown text, or one of the lists
-export type OverviewKind = 'text' | 'milestones' | 'deadlines' | 'attachments';
+// stats: the four tiles (phase, next deadline, milestones done, days left);
+// milestones: the timeline; highlights: recent decisions, method notes and the
+// personal development focus (a checklist kept here)
+export type OverviewKind = 'stats' | 'milestones' | 'highlights' | 'text' | 'deadlines' | 'attachments';
+export interface FocusItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
 export interface OverviewSection {
   id: string;
   kind: OverviewKind;
@@ -105,6 +113,8 @@ export interface OverviewSection {
   visibility: Visibility;
   files?: string[]; // attachments
   links?: Source[];
+  items?: FocusItem[]; // highlights: the personal development focus
+  target?: string | null; // stats: the milestone the days count down to (unset = the last one)
 }
 
 // a page's own settings: title, introduction, shown in the navigation or not
@@ -149,15 +159,21 @@ export const PAGES: { id: string; path: string; title: string; description: stri
 export const SECTIONS = PAGES.filter((p) => p.section);
 
 export const DEFAULT_OVERVIEW: OverviewSection[] = [
-  { id: 'description', kind: 'text', title: 'Project description', md: '**ASCIIA BAY**\n\nA cozy web-based game exploring UI/UX design for generative crafting interactions.', hidden: false, order: 0, visibility: 'private' },
-  { id: 'deadlines', kind: 'deadlines', title: 'Deadlines', md: '', hidden: false, order: 1, visibility: 'private' },
-  { id: 'milestones', kind: 'milestones', title: 'Milestones', md: '', hidden: false, order: 2, visibility: 'private' },
-  { id: 'objectives', kind: 'text', title: 'Objectives', md: '', hidden: false, order: 3, visibility: 'private' },
-  { id: 'questions', kind: 'text', title: 'Research questions', md: '', hidden: false, order: 4, visibility: 'private' },
-  { id: 'phase', kind: 'text', title: 'Current phase', md: '', hidden: false, order: 5, visibility: 'private' },
-  { id: 'notes', kind: 'text', title: 'Notes', md: '', hidden: false, order: 6, visibility: 'private' },
-  { id: 'attachments', kind: 'attachments', title: 'Attachments & links', md: '', hidden: false, order: 7, visibility: 'private', files: [], links: [] },
+  { id: 'stats', kind: 'stats', title: 'At a glance', md: '', hidden: false, order: 0, visibility: 'private' },
+  { id: 'milestones', kind: 'milestones', title: 'Milestone Timeline', md: '', hidden: false, order: 1, visibility: 'private' },
+  { id: 'highlights', kind: 'highlights', title: 'Decisions, methods & focus', md: '', hidden: false, order: 2, visibility: 'private', items: [] },
+  { id: 'description', kind: 'text', title: 'Project description', md: '**ASCIIA BAY**\n\nA cozy web-based game exploring UI/UX design for generative crafting interactions.', hidden: false, order: 3, visibility: 'private' },
+  { id: 'deadlines', kind: 'deadlines', title: 'Deadlines', md: '', hidden: false, order: 4, visibility: 'private' },
+  { id: 'objectives', kind: 'text', title: 'Objectives', md: '', hidden: false, order: 5, visibility: 'private' },
+  { id: 'questions', kind: 'text', title: 'Research questions', md: '', hidden: false, order: 6, visibility: 'private' },
+  { id: 'phase', kind: 'text', title: 'Current phase', md: '', hidden: true, order: 7, visibility: 'private' },
+  { id: 'notes', kind: 'text', title: 'Notes', md: '', hidden: false, order: 8, visibility: 'private' },
+  { id: 'attachments', kind: 'attachments', title: 'Attachments & links', md: '', hidden: false, order: 9, visibility: 'private', files: [], links: [] },
 ];
+// added once to an Overview made before the dashboard layout: the tiles, the
+// timeline and the three cards come first; everything else keeps its order
+export const OVERVIEW_V2 = DEFAULT_OVERVIEW.filter((s) => s.kind === 'stats' || s.kind === 'highlights');
+
 // first visit only: the example milestones from the brief (all editable)
 export const DEFAULT_MILESTONES: Milestone[] = [
   { id: 'm-usertesting', name: 'Usertesting', description: '', start: '2026-10', end: '', status: 'completed', order: 0, related: [], visibility: 'private' },

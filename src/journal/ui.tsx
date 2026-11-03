@@ -6,7 +6,7 @@ import { Markdown } from './markdown';
 import { fileBlobUrl, type JournalStore } from './store';
 import type { FileMeta, Source, Visibility } from './types';
 
-export function Icon({ name }: { name: 'edit' | 'up' | 'down' | 'trash' | 'eye' | 'eyeoff' | 'plus' | 'x' | 'menu' | 'lock' | 'globe' | 'clip' | 'link' | 'history' }) {
+export function Icon({ name }: { name: 'edit' | 'up' | 'down' | 'trash' | 'eye' | 'eyeoff' | 'plus' | 'x' | 'menu' | 'lock' | 'globe' | 'clip' | 'link' | 'history' | 'minus' | 'check' | 'calendar' | 'target' | 'hourglass' | 'flag' | 'layers' | 'sprout' }) {
   const d: Record<string, string> = {
     edit: 'M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4',
     up: 'M6 15l6-6 6 6',
@@ -22,6 +22,14 @@ export function Icon({ name }: { name: 'edit' | 'up' | 'down' | 'trash' | 'eye' 
     clip: 'M15 7l-6.5 6.5a2 2 0 003 3L18 10a4 4 0 00-6-6l-6.5 6.5a6 6 0 008.5 8.5L20 13',
     link: 'M10 14a4 4 0 006 0l3-3a4 4 0 00-6-6l-1 1M14 10a4 4 0 00-6 0l-3 3a4 4 0 006 6l1-1',
     history: 'M3 12a9 9 0 103-6.7L3 8M3 3v5h5M12 7v5l3 2',
+    minus: 'M5 12h14',
+    check: 'M5 12.5l4.5 4.5L19 7.5',
+    calendar: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5',
+    target: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 8a4 4 0 100 8 4 4 0 000-8zM12 11.5v1',
+    hourglass: 'M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9',
+    flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
+    layers: 'M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5',
+    sprout: 'M12 21v-8M12 13c0-4 3-7 8-7 0 4-3 7-8 7zM12 13c0-3-2-5-6-5 0 3 2 5 6 5z',
   };
   return (
     <svg className="jr-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

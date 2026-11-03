@@ -2,7 +2,7 @@
 // /api/journal and shown at once. Signed in with the dashboard's password
 // (the same session as /feedback); on the site, the unlock cookie does it.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_MILESTONES, DEFAULT_OVERVIEW, type Coll, type FileMeta, type JournalDocs } from './types';
+import { DEFAULT_MILESTONES, DEFAULT_OVERVIEW, OVERVIEW_V2, type Coll, type FileMeta, type JournalDocs, type OverviewSection } from './types';
 
 const PASS_KEY = 'asciia-feedback-pass'; // shared with /feedback
 const EMPTY: JournalDocs = { entries: {}, milestones: {}, deadlines: {}, pages: {}, overview: {}, settings: {}, files: {} };
@@ -54,9 +54,24 @@ export function useJournal(): JournalStore {
           ...DEFAULT_OVERVIEW.map((s) => ({ coll: 'overview' as const, id: s.id, data: s })),
           ...(Object.keys(d.milestones).length ? [] : DEFAULT_MILESTONES.map((m) => ({ coll: 'milestones' as const, id: m.id, data: m }))),
           { coll: 'settings', id: 'seeded', data: { at: Date.now() } },
+          { coll: 'settings', id: 'overviewV2', data: { at: Date.now() } },
         ];
         await fetch('/api/journal/batch', { method: 'POST', headers: headers(true), body: JSON.stringify({ put }) });
         for (const p of put) (d[p.coll] as Record<string, unknown>)[p.id] = p.data;
+      }
+      // once, for an Overview made before the dashboard layout: the tiles, the
+      // timeline and the three cards first; every other section stays as it was
+      if (!d.settings.overviewV2) {
+        const secs = Object.values(d.overview);
+        const top = Math.min(0, ...secs.map((x) => x.order));
+        const ms = secs.find((x) => x.kind === 'milestones');
+        const put: Put[] = [
+          ...OVERVIEW_V2.filter((x) => !secs.some((y) => y.kind === x.kind)).map((x) => ({ coll: 'overview' as const, id: x.id, data: { ...x, order: top - (x.kind === 'stats' ? 3 : 1) } as OverviewSection })),
+          ...(ms ? [{ coll: 'overview' as const, id: ms.id, data: { ...ms, order: top - 2 } }] : []),
+          { coll: 'settings', id: 'overviewV2', data: { at: Date.now() } },
+        ];
+        const r2 = await fetch('/api/journal/batch', { method: 'POST', headers: headers(true), body: JSON.stringify({ put }) });
+        if (r2.ok) for (const p of put) (d[p.coll] as Record<string, unknown>)[p.id] = p.data;
       }
       setDocs(d);
       setState('ready');

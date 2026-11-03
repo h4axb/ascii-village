@@ -120,7 +120,7 @@ export default function JournalApp() {
           </p>
         )}
         {page === 'overview' ? (
-          <Overview store={store} openEntry={openEntry} />
+          <Overview store={store} openEntry={openEntry} newEntry={(s) => setDraft(blankEntry(s))} go={go} />
         ) : page === 'timeline' ? (
           <Timeline store={store} openEntry={openEntry} />
         ) : (

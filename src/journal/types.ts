@@ -19,10 +19,11 @@ export const ENTRY_TYPES: { id: EntryType; label: string }[] = [
 ];
 
 // the status of an entry, as the Markdown log writes it: ### [x] / [pass] / [ ]
-export type EntryStatus = 'none' | 'open' | 'done' | 'passed';
+export type EntryStatus = 'none' | 'open' | 'discussion' | 'done' | 'passed';
 export const ENTRY_STATUS: { id: EntryStatus; label: string; md: string }[] = [
   { id: 'none', label: 'No status', md: '' },
   { id: 'open', label: 'Open', md: '[ ]' },
+  { id: 'discussion', label: 'In discussion', md: '[?]' },
   { id: 'done', label: 'Done', md: '[x]' },
   { id: 'passed', label: 'Passed', md: '[pass]' },
 ];
@@ -34,7 +35,7 @@ export interface Block {
   label: string; // Context, Method, Decision, Outcome, Reflection, Notes or own
   md: string;
 }
-export const BLOCK_PRESETS = ['Context', 'Method', 'Decision', 'Outcome', 'Reflection', 'Notes'];
+export const BLOCK_PRESETS = ['Context', 'Method / Approach', 'Decision / Action', 'Rationale', 'Outcome', 'Reflection', 'Notes'];
 
 export interface Source {
   label: string;
@@ -149,7 +150,7 @@ export type Coll = Exclude<keyof JournalDocs, 'files'>;
 export const PAGES: { id: string; path: string; title: string; description: string; section: boolean }[] = [
   { id: 'overview', path: '', title: 'Overview', description: '', section: false },
   { id: 'timeline', path: 'timeline', title: 'Timeline', description: 'Every entry and milestone in the order it happened.', section: false },
-  { id: 'log', path: 'log', title: 'All Project Logs', description: 'The complete log. Each entry is stored once and also appears on the pages chosen for it.', section: false },
+  { id: 'log', path: 'log', title: 'Project Log', description: 'All documentation, activities and developments.', section: false },
   { id: 'decisions', path: 'decisions', title: 'Decision Log', description: 'Design and project decisions, with their context and reasons.', section: true },
   { id: 'methodology', path: 'methodology', title: 'Methods & Methodology', description: 'How the project is researched, tested and evaluated.', section: true },
   { id: 'personal', path: 'personal', title: 'Personal Development', description: 'What I learned and how my way of working changed.', section: true },

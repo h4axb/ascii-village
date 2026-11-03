@@ -6,7 +6,7 @@ import { Markdown } from './markdown';
 import { fileBlobUrl, type JournalStore } from './store';
 import type { FileMeta, Source, Visibility } from './types';
 
-export function Icon({ name }: { name: 'edit' | 'up' | 'down' | 'trash' | 'eye' | 'eyeoff' | 'plus' | 'x' | 'menu' | 'lock' | 'globe' | 'clip' | 'link' | 'history' | 'minus' | 'check' | 'calendar' | 'target' | 'hourglass' | 'flag' | 'layers' | 'sprout' }) {
+export function Icon({ name }: { name: 'edit' | 'up' | 'down' | 'trash' | 'eye' | 'eyeoff' | 'plus' | 'x' | 'menu' | 'lock' | 'globe' | 'clip' | 'link' | 'history' | 'minus' | 'check' | 'calendar' | 'target' | 'hourglass' | 'flag' | 'layers' | 'sprout' | 'doc' | 'flask' | 'branch' | 'scale' | 'chat' | 'list' | 'grid' | 'filter' | 'more' | 'expand' | 'search' | 'note' }) {
   const d: Record<string, string> = {
     edit: 'M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4',
     up: 'M6 15l6-6 6 6',
@@ -29,6 +29,18 @@ export function Icon({ name }: { name: 'edit' | 'up' | 'down' | 'trash' | 'eye' 
     hourglass: 'M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9',
     flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
     layers: 'M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5',
+    doc: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
+    flask: 'M9 3h6M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3M7.5 15h9',
+    branch: 'M12 21v-6M12 15l-6-5M12 15l6-5M6 10a2 2 0 100-4 2 2 0 000 4zM18 10a2 2 0 100-4 2 2 0 000 4zM12 21a1.5 1.5 0 100-3',
+    scale: 'M12 4v16M7 20h10M5 7h14M5 7l-3 6a3 3 0 006 0L5 7zM19 7l-3 6a3 3 0 006 0l-3-6z',
+    chat: 'M4 5h16v11H9l-5 4z',
+    list: 'M9 6h11M9 12h11M9 18h11M4 6h1M4 12h1M4 18h1',
+    grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+    filter: 'M4 5h16l-6 8v6l-4-2v-4z',
+    more: 'M5 12h.01M12 12h.01M19 12h.01',
+    expand: 'M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7',
+    search: 'M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4',
+    note: 'M5 4h14v16H5zM9 9h6M9 13h6',
     sprout: 'M12 21v-8M12 13c0-4 3-7 8-7 0 4-3 7-8 7zM12 13c0-3-2-5-6-5 0 3 2 5 6 5z',
   };
   return (

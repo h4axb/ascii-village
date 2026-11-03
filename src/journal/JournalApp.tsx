@@ -7,7 +7,8 @@ import { useJournal, type Put } from './store';
 import { PAGES } from './types';
 import { blankEntry, EntryDialog } from './EntryEditor';
 import { Overview } from './Overview';
-import { EntryList, pageConfig, Timeline } from './pages';
+import { pageConfig, Timeline } from './pages';
+import { LogList } from './LogList';
 import { Icon, IconBtn } from './ui';
 
 const BASE = '/journal';
@@ -36,7 +37,11 @@ export default function JournalApp() {
   const page = pageOfPath(loc.path);
   const entryId = new URLSearchParams(loc.search).get('entry');
   const openEntry = (id: string) => go(loc.path, `?entry=${encodeURIComponent(id)}`);
-  const closeEntry = () => go(loc.path);
+  // (closing an entry stays where the page was scrolled to)
+  const closeEntry = () => {
+    history.pushState(null, '', loc.path);
+    setLoc({ path: loc.path, search: '' });
+  };
 
   const nav = PAGES.map((p) => pageConfig(store, p.id)).sort((a, b) => a.order - b.order);
   const title = nav.find((p) => p.id === page)?.title ?? 'Overview';
@@ -124,10 +129,11 @@ export default function JournalApp() {
         ) : page === 'timeline' ? (
           <Timeline store={store} openEntry={openEntry} />
         ) : (
-          <EntryList key={page} store={store} page={page} openEntry={openEntry} newEntry={(s) => setDraft(blankEntry(s))} />
+          <LogList key={page} store={store} page={page} selected={entryId} openEntry={openEntry} closeEntry={closeEntry} newEntry={(s) => setDraft(blankEntry(s))} />
         )}
       </main>
-      {entry && <EntryDialog key={entry.id} store={store} entry={entry} onClose={closeEntry} />}
+      {/* the log pages show an entry in their own panel; the others in the dialog */}
+      {entry && (page === 'overview' || page === 'timeline') && <EntryDialog key={entry.id} store={store} entry={entry} onClose={closeEntry} />}
       {entryId && !entry && (
         <div className="jr-banner is-floating" role="alert">
           This entry no longer exists.{' '}

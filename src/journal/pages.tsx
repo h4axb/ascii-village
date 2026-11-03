@@ -4,12 +4,12 @@
 // edited here without touching any entry.
 import { useMemo, useState } from 'react';
 import { plainText } from './markdown';
-import { readLog, writeLog, type LogImport } from './logImport';
+import type { LogImport } from './logImport';
 import type { JournalStore, Put } from './store';
 import { suggestSections, suggestTopics } from './suggest';
-import { ENTRY_STATUS, ENTRY_TYPES, PAGES, SECTIONS, fmtDate, type Entry, type PageConfig } from './types';
+import { ENTRY_STATUS, PAGES, SECTIONS, fmtDate, type Entry, type PageConfig } from './types';
 import { allTopics, EntryMeta, sectionTitle } from './EntryEditor';
-import { Chips, Icon, InlineText, MdField, Modal } from './ui';
+import { Chips, InlineText, MdField, Modal } from './ui';
 
 export function pageConfig(store: JournalStore, id: string): PageConfig {
   const def = PAGES.find((p) => p.id === id);
@@ -31,137 +31,6 @@ export function PageHead({ store, id, fallbackTitle, fallbackDescription, action
       </div>
       <MdField md={description} label="Introduction" rows={2} placeholder="No introduction." onSave={(v) => save({ description: v })} />
     </header>
-  );
-}
-
-interface Filter {
-  q: string;
-  type: string;
-  status: string;
-  topic: string;
-  section: string;
-  sort: 'new' | 'old';
-}
-const NO_FILTER: Filter = { q: '', type: '', status: '', topic: '', section: '', sort: 'new' };
-
-export function EntryList({ store, page, openEntry, newEntry }: { store: JournalStore; page: string; openEntry: (id: string) => void; newEntry: (section?: string) => void }) {
-  const [f, setF] = useState<Filter>(NO_FILTER);
-  const [importing, setImporting] = useState<{ name: string; data: LogImport } | null>(null);
-  const isSection = SECTIONS.some((s) => s.id === page);
-  const all = Object.values(store.docs.entries);
-  const list = all
-    .filter((e) => !isSection || e.sections.includes(page))
-    .filter((e) => (!f.type || e.type === f.type) && (!f.status || e.status === f.status) && (!f.topic || e.topics.includes(f.topic)) && (!f.section || e.sections.includes(f.section)))
-    .filter((e) => !f.q.trim() || `${e.title} ${e.topics.join(' ')} ${e.blocks.map((b) => b.md).join(' ')}`.toLowerCase().includes(f.q.trim().toLowerCase()))
-    .sort((a, b) => (f.sort === 'new' ? -1 : 1) * ((a.date || '0').localeCompare(b.date || '0') || a.created - b.created));
-  const topics = allTopics(store);
-  const active = JSON.stringify({ ...f, sort: 'new' }) !== JSON.stringify(NO_FILTER);
-  const exportMd = () => {
-    const md = writeLog(isSection ? all.filter((e) => e.sections.includes(page)) : all, isSection ? [] : Object.values(store.docs.deadlines), (id) => sectionTitle(store, id));
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
-    a.download = `${page === 'log' ? 'project-log' : page}.md`;
-    a.click();
-  };
-  return (
-    <>
-      <PageHead
-        store={store}
-        id={page}
-        actions={
-          <>
-            {page === 'log' && (
-              <label className="jr-btn">
-                Import Markdown
-                <input
-                  type="file"
-                  accept=".md,.markdown,.txt,text/markdown,text/plain"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = '';
-                    if (file) setImporting({ name: file.name, data: readLog(await file.text()) });
-                  }}
-                />
-              </label>
-            )}
-            <button type="button" onClick={exportMd} disabled={!list.length && page !== 'log'}>
-              Export Markdown
-            </button>
-            <button type="button" className="is-primary" onClick={() => newEntry(isSection ? page : undefined)}>
-              <Icon name="plus" /> New entry
-            </button>
-          </>
-        }
-      />
-      <div className="jr-filters" role="search">
-        <input type="search" value={f.q} placeholder="Search title, topics and text" aria-label="Search" onChange={(e) => setF({ ...f, q: e.target.value })} />
-        <select value={f.type} aria-label="Entry type" onChange={(e) => setF({ ...f, type: e.target.value })}>
-          <option value="">All types</option>
-          {ENTRY_TYPES.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
-            </option>
-          ))}
-        </select>
-        <select value={f.status} aria-label="Status" onChange={(e) => setF({ ...f, status: e.target.value })}>
-          <option value="">Any status</option>
-          {ENTRY_STATUS.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-        {topics.length > 0 && (
-          <select value={f.topic} aria-label="Topic" onChange={(e) => setF({ ...f, topic: e.target.value })}>
-            <option value="">All topics</option>
-            {topics.map((t) => (
-              <option key={t} value={t}>
-                #{t}
-              </option>
-            ))}
-          </select>
-        )}
-        {!isSection && (
-          <select value={f.section} aria-label="Section" onChange={(e) => setF({ ...f, section: e.target.value })}>
-            <option value="">All sections</option>
-            {SECTIONS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {sectionTitle(store, s.id)}
-              </option>
-            ))}
-          </select>
-        )}
-        <select value={f.sort} aria-label="Order" onChange={(e) => setF({ ...f, sort: e.target.value as Filter['sort'] })}>
-          <option value="new">Newest first</option>
-          <option value="old">Oldest first</option>
-        </select>
-        {active && (
-          <button type="button" className="jr-linkbtn" onClick={() => setF(NO_FILTER)}>
-            Reset
-          </button>
-        )}
-      </div>
-      <p className="jr-muted jr-small jr-count">{`${list.length} ${list.length === 1 ? 'entry' : 'entries'}${active ? ' (filtered)' : ''}`}</p>
-      {list.length ? (
-        <ul className="jr-entries">
-          {list.map((e) => (
-            <li key={e.id}>
-              <EntryCard store={store} e={e} onOpen={() => openEntry(e.id)} />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div className="jr-empty">
-          <p>{active ? 'No entry matches the filters.' : isSection ? 'No entry is assigned to this page yet. Choose it under “Sections” in an entry.' : 'No entries yet.'}</p>
-          {!active && (
-            <button type="button" className="is-primary" onClick={() => newEntry(isSection ? page : undefined)}>
-              <Icon name="plus" /> New entry
-            </button>
-          )}
-        </div>
-      )}
-      {importing && <ImportDialog store={store} name={importing.name} data={importing.data} onClose={() => setImporting(null)} />}
-    </>
   );
 }
 
@@ -229,7 +98,7 @@ export function Timeline({ store, openEntry }: { store: JournalStore; openEntry:
 
 // the Markdown log read into entries: shown first, sections/topics suggested
 // (preselected, every one can be removed), then stored in one go
-function ImportDialog({ store, name, data, onClose }: { store: JournalStore; name: string; data: LogImport; onClose: () => void }) {
+export function ImportDialog({ store, name, data, onClose }: { store: JournalStore; name: string; data: LogImport; onClose: () => void }) {
   const known = allTopics(store);
   const existing = new Set(Object.values(store.docs.entries).map((e) => `${e.date}|${e.title.toLowerCase()}`));
   // (an entry already in the journal starts unticked)

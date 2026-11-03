@@ -8,7 +8,7 @@
 //                                                         earlier date of it, moved for that reason
 //   ### [x] Bachelorantrag & Exposé                     → an entry, done
 //   ### [pass] Character customization (21.09.26)       → passed, dated
-//   ### [ ] … / ### Title                               → open / no status
+//   ### [ ] … / ### [?] … / ### Title                   → open / in discussion / no status
 //   (everything up to the next ### or ## heading)       → the entry's Markdown
 //
 // Only proposals: the journal shows them before anything is stored.
@@ -31,7 +31,7 @@ export function datesIn(text: string, year = new Date().getFullYear()): { date: 
 }
 const tidy = (s: string) => s.replace(/\(\s*\)/g, '').replace(/\s+:/g, ':').replace(/\s*[:–-]\s*$/, '').replace(/\s{2,}/g, ' ').trim();
 
-const STATUS: Record<string, EntryStatus> = { x: 'done', X: 'done', ' ': 'open', '': 'open', pass: 'passed' };
+const STATUS: Record<string, EntryStatus> = { x: 'done', X: 'done', ' ': 'open', '': 'open', pass: 'passed', '?': 'discussion' };
 
 export interface LogImport {
   entries: Entry[];
@@ -46,7 +46,7 @@ export function readLog(md: string, year = new Date().getFullYear()): LogImport 
   const now = Date.now();
   const flush = () => {
     if (!cur) return;
-    const m = /^\[(x|X| |pass|)\]\s*(.*)$/.exec(cur.head);
+    const m = /^\[(x|X| |pass|\?|)\]\s*(.*)$/.exec(cur.head);
     const status: EntryStatus = m ? STATUS[m[1]] : 'none';
     const { date, dateEnd, rest } = datesIn(m ? m[2] : cur.head, year);
     const body = cur.body.join('\n').replace(/^\n+|\n+$/g, '');

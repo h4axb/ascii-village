@@ -20,7 +20,7 @@ if (!inDir || !outDir) {
 }
 const DEVICE = { desktop: ['Desktop', 1300], tablet: ['Tablet', 834], mobile: ['Mobile', 390] };
 const VERSION = { aktuell: 'Aktuell', neu: 'Neu' };
-const STATE = { default: 'Standard', bearbeiten: 'Bearbeiten', 'vor-speichern': 'Vor dem Speichern', 'qualitativ-oben': 'Qualitatives Feedback, oben', 'daten-zuordnung-oben': 'Daten · Zuordnung, oben', 'uebersicht-oben': 'Übersicht, oben', 'filter-ungeprueft': 'Filter Ungeprüft', auswahl: 'Auswahl', 'aussagen-karte': 'Aussagen-Karte', 'menue-ohne-auswahl': 'Aktionen ohne Auswahl', 'menue-auswahl': 'Aktionen mit Auswahl', 'nach-ungeprueft': 'Nach „ungeprüft markieren“', 'uebersicht-gescrollt': 'Übersicht, gescrollt', 'qualitativ-gescrollt': 'Qualitatives Feedback, gescrollt' };
+const STATE = { default: 'Standard', bearbeiten: 'Bearbeiten', 'vor-speichern': 'Vor dem Speichern', 'qualitativ-oben': 'Qualitatives Feedback, oben', 'daten-zuordnung-oben': 'Daten · Zuordnung, oben', 'uebersicht-oben': 'Übersicht, oben', 'filter-ungeprueft': 'Filter Ungeprüft', auswahl: 'Auswahl', 'aussagen-karte': 'Aussagen-Karte', 'menue-ohne-auswahl': 'Aktionen ohne Auswahl', 'menue-auswahl': 'Aktionen mit Auswahl', 'nach-ungeprueft': 'Nach „ungeprüft markieren“', 'uebersicht-gescrollt': 'Übersicht, gescrollt', 'qualitativ-gescrollt': 'Qualitatives Feedback, gescrollt', 'tag-upload': 'Tag-Upload', umformulieren: 'KI-Umformulierung', bearbeitet: 'Aussage, Frage und Tags bearbeitet', zuruecksetzen: 'Zurücksetzen bestätigen' };
 const font = fs.readFileSync(path.join(__dirname, '../public/fonts/inter-latin-wght-normal.woff2')).toString('base64');
 
 (async () => {

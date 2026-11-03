@@ -4938,3 +4938,109 @@ body:has(.st-root) {
 .st-tagrev-note.is-review strong {
   color: var(--st-warn, #b45309);
 }
+
+/* review windows: question and wording editable, ↺ per side, a confirmation on top */
+.st-root .st-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+.st-root button.st-reset {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  flex: none;
+}
+.st-root button.st-reset:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: currentColor;
+}
+.st-root button.st-reset:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.st-stmt-edit {
+  display: grid;
+  gap: 6px;
+  padding: 8px 8px 4px;
+}
+.st-stmt-edit label {
+  display: grid;
+  gap: 2px;
+}
+.st-stmt-edit label > span {
+  font-size: 12px;
+}
+.st-root .st-stmt-edit input,
+.st-root .st-stmt-edit textarea {
+  width: 100%;
+  font-size: 14px;
+  line-height: 1.45;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--st-paper);
+  resize: vertical;
+}
+.st-stmt-q input {
+  font-style: italic;
+}
+.st-confirm-back {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(29, 29, 27, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.st-confirm {
+  width: min(420px, 100%);
+  background: var(--st-paper);
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.2);
+  display: grid;
+  gap: 8px;
+}
+.st-confirm h3 {
+  font-size: 16px;
+}
+.st-confirm p {
+  margin: 0;
+  color: var(--st-muted);
+  font-size: 14px;
+}
+.st-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+/* phones: the window's buttons to the right, also when they wrap */
+@media (max-width: 640px) {
+  .st-modal-foot {
+    justify-content: flex-end;
+  }
+  .st-modal-foot .st-selbar-gap {
+    display: none;
+  }
+}
+/* the side not taken is faded, but its question and wording stay bright:
+   they are edited here and stored whichever side is taken */
+.st-pane.is-dropped:has(.st-stmt-edit) {
+  opacity: 1;
+}
+.st-pane.is-dropped:has(.st-stmt-edit) > :not(.st-stmt-edit):not(.st-pane-head) {
+  opacity: 0.5;
+}

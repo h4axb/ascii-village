@@ -31,6 +31,9 @@ function Shell({
   onApply,
   onCancel,
   busy,
+  edited = new Set<string>(),
+  blocked = false,
+  extra,
 }: {
   title: string;
   intro: string;
@@ -41,19 +44,22 @@ function Shell({
   onApply: () => void;
   onCancel: () => void;
   busy: string | null;
+  edited?: Set<string>; // statements whose wording or question was edited (stored whichever side is picked)
+  blocked?: boolean; // a confirmation is open on top
+  extra?: ReactNode; // shown above the window (the confirmation)
 }) {
   const [review, setReview] = useState(false);
-  const taken = rows.filter((r) => picks[r.id] === 'neu');
-  const kept = rows.filter((r) => picks[r.id] !== 'neu');
+  const taken = rows.filter((r) => picks[r.id] === 'neu' || edited.has(r.id));
+  const kept = rows.filter((r) => picks[r.id] !== 'neu' && !edited.has(r.id));
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || busy) return;
+      if (e.key !== 'Escape' || busy || blocked) return;
       if (review) setReview(false);
       else onCancel();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [busy, review, onCancel]);
+  }, [busy, review, onCancel, blocked]);
   const groups = [...new Set(rows.map((r) => r.group))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   const summary = (list: Row[], cls: string) =>
     list.length ? (
@@ -69,6 +75,7 @@ function Shell({
                   .map((r) => (
                     <li key={r.id} data-notr>
                       {r.label}
+                      {edited.has(r.id) && <span className="st-muted">{picks[r.id] === 'neu' ? ' · mit bearbeiteter Aussage/Frage' : ' · nur Aussage/Frage bearbeitet'}</span>}
                     </li>
                   ))}
               </ul>
@@ -117,7 +124,7 @@ function Shell({
                   .map((r) => (
                     <div key={r.id} className="st-change is-konflikt">
                       <div className="st-change-head">
-                        <span className="st-change-label st-muted">{picks[r.id] === 'neu' ? 'wird übernommen' : 'bleibt wie bisher'}</span>
+                        <span className="st-change-label st-muted">{picks[r.id] === 'neu' ? 'wird übernommen' : edited.has(r.id) ? 'Aussage/Frage bearbeitet' : 'bleibt wie bisher'}</span>
                         <span className="st-change-pick">
                           <button type="button" className={picks[r.id] === 'alt' ? 'is-on' : ''} onClick={() => setPick(r.id, 'alt')}>
                             Aktuell behalten
@@ -158,11 +165,87 @@ function Shell({
           )}
         </footer>
       </div>
+      {extra}
     </div>
   );
 }
 
 const short = (t: string) => (t.length > 70 ? `${t.slice(0, 70)} …` : t);
+
+// ---- a statement's wording and question, edited in the window ----
+export interface StatementEdit {
+  text: string;
+  question: string;
+}
+const editOf = (i: ItemDoc): StatementEdit => ({ text: workingText(i), question: i.question ?? '' });
+const sameEdit = (a: StatementEdit, b: StatementEdit) => a.text.trim() === b.text.trim() && a.question.trim() === b.question.trim();
+// the item with an edited wording / question: the German version when there is
+// one (the original note stays), else the note itself (its first wording kept)
+function withEdit(i: ItemDoc, e: StatementEdit, orig: StatementEdit, text: boolean): ItemDoc {
+  let out = i;
+  if (e.question.trim() !== orig.question.trim()) out = { ...out, question: e.question.trim() || undefined, questionOwn: true };
+  if (text && e.text.trim() && e.text.trim() !== orig.text.trim())
+    out = out.de ? { ...out, de: e.text.trim(), deAuto: false, deStale: false } : { ...out, text: e.text.trim(), original: out.original ?? out.text };
+  return out;
+}
+
+function ResetBtn({ disabled, onClick, what }: { disabled: boolean; onClick: () => void; what: string }) {
+  return (
+    <button type="button" className="st-reset" disabled={disabled} onClick={onClick} aria-label={`${what} zurücksetzen`} title={disabled ? `${what}: unverändert` : `${what} auf den Stand beim Öffnen zurücksetzen`}>
+      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" />
+      </svg>
+    </button>
+  );
+}
+
+// a small confirmation above the window (Esc or "Abbrechen" keeps everything)
+function ConfirmReset({ text, onYes, onNo }: { text: string; onYes: () => void; onNo: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onNo();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onNo]);
+  return (
+    <div className="st-confirm-back" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onNo()}>
+      <div className="st-confirm" role="alertdialog" aria-modal="true" aria-labelledby="st-confirm-title">
+        <h3 id="st-confirm-title">Zurücksetzen?</h3>
+        <p>{text}</p>
+        <div className="st-confirm-actions">
+          <button type="button" onClick={onNo} autoFocus>
+            Abbrechen
+          </button>
+          <button type="button" className="is-primary" onClick={onYes}>
+            Zurücksetzen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// the question (when the statement has one) and the wording, editable
+function StatementFields({ e, orig, onChange }: { e: StatementEdit; orig: StatementEdit; onChange: (e: StatementEdit) => void }) {
+  return (
+    <div className="st-stmt-edit">
+      {(orig.question || e.question) && (
+        <label className="st-stmt-q">
+          <span className="st-muted">Frage</span>
+          <input value={e.question} onChange={(x) => onChange({ ...e, question: x.target.value })} aria-label="Frage bearbeiten" data-notr />
+        </label>
+      )}
+      <label className="st-stmt-t">
+        <span className="st-muted">Aussage</span>
+        <textarea rows={Math.min(7, Math.max(2, Math.ceil(e.text.length / 52)))} value={e.text} onChange={(x) => onChange({ ...e, text: x.target.value })} aria-label="Aussage bearbeiten" data-notr />
+      </label>
+    </div>
+  );
+}
 // the version a statement is shown and reworded in
 export const workingText = (i: ItemDoc) => i.de || i.text;
 
@@ -187,13 +270,19 @@ export function RewriteReview({ study, items, rewrites, criteria, onClose }: { s
   const [hints, setHints] = useState<Record<string, string>>({});
   const [before, setBefore] = useState<Record<string, string>>({});
   const [working, setWorking] = useState<Record<string, string | null>>({});
+  // the current wording and question, editable here; the AI's proposal as it came (for ↺)
+  const [orig] = useState<Record<string, StatementEdit>>(() => Object.fromEntries(list.map((r) => [r.id, editOf(items.get(r.id)!)])));
+  const [edits, setEdits] = useState<Record<string, StatementEdit>>(() => Object.fromEntries(list.map((r) => [r.id, editOf(items.get(r.id)!)])));
+  const [proposed] = useState<Record<string, string>>(() => Object.fromEntries(list.map((r) => [r.id, r.text])));
+  const [ask, setAsk] = useState<{ text: string; yes: () => void } | null>(null);
+  const edited = new Set(list.filter((r) => !sameEdit(edits[r.id], orig[r.id])).map((r) => r.id));
   async function regenerate(id: string) {
     const hint = (hints[id] ?? '').trim();
     if (!hint || working[id] === 'KI arbeitet …') return;
     const i = study.latest().items[id] ?? items.get(id)!;
     setWorking((x) => ({ ...x, [id]: 'KI arbeitet …' }));
     try {
-      const [r] = await study.rewrite({ items: [{ id, text: workingText(i), question: i.question, hint, previous: texts[id] }], criteria });
+      const [r] = await study.rewrite({ items: [{ id, text: edits[id]?.text.trim() || workingText(i), question: edits[id]?.question.trim() || i.question, hint, previous: texts[id] }], criteria });
       if (!r?.text.trim()) throw new Error('keine Antwort');
       setBefore((x) => ({ ...x, [id]: texts[id] }));
       setTexts((x) => ({ ...x, [id]: r.text.trim() }));
@@ -210,14 +299,18 @@ export function RewriteReview({ study, items, rewrites, criteria, onClose }: { s
   const apply = () => {
     setBusy('Stand wird gesichert, wird übernommen …');
     const put: Put[] = list
-      .filter((r) => picks[r.id] === 'neu' && texts[r.id].trim())
+      .filter((r) => (picks[r.id] === 'neu' && texts[r.id].trim()) || edited.has(r.id))
       .map((r) => {
         const i = study.latest().items[r.id] ?? items.get(r.id)!;
+        const neu = picks[r.id] === 'neu' && !!texts[r.id].trim();
+        // the edited question always; the edited current wording when it is kept
+        // (or when the statement has no German version yet: then it is the note)
+        const base = withEdit(i, edits[r.id], orig[r.id], !neu || !i.de);
         // (the original note stays as it is; the German version is the reworded one)
-        return { coll: 'items' as const, id: r.id, data: { ...i, de: texts[r.id].trim(), deAuto: false, deStale: false } };
+        return { coll: 'items' as const, id: r.id, data: neu ? { ...base, de: texts[r.id].trim(), deAuto: false, deStale: false } : base };
       });
     void store(study, put, 'KI-Umformulierung', `KI-Umformulierung: ${put.length} Aussagen übernommen`)
-      .then(() => onClose(`${put.length} Aussagen umformuliert übernommen.`))
+      .then(() => onClose(`${put.length} ${put.length === 1 ? 'Aussage' : 'Aussagen'} übernommen.`))
       .catch((e) => setBusy(`Nicht übernommen: ${String((e as Error).message)}`));
   };
   if (!list.length) {
@@ -226,7 +319,7 @@ export function RewriteReview({ study, items, rewrites, criteria, onClose }: { s
   }
   return (
     <Shell
-      title={`KI-Umformulierung prüfen (${list.length} Aussagen)`}
+      title={`KI-Umformulierung prüfen (${list.length} ${list.length === 1 ? 'Aussage' : 'Aussagen'})`}
       intro="Links die jetzige Fassung, rechts der Vorschlag der KI – rechts frei bearbeitbar. Alle Vorschläge sind vorausgewählt; „Aktuell behalten“, wo nichts geändert werden soll. Übernommen wird in die deutsche Fassung; die Originalnotiz bleibt unverändert."
       rows={rows}
       picks={picks}
@@ -234,20 +327,50 @@ export function RewriteReview({ study, items, rewrites, criteria, onClose }: { s
       busy={busy}
       onCancel={() => onClose('KI-Umformulierung verworfen: nichts übernommen.')}
       onApply={apply}
+      edited={edited}
+      blocked={!!ask}
+      extra={ask && <ConfirmReset text={ask.text} onNo={() => setAsk(null)} onYes={() => (ask.yes(), setAsk(null))} />}
       render={(id) => {
-        const cur = workingText(items.get(id)!);
+        const cur = edits[id].text;
         const d = diffWords(cur, texts[id]);
         const on = picks[id];
         return (
           <div className="st-panes">
             <div className={`st-pane is-current${on === 'alt' ? ' is-chosen' : ' is-dropped'}`}>
-              <div className="st-pane-head">Aktuell</div>
-              <p className="st-pane-text" data-notr>
+              <div className="st-pane-head">
+                Aktuell (bearbeitbar)
+                <ResetBtn
+                  what="Aktuelle Aussage"
+                  disabled={sameEdit(edits[id], orig[id])}
+                  onClick={() => setAsk({ text: 'Die aktuelle Aussage und ihre Frage auf den gespeicherten Stand zurücksetzen? Deine Änderungen hier gehen verloren.', yes: () => setEdits((x) => ({ ...x, [id]: orig[id] })) })}
+                />
+              </div>
+              <StatementFields e={edits[id]} orig={orig[id]} onChange={(e) => setEdits((x) => ({ ...x, [id]: e }))} />
+              <p className="st-pane-text st-pane-diff" data-notr>
                 <Words pieces={d.left} />
               </p>
             </div>
             <div className={`st-pane is-incoming${on === 'neu' ? ' is-chosen' : ' is-dropped'}`}>
-              <div className="st-pane-head">Neu (bearbeitbar)</div>
+              <div className="st-pane-head">
+                Neu (bearbeitbar)
+                <ResetBtn
+                  what="Neuer Vorschlag"
+                  disabled={texts[id] === proposed[id]}
+                  onClick={() =>
+                    setAsk({
+                      text: 'Den neuen Vorschlag auf den Stand beim Öffnen zurücksetzen (den ersten Vorschlag der KI)? Deine Änderungen und neu generierte Fassungen gehen verloren.',
+                      yes: () => {
+                        setTexts((x) => ({ ...x, [id]: proposed[id] }));
+                        setBefore((x) => {
+                          const n = { ...x };
+                          delete n[id];
+                          return n;
+                        });
+                      },
+                    })
+                  }
+                />
+              </div>
               <textarea
                 className="st-pane-edit"
                 rows={3}
@@ -323,6 +446,12 @@ export function TagReview({ study, tags, items, proposals, onClose, source }: { 
   const [picks, setPicks] = useState<Record<string, Pick>>(() => Object.fromEntries(list.map((p) => [p.id, 'neu' as Pick])));
   const [busy, setBusy] = useState<string | null>(null);
   const setPick = (id: string, p: Pick) => setPicks((x) => ({ ...x, [id]: p }));
+  // the wording and question, editable here; ↺ brings back the state at opening
+  const [orig] = useState<Record<string, StatementEdit>>(() => Object.fromEntries(list.map((p) => [p.id, editOf(items.get(p.id)!)])));
+  const [edits, setEdits] = useState<Record<string, StatementEdit>>(() => Object.fromEntries(list.map((p) => [p.id, editOf(items.get(p.id)!)])));
+  const [ask, setAsk] = useState<{ text: string; yes: () => void } | null>(null);
+  const edited = new Set(list.filter((p) => !sameEdit(edits[p.id], orig[p.id])).map((p) => p.id));
+  const sameSet = (a: { chips: string[]; findings: string[] }, p: TagProposal) => a.chips.join() === p.chips.join() && a.findings.join() === p.findings.join();
   const findings = Object.values(study.docs.findings).sort((a, b) => a.name.localeCompare(b.name));
   const groupOf = (c: string) => tags.find((g) => g.chips.some((x) => x.id === c));
   const label = (c: string) => tags.flatMap((g) => g.chips).find((x) => x.id === c)?.label ?? c;
@@ -344,9 +473,11 @@ export function TagReview({ study, tags, items, proposals, onClose, source }: { 
   const apply = () => {
     setBusy('Stand wird gesichert, wird übernommen …');
     const put: Put[] = list
-      .filter((p) => picks[p.id] === 'neu')
+      .filter((p) => picks[p.id] === 'neu' || edited.has(p.id))
       .map((p) => {
-        const i = study.latest().items[p.id] ?? items.get(p.id)!;
+        // the edited wording and question, whichever tags are kept
+        const i = withEdit(study.latest().items[p.id] ?? items.get(p.id)!, edits[p.id], orig[p.id], true);
+        if (picks[p.id] !== 'neu') return { coll: 'items' as const, id: p.id, data: i };
         const s = sets[p.id];
         // (tags of categories that do not apply are not stored)
         const chips = effectiveChips(s.chips, tags, new Map(tags.flatMap((g) => g.chips.map((c) => [c.id, c.role] as const))));
@@ -364,7 +495,7 @@ export function TagReview({ study, tags, items, proposals, onClose, source }: { 
   }
   return (
     <Shell
-      title={source ? `${source.title} (${list.length} ${list.length === 1 ? 'Aussage' : 'Aussagen'})` : `KI-Tags prüfen (${list.length} Aussagen)`}
+      title={source ? `${source.title} (${list.length} ${list.length === 1 ? 'Aussage' : 'Aussagen'})` : `KI-Tags prüfen (${list.length} ${list.length === 1 ? 'Aussage' : 'Aussagen'})`}
       intro={source?.intro ?? 'Links die jetzigen Tags, rechts der Vorschlag der KI (neu hinzukommende hervorgehoben). Rechts lässt sich alles anpassen: × entfernt einen Tag, „+ Tag“ fügt einen hinzu, der Befund ist wählbar. Alle Vorschläge sind vorausgewählt; „Aktuell behalten“, wo nichts geändert werden soll.'}
       rows={rows}
       picks={picks}
@@ -372,6 +503,9 @@ export function TagReview({ study, tags, items, proposals, onClose, source }: { 
       busy={busy}
       onCancel={() => onClose(source ? 'Tag-Datei verworfen: nichts übernommen.' : 'KI-Tags verworfen: nichts übernommen.')}
       onApply={apply}
+      edited={edited}
+      blocked={!!ask}
+      extra={ask && <ConfirmReset text={ask.text} onNo={() => setAsk(null)} onYes={() => (ask.yes(), setAsk(null))} />}
       render={(id) => {
         const i = items.get(id)!;
         const s = sets[id];
@@ -380,9 +514,6 @@ export function TagReview({ study, tags, items, proposals, onClose, source }: { 
         const free = tags.filter((g) => g.chips.some((c) => !s.chips.includes(c.id)));
         return (
           <>
-            <p className="st-pane-text st-tagrev-text" data-notr>
-              {workingText(i)}
-            </p>
             {source?.notes[id] && (
               <p className={`st-tagrev-note${source.notes[id].review ? ' is-review' : ''}`}>
                 <strong>{source.notes[id].review ? 'Prüfung erforderlich' : 'Sicher'}</strong>
@@ -392,14 +523,29 @@ export function TagReview({ study, tags, items, proposals, onClose, source }: { 
             )}
             <div className="st-panes">
               <div className={`st-pane is-current${on === 'alt' ? ' is-chosen' : ' is-dropped'}`}>
-                <div className="st-pane-head">Aktuell</div>
+                <div className="st-pane-head">
+                  Aktuell
+                  <ResetBtn
+                    what="Aktuelle Aussage"
+                    disabled={sameEdit(edits[id], orig[id])}
+                    onClick={() => setAsk({ text: 'Aussage und Frage auf den gespeicherten Stand zurücksetzen? Deine Änderungen hier gehen verloren.', yes: () => setEdits((x) => ({ ...x, [id]: orig[id] })) })}
+                  />
+                </div>
+                <StatementFields e={edits[id]} orig={orig[id]} onChange={(e) => setEdits((x) => ({ ...x, [id]: e }))} />
                 <div className="st-tagrev">
                   {i.chips.length ? i.chips.map((c) => <span key={c} className="st-chip is-on is-small" title={groupOf(c)?.name}>{label(c)}</span>) : <span className="st-muted">keine Tags</span>}
                 </div>
                 <p className="st-muted st-tagrev-finding">{`Befund: ${findingsOf(i).map((f) => study.docs.findings[f]?.name ?? '?').join('; ') || '–'}`}</p>
               </div>
               <div className={`st-pane is-incoming${on === 'neu' ? ' is-chosen' : ' is-dropped'}`}>
-                <div className="st-pane-head">Neu (bearbeitbar)</div>
+                <div className="st-pane-head">
+                  Neu (bearbeitbar)
+                  <ResetBtn
+                    what="Neue Tags"
+                    disabled={sameSet(s, p)}
+                    onClick={() => setAsk({ text: `Tags und Befund rechts auf den Stand beim Öffnen zurücksetzen (${source ? 'wie in der Datei' : 'den Vorschlag der KI'})? Deine Änderungen rechts gehen verloren.`, yes: () => setSets((x) => ({ ...x, [id]: { chips: p.chips, findings: p.findings } })) })}
+                  />
+                </div>
                 <div className="st-tagrev">
                   {s.chips.map((c) => (
                     <span key={c} className={`st-chip is-on is-small${i.chips.includes(c) ? '' : ' is-added'}`} title={groupOf(c)?.name}>

@@ -3562,3 +3562,75 @@ h3.jr-inline {
     margin-top: 4px;
   }
 }
+
+/* own block categories: new one, and the list to rename / recolour / delete */
+.jr-newkind,
+.jr-kindman {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--jr-soft);
+}
+.jr-newkind-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.jr-newkind-row input {
+  flex: 1;
+  min-width: 0;
+}
+.jr-newkind-sec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.jr-newkind-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+.jr-kindman ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.jr-kindman li {
+  display: grid;
+  gap: 6px;
+}
+.jr-kindman-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) minmax(0, 150px) 32px;
+  align-items: center;
+  gap: 8px;
+}
+.jr-root .jr-kindman-row input,
+.jr-root .jr-kindman-row select {
+  min-height: 32px;
+  font-size: 13px;
+}
+.jr-kindman-row > .jr-small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .jr-kindman-row {
+    grid-template-columns: 20px minmax(0, 1fr) 32px;
+  }
+  .jr-kindman-row > select,
+  .jr-kindman-row > .jr-small {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .jr-kindman-row > :last-child {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}

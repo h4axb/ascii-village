@@ -6,7 +6,7 @@
 import { useEffect, useRef } from 'react';
 import { Markdown } from './markdown';
 import type { JournalStore } from './store';
-import { ENTRY_STATUS, ENTRY_TYPES, PALETTE, blockKindOf, blockKinds, blockTitle, fmtMinutes, shortDate, taskMinutes, tasksTotal, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
+import { ENTRY_STATUS, ENTRY_TYPES, PALETTE, blockKinds, kindOf, blockTitle, fmtMinutes, shortDate, taskMinutes, tasksTotal, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
 import { sectionTitle } from './EntryEditor';
 import { CheckinStrip, weekday, weekLabel } from './EntryForm';
 import { FileThumb, Icon, type IconName } from './ui';
@@ -131,7 +131,7 @@ function Chipline({ store, sections, topics }: { store: JournalStore; sections: 
 
 // a documentation block: a card with its category's colour, title and text
 export function BlockCard({ b, kinds }: { b: Block; kinds: BlockKind[] }) {
-  const k = kinds.find((x) => x.id === blockKindOf(b)) ?? kinds[kinds.length - 1];
+  const k = kindOf(kinds, b);
   const title = blockTitle(b);
   return (
     <div className="jr-bcard" style={{ '--k': k.color } as React.CSSProperties}>
@@ -169,7 +169,7 @@ function TaskItem({ store, t, kinds, focus, onEdit }: { store: JournalStore; t: 
   }, [focus]);
   const blocks = (t.blocks ?? []).filter((b) => b.md.trim());
   const m = taskMinutes(t);
-  const first = blocks[0] ? kinds.find((k) => k.id === blockKindOf(blocks[0]))?.color : undefined;
+  const first = blocks[0] ? kindOf(kinds, blocks[0]).color : undefined;
   return (
     <li ref={ref} className={`jr-act-task${focus ? ' is-focus' : ''}`}>
       <span className="jr-act-time">

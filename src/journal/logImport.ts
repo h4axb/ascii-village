@@ -120,7 +120,7 @@ function mergeMoves(list: (Deadline & { note?: string })[]): Deadline[] {
 const short = (d: string) => (d ? `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(2, 4)}` : '');
 const shortSpan = (a: string, b?: string | null) => (b && b !== a ? `${a.slice(8, 10)}.${a.slice(5, 7)}.-${short(b)}` : short(a));
 
-export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: (id: string) => string): string {
+export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: (id: string) => string, kinds?: { id: string; label: string }[]): string {
   const out: string[] = [];
   const open = deadlines.filter((d) => !d.done).sort((a, b) => a.date.localeCompare(b.date));
   const done = deadlines.filter((d) => d.done).sort((a, b) => b.date.localeCompare(a.date));
@@ -149,7 +149,7 @@ export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: 
       const tm = [(t.sections ?? []).length ? `Sections: ${(t.sections ?? []).map(sectionTitle).join(', ')}` : '', (t.topics ?? []).length ? `Topics: ${(t.topics ?? []).join(', ')}` : ''].filter(Boolean);
       if (tm.length) out.push(`_${tm.join(' · ')}_`);
       for (const b of t.blocks ?? []) {
-        const k = BLOCK_KINDS.find((x) => x.id === blockKindOf(b))?.label ?? 'Notes';
+        const k = (kinds ?? BLOCK_KINDS).find((x) => x.id === blockKindOf(b))?.label ?? 'Notes';
         out.push('', `*${k}${blockTitle(b) ? `: ${blockTitle(b)}` : ''}*`, b.md);
       }
       for (const s of t.sources ?? []) out.push(`- [${s.label || s.url}](${s.url})`);

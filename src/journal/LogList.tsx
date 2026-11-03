@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { readLog, writeLog, type LogImport } from './logImport';
 import type { JournalStore, Put } from './store';
-import { ENTRY_STATUS, ENTRY_TYPES, SECTIONS, fmtDate, itemSections, itemText, itemTopics, sectionItems, type Entry, type LogItem } from './types';
+import { ENTRY_STATUS, ENTRY_TYPES, SECTIONS, blockKinds, fmtDate, itemSections, itemText, itemTopics, sectionItems, type Entry, type LogItem } from './types';
 import { allTopics, sectionTitle } from './EntryEditor';
 import { taskTime } from './EntryForm';
 import { EntryCard, ImportDialog, PageHead, TaskCard } from './pages';
@@ -76,7 +76,7 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
   const open = (i: LogItem) => openEntry(i.e.id, i.t?.id);
   const exportMd = () => {
     setMenu(false);
-    const md = writeLog(isSection ? [...new Set(sectionItems(all, page).map((i) => i.e))] : all, isSection ? [] : Object.values(store.docs.deadlines), (id) => sectionTitle(store, id));
+    const md = writeLog(isSection ? [...new Set(sectionItems(all, page).map((i) => i.e))] : all, isSection ? [] : Object.values(store.docs.deadlines), (id) => sectionTitle(store, id), blockKinds(store.docs.settings));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
     a.download = `${page === 'log' ? 'project-log' : page}.md`;

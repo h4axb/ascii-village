@@ -302,10 +302,21 @@ const PRESET_LABELS = new Set(['Context', 'Method / Approach', 'Decision / Actio
 export const blockKindOf = (b: Block) => b.kind ?? PRESET_KIND.find(([re]) => re.test(b.label.trim()))?.[1] ?? 'notes';
 // the block's own title: none for an older block named only by its preset
 export const blockTitle = (b: Block) => (b.kind ? b.label : PRESET_LABELS.has(b.label.trim()) || PRESET_KIND.some(([re, k]) => re.test(b.label.trim()) && b.label.trim().toLowerCase() === k) ? '' : b.label);
-export function blockKinds(settings: Record<string, unknown>): BlockKind[] {
-  const own = (settings.blockKinds as { colors?: Record<string, string> } | undefined)?.colors ?? {};
-  return BLOCK_KINDS.map((k) => ({ ...k, color: own[k.id] ?? k.color }));
+// settings/blockKinds: the built-in categories' own colours and names, and
+// categories of one's own (id k-…), with an optional section they add
+export interface BlockKindsSetting {
+  colors?: Record<string, string>;
+  labels?: Record<string, string>;
+  custom?: BlockKind[];
 }
+export const kindsSetting = (settings: Record<string, unknown>) => (settings.blockKinds ?? {}) as BlockKindsSetting;
+export function blockKinds(settings: Record<string, unknown>): (BlockKind & { own?: boolean })[] {
+  const s = kindsSetting(settings);
+  const own = s.colors ?? {};
+  return [...BLOCK_KINDS.map((k) => ({ ...k, label: s.labels?.[k.id]?.trim() || k.label, color: own[k.id] ?? k.color })), ...(s.custom ?? []).map((k) => ({ ...k, color: own[k.id] ?? k.color, own: true }))];
+}
+// a block's category; a deleted one of one's own reads as Notes
+export const kindOf = (kinds: BlockKind[], b: Block) => kinds.find((x) => x.id === blockKindOf(b)) ?? kinds.find((x) => x.id === 'notes')!;
 
 const uniq = (a: string[]) => [...new Set(a)];
 // an entry's sections and topics: its own and its tasks'

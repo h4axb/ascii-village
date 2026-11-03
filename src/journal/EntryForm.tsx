@@ -12,7 +12,7 @@
 import { useMemo, useState } from 'react';
 import type { Del, JournalStore, Put } from './store';
 import { suggestSections } from './suggest';
-import { CHECKIN, ENTRY_ICONS, ENTRY_STATUS, ENTRY_TYPES, PALETTE, SECTIONS, blockKindOf, blockKinds, blockTitle, entryTopics, fmtMinutes, isoWeek, newId, shortDate, taskMinutes, tasksTotal, today, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
+import { CHECKIN, ENTRY_ICONS, ENTRY_STATUS, ENTRY_TYPES, PALETTE, SECTIONS, blockKinds, kindOf, kindsSetting, type BlockKindsSetting, blockTitle, entryTopics, fmtMinutes, isoWeek, newId, shortDate, taskMinutes, tasksTotal, today, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
 import { allTopics, sectionTitle } from './EntryEditor';
 import { Attachments, Chips, Icon, IconBtn, type IconName } from './ui';
 
@@ -340,6 +340,7 @@ export function CheckinStrip({ ratings }: { ratings: Partial<Record<CheckinKey, 
 
 function TaskEdit({ store, t, n, open, known, onToggle, onChange, onRemove, onRename }: { store: JournalStore; t: Task; n: number; open: boolean; known: string[]; onToggle: () => void; onChange: (p: Partial<Task>) => void; onRemove: () => void; onRename: (from: string, to: string) => void }) {
   const [adding, setAdding] = useState(false);
+  const [mode, setMode] = useState<'new' | 'manage' | null>(null);
   const [att, setAtt] = useState(() => !!((t.files ?? []).length || (t.sources ?? []).length));
   const sections = t.sections ?? [];
   const blocks = t.blocks ?? [];
@@ -397,7 +398,11 @@ function TaskEdit({ store, t, n, open, known, onToggle, onChange, onRemove, onRe
             {blocks.map((b) => (
               <BlockEdit key={b.id} store={store} b={b} onChange={(p) => setBlock(b.id, p)} onRemove={() => onChange({ blocks: blocks.filter((x) => x.id !== b.id) })} />
             ))}
-            {adding ? (
+            {adding && mode === 'new' ? (
+              <NewKind store={store} onDone={(k) => (setMode(null), k ? addBlock(k) : undefined)} />
+            ) : adding && mode === 'manage' ? (
+              <KindManager store={store} onClose={() => setMode(null)} />
+            ) : adding ? (
               <div className="jr-chips jr-addmenu" role="group" aria-label="Add a block">
                 <span className="jr-muted jr-small">Category:</span>
                 {kinds.map((k) => (
@@ -406,6 +411,12 @@ function TaskEdit({ store, t, n, open, known, onToggle, onChange, onRemove, onRe
                     {k.label}
                   </button>
                 ))}
+                <button type="button" className="jr-chip is-small is-suggested" onClick={() => setMode('new')}>
+                  <Icon name="plus" /> New category
+                </button>
+                <button type="button" className="jr-linkbtn jr-small" onClick={() => setMode('manage')}>
+                  Manage
+                </button>
                 <button type="button" className="jr-linkbtn jr-small" onClick={() => setAdding(false)}>
                   Cancel
                 </button>
@@ -548,14 +559,122 @@ function DayNotes({ store, e, known, onChange, onRename }: { store: JournalStore
   );
 }
 
-// a category's colour, for every block of it (stored at once, for the whole journal)
-export async function setKindColor(store: JournalStore, id: string, color: string) {
-  const own = (store.docs.settings.blockKinds as { colors?: Record<string, string> } | undefined)?.colors ?? {};
+// the categories' settings (colours, names, own categories): stored at once, for the whole journal
+async function saveKinds(store: JournalStore, patch: (s: BlockKindsSetting) => BlockKindsSetting) {
   try {
-    await store.commit([{ coll: 'settings', id: 'blockKinds', data: { colors: { ...own, [id]: color } } }]);
+    await store.commit([{ coll: 'settings', id: 'blockKinds', data: patch(kindsSetting(store.docs.settings)) }]);
   } catch {
     /* reported by the store */
   }
+}
+export const setKindColor = (store: JournalStore, id: string, color: string) => saveKinds(store, (s) => ({ ...s, colors: { ...s.colors, [id]: color } }));
+// how many blocks use a category (every entry, its tasks too)
+const kindUses = (store: JournalStore, id: string) => Object.values(store.docs.entries).reduce((n, e) => n + [...e.blocks, ...(e.tasks ?? []).flatMap((t) => t.blocks ?? [])].filter((b) => b.kind === id).length, 0);
+
+// a new category of one's own: name, colour, and the section a block of it adds to its task
+function NewKind({ store, onDone }: { store: JournalStore; onDone: (k: BlockKind | null) => void }) {
+  const kinds = blockKinds(store.docs.settings);
+  const [label, setLabel] = useState('');
+  const [color, setColor] = useState(PALETTE[(kinds.length + 3) % PALETTE.length]);
+  const [section, setSection] = useState('');
+  const dup = kinds.some((k) => k.label.toLowerCase() === label.trim().toLowerCase());
+  const create = async () => {
+    const k: BlockKind = { id: newId('k-'), label: label.trim(), color, ...(section ? { section } : {}) };
+    await saveKinds(store, (s) => ({ ...s, custom: [...(s.custom ?? []), k] }));
+    onDone(k);
+  };
+  return (
+    <div className="jr-newkind" style={{ '--k': color } as React.CSSProperties}>
+      <span className="jr-task-label">New category</span>
+      <div className="jr-newkind-row">
+        <span className="jr-kdot" aria-hidden="true" />
+        <input
+          value={label}
+          autoFocus
+          maxLength={40}
+          placeholder="e.g. Usertest, Literature, Idea"
+          aria-label="Name of the new category"
+          onChange={(e) => setLabel(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && label.trim() && !dup) void create();
+            if (e.key === 'Escape') (e.stopPropagation(), onDone(null));
+          }}
+        />
+      </div>
+      <Swatches value={color} label="Colour of the new category" onPick={setColor} />
+      <label className="jr-newkind-sec">
+        <span className="jr-muted jr-small">Adds the task to</span>
+        <select value={section} onChange={(e) => setSection(e.target.value)}>
+          <option value="">no section</option>
+          {SECTIONS.map((x) => (
+            <option key={x.id} value={x.id}>
+              {sectionTitle(store, x.id)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {dup && <span className="jr-dw-err">A category with this name exists.</span>}
+      <div className="jr-newkind-foot">
+        <button type="button" className="jr-linkbtn jr-small" onClick={() => onDone(null)}>
+          Cancel
+        </button>
+        <button type="button" className="is-primary" disabled={!label.trim() || dup} onClick={() => void create()}>
+          Create & add block
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// every category: rename, recolour; one's own also re-section or delete
+function KindManager({ store, onClose }: { store: JournalStore; onClose: () => void }) {
+  const kinds = blockKinds(store.docs.settings);
+  const [colorOf, setColorOf] = useState<string | null>(null);
+  const rename = (k: BlockKind & { own?: boolean }, v: string) => {
+    const name = v.trim();
+    if (!name || name === k.label) return;
+    void saveKinds(store, (s) => (k.own ? { ...s, custom: (s.custom ?? []).map((x) => (x.id === k.id ? { ...x, label: name } : x)) } : { ...s, labels: { ...s.labels, [k.id]: name } }));
+  };
+  const remove = (k: BlockKind) => {
+    const n = kindUses(store, k.id);
+    if (!confirm(n ? `Delete the category “${k.label}”? Its ${n} ${n === 1 ? 'block keeps its text and shows' : 'blocks keep their text and show'} as Notes.` : `Delete the category “${k.label}”?`)) return;
+    void saveKinds(store, (s) => ({ ...s, custom: (s.custom ?? []).filter((x) => x.id !== k.id) }));
+  };
+  return (
+    <div className="jr-kindman">
+      <span className="jr-task-label">
+        Categories
+        <button type="button" className="jr-linkbtn jr-small" onClick={onClose}>
+          Done
+        </button>
+      </span>
+      <ul>
+        {kinds.map((k) => (
+          <li key={k.id} style={{ '--k': k.color } as React.CSSProperties}>
+            <div className="jr-kindman-row">
+              <button type="button" className="jr-kdot is-btn" aria-label={`Colour of ${k.label}`} aria-expanded={colorOf === k.id} onClick={() => setColorOf(colorOf === k.id ? null : k.id)} />
+              <input defaultValue={k.label} aria-label={`Rename ${k.label}`} maxLength={40} onBlur={(e) => rename(k, e.target.value)} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+              {k.own ? (
+                <select value={k.section ?? ''} aria-label={`Section added by ${k.label}`} onChange={(e) => void saveKinds(store, (s) => ({ ...s, custom: (s.custom ?? []).map((x) => (x.id === k.id ? { ...x, section: e.target.value || undefined } : x)) }))}>
+                  <option value="">no section</option>
+                  {SECTIONS.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {sectionTitle(store, x.id)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="jr-muted jr-small">{k.section ? sectionTitle(store, k.section) : 'built in'}</span>
+              )}
+              {k.own ? <IconBtn icon="trash" label={`Delete ${k.label}`} danger onClick={() => remove(k)} /> : <span />}
+            </div>
+            {colorOf === k.id && <Swatches value={k.color} label={`Colour of ${k.label}`} onPick={(c) => void setKindColor(store, k.id, c)} />}
+          </li>
+        ))}
+      </ul>
+      <span className="jr-muted jr-small">Changes apply to every block in the journal and are stored at once.</span>
+    </div>
+  );
 }
 
 function Swatches({ value, label, onPick }: { value: string; label: string; onPick: (c: string) => void }) {
@@ -571,7 +690,7 @@ function Swatches({ value, label, onPick }: { value: string; label: string; onPi
 // a block: its category (with the category's colour), an own title, free text
 function BlockEdit({ store, b, onChange, onRemove }: { store: JournalStore; b: Block; onChange: (p: Partial<Block>) => void; onRemove: () => void }) {
   const kinds = blockKinds(store.docs.settings);
-  const k = kinds.find((x) => x.id === blockKindOf(b)) ?? kinds[kinds.length - 1];
+  const k = kindOf(kinds, b);
   const title = b.kind ? b.label : blockTitle(b);
   const [colors, setColors] = useState(false);
   return (

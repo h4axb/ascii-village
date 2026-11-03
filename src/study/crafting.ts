@@ -4,9 +4,9 @@
 // participants (the recurring findings, limited to the crafting statements).
 // Only confirmed tags count (suggestions never do); people are counted once
 // however many statements they made.
-import type { CraftRole, CraftingUxDoc, FindingDoc, ItemDoc } from './types';
+import type { CraftRole, CraftingUxDoc, ItemDoc } from './types';
 import { designOfItem } from './pages/Codes';
-import { findingsOf, type Model, type Person } from './model';
+import type { Model, Person } from './model';
 
 export type Rel = 'core' | 'integration' | 'game' | 'unclear' | 'open';
 export const REL_ROLE: Record<Exclude<Rel, 'open'>, CraftRole> = { core: 'cx-core', integration: 'cx-integration', game: 'cx-game', unclear: 'cx-unclear' };
@@ -62,9 +62,21 @@ export const artOf = (m: Model, i: ItemDoc) => {
   return c ? m.chipLabel.get(c) ?? '' : '';
 };
 
+// a shared Crafting UX problem: a group of crafting statements of its own,
+// kept apart from the recurring findings (settings/craftingProblems)
+export interface CxProblem {
+  id: string;
+  name: string;
+  description?: string;
+  items: string[]; // statement ids
+  auto?: boolean; // created from an AI proposal
+}
+export const cxProblemsOf = (settings: Record<string, unknown>): CxProblem[] => ((settings.craftingProblems as { list?: CxProblem[] } | undefined)?.list ?? []);
+export const groupsOfItem = (problems: CxProblem[], id: string) => problems.filter((g) => g.items.includes(id));
+
 export interface SharedIssue {
-  finding: FindingDoc;
-  items: ItemDoc[];
+  problem: CxProblem;
+  items: ItemDoc[]; // its crafting statements in the current view
   persons: string[];
   a: number; // people with statements about variant A only
   b: number; // B only
@@ -72,12 +84,13 @@ export interface SharedIssue {
   none: number; // without a variant
   rels: Rel[];
 }
-// the recurring findings among the crafting statements, by the number of people
-export function sharedIssues(m: Model, problems: ItemDoc[], findings: Record<string, FindingDoc>): SharedIssue[] {
-  const by = new Map<string, ItemDoc[]>();
-  for (const i of problems) for (const f of findingsOf(i)) if (findings[f]) by.set(f, [...(by.get(f) ?? []), i]);
-  return [...by.entries()]
-    .map(([id, items]) => {
+// the problem groups with the crafting statements in view, by the number of people
+// (a group with none of them in view is still listed, with 0)
+export function sharedIssues(m: Model, inView: ItemDoc[], problems: CxProblem[]): SharedIssue[] {
+  const byId = new Map(inView.map((i) => [i.id, i]));
+  return problems
+    .map((g) => {
+      const items = g.items.map((id) => byId.get(id)).filter((i): i is ItemDoc => !!i);
       const persons = [...new Set(items.map((i) => i.person))].sort();
       let a = 0, b = 0, both = 0, none = 0;
       for (const p of persons) {
@@ -88,28 +101,29 @@ export function sharedIssues(m: Model, problems: ItemDoc[], findings: Record<str
         else if (hasB) b++;
         else none++;
       }
-      return { finding: findings[id], items, persons, a, b, both, none, rels: [...new Set(items.map((i) => relOf(m, i)))] };
+      return { problem: g, items, persons, a, b, both, none, rels: [...new Set(items.map((i) => relOf(m, i)))] };
     })
-    .sort((x, y) => y.persons.length - x.persons.length || y.items.length - x.items.length || x.finding.name.localeCompare(y.finding.name));
+    .sort((x, y) => y.persons.length - x.persons.length || y.items.length - x.items.length || x.problem.name.localeCompare(y.problem.name));
 }
 
-// a person's candidates for the main problem: their findings among their
-// crafting statements, then their crafting statements without a finding
+// a person's candidates for the main problem: the problem groups their crafting
+// statements are in, then their crafting statements without a group
 export interface Candidate {
-  key: string; // f:<finding> | i:<item>
-  finding: FindingDoc | null;
+  key: string; // p:<problem> | i:<item>
+  problem: CxProblem | null;
   item: ItemDoc | null;
   items: ItemDoc[]; // the person's own statements behind it
   prio: number;
   rel: Rel;
 }
-export function candidatesOf(m: Model, person: string, problems: ItemDoc[], findings: Record<string, FindingDoc>): Candidate[] {
-  const own = problems.filter((i) => i.person === person);
+export function candidatesOf(m: Model, person: string, crafting: ItemDoc[], problems: CxProblem[]): Candidate[] {
+  const own = crafting.filter((i) => i.person === person);
   const out: Candidate[] = [];
-  const byF = new Map<string, ItemDoc[]>();
-  for (const i of own) for (const f of findingsOf(i)) if (findings[f]) byF.set(f, [...(byF.get(f) ?? []), i]);
-  for (const [f, items] of byF) out.push({ key: `f:${f}`, finding: findings[f], item: null, items, prio: Math.max(...items.map((i) => prioOf(m, i))), rel: relOf(m, items[0]) });
-  for (const i of own) if (!findingsOf(i).some((f) => findings[f])) out.push({ key: `i:${i.id}`, finding: null, item: i, items: [i], prio: prioOf(m, i), rel: relOf(m, i) });
+  for (const g of problems) {
+    const items = own.filter((i) => g.items.includes(i.id));
+    if (items.length) out.push({ key: `p:${g.id}`, problem: g, item: null, items, prio: Math.max(...items.map((i) => prioOf(m, i))), rel: relOf(m, items[0]) });
+  }
+  for (const i of own) if (!problems.some((g) => g.items.includes(i.id))) out.push({ key: `i:${i.id}`, problem: null, item: i, items: [i], prio: prioOf(m, i), rel: relOf(m, i) });
   return out.sort((a, b) => b.prio - a.prio || b.items.length - a.items.length);
 }
 
@@ -124,15 +138,17 @@ export interface MainState {
 // what the page shows for a person: the decision stored, else a proposal (the
 // candidate with the highest priority and most statements), else open; a
 // stored decision whose evidence is gone is flagged
-export function mainOf(p: Person, cands: Candidate[], findings: Record<string, FindingDoc>, items: Record<string, ItemDoc>): MainState {
+export function mainOf(p: Person, cands: Candidate[], problems: CxProblem[], items: Record<string, ItemDoc>): MainState {
   const doc = p.doc.craftingUx ?? null;
-  if (doc && (doc.special || doc.finding || doc.item)) {
+  if (doc && (doc.special || doc.problem || doc.item || doc.finding)) {
     if (doc.special) return { status: 'confirmed', label: SPECIAL_LABEL[doc.special], key: null, doc };
-    const key = doc.finding ? `f:${doc.finding}` : `i:${doc.item}`;
-    const label = doc.finding ? findings[doc.finding]?.name ?? 'Befund gelöscht' : items[doc.item!]?.de || items[doc.item!]?.text || 'Aussage gelöscht';
+    // (a decision made on a recurring finding, before the problem groups: to choose again)
+    if (!doc.problem && !doc.item) return { status: 'invalid', label: 'früher auf einen Befund gesetzt – neu wählen', key: null, doc };
+    const key = doc.problem ? `p:${doc.problem}` : `i:${doc.item}`;
+    const label = doc.problem ? problems.find((g) => g.id === doc.problem)?.name ?? 'Problem-Gruppe gelöscht' : items[doc.item!]?.de || items[doc.item!]?.text || 'Aussage gelöscht';
     return { status: cands.some((c) => c.key === key) ? 'confirmed' : 'invalid', label, key, doc };
   }
   const top = cands[0];
-  if (top) return { status: 'suggested', label: top.finding?.name ?? (top.item!.de || top.item!.text), key: top.key, doc: null };
+  if (top) return { status: 'suggested', label: top.problem?.name ?? (top.item!.de || top.item!.text), key: top.key, doc: null };
   return { status: 'open', label: 'keine Crafting-Aussage erfasst', key: null, doc: null };
 }

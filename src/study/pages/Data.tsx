@@ -1,6 +1,6 @@
 // Daten & Validierung: the imports, the data sources, the checks (missing
 // values, conflicts, open work), the matching rules, and the change log.
-import { candidatesOf, craftGroup, craftItems, mainOf, relOf } from '../crafting';
+import { candidatesOf, craftGroup, craftItems, cxProblemsOf, mainOf, relOf } from '../crafting';
 import type { ColumnRole, StudyDocs } from '../types';
 import { effectiveChips, GAP_MIN, MATCH_ORDER_LABEL, matchOptions, personIdOf, type MatchOrder } from '../model';
 import { fmtBerlin, MATCH_STEPS, STEP_LABEL, ZONE_LABEL, type MatchStep, type TallyZone } from '../match';
@@ -161,8 +161,8 @@ export function useChecks(): Check[] {
     const noRel = model.items.filter((i) => relOf(model, i) === 'open');
     add('Crafting UX', 'Aussagen mit Crafting-Bezug', !noRel.length, noRel.length ? `${noRel.length} von ${model.items.length} noch nicht eingeordnet (Crafting UX → Klassifizierung)` : `${model.items.length} eingeordnet`);
     const probs = craftItems(model, model.items, 'extended');
-    const bad = model.included.filter((p) => mainOf(p, candidatesOf(model, p.id, probs, study.docs.findings), study.docs.findings, study.docs.items).status === 'invalid');
-    add('Crafting UX', 'Hauptprobleme durch eigene Aussagen belegt', !bad.length, bad.length ? `${bad.map((p) => p.id).join(', ')}: gewählter Befund gehört nicht mehr zu einer eigenen Crafting-Aussage` : '');
+    const bad = model.included.filter((p) => mainOf(p, candidatesOf(model, p.id, probs, cxProblemsOf(study.docs.settings)), cxProblemsOf(study.docs.settings), study.docs.items).status === 'invalid');
+    add('Crafting UX', 'Hauptprobleme durch eigene Aussagen belegt', !bad.length, bad.length ? `${bad.map((p) => p.id).join(', ')}: gewähltes Problem gehört nicht mehr zu einer eigenen Crafting-Aussage (oder wurde früher auf einen Befund gesetzt)` : '');
   }
   return out;
 }

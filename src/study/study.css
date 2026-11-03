@@ -5778,3 +5778,135 @@ body:has(.st-root) {
 .st-root button.st-cx-ir.is-plain .st-cx-note {
   margin: 0;
 }
+/* shared problems as groups of their own: create, edit, assign */
+.st-cx-gtools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 6px;
+}
+.st-cx-newg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+}
+.st-cx-newg input,
+.st-cx-gname,
+.st-cx-gdesc,
+.st-cx-add input,
+.st-cx-propHead input[type='text'],
+.st-cx-propHead input:not([type]) {
+  font: inherit;
+  font-size: 13.5px;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--st-paper);
+  color: var(--st-ink);
+  min-width: 0;
+}
+.st-cx-newg input {
+  flex: 1 1 220px;
+}
+.st-cx-gname {
+  font-weight: 600;
+}
+.st-cx-gdesc {
+  resize: vertical;
+}
+.st-cx-add {
+  display: grid;
+  gap: 4px;
+}
+.st-cx-add .st-cx-lab {
+  margin: 0;
+}
+.st-cx-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.st-cx-hits li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--st-soft);
+  font-size: 13px;
+}
+.st-cx-hits small {
+  display: block;
+  color: var(--st-muted);
+  font-size: 11.5px;
+}
+.st-cx-quotes .st-cx-quote {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: start;
+}
+.st-root button.st-cx-x.is-small {
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+}
+.st-cx-assign {
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--st-line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--st-paper);
+  color: var(--st-ink);
+  max-width: 160px;
+}
+.st-root button.st-cx-del {
+  justify-self: start;
+  color: var(--st-warn);
+  font-size: 12.5px;
+}
+.st-cx-prop {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--st-line);
+  border-radius: 10px;
+}
+.st-cx-prop.is-off {
+  opacity: 0.5;
+}
+.st-cx-propHead {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.st-cx-propHead input:not([type='checkbox']) {
+  flex: 1;
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .st-cx-quotes .st-cx-quote {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .st-cx-quotes .st-cx-assign {
+    grid-column: 1 / -1;
+    justify-self: start;
+    max-width: 100%;
+  }
+}
+.st-root select.st-cx-assign {
+  width: auto;
+  max-width: 170px;
+  min-height: 28px;
+}
+.st-cx-card > h3 > span > .st-cx-i {
+  margin-left: 6px;
+  vertical-align: 1px;
+}

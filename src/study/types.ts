@@ -64,10 +64,11 @@ export interface PersonDoc {
 }
 
 // the participant's biggest Crafting UX problem, as decided by hand (Crafting UX
-// page): a recurring finding (or one statement, when not grouped yet), or one
+// page): a shared problem group (or one statement, when not grouped yet), or one
 // of the special cases; unset = not decided (the page may propose one)
 export interface CraftingUxDoc {
-  finding?: string | null;
+  problem?: string | null; // a shared Crafting UX problem (settings/craftingProblems)
+  finding?: string | null; // (older decisions: a recurring finding)
   item?: string | null;
   special?: 'none' | 'multiple' | 'insufficient' | null;
   reason?: string;

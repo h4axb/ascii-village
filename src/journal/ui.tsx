@@ -6,11 +6,13 @@ import { Markdown } from './markdown';
 import { fileBlobUrl, type JournalStore } from './store';
 import type { FileMeta, Source, Visibility } from './types';
 
-export function Icon({ name }: { name: 'edit' | 'up' | 'down' | 'trash' | 'eye' | 'eyeoff' | 'plus' | 'x' | 'menu' | 'lock' | 'globe' | 'clip' | 'link' | 'history' | 'minus' | 'check' | 'calendar' | 'target' | 'hourglass' | 'flag' | 'layers' | 'sprout' | 'doc' | 'flask' | 'branch' | 'scale' | 'chat' | 'list' | 'grid' | 'filter' | 'more' | 'expand' | 'search' | 'note' }) {
+export function Icon({ name }: { name: 'edit' | 'up' | 'down' | 'trash' | 'eye' | 'eyeoff' | 'plus' | 'x' | 'menu' | 'lock' | 'globe' | 'clip' | 'link' | 'history' | 'minus' | 'check' | 'calendar' | 'target' | 'hourglass' | 'flag' | 'layers' | 'sprout' | 'doc' | 'flask' | 'branch' | 'scale' | 'chat' | 'list' | 'grid' | 'filter' | 'more' | 'expand' | 'search' | 'note' | 'left' | 'right' }) {
   const d: Record<string, string> = {
     edit: 'M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4',
     up: 'M6 15l6-6 6 6',
     down: 'M6 9l6 6 6-6',
+    left: 'M15 6l-6 6 6 6',
+    right: 'M9 6l6 6-6 6',
     trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
     eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zm10 3a3 3 0 100-6 3 3 0 000 6z',
     eyeoff: 'M3 3l18 18M10.6 5.1A10 10 0 0112 5c6 0 10 7 10 7a17 17 0 01-3.2 3.9M6.2 6.3C3.6 8.1 2 12 2 12s4 7 10 7a10 10 0 004.2-.9',

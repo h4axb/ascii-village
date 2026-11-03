@@ -42,15 +42,21 @@ export interface Source {
   url: string;
 }
 
-// a task done for an entry, with its own time range (HH:MM); the duration is
-// worked out from it (an end before the start runs past midnight)
+// a task of a day's entry: the smallest unit documented on its own. It has its
+// own time range (HH:MM; an end before the start runs past midnight), its own
+// sections (the pages that show it), tags, documentation blocks and references.
+// A section page lists the tasks assigned to it, not the whole day.
 export interface Task {
   id: string;
   title: string;
   start: string;
   end: string;
+  sections?: string[];
+  topics?: string[];
+  blocks?: Block[];
+  files?: string[];
+  sources?: Source[];
 }
-
 export interface Entry {
   id: string;
   date: string; // ISO yyyy-mm-dd
@@ -58,12 +64,15 @@ export interface Entry {
   title: string;
   type: EntryType;
   status: EntryStatus;
+  // the whole day's own sections, topics and notes: kept for entries written
+  // before tasks had their own (and for imports); new documentation goes into a task
   sections: string[]; // page ids (decisions, methodology …); every entry is in the Project Log
   topics: string[];
   blocks: Block[];
   sources: Source[];
   files: string[]; // file ids
   tasks?: Task[];
+  week?: string | null; // a weekly review added to this entry (weeks/<id>, e.g. 2026-W45)
   visibility: Visibility;
   created: number;
   updated: number;
@@ -147,11 +156,11 @@ export interface FileMeta {
 
 // the daily check-in: stored once per date (id = the ISO date) and shared by
 // every entry of that day, so the ratings are never kept twice
-export const CHECKIN: { id: 'productivity' | 'concentration' | 'sleep' | 'waking'; label: string }[] = [
-  { id: 'productivity', label: 'Productivity' },
-  { id: 'concentration', label: 'Concentration' },
-  { id: 'sleep', label: 'Sleep quality' },
-  { id: 'waking', label: 'Waking up' },
+export const CHECKIN: { id: 'productivity' | 'concentration' | 'sleep' | 'waking'; label: string; short: string }[] = [
+  { id: 'sleep', label: 'Sleep quality', short: 'Sleep' },
+  { id: 'waking', label: 'Waking up', short: 'Waking' },
+  { id: 'concentration', label: 'Concentration', short: 'Focus' },
+  { id: 'productivity', label: 'Productivity', short: 'Productivity' },
 ];
 export type CheckinKey = (typeof CHECKIN)[number]['id'];
 export interface Day {
@@ -159,7 +168,7 @@ export interface Day {
   ratings: Partial<Record<CheckinKey, number>>; // 1–10
   updated: number;
 }
-// the weekly review, written on Tuesdays: one per ISO week (id 2026-W45)
+// a weekly review: one per ISO week (id 2026-W45), added to an entry by hand
 export interface Week {
   id: string;
   priorities: string; // Markdown
@@ -251,3 +260,36 @@ export function taskMinutes(t: { start: string; end: string }): number | null {
   return (b - a + 1440) % 1440;
 }
 export const fmtMinutes = (n: number) => (n < 60 ? `${n}m` : `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}m` : ''}`);
+
+// a documentation block adds the section it belongs to, once, when it is added
+export const BLOCK_SECTION: Record<string, string> = { 'Method / Approach': 'methodology', 'Decision / Action': 'decisions', Rationale: 'decisions', Reflection: 'personal', Outcome: 'research' };
+export const TASK_BLOCKS = ['Method / Approach', 'Decision / Action', 'Rationale', 'Outcome', 'Reflection', 'Notes'];
+
+const uniq = (a: string[]) => [...new Set(a)];
+// an entry's sections and topics: its own and its tasks'
+export const entrySections = (e: Entry) => uniq([...e.sections, ...(e.tasks ?? []).flatMap((t) => t.sections ?? [])]);
+export const entryTopics = (e: Entry) => uniq([...e.topics, ...(e.tasks ?? []).flatMap((t) => t.topics ?? [])]);
+
+// what a list shows: a whole entry, or one task of it (on a section page)
+export interface LogItem {
+  key: string;
+  e: Entry;
+  t?: Task;
+}
+// a section page: the tasks assigned to it, and entries assigned as a whole
+export function sectionItems(entries: Entry[], section: string): LogItem[] {
+  const out: LogItem[] = [];
+  for (const e of entries) {
+    if (e.sections.includes(section)) out.push({ key: e.id, e });
+    for (const t of e.tasks ?? []) if (t.sections?.includes(section)) out.push({ key: `${e.id}/${t.id}`, e, t });
+  }
+  return out;
+}
+export const itemSections = (i: LogItem) => (i.t ? i.t.sections ?? [] : entrySections(i.e));
+export const itemTopics = (i: LogItem) => (i.t ? i.t.topics ?? [] : entryTopics(i.e));
+export const itemText = (i: LogItem) =>
+  (i.t
+    ? [i.t.title, i.e.title, ...(i.t.topics ?? []), ...(i.t.blocks ?? []).map((b) => b.md)]
+    : [i.e.title, ...entryTopics(i.e), ...i.e.blocks.map((b) => b.md), ...(i.e.tasks ?? []).flatMap((t) => [t.title, ...(t.blocks ?? []).map((b) => b.md)])]
+  ).join(' ');
+export const tasksTotal = (ts: Task[] | undefined) => (ts ?? []).reduce((n, t) => n + (taskMinutes(t) ?? 0), 0);

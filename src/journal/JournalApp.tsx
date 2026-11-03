@@ -5,11 +5,11 @@ import { useCallback, useEffect, useState } from 'react';
 import './journal.css';
 import { useJournal, type Put } from './store';
 import { PAGES } from './types';
-import { EntryDialog } from './EntryEditor';
 import { AddEntryDrawer } from './AddEntry';
 import { Overview } from './Overview';
 import { pageConfig, Timeline } from './pages';
 import { LogList } from './LogList';
+import { EntryPanel } from './EntryPanel';
 import { Icon, IconBtn } from './ui';
 
 const BASE = '/journal';
@@ -42,8 +42,10 @@ export default function JournalApp() {
     if (!search) window.scrollTo(0, 0);
   }, []);
   const page = pageOfPath(loc.path);
-  const entryId = new URLSearchParams(loc.search).get('entry');
-  const openEntry = (id: string) => go(loc.path, `?entry=${encodeURIComponent(id)}`);
+  const params = new URLSearchParams(loc.search);
+  const entryId = params.get('entry');
+  const taskId = params.get('task');
+  const openEntry = (id: string, task?: string) => go(loc.path, `?entry=${encodeURIComponent(id)}${task ? `&task=${encodeURIComponent(task)}` : ''}`);
   // (closing an entry stays where the page was scrolled to)
   const closeEntry = () => {
     history.pushState(null, '', loc.path);
@@ -136,11 +138,11 @@ export default function JournalApp() {
         ) : page === 'timeline' ? (
           <Timeline store={store} openEntry={openEntry} />
         ) : (
-          <LogList key={page} store={store} page={page} selected={entryId} openEntry={openEntry} closeEntry={closeEntry} newEntry={(s) => setAdding({ section: s })} />
+          <LogList key={page} store={store} page={page} selected={entryId} selectedTask={taskId} openEntry={openEntry} newEntry={(s) => setAdding({ section: s })} />
         )}
       </main>
-      {/* the log pages show an entry in their own panel; the others in the dialog */}
-      {entry && (page === 'overview' || page === 'timeline') && <EntryDialog key={entry.id} store={store} entry={entry} onClose={closeEntry} />}
+      {/* an entry opens in the overlay on every page, at its task if one is named */}
+      {entry && <EntryPanel key={entry.id} store={store} entry={entry} focusTask={taskId} onClose={closeEntry} />}
       {entryId && !entry && (
         <div className="jr-banner is-floating" role="alert">
           This entry no longer exists.{' '}

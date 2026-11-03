@@ -7,7 +7,8 @@ import { plainText } from './markdown';
 import type { LogImport } from './logImport';
 import type { JournalStore, Put } from './store';
 import { suggestSections, suggestTopics } from './suggest';
-import { ENTRY_STATUS, PAGES, SECTIONS, fmtDate, type Entry, type PageConfig } from './types';
+import { ENTRY_STATUS, PAGES, SECTIONS, fmtDate, type Entry, type PageConfig, type Task } from './types';
+import { taskTime } from './EntryForm';
 import { allTopics, EntryMeta, sectionTitle } from './EntryEditor';
 import { Chips, InlineText, MdField, Modal } from './ui';
 
@@ -35,7 +36,8 @@ export function PageHead({ store, id, fallbackTitle, fallbackDescription, action
 }
 
 export function EntryCard({ store, e, onOpen }: { store: JournalStore; e: Entry; onOpen: () => void }) {
-  const first = plainText(e.blocks.map((b) => b.md).join('\n'));
+  const tasks = e.tasks ?? [];
+  const first = plainText([...e.blocks.map((b) => b.md), ...tasks.map((t) => t.title)].join('\n'));
   return (
     <button type="button" className="jr-entry" onClick={onOpen}>
       <span className="jr-entry-title">
@@ -44,6 +46,31 @@ export function EntryCard({ store, e, onOpen }: { store: JournalStore; e: Entry;
       </span>
       <EntryMeta store={store} e={e} />
       {first && <span className="jr-entry-text">{first.length > 220 ? `${first.slice(0, 220)} …` : first}</span>}
+    </button>
+  );
+}
+
+// one task of a day, on a section page
+export function TaskCard({ store, e, t, onOpen }: { store: JournalStore; e: Entry; t: Task; onOpen: () => void }) {
+  const text = plainText((t.blocks ?? []).map((b) => b.md).join('\n'));
+  return (
+    <button type="button" className="jr-entry" onClick={onOpen}>
+      <span className="jr-entry-title">{t.title || 'Untitled task'}</span>
+      <div className="jr-meta">
+        <span className="jr-date">{fmtDate(e.date)}</span>
+        <span className="jr-type">{[e.title, taskTime(t)].filter(Boolean).join(' · ')}</span>
+        {(t.sections ?? []).map((s) => (
+          <span key={s} className="jr-tag is-section">
+            {sectionTitle(store, s)}
+          </span>
+        ))}
+        {(t.topics ?? []).map((x) => (
+          <span key={x} className="jr-tag">
+            #{x}
+          </span>
+        ))}
+      </div>
+      {text && <span className="jr-entry-text">{text.length > 220 ? `${text.slice(0, 220)} …` : text}</span>}
     </button>
   );
 }

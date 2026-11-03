@@ -7,14 +7,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { plainText } from './markdown';
 import type { JournalStore } from './store';
-import { fmtDate, MILESTONE_STATUS, newId, REASON_MAX, today, type Deadline, type FocusItem, type Milestone, type OverviewSection } from './types';
+import { fmtDate, sectionItems, MILESTONE_STATUS, newId, REASON_MAX, today, type Deadline, type FocusItem, type Milestone, type OverviewSection } from './types';
 import { Attachments, Icon, IconBtn, InlineText, MdField, VisibilitySwitch } from './ui';
 import { PageHead, pageConfig } from './pages';
 import { blankMilestone, endOf, MilestoneDialog, MilestoneTimeline, startOf } from './MilestoneTimeline';
 
 type IconName = Parameters<typeof Icon>[0]['name'];
 
-export function Overview({ store, openEntry, newEntry, go }: { store: JournalStore; openEntry: (id: string) => void; newEntry: (section?: string) => void; go: (path: string) => void }) {
+export function Overview({ store, openEntry, newEntry, go }: { store: JournalStore; openEntry: (id: string, task?: string) => void; newEntry: (section?: string) => void; go: (path: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [ms, setMs] = useState<{ m: Milestone; isNew?: boolean } | null>(null);
   const secs = Object.values(store.docs.overview).sort((a, b) => a.order - b.order);
@@ -217,11 +217,11 @@ function Stats({ store, sec, editing, save }: { store: JournalStore; sec: Overvi
 }
 
 // ---- recent decisions, method notes, personal focus ----
-function Highlights({ store, sec, save, openEntry, newEntry, go }: { store: JournalStore; sec: OverviewSection; save: (s: OverviewSection) => void; openEntry: (id: string) => void; newEntry: (section?: string) => void; go: (path: string) => void }) {
+function Highlights({ store, sec, save, openEntry, newEntry, go }: { store: JournalStore; sec: OverviewSection; save: (s: OverviewSection) => void; openEntry: (id: string, task?: string) => void; newEntry: (section?: string) => void; go: (path: string) => void }) {
+  // the newest tasks (and older whole entries) of a section
   const latest = (section: string) =>
-    Object.values(store.docs.entries)
-      .filter((e) => e.sections.includes(section))
-      .sort((a, b) => (b.date || '0').localeCompare(a.date || '0') || b.updated - a.updated)
+    sectionItems(Object.values(store.docs.entries), section)
+      .sort((a, b) => (b.e.date || '0').localeCompare(a.e.date || '0') || b.e.updated - a.e.updated || (b.t?.start ?? '').localeCompare(a.t?.start ?? ''))
       .slice(0, 3);
   const card = (section: string, label: string, icon: IconName, row: 'dot' | 'doc') => {
     const list = latest(section);
@@ -239,11 +239,11 @@ function Highlights({ store, sec, save, openEntry, newEntry, go }: { store: Jour
         </header>
         {list.length ? (
           <ul className="jr-hl-list">
-            {list.map((e) => (
-              <li key={e.id}>
-                <button type="button" className="jr-hl-item" onClick={() => openEntry(e.id)}>
+            {list.map(({ key, e, t }) => (
+              <li key={key}>
+                <button type="button" className="jr-hl-item" onClick={() => openEntry(e.id, t?.id)}>
                   {row === 'dot' ? <span className={`jr-hl-dot is-${e.status}`} aria-hidden="true" /> : <Icon name="clip" />}
-                  <span className="jr-hl-title">{e.title}</span>
+                  <span className="jr-hl-title">{t ? t.title || e.title : e.title}</span>
                   <span className="jr-hl-date">{e.date ? fmtDate(e.date) : ''}</span>
                 </button>
               </li>

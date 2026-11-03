@@ -1,21 +1,17 @@
-// The Project Log and the section pages: a table of the entries (search,
-// filters, newest/oldest, pages of 10, a list or a grid), and the chosen entry
-// beside it in a panel, where every part is edited in place: title, date,
-// type, status, sections, topics, each content block on its own, evidence and
-// references. On narrow screens the panel covers the list. It is always the
-// one record: a change here is a change on every page that shows the entry.
+// The Project Log and the section pages: a table (search, filters,
+// newest/oldest, pages of 10, a list or a grid). The Project Log lists the days'
+// entries; a section page lists the tasks assigned to it (and older entries
+// assigned as a whole), so a day with five tasks shows only the one that
+// belongs here. A row opens the entry in the overlay, at that task.
 import { useEffect, useMemo, useState } from 'react';
 import { readLog, writeLog, type LogImport } from './logImport';
 import type { JournalStore, Put } from './store';
-import { suggestSections } from './suggest';
-import { BLOCK_PRESETS, ENTRY_STATUS, ENTRY_TYPES, SECTIONS, fmtDate, newId, type Block, type Entry } from './types';
-import { allTopics, EntryDialog, sectionTitle } from './EntryEditor';
-import { EntryCard, ImportDialog, PageHead } from './pages';
-import { DayFacts } from './AddEntry';
-import { Markdown } from './markdown';
-import { Attachments, Chips, Icon, IconBtn, InlineText, MdEditor } from './ui';
+import { ENTRY_STATUS, ENTRY_TYPES, SECTIONS, fmtDate, itemSections, itemText, itemTopics, sectionItems, type Entry, type LogItem } from './types';
+import { allTopics, sectionTitle } from './EntryEditor';
+import { taskTime } from './EntryForm';
+import { EntryCard, ImportDialog, PageHead, TaskCard } from './pages';
+import { Icon, IconBtn } from './ui';
 
-type IconName = Parameters<typeof Icon>[0]['name'];
 const PAGE = 10;
 
 interface Filter {
@@ -36,31 +32,7 @@ const shortSection = (store: JournalStore, id: string) => {
   return own && own !== def ? own : SHORT[id] ?? sectionTitle(store, id);
 };
 
-// a block's icon by its name (Context, Method / Approach …; own names get a note)
-export function blockIcon(label: string): IconName {
-  const l = label.toLowerCase();
-  if (/context|kontext/.test(l)) return 'doc';
-  if (/method|approach|methode|vorgehen/.test(l)) return 'flask';
-  if (/decision|action|entscheid/.test(l)) return 'branch';
-  if (/rationale|reason|begründ/.test(l)) return 'scale';
-  if (/outcome|result|ergebnis/.test(l)) return 'target';
-  if (/reflect|reflexion/.test(l)) return 'chat';
-  return 'note';
-}
-
-const useWide = () => {
-  const q = '(min-width: 1240px)';
-  const [wide, setWide] = useState(() => matchMedia(q).matches);
-  useEffect(() => {
-    const m = matchMedia(q);
-    const on = () => setWide(m.matches);
-    m.addEventListener('change', on);
-    return () => m.removeEventListener('change', on);
-  }, []);
-  return wide;
-};
-
-export function LogList({ store, page, selected, openEntry, closeEntry, newEntry }: { store: JournalStore; page: string; selected: string | null; openEntry: (id: string) => void; closeEntry: () => void; newEntry: (section?: string) => void }) {
+export function LogList({ store, page, selected, selectedTask, openEntry, newEntry }: { store: JournalStore; page: string; selected: string | null; selectedTask: string | null; openEntry: (id: string, task?: string) => void; newEntry: (section?: string) => void }) {
   const [f, setF] = useState<Filter>(NO_FILTER);
   const [showFilters, setShowFilters] = useState(true);
   const [view, setView] = useState<'list' | 'grid'>(() => (localStorage.getItem('jr-log-view') === 'grid' ? 'grid' : 'list'));
@@ -68,16 +40,14 @@ export function LogList({ store, page, selected, openEntry, closeEntry, newEntry
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState(false);
   const [importing, setImporting] = useState<{ name: string; data: LogImport } | null>(null);
-  const wide = useWide();
   const isSection = SECTIONS.some((s) => s.id === page);
   const all = Object.values(store.docs.entries);
   const list = useMemo(
     () =>
-      all
-        .filter((e) => !isSection || e.sections.includes(page))
-        .filter((e) => (!f.section || e.sections.includes(f.section)) && (!f.type || e.type === f.type) && (!f.status || e.status === f.status) && (!f.topic || e.topics.includes(f.topic)))
-        .filter((e) => !f.q.trim() || `${e.title} ${e.topics.join(' ')} ${e.blocks.map((b) => b.md).join(' ')}`.toLowerCase().includes(f.q.trim().toLowerCase()))
-        .sort((a, b) => (f.sort === 'new' ? -1 : 1) * ((a.date || '0').localeCompare(b.date || '0') || a.created - b.created)),
+      (isSection ? sectionItems(all, page) : all.map((e): LogItem => ({ key: e.id, e })))
+        .filter((i) => (!f.section || itemSections(i).includes(f.section)) && (!f.type || i.e.type === f.type) && (!f.status || i.e.status === f.status) && (!f.topic || itemTopics(i).includes(f.topic)))
+        .filter((i) => !f.q.trim() || itemText(i).toLowerCase().includes(f.q.trim().toLowerCase()))
+        .sort((a, b) => (f.sort === 'new' ? -1 : 1) * ((a.e.date || '0').localeCompare(b.e.date || '0') || a.e.created - b.e.created || (a.t?.start ?? '').localeCompare(b.t?.start ?? ''))),
     [all, f, isSection, page],
   );
   const pages = Math.max(1, Math.ceil(list.length / PAGE));
@@ -97,25 +67,54 @@ export function LogList({ store, page, selected, openEntry, closeEntry, newEntry
   // the chosen entry's page is the one shown
   useEffect(() => {
     if (!selected) return;
-    const i = list.findIndex((e) => e.id === selected);
+    const i = list.findIndex((x) => x.e.id === selected && (!selectedTask || !x.t || x.t.id === selectedTask));
     if (i >= 0 && Math.floor(i / PAGE) !== cur) setN(Math.floor(i / PAGE));
   }, [selected]);
   const active = JSON.stringify({ ...f, sort: 'new' }) !== JSON.stringify(NO_FILTER);
   const topics = allTopics(store);
-  const entry = selected ? store.docs.entries[selected] : null;
+  const isSel = (i: LogItem) => i.e.id === selected && (!i.t || !selectedTask || i.t.id === selectedTask);
+  const open = (i: LogItem) => openEntry(i.e.id, i.t?.id);
   const exportMd = () => {
     setMenu(false);
-    const md = writeLog(isSection ? all.filter((e) => e.sections.includes(page)) : all, isSection ? [] : Object.values(store.docs.deadlines), (id) => sectionTitle(store, id));
+    const md = writeLog(isSection ? [...new Set(sectionItems(all, page).map((i) => i.e))] : all, isSection ? [] : Object.values(store.docs.deadlines), (id) => sectionTitle(store, id));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
     a.download = `${page === 'log' ? 'project-log' : page}.md`;
     a.click();
   };
-  const bulk = (put: Put[], del: { coll: 'entries'; id: string }[] = []) => {
-    void store.commit(put, del);
+  const chosen = list.filter((i) => checked.has(i.key));
+  // a selected task changes on its own; a selected day changes in all its tasks
+  // (or, for an older entry without tasks, as a whole)
+  const bulkSections = (section: string, add: boolean) => {
+    const out = new Map<string, Entry>();
+    const ed = (e: Entry) => out.get(e.id) ?? e;
+    const apply = (xs: string[] | undefined) => (add ? [...new Set([...(xs ?? []), section])] : (xs ?? []).filter((x) => x !== section));
+    for (const i of chosen) {
+      const e = ed(i.e);
+      const tasks = e.tasks ?? [];
+      if (i.t) out.set(e.id, { ...e, tasks: tasks.map((t) => (t.id === i.t!.id ? { ...t, sections: apply(t.sections) } : t)) });
+      else if (tasks.length) out.set(e.id, { ...e, sections: add ? e.sections : apply(e.sections), tasks: tasks.map((t) => ({ ...t, sections: apply(t.sections) })) });
+      else out.set(e.id, { ...e, sections: apply(e.sections) });
+    }
+    void store.commit([...out.values()].map((e): Put => ({ coll: 'entries', id: e.id, data: { ...e, updated: Date.now() } })));
     setChecked(new Set());
   };
-  const chosen = [...checked].map((id) => store.docs.entries[id]).filter(Boolean);
+  const bulkDelete = () => {
+    const days = chosen.filter((i) => !i.t);
+    const tasks = chosen.filter((i) => i.t && !days.some((d) => d.e.id === i.e.id));
+    const what = [days.length ? `${days.length} ${days.length === 1 ? 'entry' : 'entries'} with all their tasks` : '', tasks.length ? `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}` : ''].filter(Boolean).join(' and ');
+    if (!confirm(`Delete ${what}? They disappear from every page (earlier states stay in the edit history).`)) return;
+    const put = new Map<string, Entry>();
+    for (const i of tasks) {
+      const e = put.get(i.e.id) ?? i.e;
+      put.set(e.id, { ...e, tasks: (e.tasks ?? []).filter((t) => t.id !== i.t!.id), updated: Date.now() });
+    }
+    void store.commit(
+      [...put.values()].map((e): Put => ({ coll: 'entries', id: e.id, data: e })),
+      days.map((d) => ({ coll: 'entries' as const, id: d.e.id })),
+    );
+    setChecked(new Set());
+  };
 
   return (
     <div className="jr-log">
@@ -226,7 +225,7 @@ export function LogList({ store, page, selected, openEntry, closeEntry, newEntry
             <select
               value=""
               aria-label="Add to a section"
-              onChange={(e) => e.target.value && bulk(chosen.filter((x) => !x.sections.includes(e.target.value)).map((x) => ({ coll: 'entries', id: x.id, data: { ...x, sections: [...x.sections, e.target.value], updated: Date.now() } })))}
+              onChange={(e) => e.target.value && bulkSections(e.target.value, true)}
             >
               <option value="">Add to section …</option>
               {SECTIONS.map((s) => (
@@ -238,7 +237,7 @@ export function LogList({ store, page, selected, openEntry, closeEntry, newEntry
             <select
               value=""
               aria-label="Remove from a section"
-              onChange={(e) => e.target.value && bulk(chosen.filter((x) => x.sections.includes(e.target.value)).map((x) => ({ coll: 'entries', id: x.id, data: { ...x, sections: x.sections.filter((s) => s !== e.target.value), updated: Date.now() } })))}
+              onChange={(e) => e.target.value && bulkSections(e.target.value, false)}
             >
               <option value="">Remove from section …</option>
               {SECTIONS.map((s) => (
@@ -250,11 +249,7 @@ export function LogList({ store, page, selected, openEntry, closeEntry, newEntry
             <button
               type="button"
               className="is-danger"
-              onClick={() => {
-                if (!confirm(`Delete ${checked.size} ${checked.size === 1 ? 'entry' : 'entries'}? They disappear from every page (earlier states stay in the edit history).`)) return;
-                if (selected && checked.has(selected)) closeEntry();
-                bulk([], [...checked].map((id) => ({ coll: 'entries' as const, id })));
-              }}
+              onClick={bulkDelete}
             >
               <Icon name="trash" /> Delete
             </button>
@@ -264,11 +259,10 @@ export function LogList({ store, page, selected, openEntry, closeEntry, newEntry
           </div>
         )}
 
-      <div className={`jr-log-body${entry && wide ? ' has-panel' : ''}`}>
       <div className="jr-log-main">
         {!list.length ? (
           <div className="jr-empty">
-            <p>{active ? 'No entry matches the filters.' : isSection ? 'No entry is assigned to this page yet. Choose it under “Sections” in an entry.' : 'No entries yet.'}</p>
+            <p>{active ? 'Nothing matches the filters.' : isSection ? 'No task is assigned to this page yet. Choose it under “Show in sections” in a task.' : 'No entries yet.'}</p>
             {!active && (
               <button type="button" className="is-primary" onClick={() => newEntry(isSection ? page : undefined)}>
                 <Icon name="plus" /> New Entry
@@ -277,21 +271,21 @@ export function LogList({ store, page, selected, openEntry, closeEntry, newEntry
           </div>
         ) : view === 'grid' ? (
           <ul className="jr-cards">
-            {shown.map((e) => (
-              <li key={e.id} className={e.id === selected ? 'is-selected' : ''}>
-                <EntryCard store={store} e={e} onOpen={() => openEntry(e.id)} />
+            {shown.map((i) => (
+              <li key={i.key} className={isSel(i) ? 'is-selected' : ''}>
+                {i.t ? <TaskCard store={store} e={i.e} t={i.t} onOpen={() => open(i)} /> : <EntryCard store={store} e={i.e} onOpen={() => open(i)} />}
               </li>
             ))}
           </ul>
         ) : (
-          <div className="jr-table" role="table" aria-label="Entries">
+          <div className="jr-table" role="table" aria-label={isSection ? 'Tasks and entries' : 'Entries'}>
             <div className="jr-row is-head" role="row">
               <span className="jr-cell-check" role="columnheader">
                 <input
                   type="checkbox"
                   aria-label="Select all on this page"
-                  checked={shown.every((e) => checked.has(e.id))}
-                  onChange={(e) => setChecked((c) => new Set(e.target.checked ? [...c, ...shown.map((x) => x.id)] : [...c].filter((id) => !shown.some((x) => x.id === id))))}
+                  checked={shown.every((i) => checked.has(i.key))}
+                  onChange={(e) => setChecked((c) => new Set(e.target.checked ? [...c, ...shown.map((x) => x.key)] : [...c].filter((k) => !shown.some((x) => x.key === k))))}
                 />
               </span>
               <span className="jr-cell-date" role="columnheader">
@@ -304,29 +298,37 @@ export function LogList({ store, page, selected, openEntry, closeEntry, newEntry
                 Sections
               </span>
             </div>
-            {shown.map((e) => (
-              <div key={e.id} className={`jr-row is-${e.status}${e.id === selected ? ' is-selected' : ''}`} role="row" onClick={() => openEntry(e.id)}>
-                <span className="jr-cell-check" role="cell" onClick={(x) => x.stopPropagation()}>
-                  <input type="checkbox" aria-label={`Select ${e.title}`} checked={checked.has(e.id)} onChange={(x) => setChecked((c) => { const s = new Set(c); if (x.target.checked) s.add(e.id); else s.delete(e.id); return s; })} />
-                </span>
-                <span className="jr-cell-date" role="cell">
-                  {e.date ? fmtDate(e.date, e.dateEnd) : '–'}
-                </span>
-                <button type="button" className="jr-cell-title" role="cell" onClick={(x) => (x.stopPropagation(), openEntry(e.id))} aria-current={e.id === selected ? 'true' : undefined}>
-                  {e.title}
-                  <small>{`${ENTRY_TYPES.find((t) => t.id === e.type)?.label}${e.status !== 'none' ? ` · ${ENTRY_STATUS.find((s) => s.id === e.status)?.label}` : ''}`}</small>
-                </button>
-                <span className="jr-cell-sections" role="cell">
-                  {e.sections.length ? e.sections.map((s) => <span key={s} className="jr-tag is-section" title={sectionTitle(store, s)}>{shortSection(store, s)}</span>) : <span className="jr-muted">–</span>}
-                </span>
-              </div>
-            ))}
+            {shown.map((i) => {
+              const e = i.e;
+              const secs = itemSections(i);
+              const tasks = e.tasks ?? [];
+              const sub = i.t
+                ? [e.title, taskTime(i.t)].filter(Boolean).join(' · ')
+                : [ENTRY_TYPES.find((t) => t.id === e.type)?.label, e.status !== 'none' ? ENTRY_STATUS.find((s) => s.id === e.status)?.label : '', tasks.length ? `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}` : ''].filter(Boolean).join(' · ');
+              return (
+                <div key={i.key} className={`jr-row is-${e.status}${i.t ? ' is-task' : ''}${isSel(i) ? ' is-selected' : ''}`} role="row" onClick={() => open(i)}>
+                  <span className="jr-cell-check" role="cell" onClick={(x) => x.stopPropagation()}>
+                    <input type="checkbox" aria-label={`Select ${i.t?.title || e.title}`} checked={checked.has(i.key)} onChange={(x) => setChecked((c) => { const s = new Set(c); if (x.target.checked) s.add(i.key); else s.delete(i.key); return s; })} />
+                  </span>
+                  <span className="jr-cell-date" role="cell">
+                    {e.date ? fmtDate(e.date, e.dateEnd) : '–'}
+                  </span>
+                  <button type="button" className="jr-cell-title" role="cell" onClick={(x) => (x.stopPropagation(), open(i))} aria-current={isSel(i) ? 'true' : undefined}>
+                    {i.t ? i.t.title || 'Untitled task' : e.title}
+                    <small>{sub}</small>
+                  </button>
+                  <span className="jr-cell-sections" role="cell">
+                    {secs.length ? secs.map((s) => <span key={s} className="jr-tag is-section" title={sectionTitle(store, s)}>{shortSection(store, s)}</span>) : <span className="jr-muted">–</span>}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 
         {list.length > 0 && (
           <nav className="jr-pager" aria-label="Pages">
-            <span className="jr-muted jr-small">{`Showing ${shown.length} of ${list.length} ${list.length === 1 ? 'entry' : 'entries'}${active ? ' (filtered)' : ''}`}</span>
+            <span className="jr-muted jr-small">{`Showing ${shown.length} of ${list.length} ${isSection ? (list.length === 1 ? 'item' : 'items') : list.length === 1 ? 'entry' : 'entries'}${active ? ' (filtered)' : ''}`}</span>
             {pages > 1 && (
               <span className="jr-pager-pages">
                 <IconBtn icon="up" label="Previous page" disabled={cur === 0} onClick={() => setN(cur - 1)} />
@@ -347,242 +349,7 @@ export function LogList({ store, page, selected, openEntry, closeEntry, newEntry
         )}
       </div>
 
-      {entry && (
-        <>
-          {!wide && <div className="jr-panel-scrim" onClick={closeEntry} />}
-          <EntryPanel key={entry.id} store={store} entry={entry} onClose={closeEntry} floating={!wide} />
-        </>
-      )}
-      </div>
       {importing && <ImportDialog store={store} name={importing.name} data={importing.data} onClose={() => setImporting(null)} />}
     </div>
-  );
-}
-
-// ---- the chosen entry, edited in place ----
-function EntryPanel({ store, entry: e, onClose, floating }: { store: JournalStore; entry: Entry; onClose: () => void; floating: boolean }) {
-  const [menu, setMenu] = useState(false);
-  const [full, setFull] = useState(false); // the whole entry in the dialog
-  const [secEdit, setSecEdit] = useState(false);
-  const [editing, setEditing] = useState<string | null>(null); // a block's id
-  const [draft, setDraft] = useState<Block | null>(null);
-  const [preview, setPreview] = useState(false);
-  const [topic, setTopic] = useState('');
-  const save = (p: Partial<Entry>) => void store.commit([{ coll: 'entries', id: e.id, data: { ...e, ...p, updated: Date.now() } }]);
-  useEffect(() => {
-    if (!floating) return;
-    const onKey = (x: KeyboardEvent) => x.key === 'Escape' && !editing && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [floating, editing, onClose]);
-  const startBlock = (b: Block) => {
-    if (editing && draft && !confirmLeave()) return;
-    setEditing(b.id);
-    setDraft(b);
-    setPreview(false);
-  };
-  const confirmLeave = () => {
-    const was = e.blocks.find((b) => b.id === editing);
-    return !draft || !was || (draft.md === was.md && draft.label === was.label) || confirm('Discard the changes to this block?');
-  };
-  const saveBlock = () => {
-    if (!draft) return;
-    const exists = e.blocks.some((b) => b.id === draft.id);
-    save({ blocks: exists ? e.blocks.map((b) => (b.id === draft.id ? { ...draft, label: draft.label.trim() || b.label } : b)) : [...e.blocks, draft] });
-    setEditing(null);
-    setDraft(null);
-  };
-  const addBlock = (label: string) => {
-    if (editing && !confirmLeave()) return;
-    const b = { id: newId('b'), label, md: '' };
-    setEditing(b.id);
-    setDraft(b);
-    setPreview(false);
-  };
-  const sug = suggestSections(e);
-  const known = allTopics(store);
-  const addTopic = (t: string) => {
-    const v = t.trim().replace(/^#/, '');
-    if (v && !e.topics.some((x) => x.toLowerCase() === v.toLowerCase())) save({ topics: [...e.topics, known.find((k) => k.toLowerCase() === v.toLowerCase()) ?? v] });
-    setTopic('');
-  };
-  const newBlock = editing && draft && !e.blocks.some((b) => b.id === draft.id) ? draft : null;
-  const blocks = newBlock ? [...e.blocks, newBlock] : e.blocks;
-
-  return (
-    <aside className={`jr-panel${floating ? ' is-floating' : ''}`} aria-label={`Entry: ${e.title}`}>
-      <header className="jr-panel-head">
-        <span className="jr-panel-sections">
-          {e.sections.map((s) => (
-            <span key={s} className="jr-tag is-section">
-              {sectionTitle(store, s)}
-            </span>
-          ))}
-          <button type="button" className="jr-linkbtn jr-small" onClick={() => setSecEdit(!secEdit)} aria-expanded={secEdit}>
-            {secEdit ? 'Done' : e.sections.length ? 'Edit sections' : '+ Sections'}
-          </button>
-        </span>
-        <span className="jr-panel-tools">
-          <span className="jr-menuwrap">
-            <IconBtn icon="more" label="More" onClick={() => setMenu(!menu)} />
-            {menu && (
-              <span className="jr-menu" role="menu" onMouseLeave={() => setMenu(false)}>
-                <button type="button" className="jr-menu-item" role="menuitem" onClick={() => (setMenu(false), setFull(true))}>
-                  Edit history & all fields
-                </button>
-                <button
-                  type="button"
-                  className="jr-menu-item is-danger"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenu(false);
-                    if (!confirm(`Delete “${e.title}”? It disappears from every page. (Its earlier states stay in the edit history.)`)) return;
-                    onClose();
-                    void store.commit([], [{ coll: 'entries', id: e.id }]);
-                  }}
-                >
-                  Delete entry
-                </button>
-              </span>
-            )}
-          </span>
-          <IconBtn icon="expand" label="Open the whole entry" onClick={() => setFull(true)} />
-          <IconBtn icon="x" label="Close" onClick={onClose} />
-        </span>
-      </header>
-      {secEdit && (
-        <div className="jr-panel-secedit">
-          <Chips all={SECTIONS.map((s) => ({ id: s.id, label: sectionTitle(store, s.id) }))} chosen={e.sections} suggested={sug} label="Sections" onToggle={(id) => save({ sections: e.sections.includes(id) ? e.sections.filter((x) => x !== id) : [...e.sections, id] })} />
-          <p className="jr-muted jr-small">The entry also always appears in the Project Log and the Timeline. Dashed: suggested from its type and text.</p>
-        </div>
-      )}
-      <InlineText as="h2" value={e.title} label="Title" onSave={(v) => v && save({ title: v })} className="jr-panel-title" />
-      <div className="jr-panel-meta">
-        <span className="jr-panel-field">
-          <Icon name="calendar" />
-          <input type="date" value={e.date} aria-label="Date" onChange={(x) => save({ date: x.target.value })} />
-        </span>
-        <span className="jr-panel-field">
-          <Icon name="doc" />
-          <select value={e.type} aria-label="Type" onChange={(x) => save({ type: x.target.value as Entry['type'] })}>
-            {ENTRY_TYPES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </span>
-        <span className={`jr-panel-field jr-status-select is-${e.status}`}>
-          <span className="jr-dot" aria-hidden="true" />
-          <select value={e.status} aria-label="Status" onChange={(x) => save({ status: x.target.value as Entry['status'] })}>
-            {ENTRY_STATUS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </span>
-      </div>
-      <div className="jr-chips jr-panel-topics">
-        {e.topics.map((t) => (
-          <span key={t} className="jr-chip is-small">
-            #{t}
-            <button type="button" className="jr-chip-x" aria-label={`Remove topic ${t}`} onClick={() => save({ topics: e.topics.filter((x) => x !== t) })}>
-              ×
-            </button>
-          </span>
-        ))}
-        <input
-          className="jr-chip-input"
-          list="jr-topics-panel"
-          value={topic}
-          placeholder="+ topic"
-          aria-label="Add a topic"
-          onChange={(x) => setTopic(x.target.value)}
-          onKeyDown={(x) => {
-            if (x.key === 'Enter' || x.key === ',') {
-              x.preventDefault();
-              addTopic(topic);
-            }
-          }}
-          onBlur={() => topic.trim() && addTopic(topic)}
-        />
-        <datalist id="jr-topics-panel">
-          {known.map((t) => (
-            <option key={t} value={t} />
-          ))}
-        </datalist>
-      </div>
-
-      <DayFacts store={store} e={e} />
-
-      <div className="jr-panel-blocks">
-        {blocks.map((b) => {
-          const on = editing === b.id && draft;
-          return (
-            <section key={b.id} className={`jr-pblock${on ? ' is-editing' : ''}`}>
-              <span className="jr-pblock-icon" aria-hidden="true">
-                <Icon name={blockIcon(on ? draft.label : b.label)} />
-              </span>
-              <div className="jr-pblock-body">
-                {on ? (
-                  <>
-                    <input className="jr-pblock-label" value={draft.label} list="jr-blockpresets-panel" aria-label="Block name" onChange={(x) => setDraft({ ...draft, label: x.target.value })} />
-                    <MdEditor value={draft.md} onChange={(v) => setDraft({ ...draft, md: v })} rows={Math.min(14, Math.max(4, draft.md.split('\n').length + 1))} preview={preview} setPreview={setPreview} label={draft.label} />
-                    <div className="jr-actions">
-                      {e.blocks.some((x) => x.id === b.id) && (
-                        <button type="button" className="jr-linkbtn" onClick={() => confirm(`Remove the block “${b.label}”?`) && (save({ blocks: e.blocks.filter((x) => x.id !== b.id) }), setEditing(null), setDraft(null))}>
-                          Remove block
-                        </button>
-                      )}
-                      <span className="jr-spacer" />
-                      <button type="button" onClick={() => (confirmLeave() ? (setEditing(null), setDraft(null)) : undefined)}>
-                        Cancel
-                      </button>
-                      <button type="button" className="is-primary" onClick={saveBlock} disabled={!draft.md.trim() && !e.blocks.some((x) => x.id === b.id)}>
-                        Save
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <h3>{b.label}</h3>
-                    {b.md.trim() ? <Markdown md={b.md} /> : <p className="jr-muted">Empty.</p>}
-                  </>
-                )}
-              </div>
-              {!on && <IconBtn icon="edit" label={`Edit ${b.label}`} onClick={() => startBlock(b)} />}
-            </section>
-          );
-        })}
-        <datalist id="jr-blockpresets-panel">
-          {BLOCK_PRESETS.map((p) => (
-            <option key={p} value={p} />
-          ))}
-        </datalist>
-        {!editing && (
-          <div className="jr-chips jr-panel-add">
-            <span className="jr-muted jr-small">Add:</span>
-            {BLOCK_PRESETS.filter((p) => !e.blocks.some((b) => b.label === p)).map((p) => (
-              <button key={p} type="button" className="jr-chip is-small" onClick={() => addBlock(p)}>
-                <Icon name="plus" />
-                {p}
-              </button>
-            ))}
-          </div>
-        )}
-        <section className="jr-pblock">
-          <span className="jr-pblock-icon" aria-hidden="true">
-            <Icon name="clip" />
-          </span>
-          <div className="jr-pblock-body">
-            <h3>Evidence & References</h3>
-            <Attachments store={store} files={e.files} links={e.sources} onChange={(files, sources) => save({ files, sources })} />
-          </div>
-        </section>
-      </div>
-      {e.updated && <p className="jr-muted jr-small jr-panel-foot">{`Last edited ${new Date(e.updated).toLocaleString('en-GB', { timeZone: 'Europe/Berlin', dateStyle: 'medium', timeStyle: 'short' })}`}</p>}
-      {full && <EntryDialog store={store} entry={e} onClose={() => setFull(false)} />}
-    </aside>
   );
 }

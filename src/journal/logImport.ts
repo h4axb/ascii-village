@@ -12,7 +12,7 @@
 //   (everything up to the next ### or ## heading)       → the entry's Markdown
 //
 // Only proposals: the journal shows them before anything is stored.
-import { ENTRY_STATUS, newId, type Deadline, type DeadlineChange, type Entry, type EntryStatus } from './types';
+import { ENTRY_STATUS, fmtMinutes, newId, taskMinutes, type Deadline, type DeadlineChange, type Entry, type EntryStatus } from './types';
 
 const yearOf = (y: string | undefined, fallback: number) => (y ? (y.length === 2 ? 2000 + Number(y) : Number(y)) : fallback);
 const iso = (d: string, m: string, y: number) => `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
@@ -141,6 +141,16 @@ export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: 
       out.push(b.md);
     }
     for (const s of e.sources) out.push(`- [${s.label || s.url}](${s.url})`);
+    // each task with its time, sections, tags and documentation
+    for (const t of e.tasks ?? []) {
+      const m = taskMinutes(t);
+      const time = [t.start || t.end ? `${t.start || '?'}–${t.end || '?'}` : '', m != null ? fmtMinutes(m) : ''].filter(Boolean).join(', ');
+      out.push('', `**Task: ${t.title || 'Untitled'}**${time ? ` (${time})` : ''}`);
+      const tm = [(t.sections ?? []).length ? `Sections: ${(t.sections ?? []).map(sectionTitle).join(', ')}` : '', (t.topics ?? []).length ? `Topics: ${(t.topics ?? []).join(', ')}` : ''].filter(Boolean);
+      if (tm.length) out.push(`_${tm.join(' · ')}_`);
+      for (const b of t.blocks ?? []) out.push('', `*${b.label}*`, b.md);
+      for (const s of t.sources ?? []) out.push(`- [${s.label || s.url}](${s.url})`);
+    }
     out.push('', '');
   }
   return out.join('\n').replace(/\n{4,}/g, '\n\n\n');

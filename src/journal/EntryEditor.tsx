@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Markdown } from './markdown';
 import type { JournalStore } from './store';
 import { suggestSections, suggestTopics } from './suggest';
-import { BLOCK_PRESETS, ENTRY_STATUS, ENTRY_TYPES, SECTIONS, fmtDate, newId, today, type Block, type Entry } from './types';
+import { BLOCK_PRESETS, ENTRY_STATUS, ENTRY_TYPES, SECTIONS, fmtDate, newId, today, entrySections, entryTopics, type Block, type Entry } from './types';
 import { Attachments, Chips, Icon, IconBtn, MdEditor, Modal, VisibilitySwitch } from './ui';
 
 export function blankEntry(section?: string): Entry {
@@ -15,7 +15,7 @@ export function blankEntry(section?: string): Entry {
 }
 
 export const sectionTitle = (store: JournalStore, id: string) => store.docs.pages[id]?.title || SECTIONS.find((s) => s.id === id)?.title || id;
-export const allTopics = (store: JournalStore) => [...new Set(Object.values(store.docs.entries).flatMap((e) => e.topics))].sort((a, b) => a.localeCompare(b));
+export const allTopics = (store: JournalStore) => [...new Set(Object.values(store.docs.entries).flatMap(entryTopics))].sort((a, b) => a.localeCompare(b));
 
 export function EntryMeta({ store, e }: { store: JournalStore; e: Entry }) {
   const st = ENTRY_STATUS.find((s) => s.id === e.status);
@@ -24,12 +24,12 @@ export function EntryMeta({ store, e }: { store: JournalStore; e: Entry }) {
       {e.date && <span className="jr-date">{fmtDate(e.date, e.dateEnd)}</span>}
       <span className="jr-type">{ENTRY_TYPES.find((t) => t.id === e.type)?.label}</span>
       {e.status !== 'none' && <span className={`jr-status is-${e.status}`}>{st?.label}</span>}
-      {e.sections.map((s) => (
+      {entrySections(e).map((s) => (
         <span key={s} className="jr-tag is-section">
           {sectionTitle(store, s)}
         </span>
       ))}
-      {e.topics.map((t) => (
+      {entryTopics(e).map((t) => (
         <span key={t} className="jr-tag">
           #{t}
         </span>

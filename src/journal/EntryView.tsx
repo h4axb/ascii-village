@@ -1,28 +1,15 @@
-// A day's entry to read: the day (date, status), its tasks — collapsed to
-// title, time and sections, opened with a click to their documentation — the
-// day's check-in, the weekly review if one is added, and an older entry's own
-// notes. The entry panel shows it with "Edit"; the new-entry drawer shows it
-// as "Review entry" before storing.
-import { useEffect, useRef, useState } from 'react';
+// A day's entry to read, as an activity log: the day on top with its icon,
+// then each task on the timeline at its time, with its documentation blocks as
+// cards in their category's colour; below, the day's check-in, the weekly
+// review if one is added, and an older entry's own notes. The entry panel
+// shows it with "Edit"; the new-entry drawer shows it as "Review entry".
+import { useEffect, useRef } from 'react';
 import { Markdown } from './markdown';
 import type { JournalStore } from './store';
-import { ENTRY_STATUS, ENTRY_TYPES, fmtMinutes, tasksTotal, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
+import { ENTRY_STATUS, ENTRY_TYPES, PALETTE, blockKindOf, blockKinds, blockTitle, fmtMinutes, shortDate, taskMinutes, tasksTotal, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
 import { sectionTitle } from './EntryEditor';
-import { CheckinStrip, longDate, taskTime, weekday, weekLabel } from './EntryForm';
-import { FileThumb, Icon } from './ui';
-
-type IconName = Parameters<typeof Icon>[0]['name'];
-// a block's icon by its name (Context, Method / Approach …; own names get a note)
-export function blockIcon(label: string): IconName {
-  const l = label.toLowerCase();
-  if (/context|kontext/.test(l)) return 'doc';
-  if (/method|approach|methode|vorgehen/.test(l)) return 'flask';
-  if (/decision|action|entscheid/.test(l)) return 'branch';
-  if (/rationale|reason|begründ/.test(l)) return 'scale';
-  if (/outcome|result|ergebnis/.test(l)) return 'target';
-  if (/reflect|reflexion/.test(l)) return 'chat';
-  return 'note';
-}
+import { CheckinStrip, weekday, weekLabel } from './EntryForm';
+import { FileThumb, Icon, type IconName } from './ui';
 
 export interface EditAt {
   task?: string;
@@ -32,7 +19,7 @@ export interface EditAt {
 
 export function EntryView({ store, e, ratings, week, focusTask, onEdit }: { store: JournalStore; e: Entry; ratings?: Partial<Record<CheckinKey, number>>; week?: { priorities: string; reflection: string } | null; focusTask?: string | null; onEdit?: (at: EditAt) => void }) {
   const tasks = e.tasks ?? [];
-  const [open, setOpen] = useState<string[]>(() => (focusTask ? [focusTask] : tasks.length === 1 ? [tasks[0].id] : []));
+  const kinds = blockKinds(store.docs.settings);
   const day = store.docs.days[e.date] as Day | undefined;
   const r = ratings ?? day?.ratings ?? {};
   const wk = e.week ? (week ?? (store.docs.weeks[e.week] as Week | undefined)) : null;
@@ -41,32 +28,39 @@ export function EntryView({ store, e, ratings, week, focusTask, onEdit }: { stor
   const legacy = e.sections.length > 0 || e.topics.length > 0 || e.blocks.length > 0 || e.files.length > 0 || e.sources.length > 0;
   return (
     <div className="jr-view">
-      <div className="jr-view-day">
-        <span className="jr-muted jr-small">{`${longDate(e.date)} · ${weekday(e.date)}${e.type !== 'log' ? ` · ${ENTRY_TYPES.find((t) => t.id === e.type)?.label}` : ''}`}</span>
-        <h2 className="jr-view-title">{e.title || <span className="jr-muted">Untitled</span>}</h2>
-        {e.status !== 'none' && <span className={`jr-status is-${e.status}`}>{st?.label}</span>}
-      </div>
-
-      <section className="jr-view-sec" aria-label="Tasks">
-        <header className="jr-dw-sechead">
-          <h3>Tasks</h3>
-          {total > 0 && <span className="jr-dw-total">{`${fmtMinutes(total)} total`}</span>}
-        </header>
-        {tasks.length ? (
-          <ul className="jr-tasks">
-            {tasks.map((t) => (
-              <TaskView key={t.id} store={store} t={t} open={open.includes(t.id)} focus={t.id === focusTask} onToggle={() => setOpen((o) => (o.includes(t.id) ? o.filter((x) => x !== t.id) : [...o, t.id]))} onEdit={onEdit ? () => onEdit({ task: t.id }) : undefined} />
-            ))}
-          </ul>
-        ) : (
-          <p className="jr-muted jr-small">No tasks.</p>
-        )}
+      <ol className="jr-act">
+        <li className="jr-act-day">
+          <span className="jr-act-time">
+            {shortDate(e.date)}
+            <small>{weekday(e.date)}</small>
+          </span>
+          <span className="jr-node" style={{ '--k': e.color ?? PALETTE[0] } as React.CSSProperties} aria-hidden="true">
+            <Icon name={(e.icon ?? 'doc') as IconName} />
+          </span>
+          <div className="jr-act-body">
+            <h2 className="jr-view-title">{e.title || <span className="jr-muted">Untitled</span>}</h2>
+            <span className="jr-meta">
+              {e.status !== 'none' && <span className={`jr-status is-${e.status}`}>{st?.label}</span>}
+              {e.type !== 'log' && <span className="jr-type">{ENTRY_TYPES.find((t) => t.id === e.type)?.label}</span>}
+              <span className="jr-muted jr-small">{[`${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`, total ? `${fmtMinutes(total)} total` : ''].filter(Boolean).join(' · ')}</span>
+            </span>
+          </div>
+        </li>
+        {tasks.map((t) => (
+          <TaskItem key={t.id} store={store} t={t} kinds={kinds} focus={t.id === focusTask} onEdit={onEdit ? () => onEdit({ task: t.id }) : undefined} />
+        ))}
         {onEdit && (
-          <button type="button" className="jr-linkbtn jr-dw-add" onClick={() => onEdit({ addTask: true })}>
-            <Icon name="plus" /> Add task
-          </button>
+          <li className="jr-act-add">
+            <span className="jr-act-time" />
+            <span className="jr-act-dot is-add" aria-hidden="true" />
+            <div className="jr-act-body">
+              <button type="button" className="jr-linkbtn jr-dw-add" onClick={() => onEdit({ addTask: true })}>
+                <Icon name="plus" /> Add task
+              </button>
+            </div>
+          </li>
         )}
-      </section>
+      </ol>
 
       <section className="jr-view-sec" aria-label="Daily check-in">
         <header className="jr-dw-sechead">
@@ -109,7 +103,7 @@ export function EntryView({ store, e, ratings, week, focusTask, onEdit }: { stor
           </header>
           {(e.sections.length > 0 || e.topics.length > 0) && <Chipline store={store} sections={e.sections} topics={e.topics} />}
           {e.blocks.map((b) => (
-            <Doc key={b.id} label={b.label} md={b.md} />
+            <BlockCard key={b.id} b={b} kinds={kinds} />
           ))}
           <Refs store={store} files={e.files} links={e.sources} />
         </section>
@@ -135,16 +129,15 @@ function Chipline({ store, sections, topics }: { store: JournalStore; sections: 
   );
 }
 
-function Doc({ label, md }: { label: string; md: string }) {
+// a documentation block: a card with its category's colour, title and text
+export function BlockCard({ b, kinds }: { b: Block; kinds: BlockKind[] }) {
+  const k = kinds.find((x) => x.id === blockKindOf(b)) ?? kinds[kinds.length - 1];
+  const title = blockTitle(b);
   return (
-    <div className="jr-vblock">
-      <span className="jr-vblock-icon" aria-hidden="true">
-        <Icon name={blockIcon(label)} />
-      </span>
-      <div>
-        <h4>{label}</h4>
-        <Markdown md={md} />
-      </div>
+    <div className="jr-bcard" style={{ '--k': k.color } as React.CSSProperties}>
+      <span className="jr-bcard-kind">{k.label}</span>
+      {title && <strong className="jr-bcard-title">{title}</strong>}
+      <Markdown md={b.md} />
     </div>
   );
 }
@@ -153,7 +146,6 @@ function Refs({ store, files, links }: { store: JournalStore; files: string[]; l
   if (!files.length && !links.length) return null;
   return (
     <div className="jr-vrefs">
-      <h4>Attachments & links</h4>
       {files.length > 0 && (
         <div className="jr-files">
           {files.map((id) => (store.docs.files[id] ? <FileThumb key={id} meta={store.docs.files[id]} /> : null))}
@@ -169,55 +161,42 @@ function Refs({ store, files, links }: { store: JournalStore; files: string[]; l
   );
 }
 
-function TaskView({ store, t, open, focus, onToggle, onEdit }: { store: JournalStore; t: Task; open: boolean; focus: boolean; onToggle: () => void; onEdit?: () => void }) {
+// a task on the timeline: its time on the left, its blocks as cards
+function TaskItem({ store, t, kinds, focus, onEdit }: { store: JournalStore; t: Task; kinds: BlockKind[]; focus: boolean; onEdit?: () => void }) {
   const ref = useRef<HTMLLIElement>(null);
   useEffect(() => {
     if (focus) ref.current?.scrollIntoView({ block: 'nearest' });
   }, [focus]);
-  const time = taskTime(t);
   const blocks = (t.blocks ?? []).filter((b) => b.md.trim());
-  const refs = (t.files ?? []).length + (t.sources ?? []).length;
+  const m = taskMinutes(t);
+  const first = blocks[0] ? kinds.find((k) => k.id === blockKindOf(blocks[0]))?.color : undefined;
   return (
-    <li ref={ref} className={`jr-task${open ? ' is-open' : ''}${focus ? ' is-focus' : ''}`}>
-      <button type="button" className="jr-task-head" aria-expanded={open} onClick={onToggle}>
-        <Icon name="down" />
-        <span className="jr-task-name">
+    <li ref={ref} className={`jr-act-task${focus ? ' is-focus' : ''}`}>
+      <span className="jr-act-time">
+        {t.start || t.end ? `${t.start || '?'}–${t.end || '?'}` : '–'}
+        {m != null && <small>{fmtMinutes(m)}</small>}
+      </span>
+      <span className="jr-act-dot" style={first ? ({ '--k': first } as React.CSSProperties) : undefined} aria-hidden="true" />
+      <div className="jr-act-body">
+        <div className="jr-act-head">
           <strong>{t.title || <em className="jr-muted">Untitled task</em>}</strong>
-          {time && <small>{time}</small>}
-        </span>
-        <span className="jr-task-chips">
-          {(t.sections ?? []).map((s) => (
-            <span key={s} className="jr-tag is-section">
-              {sectionTitle(store, s)}
-            </span>
-          ))}
-          {(t.topics ?? []).map((x) => (
-            <span key={x} className="jr-tag">
-              #{x}
-            </span>
-          ))}
-          {!open && (blocks.length > 0 || refs > 0) && <span className="jr-muted jr-small">{[blocks.length ? `${blocks.length} ${blocks.length === 1 ? 'block' : 'blocks'}` : '', refs ? `${refs} ${refs === 1 ? 'reference' : 'references'}` : ''].filter(Boolean).join(' · ')}</span>}
-        </span>
-      </button>
-      {open && (
-        <div className="jr-task-body">
-          {blocks.map((b) => (
-            <Doc key={b.id} label={b.label} md={b.md} />
-          ))}
-          <Refs store={store} files={t.files ?? []} links={t.sources ?? []} />
-          {!blocks.length && !refs && <p className="jr-muted jr-small">No documentation yet.</p>}
           {onEdit && (
-            <div className="jr-task-foot">
-              <button type="button" className="jr-linkbtn jr-small" onClick={onEdit}>
-                <Icon name="plus" /> Add block
-              </button>
-              <button type="button" className="jr-linkbtn jr-small" onClick={onEdit}>
-                <Icon name="edit" /> Edit task
-              </button>
-            </div>
+            <button type="button" className="jr-linkbtn jr-small jr-act-edit" onClick={onEdit} aria-label={`Edit task ${t.title}`}>
+              <Icon name="edit" /> Edit
+            </button>
           )}
         </div>
-      )}
+        {((t.sections ?? []).length > 0 || (t.topics ?? []).length > 0) && <Chipline store={store} sections={t.sections ?? []} topics={t.topics ?? []} />}
+        {blocks.map((b) => (
+          <BlockCard key={b.id} b={b} kinds={kinds} />
+        ))}
+        <Refs store={store} files={t.files ?? []} links={t.sources ?? []} />
+        {onEdit && !blocks.length && (
+          <button type="button" className="jr-linkbtn jr-small jr-dw-add" onClick={onEdit}>
+            <Icon name="plus" /> Add block
+          </button>
+        )}
+      </div>
     </li>
   );
 }

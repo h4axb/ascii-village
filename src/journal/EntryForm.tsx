@@ -12,9 +12,9 @@
 import { useMemo, useState } from 'react';
 import type { Del, JournalStore, Put } from './store';
 import { suggestSections } from './suggest';
-import { BLOCK_SECTION, CHECKIN, ENTRY_STATUS, ENTRY_TYPES, SECTIONS, TASK_BLOCKS, entryTopics, fmtMinutes, isoWeek, newId, shortDate, taskMinutes, tasksTotal, today, type Block, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
+import { CHECKIN, ENTRY_ICONS, ENTRY_STATUS, ENTRY_TYPES, PALETTE, SECTIONS, blockKindOf, blockKinds, blockTitle, entryTopics, fmtMinutes, isoWeek, newId, shortDate, taskMinutes, tasksTotal, today, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
 import { allTopics, sectionTitle } from './EntryEditor';
-import { Attachments, Chips, Icon, IconBtn } from './ui';
+import { Attachments, Chips, Icon, IconBtn, type IconName } from './ui';
 
 export interface Form {
   entry: Entry;
@@ -50,7 +50,7 @@ export const formEmpty = (f: Form) => !f.entry.title.trim() && (f.entry.tasks ??
 // the entry as stored: empty tasks and empty blocks left out
 export function cleanEntry(f: Form): Entry {
   const e = f.entry;
-  const tasks = (e.tasks ?? []).filter((t) => !taskEmpty(t)).map((t) => ({ ...t, title: t.title.trim(), blocks: (t.blocks ?? []).filter((b) => b.md.trim()).map((b) => ({ ...b, label: b.label.trim() || 'Notes' })) }));
+  const tasks = (e.tasks ?? []).filter((t) => !taskEmpty(t)).map((t) => ({ ...t, title: t.title.trim(), blocks: (t.blocks ?? []).filter((b) => b.md.trim()).map((b) => ({ ...b, label: b.kind ? b.label.trim() : b.label.trim() || 'Notes' })) }));
   return { ...e, title: e.title.trim(), tasks, blocks: e.blocks.filter((b) => b.md.trim()), updated: Date.now() };
 }
 export function formChanges(store: JournalStore, f: Form): { put: Put[]; del: Del[]; entry: Entry } {
@@ -154,13 +154,16 @@ export function EntryForm({ store, f, set, titleErr, titleRef }: { store: Journa
 
   return (
     <div className="jr-eform">
-      <label className="jr-field">
-        <span>
-          Title <span className="jr-req">*</span>
-        </span>
-        <input ref={titleRef} value={e.title} placeholder="e.g. Usertesting feedback tagging" aria-invalid={titleErr && !e.title.trim()} onChange={(x) => setE({ title: x.target.value })} />
-        {titleErr && !e.title.trim() && <span className="jr-dw-err">A title is needed.</span>}
-      </label>
+      <div className="jr-titlerow">
+        <NodePicker icon={e.icon} color={e.color} onChange={(icon, color) => setE({ icon, color })} />
+        <label className="jr-field">
+          <span>
+            Title <span className="jr-req">*</span>
+          </span>
+          <input ref={titleRef} value={e.title} placeholder="e.g. Usertesting feedback tagging" aria-invalid={titleErr && !e.title.trim()} onChange={(x) => setE({ title: x.target.value })} />
+          {titleErr && !e.title.trim() && <span className="jr-dw-err">A title is needed.</span>}
+        </label>
+      </div>
 
       <div className="jr-dw-row">
         <span className="jr-field">
@@ -342,9 +345,11 @@ function TaskEdit({ store, t, n, open, known, onToggle, onChange, onRemove, onRe
   const blocks = t.blocks ?? [];
   const sug = suggestSections({ title: t.title, blocks, type: 'log', sections });
   const setBlock = (id: string, p: Partial<Block>) => onChange({ blocks: blocks.map((b) => (b.id === id ? { ...b, ...p } : b)) });
-  const addBlock = (label: string) => {
-    const sec = BLOCK_SECTION[label];
-    onChange({ blocks: [...blocks, { id: newId('b'), label, md: '' }], ...(sec && !sections.includes(sec) ? { sections: [...sections, sec] } : {}) });
+  const kinds = blockKinds(store.docs.settings);
+  // a new block of a category; the category's section is added to the task once
+  const addBlock = (k: BlockKind) => {
+    const sec = k.section;
+    onChange({ blocks: [...blocks, { id: newId('b'), kind: k.id, label: '', md: '' }], ...(sec && !sections.includes(sec) ? { sections: [...sections, sec] } : {}) });
     setAdding(false);
   };
   const time = taskTime(t);
@@ -388,32 +393,19 @@ function TaskEdit({ store, t, n, open, known, onToggle, onChange, onRemove, onRe
           </div>
 
           <div className="jr-task-part">
-            <span className="jr-task-label">Documentation</span>
+            <span className="jr-task-label">{`Documentation · ${blocks.length} ${blocks.length === 1 ? 'block' : 'blocks'}`}</span>
             {blocks.map((b) => (
-              <div key={b.id} className="jr-tblock">
-                <div className="jr-tblock-head">
-                  <input className="jr-tblock-label" value={b.label} list="jr-taskblocks" aria-label="Block name" onChange={(x) => setBlock(b.id, { label: x.target.value })} />
-                  <IconBtn icon="x" label={`Remove ${b.label}`} onClick={() => (!b.md.trim() || confirm(`Remove the block “${b.label}”?`)) && onChange({ blocks: blocks.filter((x) => x.id !== b.id) })} />
-                </div>
-                <textarea rows={Math.min(12, Math.max(3, b.md.split('\n').length + 1))} value={b.md} aria-label={b.label} placeholder="Markdown: **bold**, - list, [link](https://…)" onChange={(x) => setBlock(b.id, { md: x.target.value })} />
-              </div>
+              <BlockEdit key={b.id} store={store} b={b} onChange={(p) => setBlock(b.id, p)} onRemove={() => onChange({ blocks: blocks.filter((x) => x.id !== b.id) })} />
             ))}
-            <datalist id="jr-taskblocks">
-              {TASK_BLOCKS.map((p) => (
-                <option key={p} value={p} />
-              ))}
-            </datalist>
             {adding ? (
               <div className="jr-chips jr-addmenu" role="group" aria-label="Add a block">
-                {TASK_BLOCKS.filter((p) => !blocks.some((b) => b.label === p)).map((p) => (
-                  <button key={p} type="button" className="jr-chip is-small" onClick={() => addBlock(p)}>
-                    <Icon name="plus" />
-                    {p}
+                <span className="jr-muted jr-small">Category:</span>
+                {kinds.map((k) => (
+                  <button key={k.id} type="button" className="jr-chip is-small jr-kindchip" style={{ '--k': k.color } as React.CSSProperties} onClick={() => addBlock(k)}>
+                    <span className="jr-kdot" aria-hidden="true" />
+                    {k.label}
                   </button>
                 ))}
-                <button type="button" className="jr-chip is-small" onClick={() => addBlock('')}>
-                  <Icon name="plus" /> Own block
-                </button>
                 <button type="button" className="jr-linkbtn jr-small" onClick={() => setAdding(false)}>
                   Cancel
                 </button>
@@ -549,15 +541,91 @@ function DayNotes({ store, e, known, onChange, onRename }: { store: JournalStore
         <TagEdit tags={e.topics} known={known} label="the whole entry" onChange={(topics) => onChange({ topics })} onRename={onRename} />
       </div>
       {e.blocks.map((b) => (
-        <div key={b.id} className="jr-tblock">
-          <div className="jr-tblock-head">
-            <input className="jr-tblock-label" value={b.label} aria-label="Block name" onChange={(x) => onChange({ blocks: e.blocks.map((y) => (y.id === b.id ? { ...y, label: x.target.value } : y)) })} />
-            <IconBtn icon="x" label={`Remove ${b.label}`} onClick={() => (!b.md.trim() || confirm(`Remove the block “${b.label}”?`)) && onChange({ blocks: e.blocks.filter((y) => y.id !== b.id) })} />
-          </div>
-          <textarea rows={Math.min(14, Math.max(3, b.md.split('\n').length + 1))} value={b.md} aria-label={b.label} onChange={(x) => onChange({ blocks: e.blocks.map((y) => (y.id === b.id ? { ...y, md: x.target.value } : y)) })} />
-        </div>
+        <BlockEdit key={b.id} store={store} b={b} onChange={(p) => onChange({ blocks: e.blocks.map((y) => (y.id === b.id ? { ...y, ...p } : y)) })} onRemove={() => onChange({ blocks: e.blocks.filter((y) => y.id !== b.id) })} />
       ))}
       <Attachments store={store} files={e.files} links={e.sources} onChange={(files, sources) => onChange({ files, sources })} />
     </section>
+  );
+}
+
+// a category's colour, for every block of it (stored at once, for the whole journal)
+export async function setKindColor(store: JournalStore, id: string, color: string) {
+  const own = (store.docs.settings.blockKinds as { colors?: Record<string, string> } | undefined)?.colors ?? {};
+  try {
+    await store.commit([{ coll: 'settings', id: 'blockKinds', data: { colors: { ...own, [id]: color } } }]);
+  } catch {
+    /* reported by the store */
+  }
+}
+
+function Swatches({ value, label, onPick }: { value: string; label: string; onPick: (c: string) => void }) {
+  return (
+    <span className="jr-swatches" role="radiogroup" aria-label={label}>
+      {PALETTE.map((c) => (
+        <button key={c} type="button" role="radio" aria-checked={c === value} aria-label={c} className={`jr-swatch${c === value ? ' is-on' : ''}`} style={{ background: c }} onClick={() => onPick(c)} />
+      ))}
+    </span>
+  );
+}
+
+// a block: its category (with the category's colour), an own title, free text
+function BlockEdit({ store, b, onChange, onRemove }: { store: JournalStore; b: Block; onChange: (p: Partial<Block>) => void; onRemove: () => void }) {
+  const kinds = blockKinds(store.docs.settings);
+  const k = kinds.find((x) => x.id === blockKindOf(b)) ?? kinds[kinds.length - 1];
+  const title = b.kind ? b.label : blockTitle(b);
+  const [colors, setColors] = useState(false);
+  return (
+    <div className="jr-tblock" style={{ '--k': k.color } as React.CSSProperties}>
+      <div className="jr-tblock-head">
+        <span className="jr-kindsel">
+          <button type="button" className="jr-kdot is-btn" aria-label={`Colour of ${k.label}`} aria-expanded={colors} title="Change the category's colour" onClick={() => setColors(!colors)} />
+          <select value={k.id} aria-label="Category" onChange={(x) => onChange({ kind: x.target.value, label: title })}>
+            {kinds.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.label}
+              </option>
+            ))}
+          </select>
+        </span>
+        <input className="jr-tblock-label" value={title} placeholder="Title (optional)" aria-label={`${k.label} block title`} onChange={(x) => onChange({ kind: k.id, label: x.target.value })} />
+        <IconBtn icon="x" label={`Remove ${title || k.label}`} onClick={() => (!b.md.trim() || confirm(`Remove the block “${title || k.label}”?`)) && onRemove()} />
+      </div>
+      {colors && (
+        <div className="jr-colorpick">
+          <Swatches value={k.color} label={`Colour of ${k.label}`} onPick={(c) => void setKindColor(store, k.id, c)} />
+          <span className="jr-muted jr-small">{`For every ${k.label} block in the journal; stored at once.`}</span>
+        </div>
+      )}
+      <textarea rows={Math.min(12, Math.max(3, b.md.split('\n').length + 1))} value={b.md} aria-label={`${k.label} text`} placeholder="Free text · Markdown: **bold**, - list, [link](https://…)" onChange={(x) => onChange({ md: x.target.value })} />
+    </div>
+  );
+}
+
+// the day's node in the timeline: an icon and its colour
+function NodePicker({ icon, color, onChange }: { icon?: string; color?: string; onChange: (icon: string, color: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ic = (icon ?? 'doc') as IconName;
+  const c = color ?? PALETTE[0];
+  return (
+    <span className="jr-nodepick">
+      <button type="button" className="jr-node is-btn" style={{ '--k': c } as React.CSSProperties} aria-label="Icon and colour of the entry" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name={ic} />
+      </button>
+      {open && (
+        <span className="jr-nodepop" role="dialog" aria-label="Icon and colour">
+          <span className="jr-icongrid" role="radiogroup" aria-label="Icon">
+            {ENTRY_ICONS.map((x) => (
+              <button key={x} type="button" role="radio" aria-checked={x === ic} aria-label={x} className={x === ic ? 'is-on' : ''} onClick={() => onChange(x, c)}>
+                <Icon name={x as IconName} />
+              </button>
+            ))}
+          </span>
+          <Swatches value={c} label="Colour" onPick={(x) => onChange(ic, x)} />
+          <button type="button" className="jr-linkbtn jr-small" onClick={() => setOpen(false)}>
+            Done
+          </button>
+        </span>
+      )}
+    </span>
   );
 }

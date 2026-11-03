@@ -30,10 +30,14 @@ export const ENTRY_STATUS: { id: EntryStatus; label: string; md: string }[] = [
 
 export type Visibility = 'private' | 'shared';
 
+// a documentation block: a category (method, decision … — its colour), an own
+// title and free Markdown text. Older blocks have only a label (Context,
+// Method / Approach … or an own name); their category is read from it.
 export interface Block {
   id: string;
-  label: string; // Context, Method, Decision, Outcome, Reflection, Notes or own
+  label: string; // the block's own title (older blocks: the preset name or an own name)
   md: string;
+  kind?: string; // a BlockKind id
 }
 export const BLOCK_PRESETS = ['Context', 'Method / Approach', 'Decision / Action', 'Rationale', 'Outcome', 'Reflection', 'Notes'];
 
@@ -73,6 +77,8 @@ export interface Entry {
   files: string[]; // file ids
   tasks?: Task[];
   week?: string | null; // a weekly review added to this entry (weeks/<id>, e.g. 2026-W45)
+  icon?: string; // the day's node in the timeline: one of ENTRY_ICONS
+  color?: string; // its colour, from PALETTE
   visibility: Visibility;
   created: number;
   updated: number;
@@ -261,9 +267,45 @@ export function taskMinutes(t: { start: string; end: string }): number | null {
 }
 export const fmtMinutes = (n: number) => (n < 60 ? `${n}m` : `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}m` : ''}`);
 
-// a documentation block adds the section it belongs to, once, when it is added
-export const BLOCK_SECTION: Record<string, string> = { 'Method / Approach': 'methodology', 'Decision / Action': 'decisions', Rationale: 'decisions', Reflection: 'personal', Outcome: 'research' };
-export const TASK_BLOCKS = ['Method / Approach', 'Decision / Action', 'Rationale', 'Outcome', 'Reflection', 'Notes'];
+// the block categories: each with its colour (changeable, settings/blockKinds)
+// and the section a new block of it adds to its task, once
+export interface BlockKind {
+  id: string;
+  label: string;
+  color: string;
+  section?: string;
+}
+export const BLOCK_KINDS: BlockKind[] = [
+  { id: 'method', label: 'Method', color: '#2f6fd6', section: 'methodology' },
+  { id: 'decision', label: 'Decision', color: '#7a4fd0', section: 'decisions' },
+  { id: 'rationale', label: 'Rationale', color: '#1f8a84', section: 'decisions' },
+  { id: 'outcome', label: 'Outcome', color: '#2f8a4a', section: 'research' },
+  { id: 'reflection', label: 'Reflection', color: '#c68a12', section: 'personal' },
+  { id: 'context', label: 'Context', color: '#6b6b66' },
+  { id: 'notes', label: 'Notes', color: '#9a9a94' },
+];
+// the colours to choose from (icon nodes and categories)
+export const PALETTE = ['#2f6fd6', '#7a4fd0', '#1f8a84', '#2f8a4a', '#c68a12', '#c2571a', '#c23b3b', '#d14d8a', '#6b6b66', '#1d1d1b'];
+// the icons a day's entry can show on its node
+export const ENTRY_ICONS = ['doc', 'user', 'flask', 'branch', 'chat', 'target', 'layers', 'grid', 'search', 'flag', 'sprout', 'check', 'calendar', 'clip', 'note', 'scale', 'trash'] as const;
+
+const PRESET_KIND: [RegExp, string][] = [
+  [/^(method|approach|methode|vorgehen)/i, 'method'],
+  [/^(decision|action|entscheid)/i, 'decision'],
+  [/^(rationale|reason|begründ)/i, 'rationale'],
+  [/^(outcome|result|ergebnis)/i, 'outcome'],
+  [/^(reflect|reflexion)/i, 'reflection'],
+  [/^(context|kontext)/i, 'context'],
+  [/^notes?$/i, 'notes'],
+];
+const PRESET_LABELS = new Set(['Context', 'Method / Approach', 'Decision / Action', 'Rationale', 'Outcome', 'Reflection', 'Notes']);
+export const blockKindOf = (b: Block) => b.kind ?? PRESET_KIND.find(([re]) => re.test(b.label.trim()))?.[1] ?? 'notes';
+// the block's own title: none for an older block named only by its preset
+export const blockTitle = (b: Block) => (b.kind ? b.label : PRESET_LABELS.has(b.label.trim()) || PRESET_KIND.some(([re, k]) => re.test(b.label.trim()) && b.label.trim().toLowerCase() === k) ? '' : b.label);
+export function blockKinds(settings: Record<string, unknown>): BlockKind[] {
+  const own = (settings.blockKinds as { colors?: Record<string, string> } | undefined)?.colors ?? {};
+  return BLOCK_KINDS.map((k) => ({ ...k, color: own[k.id] ?? k.color }));
+}
 
 const uniq = (a: string[]) => [...new Set(a)];
 // an entry's sections and topics: its own and its tasks'

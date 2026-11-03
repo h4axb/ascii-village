@@ -3265,3 +3265,300 @@ h3.jr-inline {
     flex: 1 1 140px;
   }
 }
+
+/* ---- the entry as an activity log: the day's node, then the tasks on the
+   timeline with their blocks as cards in their category's colour ---- */
+.jr-act {
+  --jr-act-time: 96px;
+  --jr-act-rail: 40px;
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 22px;
+}
+.jr-act::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  bottom: 14px;
+  left: calc(var(--jr-act-time) + var(--jr-act-rail) / 2);
+  border-left: 1px solid var(--jr-line);
+}
+.jr-act > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--jr-act-time) var(--jr-act-rail) minmax(0, 1fr);
+  align-items: start;
+}
+.jr-act-time {
+  padding-top: 4px;
+  padding-right: 10px;
+  text-align: right;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--jr-ink);
+  white-space: nowrap;
+}
+.jr-act-time small {
+  display: block;
+  font-size: 12px;
+  color: var(--jr-muted);
+}
+.jr-node {
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--k);
+  color: #fff;
+  box-shadow: 0 0 0 4px var(--jr-paper);
+}
+.jr-root button.jr-node.is-btn {
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: var(--k);
+  color: #fff;
+}
+.jr-root button.jr-node.is-btn:hover:not(:disabled) {
+  background: var(--k);
+  filter: brightness(1.08);
+}
+.jr-act-day .jr-act-time {
+  padding-top: 8px;
+}
+.jr-act-day .jr-act-body {
+  display: grid;
+  gap: 4px;
+  padding-top: 2px;
+}
+.jr-act-dot {
+  justify-self: center;
+  margin-top: 8px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--k, var(--jr-muted));
+  background: var(--jr-paper);
+  box-shadow: 0 0 0 3px var(--jr-paper);
+}
+.jr-act-dot.is-add {
+  border-style: dashed;
+}
+.jr-act-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.jr-act-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.jr-act-head strong {
+  font-size: 14.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.jr-root button.jr-act-edit {
+  flex: none;
+  display: inline-flex;
+  gap: 4px;
+  text-decoration: none;
+}
+.jr-act-edit .jr-icon {
+  width: 14px;
+  height: 14px;
+}
+.jr-act-task.is-focus .jr-act-body {
+  border-radius: 12px;
+  box-shadow: 0 0 0 6px var(--jr-accent-soft);
+  background: var(--jr-accent-soft);
+}
+.jr-bcard {
+  display: grid;
+  gap: 2px;
+  padding: 9px 14px 10px;
+  border-left: 3px solid var(--k);
+  border-radius: 4px 10px 10px 4px;
+  background: color-mix(in srgb, var(--k) 7%, var(--jr-paper));
+}
+.jr-bcard-kind {
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--k) 80%, #000);
+}
+.jr-bcard-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+.jr-bcard .jr-md > :first-child {
+  margin-top: 0;
+}
+.jr-bcard .jr-md > :last-child {
+  margin-bottom: 0;
+}
+
+/* the editor: a block's category, colour and title */
+.jr-tblock {
+  padding: 8px 10px 10px;
+  border-left: 3px solid var(--k);
+  border-radius: 4px 10px 10px 4px;
+  background: color-mix(in srgb, var(--k) 6%, var(--jr-paper));
+}
+.jr-tblock-head {
+  flex-wrap: wrap;
+}
+.jr-kindsel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.jr-root .jr-kindsel select {
+  min-height: 30px;
+  padding: 2px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--k) 80%, #000);
+}
+.jr-kdot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--k);
+  flex: none;
+}
+.jr-root button.jr-kdot.is-btn {
+  width: 20px;
+  min-height: 20px;
+  padding: 0;
+  border: 2px solid var(--jr-paper);
+  box-shadow: 0 0 0 1px var(--jr-line);
+  background: var(--k);
+}
+.jr-root button.jr-kdot.is-btn:hover:not(:disabled) {
+  background: var(--k);
+}
+.jr-kindchip .jr-kdot {
+  width: 10px;
+  height: 10px;
+}
+.jr-colorpick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 4px 0 6px;
+}
+.jr-swatches {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.jr-root button.jr-swatch {
+  width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--jr-paper);
+  box-shadow: 0 0 0 1px var(--jr-line);
+}
+.jr-root button.jr-swatch.is-on {
+  box-shadow: 0 0 0 2px var(--jr-ink);
+}
+.jr-titlerow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: 12px;
+}
+.jr-nodepick {
+  position: relative;
+  padding-bottom: 1px;
+}
+.jr-nodepick .jr-node {
+  width: 36px;
+  height: 36px;
+  box-shadow: none;
+}
+.jr-nodepop {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(280px, calc(100vw - 48px));
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 12px;
+  border: 1px solid var(--jr-line);
+  border-radius: 12px;
+  background: var(--jr-paper);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+}
+.jr-icongrid {
+  display: grid;
+  grid-template-columns: repeat(6, 36px);
+  gap: 4px;
+}
+.jr-root .jr-icongrid button {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 8px;
+  border-color: transparent;
+  background: var(--jr-soft);
+}
+.jr-root .jr-icongrid button.is-on {
+  background: var(--jr-ink);
+  color: #fff;
+}
+@media (max-width: 640px) {
+  .jr-act {
+    --jr-act-rail: 30px;
+  }
+  .jr-act::before {
+    left: calc(var(--jr-act-rail) / 2);
+  }
+  .jr-act > li {
+    grid-template-columns: var(--jr-act-rail) minmax(0, 1fr);
+    column-gap: 8px;
+  }
+  .jr-act > li > .jr-node,
+  .jr-act > li > .jr-act-dot {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  .jr-act > li > .jr-act-time {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: left;
+    padding: 0;
+  }
+  .jr-act > li > .jr-act-time:empty {
+    display: none;
+  }
+  .jr-act-time small {
+    display: inline;
+    margin-left: 6px;
+  }
+  .jr-act > li > .jr-act-body {
+    grid-column: 2;
+  }
+  .jr-node {
+    width: 30px;
+    height: 30px;
+  }
+  .jr-act-dot {
+    margin-top: 4px;
+  }
+}

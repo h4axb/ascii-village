@@ -1,7 +1,7 @@
 // Crafting UX: which statements concern the generative crafting (its generator
 // and interface, or its use in the game) and which only the game; each
 // participant's biggest Crafting UX problem; and the problems shared across
-// participants (the recurring findings, limited to confirmed crafting problems).
+// participants (the recurring findings, limited to the crafting statements).
 // Only confirmed tags count (suggestions never do); people are counted once
 // however many statements they made.
 import type { CraftRole, CraftingUxDoc, FindingDoc, ItemDoc } from './types';
@@ -51,9 +51,16 @@ export function distribution(m: Model, items: ItemDoc[]) {
   return out;
 }
 
-// the confirmed crafting problems (Art: Problem with a Crafting-Bezug in scope)
-export const craftProblems = (m: Model, items: ItemDoc[], scope: CraftScope, variant: 'all' | 'A' | 'B' = 'all') =>
-  items.filter((i) => isProblem(m, i) && inScope(relOf(m, i), scope) && (variant === 'all' || designOfItem(i) === variant));
+// the crafting statements: every statement whose confirmed Crafting-Bezug is in
+// scope (Kern, or Kern + Integration), whatever its Art (problem, observation,
+// remark …): the Crafting-Bezug alone decides
+export const craftItems = (m: Model, items: ItemDoc[], scope: CraftScope, variant: 'all' | 'A' | 'B' = 'all') =>
+  items.filter((i) => inScope(relOf(m, i), scope) && (variant === 'all' || designOfItem(i) === variant));
+// the statement's Art as tagged (Problem, Anmerkung …), for showing it
+export const artOf = (m: Model, i: ItemDoc) => {
+  const c = i.chips.find((x) => ['problem', 'positive', 'surprise', 'remark'].includes(roleOf(m, x) ?? ''));
+  return c ? m.chipLabel.get(c) ?? '' : '';
+};
 
 export interface SharedIssue {
   finding: FindingDoc;
@@ -65,7 +72,7 @@ export interface SharedIssue {
   none: number; // without a variant
   rels: Rel[];
 }
-// the recurring findings among the crafting problems, by the number of people
+// the recurring findings among the crafting statements, by the number of people
 export function sharedIssues(m: Model, problems: ItemDoc[], findings: Record<string, FindingDoc>): SharedIssue[] {
   const by = new Map<string, ItemDoc[]>();
   for (const i of problems) for (const f of findingsOf(i)) if (findings[f]) by.set(f, [...(by.get(f) ?? []), i]);
@@ -87,7 +94,7 @@ export function sharedIssues(m: Model, problems: ItemDoc[], findings: Record<str
 }
 
 // a person's candidates for the main problem: their findings among their
-// crafting problems, then their crafting problems without a finding
+// crafting statements, then their crafting statements without a finding
 export interface Candidate {
   key: string; // f:<finding> | i:<item>
   finding: FindingDoc | null;
@@ -127,5 +134,5 @@ export function mainOf(p: Person, cands: Candidate[], findings: Record<string, F
   }
   const top = cands[0];
   if (top) return { status: 'suggested', label: top.finding?.name ?? (top.item!.de || top.item!.text), key: top.key, doc: null };
-  return { status: 'open', label: 'kein Crafting-Problem erfasst', key: null, doc: null };
+  return { status: 'open', label: 'keine Crafting-Aussage erfasst', key: null, doc: null };
 }

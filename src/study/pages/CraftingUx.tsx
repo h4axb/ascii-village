@@ -9,8 +9,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { CraftingUxDoc, ItemDoc } from '../types';
 import { SECTION_LABEL } from '../types';
-import { candidatesOf, craftGroup, craftProblems, distribution, mainOf, prioOf, relChip, relOf, REL_HINT, REL_LABEL, REL_SHORT, sharedIssues, SPECIAL_LABEL, suggestedRel, type Candidate, type CraftScope, type MainState, type Rel, type SharedIssue } from '../crafting';
+import { artOf, candidatesOf, craftGroup, craftItems, distribution, mainOf, prioOf, relChip, relOf, REL_HINT, REL_LABEL, REL_SHORT, sharedIssues, SPECIAL_LABEL, suggestedRel, type Candidate, type CraftScope, type MainState, type Rel, type SharedIssue } from '../crafting';
 import { designOfItem } from './Codes';
+import { findingsOf } from '../model';
 import { itemText, useContentView } from '../translations';
 import { Empty, logChange, useCtx } from '../ui';
 
@@ -405,11 +406,11 @@ function Analysis() {
   const [mobile, setMobile] = useState<'people' | 'issues'>('people');
   const [editing, setEditing] = useState<string | null>(null);
   const findings = study.docs.findings;
-  const problems = useMemo(() => craftProblems(model, slice.items, scope, variant), [model, slice.items, scope, variant]);
+  const problems = useMemo(() => craftItems(model, slice.items, scope, variant), [model, slice.items, scope, variant]);
   const issues = useMemo(() => sharedIssues(model, problems, findings), [model, problems, findings]);
   const withProblems = new Set(problems.map((i) => i.person)).size;
-  // a person's main problem is decided over all their crafting problems (not the filter)
-  const allProblems = useMemo(() => craftProblems(model, slice.items, 'extended'), [model, slice.items]);
+  // a person's main problem is decided over all their crafting statements (not the filter)
+  const allProblems = useMemo(() => craftItems(model, slice.items, 'extended'), [model, slice.items]);
   const people = slice.persons.map((p) => {
     const cands = candidatesOf(model, p.id, allProblems, findings);
     return { p, cands, main: mainOf(p, cands, findings, study.docs.items) };
@@ -424,7 +425,7 @@ function Analysis() {
   return (
     <>
       <div className="st-cx-top">
-        <Seg value={scope} label="Crafting-Probleme" options={[['core', 'Kern'], ['extended', 'Kern + Integration']]} onChange={setScope} />
+        <Seg value={scope} label="Crafting-Bezug" options={[['core', 'Kern'], ['extended', 'Kern + Integration']]} onChange={setScope} />
         <Seg value={variant} label="Variante" options={[['all', 'Alle Varianten'], ['A', 'A'], ['B', 'B']]} onChange={setVariant} />
         <span className="st-cx-mobile">
           <Seg value={mobile} label="Ansicht" options={[['people', 'Personen'], ['issues', 'Probleme']]} onChange={setMobile} />
@@ -484,7 +485,7 @@ function Analysis() {
         <section className="st-cx-card st-cx-issues" aria-label="Gemeinsame Probleme">
           <h3>
             Gemeinsame Probleme
-            <small>{person ? `bei ${person} hervorgehoben` : sel ? 'Betroffene links hervorgehoben' : `n = ${withProblems} ${withProblems === 1 ? 'Person' : 'Personen'} mit Crafting-Problemen`}</small>
+            <small>{person ? `bei ${person} hervorgehoben` : sel ? 'Betroffene links hervorgehoben' : `n = ${withProblems} ${withProblems === 1 ? 'Person' : 'Personen'} mit Crafting-Aussagen`}</small>
           </h3>
           {issues.length ? (
             <ul className="st-cx-il">
@@ -501,7 +502,7 @@ function Analysis() {
               })}
             </ul>
           ) : (
-            <p className="st-cx-note">{problems.length ? 'Die Crafting-Probleme sind noch keinem wiederkehrenden Befund zugeordnet (Seite „Wiederkehrende Befunde“).' : 'Noch keine bestätigten Crafting-Probleme in dieser Auswahl.'}</p>
+            <p className="st-cx-note">{problems.length ? 'Die Crafting-Aussagen sind noch keinem wiederkehrenden Befund zugeordnet (Seite „Wiederkehrende Befunde“).' : 'Noch keine Aussagen mit diesem Crafting-Bezug.'}</p>
           )}
           <div className="st-cx-legend">
             <span>
@@ -521,10 +522,7 @@ function Analysis() {
               ohne Variante
             </span>
           </div>
-          <p className="st-cx-note">
-            {`${problems.length} bestätigte Crafting-Probleme · ${problems.filter((i) => !i.finding && !(i.moreFindings ?? []).length).length} ohne Befund. `}
-            <a href="#qualitativ/befunde">Befunde bündeln →</a>
-          </p>
+          <NoFinding items={problems.filter((i) => !findingsOf(i).some((f) => findings[f]))} total={problems.length} person={person} view={view} />
         </section>
       </div>
       {editP && <MainDrawer key={editP.p.id} person={editP.p.id} doc={editP.p.doc} cands={editP.cands} main={editP.main} group={editP.p.group} onClose={() => setEditing(null)} />}
@@ -576,15 +574,54 @@ function IssueDetail({ x, mains, view }: { x: SharedIssue; mains: string[]; view
         <span className="st-cx-tag">{designs.includes('A') && designs.includes('B') ? 'A und B' : designs.includes('A') ? 'nur Variante A' : designs.includes('B') ? 'nur Variante B' : 'Variante nicht zugeordnet'}</span>
       </div>
       <span className="st-cx-note">{`${x.items.length} ${x.items.length === 1 ? 'Aussage' : 'Aussagen'} · ${x.persons.join(', ')}${mains.length ? ` · Hauptproblem bei ${mains.join(', ')}` : ''}${x.persons.length === 1 ? ' · nur eine Person: nicht wiederkehrend' : ''}`}</span>
-      {x.items.slice(0, 3).map((i) => (
-        <div key={i.id} className="st-cx-quote">
-          <small>{i.person}</small>
-          {itemText(view, i)}
-        </div>
-      ))}
+      <Quotes items={x.items} view={view} />
       <a className="st-cx-more" href="#qualitativ/befunde">
-        {x.items.length > 3 ? `Alle ${x.items.length} Aussagen · Befund bearbeiten` : 'Befund bearbeiten'}
+        Befund bearbeiten
       </a>
+    </div>
+  );
+}
+
+// every statement, with its person, Art and Crafting-Bezug
+function Quotes({ items, view, person }: { items: ItemDoc[]; view: ReturnType<typeof useContentView>; person?: string | null }) {
+  const { model } = useCtx();
+  return (
+    <ul className="st-cx-quotes">
+      {items.map((i) => (
+        <li key={i.id} className={`st-cx-quote${person && i.person !== person ? ' is-dim' : ''}`}>
+          <small>{[i.person, artOf(model, i), REL_SHORT[relOf(model, i)], designOfItem(i) ? `Variante ${designOfItem(i)}` : ''].filter(Boolean).join(' · ')}</small>
+          {itemText(view, i)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// the crafting statements not yet in a recurring finding, all listed (folded)
+function NoFinding({ items, total, person, view }: { items: ItemDoc[]; total: number; person: string | null; view: ReturnType<typeof useContentView> }) {
+  const [open, setOpen] = useState(false);
+  const own = person ? items.filter((i) => i.person === person).length : 0;
+  return (
+    <div className="st-cx-nof">
+      <button type="button" className="st-cx-ir is-plain" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className="st-cx-iname">
+          Ohne Befund
+          {person && own > 0 && <span className="st-cx-star">{`${own} von ${person}`}</span>}
+        </span>
+        <span className="st-cx-note">{`${items.length} von ${total} Crafting-Aussagen`}</span>
+        <span />
+        <span className="st-cx-chev" aria-hidden="true">
+          {open ? '▾' : '▸'}
+        </span>
+      </button>
+      {open && (
+        <div className="st-cx-ix">
+          {items.length ? <Quotes items={items} view={view} person={person} /> : <span className="st-cx-note">Alle Crafting-Aussagen gehören zu einem Befund.</span>}
+          <a className="st-cx-more" href="#qualitativ/befunde">
+            Befunde bündeln →
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -645,7 +682,7 @@ function MainDrawer({ person, doc, cands, main, group, onClose }: { person: stri
                   <span className={`st-cx-r${on ? ' is-on' : ''}`} aria-hidden="true" />
                   <span>
                     {c.finding ? c.finding.name : itemText(view, c.item!)}
-                    <small>{[c.finding ? `Befund · ${c.items.length} eigene ${c.items.length === 1 ? 'Aussage' : 'Aussagen'}` : 'Aussage ohne Befund', REL_SHORT[c.rel], PRIO_LABEL[c.prio], sections].filter(Boolean).join(' · ')}</small>
+                    <small>{[c.finding ? `Befund · ${c.items.length} eigene ${c.items.length === 1 ? 'Aussage' : 'Aussagen'}` : 'Aussage ohne Befund', REL_SHORT[c.rel], [...new Set(c.items.map((i) => artOf(model, i)))].filter(Boolean).join(' / '), PRIO_LABEL[c.prio], sections].filter(Boolean).join(' · ')}</small>
                   </span>
                   {main.status === 'suggested' && main.key === c.key && !stored && <span className="st-cx-ai">Vorschlag</span>}
                 </button>
@@ -653,7 +690,7 @@ function MainDrawer({ person, doc, cands, main, group, onClose }: { person: stri
             })}
           </div>
         ) : (
-          <p className="st-cx-note">Keine bestätigten Crafting-Probleme dieser Person.</p>
+          <p className="st-cx-note">Keine Aussagen dieser Person mit Crafting-Bezug Kern oder Integration.</p>
         )}
       </div>
       <label className="st-cx-field">

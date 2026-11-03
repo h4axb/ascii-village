@@ -44,6 +44,11 @@ export function useLang(): Lang {
 
 // ---- the English dictionary (German interface text → English) ----
 const EN: Record<string, string> = {
+  'Ohne Befund': 'Without finding',
+  'keine Crafting-Aussage erfasst': 'no crafting statement recorded',
+  'Noch keine Aussagen mit diesem Crafting-Bezug.': 'No statements with this crafting relevance yet.',
+  'Alle Crafting-Aussagen gehören zu einem Befund.': 'All crafting statements belong to a finding.',
+  'Keine Aussagen dieser Person mit Crafting-Bezug Kern oder Integration.': 'No statements of this person with crafting relevance core or integration.',
   'Crafting UX': 'Crafting UX',
   'Klassifizierung': 'Classification',
   'UX-Analyse': 'UX analysis',
@@ -1233,7 +1238,9 @@ const PATTERNS: [RegExp, string][] = [
   [/^(\d+) von (\d+) noch nicht eingeordnet \(Crafting UX → Klassifizierung\)$/, '$1 of $2 not classified yet (Crafting UX → Classification)'],
   [/^(\d+) eingeordnet$/, '$1 classified'],
   [/^(\d+) bestätigt · (\d+) Vorschläge$/, '$1 confirmed · $2 suggestions'],
-  [/^n = (\d+) Personen? mit Crafting-Problemen$/, 'n = $1 people with crafting problems'],
+  [/^n = (\d+) Personen? mit Crafting-Aussagen$/, 'n = $1 people with crafting statements'],
+  [/^(\d+) von (\d+) Crafting-Aussagen$/, '$1 of $2 crafting statements'],
+  [/^(\d+) von (P\d+)$/, '$1 of $2'],
   [/^bei (P\d+) hervorgehoben$/, 'highlighted for $1'],
   [/^Vorschlag: (.+)$/, 'Suggestion: $1'],
   [/^KI: vorschlagen \((\d+)\)$/, 'AI: suggest ($1)'],

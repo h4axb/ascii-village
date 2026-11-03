@@ -42,6 +42,15 @@ export interface Source {
   url: string;
 }
 
+// a task done for an entry, with its own time range (HH:MM); the duration is
+// worked out from it (an end before the start runs past midnight)
+export interface Task {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+}
+
 export interface Entry {
   id: string;
   date: string; // ISO yyyy-mm-dd
@@ -54,6 +63,7 @@ export interface Entry {
   blocks: Block[];
   sources: Source[];
   files: string[]; // file ids
+  tasks?: Task[];
   visibility: Visibility;
   created: number;
   updated: number;
@@ -135,6 +145,28 @@ export interface FileMeta {
   created: number;
 }
 
+// the daily check-in: stored once per date (id = the ISO date) and shared by
+// every entry of that day, so the ratings are never kept twice
+export const CHECKIN: { id: 'productivity' | 'concentration' | 'sleep' | 'waking'; label: string }[] = [
+  { id: 'productivity', label: 'Productivity' },
+  { id: 'concentration', label: 'Concentration' },
+  { id: 'sleep', label: 'Sleep quality' },
+  { id: 'waking', label: 'Waking up' },
+];
+export type CheckinKey = (typeof CHECKIN)[number]['id'];
+export interface Day {
+  date: string;
+  ratings: Partial<Record<CheckinKey, number>>; // 1–10
+  updated: number;
+}
+// the weekly review, written on Tuesdays: one per ISO week (id 2026-W45)
+export interface Week {
+  id: string;
+  priorities: string; // Markdown
+  reflection: string;
+  updated: number;
+}
+
 export interface JournalDocs {
   entries: Record<string, Entry>;
   milestones: Record<string, Milestone>;
@@ -142,6 +174,8 @@ export interface JournalDocs {
   pages: Record<string, PageConfig>;
   overview: Record<string, OverviewSection>;
   settings: Record<string, unknown>;
+  days: Record<string, Day>;
+  weeks: Record<string, Week>;
   files: Record<string, FileMeta>;
 }
 export type Coll = Exclude<keyof JournalDocs, 'files'>;
@@ -195,3 +229,25 @@ export function fmtDate(iso: string | null | undefined, end?: string | null): st
   return end && end !== iso ? `${one(iso)} – ${one(end)}` : one(iso);
 }
 export const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+
+// "03.11.26", as the entry panel shows a date
+export const shortDate = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(2, 4)}` : iso);
+// the ISO week of a date: 2026-11-03 → 2026-W45
+export function isoWeek(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  const day = (d.getUTCDay() + 6) % 7; // Monday 0
+  d.setUTCDate(d.getUTCDate() - day + 3); // the Thursday of that week
+  const y = d.getUTCFullYear();
+  const n = 1 + Math.floor((d.getTime() - Date.UTC(y, 0, 1)) / 86400000 / 7);
+  return `${y}-W${String(n).padStart(2, '0')}`;
+}
+export const isTuesday = (iso: string) => /^\d{4}-\d{2}-\d{2}$/.test(iso) && new Date(`${iso}T12:00:00Z`).getUTCDay() === 2;
+// minutes between two HH:MM, past midnight if the end is earlier; null if one is missing
+export function taskMinutes(t: { start: string; end: string }): number | null {
+  const m = (x: string) => (/^\d{1,2}:\d{2}$/.test(x) ? Number(x.split(':')[0]) * 60 + Number(x.split(':')[1]) : null);
+  const a = m(t.start),
+    b = m(t.end);
+  if (a == null || b == null) return null;
+  return (b - a + 1440) % 1440;
+}
+export const fmtMinutes = (n: number) => (n < 60 ? `${n}m` : `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}m` : ''}`);

@@ -1,5 +1,6 @@
 // The project journal's data (/journal, src/journal/): log entries, milestones,
-// deadlines, page settings and the Overview's sections, each a JSON document,
+// deadlines, page settings, the Overview's sections, the daily check-ins (days,
+// one per date) and the weekly reviews (weeks, one per ISO week), each a JSON document,
 // plus uploaded files. Kept apart from the study's tables (its exports and
 // versions never contain the journal). Dashboard password only.
 //
@@ -16,7 +17,7 @@
 // edit can always be looked up and restored.
 import { dbOf, isAdmin, json, type D1Database, type SessionEnv } from './session';
 
-export const JOURNAL_COLLS = ['entries', 'milestones', 'deadlines', 'pages', 'overview', 'settings', 'files'] as const;
+export const JOURNAL_COLLS = ['entries', 'milestones', 'deadlines', 'pages', 'overview', 'settings', 'days', 'weeks', 'files'] as const;
 type Coll = (typeof JOURNAL_COLLS)[number];
 const isColl = (c: string): c is Coll => (JOURNAL_COLLS as readonly string[]).includes(c);
 

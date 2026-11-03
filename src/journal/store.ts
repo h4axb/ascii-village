@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_MILESTONES, DEFAULT_OVERVIEW, OVERVIEW_V2, type Coll, type FileMeta, type JournalDocs, type OverviewSection } from './types';
 
 const PASS_KEY = 'asciia-feedback-pass'; // shared with /feedback
-const EMPTY: JournalDocs = { entries: {}, milestones: {}, deadlines: {}, pages: {}, overview: {}, settings: {}, files: {} };
+const EMPTY: JournalDocs = { entries: {}, milestones: {}, deadlines: {}, pages: {}, overview: {}, settings: {}, days: {}, weeks: {}, files: {} };
 
 export interface Put {
   coll: Coll;

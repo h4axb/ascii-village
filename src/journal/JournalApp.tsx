@@ -5,7 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import './journal.css';
 import { useJournal, type Put } from './store';
 import { PAGES } from './types';
-import { blankEntry, EntryDialog } from './EntryEditor';
+import { EntryDialog } from './EntryEditor';
+import { AddEntryDrawer } from './AddEntry';
 import { Overview } from './Overview';
 import { pageConfig, Timeline } from './pages';
 import { LogList } from './LogList';
@@ -22,7 +23,13 @@ export default function JournalApp() {
   const [loc, setLoc] = useState(() => ({ path: location.pathname, search: location.search }));
   const [menu, setMenu] = useState(false);
   const [editNav, setEditNav] = useState(false);
-  const [draft, setDraft] = useState<ReturnType<typeof blankEntry> | null>(null);
+  const [adding, setAdding] = useState<{ section?: string } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [toast]);
   useEffect(() => {
     const on = () => setLoc({ path: location.pathname, search: location.search });
     window.addEventListener('popstate', on);
@@ -125,11 +132,11 @@ export default function JournalApp() {
           </p>
         )}
         {page === 'overview' ? (
-          <Overview store={store} openEntry={openEntry} newEntry={(s) => setDraft(blankEntry(s))} go={go} />
+          <Overview store={store} openEntry={openEntry} newEntry={(s) => setAdding({ section: s })} go={go} />
         ) : page === 'timeline' ? (
           <Timeline store={store} openEntry={openEntry} />
         ) : (
-          <LogList key={page} store={store} page={page} selected={entryId} openEntry={openEntry} closeEntry={closeEntry} newEntry={(s) => setDraft(blankEntry(s))} />
+          <LogList key={page} store={store} page={page} selected={entryId} openEntry={openEntry} closeEntry={closeEntry} newEntry={(s) => setAdding({ section: s })} />
         )}
       </main>
       {/* the log pages show an entry in their own panel; the others in the dialog */}
@@ -142,7 +149,27 @@ export default function JournalApp() {
           </button>
         </div>
       )}
-      {draft && <EntryDialog key={draft.id} store={store} entry={draft} isNew onClose={() => setDraft(null)} />}
+      {adding && (
+        <AddEntryDrawer
+          store={store}
+          section={adding.section}
+          onClose={(kept) => {
+            setAdding(null);
+            if (kept) setToast('Draft kept – “New Entry” continues it.');
+          }}
+          onSaved={(e) => {
+            setAdding(null);
+            setToast(`Saved “${e.title}”.`);
+            openEntry(e.id);
+          }}
+        />
+      )}
+      {toast && (
+        <p className="jr-toast" role="status">
+          <Icon name="check" />
+          {toast}
+        </p>
+      )}
     </div>
   );
 }

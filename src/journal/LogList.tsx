@@ -11,6 +11,7 @@ import { suggestSections } from './suggest';
 import { BLOCK_PRESETS, ENTRY_STATUS, ENTRY_TYPES, SECTIONS, fmtDate, newId, type Block, type Entry } from './types';
 import { allTopics, EntryDialog, sectionTitle } from './EntryEditor';
 import { EntryCard, ImportDialog, PageHead } from './pages';
+import { DayFacts } from './AddEntry';
 import { Markdown } from './markdown';
 import { Attachments, Chips, Icon, IconBtn, InlineText, MdEditor } from './ui';
 
@@ -512,6 +513,8 @@ function EntryPanel({ store, entry: e, onClose, floating }: { store: JournalStor
           ))}
         </datalist>
       </div>
+
+      <DayFacts store={store} e={e} />
 
       <div className="jr-panel-blocks">
         {blocks.map((b) => {

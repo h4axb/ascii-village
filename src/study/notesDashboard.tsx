@@ -1,12 +1,12 @@
-// Qualitatives Feedback: a filter-first overview above the statements. Three
-// questions in seconds: what problems dominate, what to look into, and which
-// observations back that up. Every tile and bar is a filter for the list below.
+// Qualitatives Feedback: a filter-first overview above the statements: what
+// problems dominate and what to look into. Every tile and bar is a filter for the
+// statements below; the same filters (and the active ones) sit in the Aussagen
+// card as chips (DashFilterBar). The section can be folded.
 import { useState } from 'react';
 import type { ChipRole, ItemDoc, TagGroup } from './types';
 import { effectiveChips, shortName, type Model } from './model';
-import { itemText, type ContentView } from './translations';
 
-export type Kpi = 'problem' | 'essential' | 'tbd' | 'unchecked';
+export type Kpi = 'problem' | 'essential' | 'tbd' | 'nice' | 'unchecked';
 export interface DashFilter {
   kpi?: Kpi;
   tags: Record<string, string>; // group id → tag id
@@ -31,7 +31,7 @@ export function matchDash(m: Model, i: ItemDoc, f: DashFilter, skip?: 'kpi' | 'p
 
 const PICK_KEY = 'asciia-study-dash-group';
 const MORE_KEY = 'asciia-study-dash-more';
-const EVID_KEY = 'asciia-study-dash-evidence';
+const FOLD_KEY = 'asciia-study-dash-folded';
 const read = (k: string) => {
   try {
     return localStorage.getItem(k);
@@ -67,13 +67,13 @@ function Bars({ rows, on, onPick, label }: { rows: { id: string; label: string; 
   );
 }
 
-export function NotesDashboard({ model, live, shown, f, setF, view }: { model: Model; live: ItemDoc[]; shown: ItemDoc[]; f: DashFilter; setF: (f: DashFilter) => void; view: ContentView }) {
+export function NotesDashboard({ model, live, f, setF }: { model: Model; live: ItemDoc[]; f: DashFilter; setF: (f: DashFilter) => void }) {
   const artGroup = model.tags.find((g) => g.chips.some((c) => c.role === 'problem'));
   const prioGroup = model.tags.find((g) => g.chips.some((c) => c.role === 'essential'));
   const groups = model.tags.filter((g) => g !== artGroup && g !== prioGroup && g.chips.length);
   const [pick, setPick] = useState(() => read(PICK_KEY) ?? '');
   const [more, setMore] = useState(() => read(MORE_KEY) === '1');
-  const [evOpen, setEvOpen] = useState(() => read(EVID_KEY) === '1');
+  const [folded, setFolded] = useState(() => read(FOLD_KEY) === '1');
   const group: TagGroup | undefined = groups.find((g) => g.id === pick) ?? groups.find((g) => g.id === 'thema') ?? groups[0];
 
   const tile = (k: Kpi, label: string, hint: string) => {
@@ -108,34 +108,22 @@ export function NotesDashboard({ model, live, shown, f, setF, view }: { model: M
     return ids.map((p) => ({ id: p, label: p, n: base.filter((i) => i.person === p).length })).sort((a, b) => b.n - a.n || a.label.localeCompare(b.label));
   })();
 
-  const label = (id: string) => model.chipLabel.get(id) ?? id;
-  const groupName = (id: string) => model.tags.find((g) => g.id === id)?.name ?? id;
-  const kpiName: Record<Kpi, string> = { problem: 'Probleme', essential: shortName(model, 'essential', 'Essenziell'), tbd: shortName(model, 'tbd', 'Offen'), unchecked: 'Ungeprüft' };
-  const active = dashActive(f);
-
-  // the evidence: the most pressing statements first
-  const rank = (i: ItemDoc) => {
-    const c = chipsOf(model, i);
-    return hasRole(model, c, 'essential') ? 0 : hasRole(model, c, 'tbd') ? 1 : hasRole(model, c, 'problem') ? 2 : 3;
-  };
-  const evidence = [...shown].sort((a, b) => rank(a) - rank(b) || a.person.localeCompare(b.person) || a.order - b.order).slice(0, 8);
-  const meta = (i: ItemDoc) => {
-    const c = chipsOf(model, i);
-    const prio = prioGroup ? c.filter((x) => prioGroup.chips.some((y) => y.id === x)).map(label) : [];
-    const art = artGroup ? c.filter((x) => artGroup.chips.some((y) => y.id === x)).map(label) : [];
-    const rest = group ? c.filter((x) => group.chips.some((y) => y.id === x)).map(label) : [];
-    return [...(prio.length ? prio : art), ...rest, i.link ?? i.person].join(' · ');
-  };
-  const jump = (sel: string, block: ScrollLogicalPosition = 'center') => {
-    const el = document.querySelector<HTMLElement>(sel);
-    el?.scrollIntoView({ behavior: 'smooth', block });
-    el?.classList.add('is-flash');
-    window.setTimeout(() => el?.classList.remove('is-flash'), 1400);
-  };
-
+  const kpiName = KPI_NAME(model);
   return (
-    <>
-    <section className="st-dash" aria-label="Probleme" data-nav="Probleme">
+    <section className={`st-dash${folded ? ' is-folded' : ''}`} aria-label="Probleme" data-nav="Probleme">
+      <div className="st-foldhead">
+        <h2>Probleme</h2>
+        <FoldBtn
+          folded={folded}
+          label="Probleme"
+          onClick={() => {
+            setFolded(!folded);
+            write(FOLD_KEY, folded ? '0' : '1');
+          }}
+        />
+      </div>
+      {!folded && (
+      <>
       <div className="st-dash-kpis">
         {tile('problem', kpiName.problem, 'Aussagen mit der Art „Problem“ – anklicken zum Filtern')}
         {tile('essential', kpiName.essential, 'Probleme mit der Priorität „Essenziell“ – anklicken zum Filtern')}
@@ -200,76 +188,63 @@ export function NotesDashboard({ model, live, shown, f, setF, view }: { model: M
           )}
         </div>
 
+      </>
+      )}
     </section>
-        <details
-          className="st-dash-card st-dash-evidence"
-          data-nav="Beobachtungen"
-          open={evOpen}
-          onToggle={(e) => {
-            const o = (e.target as HTMLDetailsElement).open;
-            setEvOpen(o);
-            write(EVID_KEY, o ? '1' : '0');
-          }}
-        >
-          <summary className="st-dash-evsum">
-            <span>
-              <b>Gefilterte Beobachtungen:</b> <span className="st-dash-count">{`${shown.length} von ${live.length}`}</span>
-              {active && <span className="st-muted">{` · ${[f.kpi, f.person, ...Object.keys(f.tags)].filter(Boolean).length} Filter aktiv`}</span>}
-            </span>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </summary>
-          {active && (
-            <button type="button" className="st-linkbtn st-dash-reset" onClick={() => setF(NO_DASH)}>
-              Zurücksetzen
-            </button>
-          )}
-          {active && (
-            <div className="st-dash-active">
-              {f.kpi && (
-                <button type="button" className="st-chip is-on" onClick={() => setF({ ...f, kpi: undefined })} aria-label={`Filter ${kpiName[f.kpi]} entfernen`}>
-                  {kpiName[f.kpi]} ×
-                </button>
-              )}
-              {Object.entries(f.tags).map(([g, c]) => (
-                <button key={g} type="button" className="st-chip is-on" onClick={() => setTag(g, c)} aria-label={`Filter ${groupName(g)}: ${label(c)} entfernen`}>
-                  {`${groupName(g)}: ${label(c)} ×`}
-                </button>
-              ))}
-              {f.person && (
-                <button type="button" className="st-chip is-on" onClick={() => setF({ ...f, person: undefined })} aria-label={`Filter ${f.person} entfernen`}>
-                  {f.person} ×
-                </button>
-              )}
-            </div>
-          )}
-          {evidence.length ? (
-            <ul className="st-dash-list">
-              {evidence.map((i) => (
-                <li key={i.id}>
-                  <button type="button" onClick={() => jump(`[data-anchor="i-${i.id}"]`)} title="Zur Aussage springen">
-                    <svg className="st-dash-note" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                      <path d="M14 3v6h6M8 13h8M8 17h5" />
-                    </svg>
-                    <span className="st-dash-text">
-                      <span data-notr>{itemText(view, i)}</span>
-                      <span className="st-dash-meta">{meta(i)}</span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="st-muted">Keine Aussage passt zu den Filtern.</p>
-          )}
-          {shown.length > evidence.length && (
-            <button type="button" className="st-linkbtn" onClick={() => jump('.st-lcard', 'start')}>
-              {`Alle ${shown.length} unten anzeigen`}
-            </button>
-          )}
-        </details>
-    </>
+  );
+}
+
+const KPI_NAME = (model: Model): Record<Kpi, string> => ({ problem: 'Probleme', essential: shortName(model, 'essential', 'Essenziell'), tbd: shortName(model, 'tbd', 'Offen'), nice: shortName(model, 'nice', 'Nice-to-have'), unchecked: 'Ungeprüft' });
+
+// a fold button: "Einklappen" / "Ausklappen" with its arrow
+export function FoldBtn({ folded, label, onClick, compact }: { folded: boolean; label: string; onClick: () => void; compact?: boolean }) {
+  return (
+    <button type="button" className={`st-foldtoggle${compact ? ' is-compact' : ''}`} aria-expanded={!folded} aria-label={`${label} ${folded ? 'ausklappen' : 'einklappen'}`} title={folded ? 'Ausklappen' : 'Einklappen'} onClick={onClick}>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d={folded ? 'm6 9 6 6 6-6' : 'm6 15 6-6 6 6'} />
+      </svg>
+      {!compact && <span>{folded ? 'Ausklappen' : 'Einklappen'}</span>}
+    </button>
+  );
+}
+
+// the filters as chips in the Aussagen card: Probleme, Essenziell, Offen,
+// Nice-to-have, Ungeprüft (each counted against the other filters), the active
+// tag and person filters set above, and Zurücksetzen
+export function DashFilterBar({ model, live, f, setF }: { model: Model; live: ItemDoc[]; f: DashFilter; setF: (f: DashFilter) => void }) {
+  const kpiName = KPI_NAME(model);
+  const base = live.filter((i) => matchDash(model, i, f, 'kpi'));
+  const label = (id: string) => model.chipLabel.get(id) ?? id;
+  const groupName = (id: string) => model.tags.find((g) => g.id === id)?.name ?? id;
+  const kpis: Kpi[] = ['problem', 'essential', 'tbd', 'nice', 'unchecked'];
+  return (
+    <div className="st-lc-fchips" role="group" aria-label="Filtern">
+      <b>Filtern:</b>
+      {kpis.map((k) => {
+        const n = base.filter((i) => kpiOk(model, i, chipsOf(model, i), k)).length;
+        const on = f.kpi === k;
+        return (
+          <button key={k} type="button" className={`st-fchip${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => setF({ ...f, kpi: on ? undefined : k })}>
+            {kpiName[k]}
+            <small>{n}</small>
+          </button>
+        );
+      })}
+      {Object.entries(f.tags).map(([g, c]) => (
+        <button key={g} type="button" className="st-fchip is-on" onClick={() => { const tags = { ...f.tags }; delete tags[g]; setF({ ...f, tags }); }} aria-label={`Filter ${groupName(g)}: ${label(c)} entfernen`}>
+          {`${groupName(g)}: ${label(c)} ×`}
+        </button>
+      ))}
+      {f.person && (
+        <button type="button" className="st-fchip is-on" onClick={() => setF({ ...f, person: undefined })} aria-label={`Filter ${f.person} entfernen`}>
+          {`${f.person} ×`}
+        </button>
+      )}
+      {dashActive(f) && (
+        <button type="button" className="st-linkbtn st-fchip-reset" onClick={() => setF(NO_DASH)}>
+          Zurücksetzen
+        </button>
+      )}
+    </div>
   );
 }

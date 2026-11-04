@@ -41,7 +41,7 @@ interface Draft {
 }
 const LABEL: Record<keyof Draft, string> = { testgroup: 'Testgruppe', order: 'Reihenfolge', name: 'Name', age: 'Alter', job: 'Beruf', date: 'Datum', time: 'Testzeit', links: 'Testlink' };
 
-export function PersonCard({ pid, meta, person }: { pid: string; meta?: NotesMeta; person?: Person }) {
+export function PersonCard({ pid, meta, person, onFold }: { pid: string; meta?: NotesMeta; person?: Person; onFold?: () => void }) {
   const { study, model } = useCtx();
   const m: NotesMeta = meta ?? { id: pid, name: '', link: '', slot: '', group: '' };
   const row = model.survey.find((r) => r.person === pid);
@@ -172,6 +172,11 @@ export function PersonCard({ pid, meta, person }: { pid: string; meta?: NotesMet
         ) : (
           <button type="button" className="st-pc-icon" onClick={open} aria-label={`${pid}: Profil bearbeiten`} title="Bearbeiten">
             <Icon d={PEN} size={17} />
+          </button>
+        )}
+        {onFold && !edit && (
+          <button type="button" className="st-pc-icon" onClick={onFold} aria-expanded={true} aria-label={`${pid} einklappen`} title="Einklappen">
+            <Icon d="m6 15 6-6 6 6" size={17} />
           </button>
         )}
       </div>

@@ -69,6 +69,9 @@ const EN: Record<string, string> = {
   'Problembewertungen vollständig (A · S · W)': 'Problem ratings complete (A · S · W)',
   'Bewertete Probleme mit bestätigtem Beleg': 'Rated problems with confirmed evidence',
   'Kein Gleichstand an Platz 3': 'No tie at place 3',
+  Ausklappen: 'Expand',
+  'Filtern:': 'Filter:',
+  Filtern: 'Filter',
   // Crafting UX · UX-Problemanalyse & Lösungsentwicklung
   'betroffen ·': 'affected ·',
   'zentral ·': 'central ·',
@@ -1337,6 +1340,10 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^Alle (\d+) Aussagen von (P\d+) anzeigen$/, 'Show all $1 statements of $2'],
+  [/^(\d+) Aussagen? · eingeklappt$/, '$1 statements · folded'],
+  [/^(.+) einklappen$/, 'Fold $1'],
+  [/^(.+) ausklappen$/, 'Unfold $1'],
   [/^(\d+) Kandidaten? · Reihenfolge (AB|BA)$/, '$1 candidates · order $2'],
   [/^(\d+) Kandidaten? · Reihenfolge (AB|BA) · ein gespeicherter Beleg fehlt$/, '$1 candidates · order $2 · a stored evidence is missing'],
   [/^(\d+) Kandidaten?$/, '$1 candidates'],

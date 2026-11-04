@@ -14,7 +14,7 @@ import { RewriteReview, TagReview, workingText, type Rewrite, type TagProposal }
 import { designOfItem } from './Codes';
 import { itemText, translateNotes, useContentView } from '../translations';
 import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
-import { matchDash, NO_DASH, NotesDashboard, type DashFilter } from '../notesDashboard';
+import { DashFilterBar, dashActive, FoldBtn, matchDash, NO_DASH, NotesDashboard, type DashFilter } from '../notesDashboard';
 
 // ---- chip logic ----
 const groupOfChip = (tags: TagGroup[], chip: string) => tags.find((g) => g.chips.some((c) => c.id === chip));
@@ -675,13 +675,28 @@ function MoreMenu({ actions, up, label = 'Bearbeiten ⋯', title, icon, classNam
 
 // Deutsch / Original / Beides: which text of notes and survey the dashboard shows
 // ---- the page ----
+// the Qualitatives Feedback page's folded parts ('aussagen', 'p:<P-ID>') and the
+// persons shown with all their statements
+interface NotesFold {
+  folded: string[];
+  all: string[];
+}
+const NOTES_FOLD_KEY = 'asciia-study-notes-fold';
+const readNotesFold = (): NotesFold => {
+  try {
+    const v = JSON.parse(localStorage.getItem(NOTES_FOLD_KEY) ?? '{}') as Partial<NotesFold>;
+    return { folded: Array.isArray(v.folded) ? v.folded : [], all: Array.isArray(v.all) ? v.all : [] };
+  } catch {
+    return { folded: [], all: [] };
+  }
+};
+
 export default function Notes() {
   const ctx = useCtx();
   const { study, model, scope, omitted } = ctx;
   const [filter, setFilter] = useState<'all' | 'open' | 'checked' | 'changed'>('all');
   const [q, setQ] = useState('');
   const [dash, setDash] = useState<DashFilter>(NO_DASH);
-  const view = useContentView();
   const [fresh, setFresh] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const metas = (study.docs.settings.notesMeta ?? {}) as Record<string, NotesMeta>;
@@ -825,7 +840,29 @@ export default function Notes() {
     );
   // one participant chosen above: their profile first, before everything else
   const onePid = scope.kind === 'all' ? null : scope.kind === 'link' ? (model.links.find((l) => l.key === scope.key)?.person ?? null) : scope.id;
-  const card = (pid: string) => <PersonCard pid={pid} meta={metas[pid]} person={model.persons.find((p) => p.id === pid)} />;
+  // folded parts of the page (the Aussagen card, persons) and persons shown in full, remembered
+  const [fold, setFoldState] = useState<NotesFold>(readNotesFold);
+  const setFold = (n: NotesFold) => {
+    setFoldState(n);
+    try {
+      localStorage.setItem(NOTES_FOLD_KEY, JSON.stringify(n));
+    } catch {
+      // (not remembered)
+    }
+  };
+  const flip = (k: 'folded' | 'all', id: string) => setFold({ ...fold, [k]: fold[k].includes(id) ? fold[k].filter((x) => x !== id) : [...fold[k], id] });
+  const pFolded = (pid: string) => fold.folded.includes(`p:${pid}`);
+  const card = (pid: string) => <PersonCard pid={pid} meta={metas[pid]} person={model.persons.find((p) => p.id === pid)} onFold={() => flip('folded', `p:${pid}`)} />;
+  // a folded person: one line with the P-ID and the number of statements
+  const foldedBar = (pid: string, n: number) => (
+    <button type="button" className="st-pfold-bar" aria-expanded={false} aria-label={`${pid} ausklappen`} onClick={() => flip('folded', `p:${pid}`)}>
+      <strong>{pid}</strong>
+      <span className="st-muted">{`${n} ${n === 1 ? 'Aussage' : 'Aussagen'} · eingeklappt`}</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    </button>
+  );
   const addFor = (pid: string) => {
     const id = `m-${pid}-${Date.now().toString(36)}`;
     // (shown at once, opened for typing; filters that would hide it are reset)
@@ -845,6 +882,45 @@ export default function Notes() {
   ];
   const rows = (items: ItemDoc[]) =>
     items.map((i) => <ItemRow key={i.id} item={i} model={model} save={save} remove={remove} fresh={i.id === fresh} selected={sel.has(i.id)} onSelect={(shift) => select(i.id, shift)} {...(sel.has(i.id) && selShown.length > 1 ? { onTag: (g: TagGroup, chip: string) => tagSelected(i, g, chip), many: selShown.length } : {})} />);
+  // with everyone shown and nothing filtered or searched: one statement per person,
+  // a glimpse of the second, and a button for the rest (a new one shows them all)
+  const narrowed = !!q.trim() || dashActive(dash) || filter !== 'all';
+  const personRows = (pid: string, list: ItemDoc[]) => {
+    const full = narrowed || list.length < 2 || fold.all.includes(pid) || list.some((i) => i.id === fresh);
+    if (full)
+      return (
+        <>
+          {rows(list)}
+          {!narrowed && list.length > 2 && fold.all.includes(pid) && (
+            <div className="st-pmore">
+              <button type="button" aria-expanded={true} onClick={() => flip('all', pid)}>
+                Weniger anzeigen
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m6 15 6-6 6 6" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </>
+      );
+    return (
+      <>
+        {rows(list.slice(0, 1))}
+        <div className="st-teaser" onClick={() => flip('all', pid)} aria-hidden="true">
+          <div {...{ inert: '' }}>{rows(list.slice(1, 2))}</div>
+        </div>
+        <div className="st-pmore">
+          <button type="button" aria-expanded={false} onClick={() => flip('all', pid)}>
+            {`Alle ${list.length} Aussagen von ${pid} anzeigen`}
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        </div>
+      </>
+    );
+  };
+  const cardFolded = fold.folded.includes('aussagen');
   const plus = (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
       <path d="M12 5v14M5 12h14" />
@@ -866,8 +942,8 @@ export default function Notes() {
   return (
     <>
       <PageIntro />
-      {onePid && <div data-nav="Profil">{card(onePid)}</div>}
-      <NotesDashboard model={model} live={live} shown={shown} f={dash} setF={setDash} view={view} />
+      {onePid && <div data-nav="Profil">{pFolded(onePid) ? <div className="st-pfold-wrap">{foldedBar(onePid, live.length)}</div> : card(onePid)}</div>}
+      <NotesDashboard model={model} live={live} f={dash} setF={setDash} />
       {showCriteria && (
         <div className="st-criteria">
           <label className="st-fprop-field">
@@ -945,13 +1021,16 @@ export default function Notes() {
         </div>
       )}
 
-      <section className="st-lcard" data-nav="Aussagen" aria-label="Aussagen">
+      <section className={`st-lcard${cardFolded ? ' is-folded' : ''}`} data-nav="Aussagen" aria-label="Aussagen">
         <div className="st-lc-title">
           <h2>
             Aussagen <span className="st-lc-count">{`(${live.length})`}</span>
           </h2>
-          <span className="st-muted">{onePid ? (scope.kind === 'link' ? scope.id : onePid) : `Alle (${allPersons.length})`}</span>
+          <span className="st-muted st-lc-who">{onePid ? (scope.kind === 'link' ? scope.id : onePid) : `Alle (${allPersons.length})`}</span>
+          <FoldBtn folded={cardFolded} label="Aussagen" onClick={() => flip('folded', 'aussagen')} />
         </div>
+        {!cardFolded && (
+        <>
         <div className="st-lc-row st-lc-ai">
           <button
             type="button"
@@ -1026,6 +1105,7 @@ export default function Notes() {
           />
         </div>
         </div>
+        <DashFilterBar model={model} live={live} f={dash} setF={setDash} />
         <div className="st-tabs st-lc-tabs" role="tablist" aria-label="Anzeigen">
           {tabs.map(([k, l, n]) => (
             <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)}>
@@ -1038,12 +1118,20 @@ export default function Notes() {
           {onePid
             ? rows(mineOf(onePid))
             : byPerson.map((pid) => (
-                <section key={pid} className="st-notes-person" data-anchor={`p-${pid}`} data-nav={pid}>
-                  {card(pid)}
-                  {rows(mineOf(pid))}
+                <section key={pid} className={`st-notes-person${pFolded(pid) ? ' is-folded' : ''}`} data-anchor={`p-${pid}`} data-nav={pid}>
+                  {pFolded(pid) ? (
+                    foldedBar(pid, mineOf(pid).length)
+                  ) : (
+                    <>
+                      {card(pid)}
+                      {personRows(pid, mineOf(pid))}
+                    </>
+                  )}
                 </section>
               ))}
         </div>
+        </>
+        )}
       </section>
 
       {selShown.length > 0 && (

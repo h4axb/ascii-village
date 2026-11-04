@@ -1,15 +1,18 @@
-// Qualitatives Feedback → A/B-Vergleich & Gestaltungsableitung, in three steps:
-//   1. A/B-Ergebnisse   every Tally comparison question (Teil 1: Direkter Vergleich)
-//                       as a row: A, B, without a preference, the sign test; the
-//                       values come from Tally and are never changed here; a click
-//                       on a row filters the hypotheses by that research dimension
+// Qualitatives Feedback → A/B-Vergleich & Gestaltungsableitung:
+//   Gesamtbewertung     the leading variant in Tally (the preference question)
+//                       and in-game (the overall rating, compared per person)
+//   Einzelbewertungen   Tally (Teil 1: Direkter Vergleich) or In-Game (the five
+//                       rating questions after each variant), one row per
+//                       criterion: the leading variant and A · Gleich · B; Tally
+//                       values are never changed here; a click on a Tally row
+//                       filters the hypotheses by that research dimension
 //   2. Hypothesen       own interpretations, each with linked statements from
 //                       Beobachtungen & Feedback (supporting, contradicting or
 //                       complementary); weakly backed ones are flagged
 //   3. Redesign         design decisions: the hypotheses considered, the proposal
 //                       and why; a hypothesis can also be "Nicht berücksichtigt"
-// The tiles on top (Präferenz A / B, Hypothesen, Redesign) choose what is shown
-// below the results. Stored in settings/abCompare.
+// The dashboard's A/B tiles can show the people with preference A or B.
+// Stored in settings/abCompare.
 import { useEffect, useMemo, useState } from 'react';
 import { part1, type P1Result } from './analysis';
 import type { ItemDoc } from './types';
@@ -17,6 +20,9 @@ import { SECTION_LABEL } from './types';
 import { itemText, useContentView } from './translations';
 import { logChange, useCtx } from './ui';
 import { FoldBtn } from './notesDashboard';
+import { RATING_LABEL, scopeLabel } from './model';
+import { designOf } from '../feedback/schema';
+import { RATING_QUESTIONS } from '../quest/quests';
 
 export type EvKind = 'support' | 'contra' | 'extra';
 export const EV_KIND: [EvKind, string][] = [
@@ -56,7 +62,6 @@ interface AbDoc {
 }
 
 const uid = (p: string) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)} %` : '–');
 const pText = (p: number) => (Number.isFinite(p) ? `p = ${p < 0.001 ? '< 0,001' : p.toFixed(2).replace('.', ',')}` : '');
 const lead = (q: string) => q.replace(/[\s?:.]+$/, '');
 const PREF_RE = /insgesamt|gefallen|präferenz|bevorzug|lieber|overall|prefer/i;
@@ -96,7 +101,7 @@ export function useAbSummary() {
 }
 
 export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { folded: boolean; onFold: () => void; show?: AbView; setShow?: (v: AbView) => void }) {
-  const { slice, study } = useCtx();
+  const { slice, study, scope } = useCtx();
   const view = useContentView();
   const { doc, latest, save } = useAb();
   const [own, setOwn] = useState<View>(null);
@@ -112,7 +117,6 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const items = useMemo(() => new Map(slice.items.map((i) => [i.id, i])), [slice.items]);
   const allItems = study.docs.items;
   const byPref = (v: 'A' | 'B') => slice.survey.filter((r) => r.person && prefQ && r.p1[prefQ] === v);
-  const toggle = (v: View) => setShow(show === v ? null : v);
   const shownHyps = dim ? hyps.filter((h) => h.dims.includes(dim)) : hyps;
   const putHyp = (h: AbHyp, what: string) => save({ hyps: (latest().hyps ?? []).some((x) => x.id === h.id) ? (latest().hyps ?? []).map((x) => (x.id === h.id ? h : x)) : [...(latest().hyps ?? []), h] }, what);
   const delHyp = (h: AbHyp) =>
@@ -120,85 +124,110 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const putDec = (d: AbDecision, what: string) => save({ decisions: (latest().decisions ?? []).some((x) => x.id === d.id) ? (latest().decisions ?? []).map((x) => (x.id === d.id ? d : x)) : [...(latest().decisions ?? []), d] }, what);
   const nextCode = () => `H${Math.max(0, ...hyps.map((h) => Number(h.code.replace(/\D/g, '')) || 0)) + 1}`;
   const [fresh, setFresh] = useState<string | null>(null);
+  const [src, setSrc] = useState<'tally' | 'game'>('tally');
+  const [crit, setCrit] = useState('');
+  const game = useMemo(() => gameVotes(slice.feedback), [slice.feedback]);
+  const tallyRows: Vote[] = results.map((r) => ({
+    key: r.question,
+    title: r.question === prefQ ? 'Gesamtbewertung' : label(r.question),
+    sub: r.question === prefQ ? label(r.question) : r.question,
+    A: r.A,
+    B: r.B,
+    tie: r.neutral,
+    pref: r.question === prefQ,
+    nHyp: hyps.filter((h) => h.dims.includes(r.question)).length,
+    hint: r.winner ? `Mehrheit ${r.winner} · ${pText(r.p)}` : 'keine Mehrheit',
+  }));
+  const rows = src === 'tally' ? tallyRows : game;
+  const tallyAll = tallyRows.find((r) => r.pref) ?? null;
+  const gameAll = game.find((r) => r.key === 'overall') ?? null;
+  const nPeople = new Set([...slice.survey.filter((r) => r.person && Object.keys(r.p1).length).map((r) => r.person), ...slice.feedback.filter((r) => r.rating && r.participant).map((r) => r.participant)]).size;
 
   return (
     <section className={`st-lcard st-ab${folded ? ' is-folded' : ''}`} data-nav="A/B-Vergleich" aria-label="A/B-Vergleich & Gestaltungsableitung">
       <div className="st-lc-title">
         <h2>A/B-Vergleich & Gestaltungsableitung</h2>
-        <span className="st-muted st-lc-who">Empirische Ergebnisse · Interpretation · Redesign</span>
+        <span className="st-muted st-lc-who">{`${scopeLabel(scope)} · n = ${nPeople}`}</span>
         <FoldBtn folded={folded} label="A/B-Vergleich" onClick={onFold} />
       </div>
       {!folded && (
         <>
-          <div className="st-ab-tiles">
-            {(
-              [
-                ['A', 'Präferenz A', byPref('A').length, `von ${slice.survey.filter((r) => r.person && prefQ && r.p1[prefQ] != null).length} Personen`],
-                ['B', 'Präferenz B', byPref('B').length, `von ${slice.survey.filter((r) => r.person && prefQ && r.p1[prefQ] != null).length} Personen`],
-                ['hyp', 'Hypothesen', hyps.length, `${hyps.filter((h) => h.status === 'selected').length} für Redesign`],
-                ['red', 'Redesign', decisions.length, decisions.length === 1 ? 'Maßnahme' : 'Maßnahmen'],
-              ] as [View, string, number, string][]
-            ).map(([v, l, n, sub]) => (
-              <button key={v} type="button" className={`st-dash-kpi${show === v ? ' is-on' : ''}`} aria-pressed={show === v} onClick={() => toggle(v)}>
-                <span className="st-dash-kpilabel">{l}</span>
-                <span className="st-dash-kpivalue">{n}</span>
-                <span className="st-dash-kpisub">{sub}</span>
-              </button>
-            ))}
+          <div className="st-ab-step">
+            <b>Gesamtbewertung</b>
+          </div>
+          <div className="st-ab-tiles is-two">
+            <OverallTile source="Tally" v={tallyAll} unit="Person" what={prefQ ? label(prefQ) : 'Direkte Nutzungspräferenz'} />
+            <OverallTile source="In-Game" v={gameAll} unit="Person" what="Crafting-Erfahrung 1–5 · Gesamteindruck" />
           </div>
 
-          <div className="st-ab-step">
+          <div className="st-ab-step st-ab-rhead">
             <i>1</i>
-            <b>A/B-Ergebnisse</b>
-            <span className="st-muted">Tally · Teil 1: Direkter Vergleich · Zeile anklicken filtert die Hypothesen</span>
+            <b>Einzelbewertungen</b>
+            <span className="st-ab-rtools">
+              <select value={crit} aria-label="Kriterium" onChange={(e) => setCrit(e.target.value)}>
+                <option value="">Alle Kriterien</option>
+                {rows.map((r) => (
+                  <option key={r.key} value={r.key}>
+                    {r.title}
+                  </option>
+                ))}
+              </select>
+              <span className="st-seg st-cx-seg" role="group" aria-label="Quelle">
+                {(
+                  [
+                    ['tally', 'Tally'],
+                    ['game', 'In-Game'],
+                  ] as const
+                ).map(([v, l]) => (
+                  <button key={v} type="button" className={src === v ? 'is-on' : ''} aria-pressed={src === v} onClick={() => (setSrc(v), setCrit(''))}>
+                    {l}
+                  </button>
+                ))}
+              </span>
+            </span>
           </div>
-          {results.length ? (
+          {rows.length ? (
             <>
-              <div className="st-ab-tblwrap">
-              <table className="st-ab-tbl">
-                <thead>
-                  <tr>
-                    <th>Forschungsdimension</th>
-                    <th>A</th>
-                    <th>B</th>
-                    <th className="st-ab-hm">ohne Präf.</th>
-                    <th className="st-ab-hm" aria-label="Verteilung" />
-                    <th>Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((r) => (
-                    <ResultRow
-                      key={r.question}
-                      r={r}
-                      label={label(r.question)}
-                      pref={r.question === prefQ}
-                      on={dim === r.question}
-                      renaming={rename === r.question}
-                      onClick={() => setDim(dim === r.question ? null : r.question)}
-                      onRename={() => setRename(r.question)}
-                      onRenamed={(v) => {
-                        setRename(null);
-                        if (v !== null) save({ dims: { ...(latest().dims ?? {}), [r.question]: v.trim() } }, `Kurzname für „${lead(r.question)}“`);
-                      }}
-                      nHyp={hyps.filter((h) => h.dims.includes(r.question)).length}
-                    />
-                  ))}
-                </tbody>
-              </table>
+              <div className="st-ab-rows">
+                {rows
+                  .filter((r) => !crit || r.key === crit)
+                  .map((r) =>
+                    src === 'tally' ? (
+                      <VoteRow
+                        key={r.key}
+                        r={r}
+                        on={dim === r.key}
+                        renaming={rename === r.key}
+                        onClick={() => setDim(dim === r.key ? null : r.key)}
+                        onRename={() => setRename(r.key)}
+                        onRenamed={(v) => {
+                          setRename(null);
+                          if (v !== null) save({ dims: { ...(latest().dims ?? {}), [r.key]: v.trim() } }, `Kurzname für „${lead(r.key)}“`);
+                        }}
+                      />
+                    ) : (
+                      <VoteRow key={r.key} r={r} />
+                    ),
+                  )}
               </div>
               <div className="st-ab-under">
-                <span className="st-muted">Werte aus Tally, hier nicht veränderbar. „ohne Präf.“ zählt nicht im Vorzeichentest.</span>
-                <label className="st-ab-prefsel">
-                  Präferenzfrage
-                  <select value={prefQ ?? ''} onChange={(e) => save({ prefQ: e.target.value }, 'Präferenzfrage gewählt')}>
-                    {results.map((r) => (
-                      <option key={r.question} value={r.question}>
-                        {label(r.question)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <span className="st-muted">
+                  {src === 'tally'
+                    ? 'Werte aus Tally, hier nicht veränderbar. Zeile anklicken filtert die Hypothesen.'
+                    : 'Je Person gezählt: die höhere Bewertung ist eine Stimme für die Variante, bei Frustration die niedrigere. Gleiche Werte zählen als „Gleich“.'}
+                </span>
+                {src === 'tally' && (
+                  <label className="st-ab-prefsel">
+                    Präferenzfrage
+                    <select value={prefQ ?? ''} onChange={(e) => save({ prefQ: e.target.value }, 'Präferenzfrage gewählt')}>
+                      {results.map((r) => (
+                        <option key={r.question} value={r.question}>
+                          {label(r.question)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {dim && (
                   <button type="button" className="st-fchip is-on" onClick={() => setDim(null)}>
                     {`${label(dim)} ×`}
@@ -207,7 +236,9 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
               </div>
             </>
           ) : (
-            <p className="st-muted st-ab-empty">Noch keine Tally-Vergleichsfragen: unter Daten & Validierung → Zuordnung die Spalten als „Teil 1“ zuordnen.</p>
+            <p className="st-muted st-ab-empty">
+              {src === 'tally' ? 'Noch keine Tally-Vergleichsfragen: unter Daten & Validierung → Zuordnung die Spalten als „Teil 1“ zuordnen.' : 'Noch keine In-Game-Bewertungen (die 5 Fragen nach jeder Variante).'}
+            </p>
           )}
 
           {(show === 'A' || show === 'B') && (
@@ -215,6 +246,9 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
               <div className="st-ab-step">
                 <b>{`Präferenz ${show}`}</b>
                 <span className="st-muted">{`${byPref(show).length} Personen · ihre Tally-Antworten und verknüpften Aussagen`}</span>
+                <button type="button" className="st-cx-btn st-ab-add" onClick={() => setShow(null)}>
+                  Schließen
+                </button>
               </div>
               {!byPref(show).length && <p className="st-muted st-ab-empty">Niemand mit dieser Präferenz.</p>}
               {byPref(show).map((row) => {
@@ -307,13 +341,78 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   );
 }
 
-function ResultRow({ r, label, pref, on, renaming, onClick, onRename, onRenamed, nHyp }: { r: P1Result; label: string; pref: boolean; on: boolean; renaming: boolean; onClick: () => void; onRename: () => void; onRenamed: (v: string | null) => void; nHyp: number }) {
-  const [v, setV] = useState(label);
-  useEffect(() => setV(label), [label, renaming]);
-  const of = r.A + r.B + r.neutral;
+// one criterion, A against B: votes per person (Tally answers, or the in-game
+// ratings compared per person), the leading variant and a small distribution bar
+interface Vote {
+  key: string;
+  title: string;
+  sub: string;
+  A: number;
+  B: number;
+  tie: number;
+  pref?: boolean;
+  nHyp?: number;
+  hint?: string;
+  means?: { A: number | null; B: number | null; nA: number; nB: number };
+}
+const lead2 = (v: Pick<Vote, 'A' | 'B'>) => (v.A > v.B ? 'A' : v.B > v.A ? 'B' : null);
+const num = (x: number | null) => (x == null ? '–' : x.toFixed(1).replace('.', ','));
+
+// the in-game rating questions: per person the mean of each design's ratings,
+// the higher one is a vote for that design (frustration: the lower one)
+export function gameVotes(feedback: { participant?: string; rating?: Record<string, number | null>; cond?: string }[]): Vote[] {
+  const per = new Map<string, Record<string, { A: number[]; B: number[] }>>();
+  for (const r of feedback) {
+    if (!r.rating || !r.participant) continue;
+    const d = designOf(r.cond);
+    if (!d) continue;
+    const p = per.get(r.participant) ?? {};
+    per.set(r.participant, p);
+    for (const [q, v] of Object.entries(r.rating)) if (typeof v === 'number') (p[q] ??= { A: [], B: [] })[d].push(v);
+  }
+  const avg = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : null);
+  return RATING_QUESTIONS.map((q) => {
+    const out: Vote = { key: q.id, title: RATING_LABEL[q.id] ?? q.id, sub: q.id === 'frustration' ? `${q.text} · niedriger ist besser` : q.text, A: 0, B: 0, tie: 0 };
+    const all = { A: [] as number[], B: [] as number[] };
+    for (const p of per.values()) {
+      const x = p[q.id];
+      if (!x) continue;
+      all.A.push(...x.A);
+      all.B.push(...x.B);
+      const a = avg(x.A);
+      const b = avg(x.B);
+      if (a == null || b == null) continue;
+      const d = q.id === 'frustration' ? a - b : b - a;
+      if (d > 0) out.B++;
+      else if (d < 0) out.A++;
+      else out.tie++;
+    }
+    out.means = { A: avg(all.A), B: avg(all.B), nA: all.A.length, nB: all.B.length };
+    return out;
+  }).filter((v) => v.A + v.B + v.tie > 0);
+}
+
+function OverallTile({ source, v, unit, what }: { source: string; v: Vote | null; unit: string; what: string }) {
+  const of = v ? v.A + v.B + v.tie : 0;
+  const w = v ? lead2(v) : null;
   return (
-    <tr className={on ? 'is-on' : ''} onClick={renaming ? undefined : onClick} aria-selected={on}>
-      <td>
+    <div className="st-ab-otile">
+      <span className="st-ab-olabel">{source}</span>
+      <span className={`st-ab-ovalue is-${w ?? 'tie'}`}>{!of ? '–' : (w ?? '=')}</span>
+      <span className="st-ab-otext">{!of ? 'noch keine Antworten' : w ? `Variante ${w} · ${v![w]} von ${of} ${of === 1 ? unit : `${unit}en`}` : `Gleichstand · A ${v!.A} · Gleich ${v!.tie} · B ${v!.B}`}</span>
+      <span className="st-muted st-ab-owhat">{what}</span>
+    </div>
+  );
+}
+
+function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; on?: boolean; renaming?: boolean; onClick?: () => void; onRename?: () => void; onRenamed?: (v: string | null) => void }) {
+  const [v, setV] = useState(r.title);
+  useEffect(() => setV(r.pref ? r.sub : r.title), [r.title, r.sub, r.pref, renaming]);
+  const of = r.A + r.B + r.tie;
+  const w = lead2(r);
+  const body = (
+    <>
+      <span className="st-ab-rname">
         {renaming ? (
           <input
             autoFocus
@@ -322,51 +421,51 @@ function ResultRow({ r, label, pref, on, renaming, onClick, onRename, onRenamed,
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => setV(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') onRenamed(v);
-              if (e.key === 'Escape') (e.stopPropagation(), onRenamed(null));
+              if (e.key === 'Enter') onRenamed?.(v);
+              if (e.key === 'Escape') (e.stopPropagation(), onRenamed?.(null));
             }}
-            onBlur={() => onRenamed(v)}
+            onBlur={() => onRenamed?.(v)}
           />
         ) : (
-          <span className="st-ab-dim">
-            <button type="button" className="st-ab-dimname" aria-pressed={on} title={r.question}>
-              {label}
-            </button>
-            {pref && <span className="st-ab-pref">Präferenzfrage</span>}
-            {nHyp > 0 && <span className="st-ab-nh">{`${nHyp} H`}</span>}
-            <button
-              type="button"
-              className="st-ab-ren"
-              aria-label={`Kurzname für ${label} ändern`}
-              title="Kurzname ändern"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRename();
-              }}
-            >
-              ✎
-            </button>
-          </span>
+          <b>
+            {r.title}
+            {(r.nHyp ?? 0) > 0 && <span className="st-ab-nh">{`${r.nHyp} H`}</span>}
+          </b>
         )}
-      </td>
-      <td className="st-ab-num">
-        {r.A}
-        <small>{pct(r.A, of)}</small>
-      </td>
-      <td className="st-ab-num">
-        {r.B}
-        <small>{pct(r.B, of)}</small>
-      </td>
-      <td className="st-ab-num st-ab-hm">{r.neutral}</td>
-      <td className="st-ab-hm">
-        <span className="st-ab-bar" aria-hidden="true">
-          <i className="is-a" style={{ width: `${of ? (r.A / of) * 100 : 0}%` }} />
-          <i className="is-b" style={{ width: `${of ? (r.B / of) * 100 : 0}%` }} />
-          <i className="is-n" style={{ width: `${of ? (r.neutral / of) * 100 : 0}%` }} />
+        <span className="st-muted" title={r.sub}>
+          {r.sub}
         </span>
-      </td>
-      <td className="st-ab-det">{r.winner ? `Mehrheit ${r.winner} · ${pText(r.p)}` : 'keine Mehrheit'}</td>
-    </tr>
+      </span>
+      <span className={`st-ab-win is-${w ?? 'tie'}`}>{w ?? 'Gleich'}</span>
+      <span className="st-ab-count">
+        {`A ${r.A} · Gleich ${r.tie} · B ${r.B}`}
+        {r.means && <small title="Mittelwert aller Bewertungen (1–5) je Variante">{`Ø A ${num(r.means.A)} (n=${r.means.nA}) · Ø B ${num(r.means.B)} (n=${r.means.nB})`}</small>}
+      </span>
+      <span className="st-ab-bar" aria-hidden="true">
+        <i className="is-a" style={{ width: `${of ? (r.A / of) * 100 : 0}%` }} />
+        <i className="is-n" style={{ width: `${of ? (r.tie / of) * 100 : 0}%` }} />
+        <i className="is-b" style={{ width: `${of ? (r.B / of) * 100 : 0}%` }} />
+      </span>
+    </>
+  );
+  if (!onClick) return <div className="st-ab-r">{body}</div>;
+  return (
+    <div className={`st-ab-r is-click${on ? ' is-on' : ''}`} title={r.hint}>
+      <button type="button" className="st-ab-rbtn" aria-pressed={on} aria-label={`${r.title}: Hypothesen filtern`} onClick={renaming ? undefined : onClick} />
+      {body}
+      <button
+        type="button"
+        className="st-ab-ren"
+        aria-label={`Kurzname für ${r.title} ändern`}
+        title="Kurzname ändern"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRename?.();
+        }}
+      >
+        ✎
+      </button>
+    </div>
   );
 }
 

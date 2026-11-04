@@ -137,6 +137,19 @@ const EN: Record<string, string> = {
   'Anklicken zeigt es im Bereich „A/B-Vergleich & Gestaltungsableitung“.': 'Click to show it in the section "A/B comparison & design derivation".',
   'Noch keine Tally-Vergleichsfragen (Teil 1) zugeordnet.': 'No Tally comparison questions (Part 1) mapped yet.',
   'Anklicken: im Bereich A/B-Vergleich anzeigen': 'Click: show in the A/B comparison section',
+  // A/B-Vergleich: Gesamt- und Einzelbewertungen
+  Gesamtbewertung: 'Overall rating',
+  Einzelbewertungen: 'Individual ratings',
+  'Alle Kriterien': 'All criteria',
+  Kriterium: 'Criterion',
+  Gleich: 'Tie',
+  'Direkte Nutzungspräferenz': 'Direct use preference',
+  'Crafting-Erfahrung 1–5 · Gesamteindruck': 'Crafting experience 1–5 · overall impression',
+  'noch keine Antworten': 'no answers yet',
+  'Werte aus Tally, hier nicht veränderbar. Zeile anklicken filtert die Hypothesen.': 'Values from Tally, not editable here. Click a row to filter the hypotheses.',
+  'Je Person gezählt: die höhere Bewertung ist eine Stimme für die Variante, bei Frustration die niedrigere. Gleiche Werte zählen als „Gleich“.': 'Counted per person: the higher rating is a vote for that variant, for frustration the lower one. Equal ratings count as “Tie”.',
+  'Noch keine In-Game-Bewertungen (die 5 Fragen nach jeder Variante).': 'No in-game ratings yet (the 5 questions after each variant).',
+  'Mittelwert aller Bewertungen (1–5) je Variante': 'Mean of all ratings (1–5) per variant',
   // Crafting UX · UX-Problemanalyse & Lösungsentwicklung
   'betroffen ·': 'affected ·',
   'zentral ·': 'central ·',
@@ -1405,6 +1418,14 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^Variante ([AB]) · (\d+) von (\d+) Person(?:en)?$/, 'Variant $1 · $2 of $3 people'],
+  [/^Gleichstand · A (\d+) · Gleich (\d+) · B (\d+)$/, 'Tie · A $1 · tie $2 · B $3'],
+  [/^A (\d+) · Gleich (\d+) · B (\d+)$/, 'A $1 · tie $2 · B $3'],
+  [/^Ø A (.+) · Ø B (.+)$/, 'Mean A $1 · mean B $2'],
+
+  [/^Alle · n = (\d+)$/, 'All · n = $1'],
+  [/^(.+) · niedriger ist besser$/, '$1 · lower is better'],
+  [/^(.+): Hypothesen filtern$/, '$1: filter hypotheses'],
   [/^(\d+) offen$/, '$1 open'],
   [/^Mehrheit ([AB]) · p = (.+)$/, 'majority $1 · p = $2'],
   [/^(\d+) für Redesign$/, '$1 for redesign'],

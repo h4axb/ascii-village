@@ -4,7 +4,7 @@
 // participants (the recurring findings, limited to the crafting statements).
 // Only confirmed tags count (suggestions never do); people are counted once
 // however many statements they made.
-import type { CraftRole, CraftingUxDoc, CraftingUxPick, ItemDoc } from './types';
+import type { CraftRole, CraftingUxDoc, CraftingUxPick, CraftingUxRating, ItemDoc } from './types';
 import { designOfItem } from './pages/Codes';
 import type { Model, Person } from './model';
 
@@ -178,6 +178,28 @@ export interface MainPick {
   key: string;
   label: string;
   ok: boolean; // its evidence is still there
+  score?: number; // (automatic: its rating)
+}
+// ---- the rating: A + S + W (0–3 each), only with confirmed evidence ----
+export const scoreOf = (r: CraftingUxRating | undefined): number | null => (r?.ok && r.a != null && r.s != null && r.w != null ? r.a + r.s + r.w : null);
+export const ratedAny = (r: CraftingUxRating | undefined) => !!r && (r.a != null || r.s != null || r.w != null);
+export const ratedAll = (r: CraftingUxRating | undefined) => !!r && r.a != null && r.s != null && r.w != null;
+export interface Ranked {
+  cand: Candidate;
+  score: number | null;
+  top: boolean; // among the central three
+  tie: boolean; // shares the score at the border of the three
+}
+// the candidates by score (the unscored after them, in their own order: priority,
+// statements); the top three are the central problems. A person's statements on
+// one problem group are one candidate already, so a group takes one place only.
+export function rankCands(cands: Candidate[], ratings: Record<string, CraftingUxRating> = {}): { ranked: Ranked[]; top: Ranked[]; tie: boolean } {
+  const scored = cands.map((c) => ({ cand: c, score: scoreOf(ratings[c.key]) }));
+  const withScore = scored.filter((x) => x.score != null).sort((a, b) => b.score! - a.score!); // (stable: ties keep the candidates' order)
+  const border = withScore.length > MAX_PICKS ? withScore[MAX_PICKS - 1].score : null;
+  const tie = border != null && withScore[MAX_PICKS].score === border;
+  const ranked: Ranked[] = [...withScore, ...scored.filter((x) => x.score == null)].map((x, i) => ({ ...x, top: x.score != null && i < MAX_PICKS, tie: tie && x.score === border }));
+  return { ranked, top: ranked.filter((x) => x.top), tie };
 }
 export interface MainState {
   status: 'confirmed' | 'suggested' | 'open' | 'invalid';
@@ -185,6 +207,8 @@ export interface MainState {
   key: string | null; // the first chosen / the proposed candidate
   picks: MainPick[]; // the central problems chosen, by weight
   doc: CraftingUxDoc | null;
+  auto?: boolean; // derived from the ratings
+  tie?: boolean; // (automatic) a tie at the border of the three: provisional
 }
 // what the page shows for a person: the decision stored (up to three central
 // problems, or a special case), else a proposal (the candidate with the highest
@@ -192,8 +216,16 @@ export interface MainState {
 // gone is flagged
 export function mainOf(p: Person, cands: Candidate[], problems: CxProblem[], items: Record<string, ItemDoc>): MainState {
   const doc = p.doc.craftingUx ?? null;
-  const picks = picksOf(doc);
-  if (doc && (doc.special || picks.length || doc.finding)) {
+  // automatic: the three highest rated (nothing rated yet: the proposal below)
+  if (doc?.mode === 'auto' && !doc.special) {
+    const { top, tie } = rankCands(cands, doc.ratings);
+    if (top.length) {
+      const out = top.map((x) => ({ key: x.cand.key, label: x.cand.problem?.name ?? (x.cand.item!.de || x.cand.item!.text), ok: true, score: x.score! }));
+      return { status: 'confirmed', label: out.map((x) => x.label).join(' · '), key: out[0].key, picks: out, doc, auto: true, tie };
+    }
+  }
+  const picks = doc?.mode === 'auto' ? [] : picksOf(doc);
+  if (doc && (doc.special || picks.length || (doc.finding && doc.mode !== 'auto'))) {
     if (doc.special) return { status: 'confirmed', label: SPECIAL_LABEL[doc.special], key: null, picks: [], doc };
     // (a decision made on a recurring finding, before the problem groups: to choose again)
     if (!picks.length) return { status: 'invalid', label: 'früher auf einen Befund gesetzt – neu wählen', key: null, picks: [], doc };

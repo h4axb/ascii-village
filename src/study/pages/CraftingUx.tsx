@@ -12,9 +12,9 @@
 //                    evaluation, the problem's status and evaluation result)
 // Only confirmed tags count; AI suggestions are shown as such until taken over.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { CraftingUxDoc, ItemDoc } from '../types';
+import type { CraftingUxDoc, CraftingUxRating, ItemDoc } from '../types';
 import { SECTION_LABEL } from '../types';
-import { artOf, candidatesOf, centralTo, craftGroup, craftItems, cxProblemsOf, CX_STATUS, type CxProblem, type CxSolution, type CxStatus, distribution, mainOf, MAX_PICKS, picksOf, pickKey, prioOf, relChip, relOf, REL_HINT, REL_LABEL, REL_SHORT, roleIn, sharedIssues, solStatus, SPECIAL_LABEL, suggestedRel, type Candidate, type CraftScope, type MainState, type Rel, type SharedIssue } from '../crafting';
+import { artOf, candidatesOf, centralTo, craftGroup, craftItems, cxProblemsOf, CX_STATUS, type CxProblem, type CxSolution, type CxStatus, distribution, mainOf, MAX_PICKS, picksOf, pickKey, rankCands, ratedAny, scoreOf, prioOf, relChip, relOf, REL_HINT, REL_LABEL, REL_SHORT, roleIn, sharedIssues, solStatus, SPECIAL_LABEL, suggestedRel, type Candidate, type CraftScope, type MainState, type Rel, type SharedIssue } from '../crafting';
 import { designOfItem } from './Codes';
 import { itemText, useContentView } from '../translations';
 import { Empty, logChange, useCtx } from '../ui';
@@ -506,7 +506,7 @@ function Analysis() {
                 Auswahl aufheben
               </button>
             ) : (
-              <Info text={`Ein Punkt je Problem-Gruppe der Person; farbig sind ihre bis zu ${MAX_PICKS} zentralen Probleme, in ihrer Reihenfolge. Zeile anklicken: ihre Probleme hervorheben; › : zentrale Probleme festlegen.`} />
+              <Info text={`Ein Punkt je Problem-Gruppe der Person; farbig sind ihre bis zu ${MAX_PICKS} zentralen Probleme, in ihrer Reihenfolge. Zeile anklicken: ihre Probleme hervorheben; › : ihre Probleme bewerten (A · S · W) – die drei höchsten werden automatisch zentral, oder manuell wählen. n/3: zentrale Probleme; ≈: Gleichstand an Platz 3.`} />
             )}
           </h3>
           <ul className="st-cx-pl2">
@@ -523,8 +523,14 @@ function Analysis() {
                       ))}
                       {dots.length > 6 && <small>{`+${dots.length - 6}`}</small>}
                     </span>
+                    {main.picks.length > 0 && (
+                      <span className={`st-cx-n${main.picks.length >= MAX_PICKS ? ' is-full' : ''}${main.tie ? ' is-tie' : ''}`} title={`${main.picks.length} von ${MAX_PICKS} zentralen Problemen${main.auto ? ' · automatisch aus der Bewertung' : ' · manuell'}${main.tie ? ' · Gleichstand an Platz 3: vorläufig' : ''}`}>
+                        {`${main.picks.length}/${MAX_PICKS}`}
+                        {main.tie && '≈'}
+                      </span>
+                    )}
                   </button>
-                  <button type="button" className="st-cx-open" aria-label={`Zentrale Probleme von ${p.id} festlegen`} title="Zentrale Probleme festlegen" onClick={() => setEditing(p.id)}>
+                  <button type="button" className="st-cx-open" aria-label={`Crafting-Probleme von ${p.id} bewerten`} title="Bewerten und zentrale Probleme festlegen" onClick={() => setEditing(p.id)}>
                     <Ico n="chev" />
                   </button>
                 </li>
@@ -1150,19 +1156,38 @@ function ClusterDrawer({ items, onClose }: { items: ItemDoc[]; onClose: () => vo
   );
 }
 
-// a person's central Crafting UX problems: up to three of their candidates (the
-// problem groups their statements are in, their statements without a group),
-// in the order of their weight, or one special case
+// a person's central Crafting UX problems. Automatisch: each candidate (the
+// problem groups their statements are in, their statements without a group) is
+// rated A (Aufgabenbeeinträchtigung), S (Schwierigkeit), W (Wiederholung), 0–3
+// each, and its evidence confirmed; the three highest scores are the central
+// problems (a tie at place three is provisional). Manuell: up to three picked
+// and ordered by hand. Or one special case.
+const CRIT: { k: 'a' | 's' | 'w'; l: string; name: string }[] = [
+  { k: 'a', l: 'A', name: 'Aufgabenbeeinträchtigung' },
+  { k: 's', l: 'S', name: 'Schwierigkeit' },
+  { k: 'w', l: 'W', name: 'Wiederholung' },
+];
 function MainDrawer({ person, doc, cands, main, group, onClose }: { person: string; doc: import('../types').PersonDoc; cands: Candidate[]; main: MainState; group: 'AB' | 'BA' | null; onClose: () => void }) {
   const { study, model } = useCtx();
   const view = useContentView();
   const stored = doc.craftingUx ?? null;
+  // (older decisions picked by hand stay manual; anything new starts automatic)
+  const [mode, setMode] = useState<'auto' | 'manual'>(stored?.mode ?? (picksOf(stored).length ? 'manual' : 'auto'));
+  const [ratings, setRatings] = useState<Record<string, CraftingUxRating>>(stored?.ratings ?? {});
+  const [onlyTop, setOnlyTop] = useState(false);
   // the stored picks (kept even when their evidence is gone, to be seen and removed), else the proposal
-  const [keys, setKeys] = useState<string[]>(() => (stored ? picksOf(stored).map(pickKey) : main.key ? [main.key] : []));
+  const [keys, setKeys] = useState<string[]>(() => (stored && stored.mode !== 'auto' ? picksOf(stored).map(pickKey) : []));
   const [special, setSpecial] = useState<CraftingUxDoc['special']>(stored?.special ?? null);
   const [reason, setReason] = useState(stored?.reason ?? '');
   const byKey = new Map(cands.map((c) => [c.key, c]));
-  const chosen = special ? [] : keys;
+  const rank = rankCands(cands, ratings);
+  const rate = (k: string, p: Partial<CraftingUxRating>) => setRatings((r) => ({ ...r, [k]: { ...r[k], ...p } }));
+  const toMode = (m: 'auto' | 'manual') => {
+    // (to decide by hand: start from the automatic three)
+    if (m === 'manual' && !keys.length) setKeys(rank.top.map((x) => x.cand.key));
+    setMode(m);
+  };
+  const chosen = special ? [] : mode === 'auto' ? rank.top.map((x) => x.cand.key) : keys;
   const toggle = (k: string) => {
     setSpecial(null);
     setKeys(keys.includes(k) ? keys.filter((x) => x !== k) : keys.length < MAX_PICKS ? [...keys, k] : keys);
@@ -1175,25 +1200,31 @@ function MainDrawer({ person, doc, cands, main, group, onClose }: { person: stri
     [n[i], n[j]] = [n[j], n[i]];
     setKeys(n);
   };
+  // (the ratings of candidates that are gone are left out)
+  const keptRatings = Object.fromEntries(Object.entries(ratings).filter(([k, r]) => byKey.has(k) && (ratedAny(r) || r.ok)));
   const save = (data: CraftingUxDoc | null) => {
     const { craftingUx: _old, ...rest } = doc;
     study.commit([{ coll: 'people', id: person, data: { ...rest, id: person, ...(data ? { craftingUx: data } : {}) } }]);
-    logChange(study, `Crafting UX: zentrale Probleme von ${person} ${data ? (data.special ? `= ${SPECIAL_LABEL[data.special]}` : `festgelegt (${data.picks?.length ?? 0})`) : 'zurückgesetzt'}`);
+    logChange(study, `Crafting UX: zentrale Probleme von ${person} ${data ? (data.special ? `= ${SPECIAL_LABEL[data.special]}` : data.mode === 'auto' ? `automatisch aus der Bewertung (${rankCands(cands, data.ratings).top.length})` : `festgelegt (${data.picks?.length ?? 0})`) : 'zurückgesetzt'}`);
     onClose();
   };
-  const valid = chosen.filter((k) => byKey.has(k));
+  const valid = keys.filter((k) => byKey.has(k));
+  const base = { ratings: Object.keys(keptRatings).length ? keptRatings : undefined, reason: reason.trim() || undefined, at: Date.now() };
   const confirm = () => {
-    if (special) return save({ special, reason: reason.trim() || undefined, at: Date.now() });
+    if (special) return save({ ...base, mode, special });
+    if (mode === 'auto') return save({ ...base, mode: 'auto' });
     const picks = valid.map((k) => (k.startsWith('p:') ? { problem: k.slice(2), item: null } : { problem: null, item: k.slice(2) }));
-    if (picks.length) save({ picks, problem: picks[0].problem, item: picks[0].item, reason: reason.trim() || undefined, at: Date.now() });
+    if (picks.length) save({ ...base, mode: 'manual', picks, problem: picks[0].problem, item: picks[0].item });
   };
-  const lost = chosen.filter((k) => !byKey.has(k));
-  const others = cands.filter((c) => !chosen.includes(c.key));
+  const lost = keys.filter((k) => !byKey.has(k));
+  const others = cands.filter((c) => !keys.includes(c.key));
   const evidence = chosen.flatMap((k) => byKey.get(k)?.items ?? []);
+  const nameOf = (c: Candidate) => (c.problem ? c.problem.name : itemText(view, c.item!));
   const line = (c: Candidate) => [c.problem ? `Problem-Gruppe · ${c.items.length} eigene ${c.items.length === 1 ? 'Aussage' : 'Aussagen'}` : 'Aussage ohne Problem-Gruppe', REL_SHORT[c.rel], [...new Set(c.items.map((i) => artOf(model, i)))].filter(Boolean).join(' / '), PRIO_LABEL[c.prio], [...new Set(c.items.map((i) => SECTION_LABEL[i.section]))].join(' / ')].filter(Boolean).join(' · ');
+  const shownRanked = onlyTop ? rank.ranked.filter((x) => x.top) : rank.ranked;
   return (
     <Drawer
-      title={`${person} · Zentrale Probleme`}
+      title={`${person} · Crafting-Probleme bewerten`}
       sub={`${cands.length} ${cands.length === 1 ? 'Kandidat' : 'Kandidaten'}${group ? ` · Reihenfolge ${group}` : ''}${main.status === 'invalid' ? ' · ein gespeicherter Beleg fehlt' : ''}`}
       onClose={onClose}
       footer={
@@ -1207,72 +1238,153 @@ function MainDrawer({ person, doc, cands, main, group, onClose }: { person: stri
           <button type="button" className="st-cx-btn" onClick={onClose}>
             Abbrechen
           </button>
-          <button type="button" className="st-cx-btn is-pri" disabled={!special && !valid.length} onClick={confirm}>
+          <button type="button" className="st-cx-btn is-pri" disabled={!special && mode === 'manual' && !valid.length} onClick={confirm}>
             Bestätigen
           </button>
         </>
       }
     >
-      <div>
-        <span className="st-cx-lab">
-          <span>
-            Zentrale Probleme
-            <Info text="Kriterien: Auswirkung auf die Aufgabe · beobachtet oder ausdrücklich berichtet · wiederholt · Forschungsbezug (Kontrolle, Erwartung, Umgang mit dem KI-Ergebnis). Das wichtigste zuerst." />
-          </span>
-          <small>{`bis zu ${MAX_PICKS}, nach Gewicht geordnet · ${chosen.length} gewählt`}</small>
-        </span>
-        {chosen.length > 0 ? (
-          <ol className="st-cx-picks">
-            {chosen.map((k, r) => {
-              const c = byKey.get(k);
-              const label = c ? (c.problem ? c.problem.name : itemText(view, c.item!)) : main.picks.find((x) => x.key === k)?.label ?? 'Beleg fehlt';
-              return (
-                <li key={k} className={`st-cx-pick is-on${c ? '' : ' is-bad'}`}>
-                  <button type="button" className="st-cx-rank" aria-label={`${label}: abwählen`} title="Abwählen" onClick={() => toggle(k)}>
-                    {r + 1}
-                  </button>
-                  <span>
-                    {label}
-                    <small>{c ? line(c) : 'gehört nicht mehr zu einer eigenen Crafting-Aussage – abwählen oder neu wählen'}</small>
-                  </span>
-                  {main.status === 'suggested' && !stored && main.key === k && <span className="st-cx-ai">Vorschlag</span>}
-                  <span className="st-cx-mv">
-                    <button type="button" aria-label={`${label}: nach oben`} disabled={r === 0} onClick={() => moveBy(k, -1)}>
-                      <Ico n="up" s={13} />
-                    </button>
-                    <button type="button" aria-label={`${label}: nach unten`} disabled={r === chosen.length - 1} onClick={() => moveBy(k, 1)}>
-                      <Ico n="down" s={13} />
-                    </button>
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        ) : (
-          <p className="st-cx-note">{special ? 'Sonderfall gewählt.' : 'Noch keins gewählt: unten antippen.'}</p>
+      <div className="st-cx-rtop">
+        <Seg value={mode} label="Auswahl der zentralen Probleme" options={[['auto', 'Automatisch'], ['manual', 'Manuell']]} onChange={toMode} />
+        {mode === 'auto' && (
+          <label className="st-cx-onlytop">
+            <input type="checkbox" checked={onlyTop} onChange={(e) => setOnlyTop(e.target.checked)} /> Nur Top 3
+          </label>
         )}
       </div>
-      {others.length > 0 && (
-        <div>
-          <span className="st-cx-lab">
-            {chosen.length ? 'Weitere Kandidaten' : 'Kandidaten'}
-            {chosen.length >= MAX_PICKS && <small>{`schon ${MAX_PICKS} gewählt: erst eins abwählen`}</small>}
-          </span>
-          <div className="st-cx-opts">
-            {others.map((c) => (
-              <button key={c.key} type="button" className="st-cx-opt st-cx-pick" disabled={chosen.length >= MAX_PICKS} onClick={() => toggle(c.key)}>
-                <span className="st-cx-rank" aria-hidden="true" />
-                <span>
-                  {c.problem ? c.problem.name : itemText(view, c.item!)}
-                  <small>{line(c)}</small>
-                </span>
-                {main.status === 'suggested' && !stored && main.key === c.key && <span className="st-cx-ai">Vorschlag</span>}
-              </button>
-            ))}
+      {mode === 'auto' ? (
+        <>
+          <p className="st-cx-note">A = Aufgabenbeeinträchtigung · S = Schwierigkeit · W = Wiederholung, je 0–3 · max. 9. Gewertet wird nur mit bestätigtem Beleg und allen drei Werten – nach den dokumentierten Beobachtungen, nicht nach Art oder Priorität.</p>
+          {cands.length ? (
+            <div className="st-cx-rrows">
+              {shownRanked.map(({ cand: c, score, top, tie }) => {
+                const r = ratings[c.key] ?? {};
+                return (
+                  <div key={c.key} className={`st-cx-rrow${top ? ' is-top' : ''}${score == null ? ' is-off' : ''}`}>
+                    <span className="st-cx-rname2">
+                      <strong>
+                        {nameOf(c)}
+                        {top && <span className={`st-cx-topb${tie ? ' is-tie' : ''}`}>{tie ? 'Gleichstand' : 'Top 3'}</span>}
+                        {!top && tie && <span className="st-cx-topb is-tie is-out">Gleichstand</span>}
+                      </strong>
+                      <small>{line(c)}</small>
+                    </span>
+                    <span className="st-cx-score" aria-label={score == null ? 'nicht gewertet' : `${score} von 9 Punkten`}>
+                      {score ?? '—'}
+                      <small>/9</small>
+                    </span>
+                    <span className="st-cx-rctl">
+                      {CRIT.map(({ k, l, name }) => (
+                        <span key={k} className="st-cx-crit" role="radiogroup" aria-label={`${name}: ${nameOf(c)}`}>
+                          <b title={name}>{l}</b>
+                          <span>
+                            {([null, 0, 1, 2, 3] as const).map((v) => (
+                              <button key={String(v)} type="button" role="radio" aria-checked={(r[k] ?? null) === v} aria-label={`${l} ${v ?? 'nicht bewertet'}`} className={(r[k] ?? null) === v ? 'is-on' : ''} onClick={() => rate(c.key, { [k]: v })}>
+                                {v ?? '—'}
+                              </button>
+                            ))}
+                          </span>
+                        </span>
+                      ))}
+                      <label className={`st-cx-okb${r.ok ? '' : ' is-no'}`}>
+                        <input type="checkbox" checked={!!r.ok} onChange={(e) => rate(c.key, { ok: e.target.checked })} />
+                        {r.ok ? 'Beleg bestätigt' : 'Beleg prüfen'}
+                      </label>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="st-cx-note">Keine Aussagen dieser Person mit Crafting-Bezug Kern oder Integration.</p>
+          )}
+          <div>
+            <span className="st-cx-lab">
+              <span>Automatisch verknüpfte zentrale Probleme</span>
+              <small>{`${rank.top.length} ausgewählt`}</small>
+            </span>
+            {rank.top.length ? (
+              <ol className="st-cx-res">
+                {rank.top.map((x, i) => (
+                  <li key={x.cand.key}>
+                    <b>{i + 1}</b>
+                    <span>{nameOf(x.cand)}</span>
+                    <em>{`${x.score}/9`}</em>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="st-cx-note">Noch keins: ein Problem mit allen drei Werten und bestätigtem Beleg bewerten.</p>
+            )}
+            {rank.tie && <p className="st-cx-warn2">Gleichstand an Platz 3: die Auswahl ist vorläufig. Unter „Manuell“ entscheiden.</p>}
           </div>
-        </div>
+        </>
+      ) : (
+        <>
+          <div>
+            <span className="st-cx-lab">
+              <span>
+                Zentrale Probleme
+                <Info text="Kriterien: Auswirkung auf die Aufgabe · beobachtet oder ausdrücklich berichtet · wiederholt · Forschungsbezug (Kontrolle, Erwartung, Umgang mit dem KI-Ergebnis). Das wichtigste zuerst." />
+              </span>
+              <small>{`bis zu ${MAX_PICKS}, nach Gewicht geordnet · ${keys.length} gewählt`}</small>
+            </span>
+            {keys.length > 0 && !special ? (
+              <ol className="st-cx-picks">
+                {keys.map((k, r) => {
+                  const c = byKey.get(k);
+                  const label = c ? nameOf(c) : main.picks.find((x) => x.key === k)?.label ?? 'Beleg fehlt';
+                  const sc = scoreOf(ratings[k]);
+                  return (
+                    <li key={k} className={`st-cx-pick is-on${c ? '' : ' is-bad'}`}>
+                      <button type="button" className="st-cx-rank" aria-label={`${label}: abwählen`} title="Abwählen" onClick={() => toggle(k)}>
+                        {r + 1}
+                      </button>
+                      <span>
+                        {label}
+                        <small>{c ? `${line(c)}${sc != null ? ` · ${sc}/9` : ''}` : 'gehört nicht mehr zu einer eigenen Crafting-Aussage – abwählen oder neu wählen'}</small>
+                      </span>
+                      <span className="st-cx-mv">
+                        <button type="button" aria-label={`${label}: nach oben`} disabled={r === 0} onClick={() => moveBy(k, -1)}>
+                          <Ico n="up" s={13} />
+                        </button>
+                        <button type="button" aria-label={`${label}: nach unten`} disabled={r === keys.length - 1} onClick={() => moveBy(k, 1)}>
+                          <Ico n="down" s={13} />
+                        </button>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p className="st-cx-note">{special ? 'Sonderfall gewählt.' : 'Noch keins gewählt: unten antippen.'}</p>
+            )}
+          </div>
+          {others.length > 0 && (
+            <div>
+              <span className="st-cx-lab">
+                <span>{keys.length ? 'Weitere Kandidaten' : 'Kandidaten'}</span>
+                {keys.length >= MAX_PICKS && <small>{`schon ${MAX_PICKS} gewählt: erst eins abwählen`}</small>}
+              </span>
+              <div className="st-cx-opts">
+                {others.map((c) => {
+                  const sc = scoreOf(ratings[c.key]);
+                  return (
+                    <button key={c.key} type="button" className="st-cx-opt st-cx-pick" disabled={keys.length >= MAX_PICKS} onClick={() => toggle(c.key)}>
+                      <span className="st-cx-rank" aria-hidden="true" />
+                      <span>
+                        {nameOf(c)}
+                        <small>{`${line(c)}${sc != null ? ` · ${sc}/9` : ''}`}</small>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {!cands.length && !lost.length && <p className="st-cx-note">Keine Aussagen dieser Person mit Crafting-Bezug Kern oder Integration.</p>}
+        </>
       )}
-      {!cands.length && !lost.length && <p className="st-cx-note">Keine Aussagen dieser Person mit Crafting-Bezug Kern oder Integration.</p>}
       <label className="st-cx-field">
         <span className="st-cx-lab">Oder ein Sonderfall</span>
         <select value={special ?? ''} onChange={(e) => setSpecial((e.target.value || null) as CraftingUxDoc['special'])}>
@@ -1290,7 +1402,7 @@ function MainDrawer({ person, doc, cands, main, group, onClose }: { person: stri
       </label>
       {evidence.length > 0 && (
         <div>
-          <span className="st-cx-lab">Belege</span>
+          <span className="st-cx-lab">Belege der zentralen Probleme</span>
           {evidence.map((i) => (
             <div key={i.id} className="st-cx-quote">
               <small>{`${SECTION_LABEL[i.section]}${prioOf(model, i) ? ` · ${PRIO_LABEL[prioOf(model, i)]}` : ''}${designOfItem(i) ? ` · Variante ${designOfItem(i)}` : ''}`}</small>

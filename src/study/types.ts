@@ -71,7 +71,21 @@ export interface CraftingUxPick {
   problem?: string | null;
   item?: string | null;
 }
+// a candidate's rating for this person: A (Aufgabenbeeinträchtigung), S
+// (Schwierigkeit), W (Wiederholung), each 0–3 (null: not rated), and whether
+// its evidence was checked; scored (max. 9) only with all three and the evidence
+export type CraftingUxScore = 0 | 1 | 2 | 3;
+export interface CraftingUxRating {
+  a?: CraftingUxScore | null;
+  s?: CraftingUxScore | null;
+  w?: CraftingUxScore | null;
+  ok?: boolean; // evidence confirmed
+}
 export interface CraftingUxDoc {
+  // auto: the central problems are the three highest rated (derived, not stored);
+  // manual (or unset, older decisions): the picks below
+  mode?: 'auto' | 'manual';
+  ratings?: Record<string, CraftingUxRating>; // by candidate key (p:<group> | i:<statement>)
   picks?: CraftingUxPick[]; // ranked, at most three
   problem?: string | null; // (the first pick; older decisions had only this)
   finding?: string | null; // (older decisions: a recurring finding)

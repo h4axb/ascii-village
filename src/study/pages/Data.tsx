@@ -1,6 +1,6 @@
 // Daten & Validierung: the imports, the data sources, the checks (missing
 // values, conflicts, open work), the matching rules, and the change log.
-import { candidatesOf, craftGroup, craftItems, cxProblemsOf, mainOf, relOf } from '../crafting';
+import { candidatesOf, craftGroup, craftItems, cxProblemsOf, mainOf, rankCands, ratedAll, ratedAny, relOf } from '../crafting';
 import type { ColumnRole, StudyDocs } from '../types';
 import { effectiveChips, GAP_MIN, MATCH_ORDER_LABEL, matchOptions, personIdOf, type MatchOrder } from '../model';
 import { fmtBerlin, MATCH_STEPS, STEP_LABEL, ZONE_LABEL, type MatchStep, type TallyZone } from '../match';
@@ -165,6 +165,30 @@ export function useChecks(): Check[] {
     const probs = craftItems(model, model.items, 'extended');
     const bad = model.included.filter((p) => mainOf(p, candidatesOf(model, p.id, probs, cxProblemsOf(study.docs.settings)), cxProblemsOf(study.docs.settings), study.docs.items).status === 'invalid');
     add('Crafting UX', 'Zentrale Probleme durch eigene Aussagen belegt', !bad.length, bad.length ? `${bad.map((p) => p.id).join(', ')}: ein gewähltes zentrales Problem gehört nicht mehr zu einer eigenen Crafting-Aussage (oder wurde früher auf einen Befund gesetzt)` : '');
+    // the ratings (A · S · W): complete, with the evidence checked, no tie at place three
+    const groups = cxProblemsOf(study.docs.settings);
+    const rated = model.included.map((p) => {
+      const cands = candidatesOf(model, p.id, probs, groups);
+      const doc = p.doc.craftingUx;
+      const r = doc?.ratings ?? {};
+      const here = cands.filter((c) => r[c.key]);
+      return {
+        id: p.id,
+        auto: doc?.mode === 'auto' && !doc.special,
+        partial: here.filter((c) => ratedAny(r[c.key]) && !ratedAll(r[c.key])).length,
+        noEvidence: here.filter((c) => ratedAll(r[c.key]) && !r[c.key].ok).length,
+        tie: doc?.mode === 'auto' && !doc.special && rankCands(cands, r).tie,
+        none: doc?.mode === 'auto' && !doc.special && !rankCands(cands, r).top.length && cands.length > 0,
+      };
+    });
+    const partial = rated.filter((x) => x.partial || x.none);
+    const noEv = rated.filter((x) => x.noEvidence);
+    const ties = rated.filter((x) => x.tie);
+    if (rated.some((x) => x.auto) || partial.length || noEv.length) {
+      add('Crafting UX', 'Problembewertungen vollständig (A · S · W)', !partial.length, partial.map((x) => (x.none ? `${x.id}: noch kein Problem vollständig bewertet` : `${x.id}: ${x.partial} ${x.partial === 1 ? 'Problem' : 'Probleme'} nur teilweise bewertet`)).join('; '));
+      add('Crafting UX', 'Bewertete Probleme mit bestätigtem Beleg', !noEv.length, noEv.map((x) => `${x.id}: ${x.noEvidence} ohne bestätigten Beleg (zählen nicht)`).join('; '));
+      add('Crafting UX', 'Kein Gleichstand an Platz 3', !ties.length, ties.length ? `${ties.map((x) => x.id).join(', ')}: Auswahl vorläufig – unter Crafting UX manuell entscheiden` : '');
+    }
   }
   return out;
 }

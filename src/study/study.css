@@ -7447,13 +7447,13 @@ body:has(.st-root) {
   display: block;
 }
 .st-ab-bar .is-a {
-  background: #2f6fd6;
+  background: #4b4b48;
 }
 .st-ab-bar .is-b {
   background: #c2571a;
 }
 .st-ab-bar .is-n {
-  background: #cfcfd4;
+  background: #bdbcb5;
 }
 .st-ab-det {
   font-size: 12.5px;
@@ -7529,7 +7529,7 @@ body:has(.st-root) {
   background: var(--st-soft);
 }
 .st-ab-ans.is-A b {
-  background: #2f6fd6;
+  background: #4b4b48;
   color: #fff;
 }
 .st-ab-ans.is-B b {

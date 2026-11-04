@@ -715,15 +715,29 @@ export default function Notes() {
   // (search and the overview's filters; the tabs count against these)
   const found = live.filter((i) => (!q || `${i.text} ${i.de ?? ''}`.toLowerCase().includes(q.toLowerCase())) && matchDash(model, i, dash));
   const shown = found.filter((i) => inTab(i, filter));
-  const byPerson = [...new Set(shown.map((i) => i.person))].sort();
+  // the Tally survey answers in a section of their own, by question; the rest (observations, follow-up talk) by person
+  const isSurvey = (i: ItemDoc) => i.section === 'survey';
+  const shownMain = shown.filter((i) => !isSurvey(i));
+  const liveMain = live.filter((i) => !isSurvey(i));
+  const liveSurvey = live.filter(isSurvey);
+  const byPerson = [...new Set(shownMain.map((i) => i.person))].sort();
   const open = live.filter((i) => !i.confirmed);
-  const mineOf = (pid: string) => shown.filter((i) => i.person === pid).sort((a, b) => sectionRank(a.section) - sectionRank(b.section) || a.order - b.order);
+  const mineOf = (pid: string) => shownMain.filter((i) => i.person === pid).sort((a, b) => sectionRank(a.section) - sectionRank(b.section) || a.order - b.order);
+  const byQuestion = (() => {
+    const m = new Map<string, ItemDoc[]>();
+    for (const i of shown.filter(isSurvey).sort((a, b) => a.order - b.order || a.person.localeCompare(b.person, undefined, { numeric: true }))) {
+      const k = i.question?.trim() || 'Ohne Frage';
+      m.set(k, [...(m.get(k) ?? []), i]);
+    }
+    for (const [k, list] of m) m.set(k, list.sort((a, b) => a.person.localeCompare(b.person, undefined, { numeric: true })));
+    return [...m];
+  })();
 
   // several statements at once: select (Umschalt: a range, in the order shown), then set or remove a tag
   const [sel, setSel] = useState<Set<string>>(() => new Set());
   const [pickTag, setPickTag] = useState('');
   const lastClicked = useRef<string | null>(null);
-  const ordered = byPerson.flatMap(mineOf);
+  const ordered = [...byPerson.flatMap(mineOf), ...byQuestion.flatMap(([, list]) => list)];
   const selShown = ordered.filter((i) => sel.has(i.id));
   const select = (id: string, shift: boolean) => {
     const from = shift ? lastClicked.current : null; // (read now: the update below runs later)
@@ -885,7 +899,7 @@ export default function Notes() {
   // with everyone shown and nothing filtered or searched: one statement per person,
   // a glimpse of the second, and a button for the rest (a new one shows them all)
   const narrowed = !!q.trim() || dashActive(dash) || filter !== 'all';
-  const personRows = (pid: string, list: ItemDoc[]) => {
+  const personRows = (pid: string, list: ItemDoc[], allLabel = `Alle ${list.length} Aussagen von ${pid} anzeigen`) => {
     const full = narrowed || list.length < 2 || fold.all.includes(pid) || list.some((i) => i.id === fresh);
     if (full)
       return (
@@ -911,7 +925,7 @@ export default function Notes() {
         </div>
         <div className="st-pmore">
           <button type="button" aria-expanded={false} onClick={() => flip('all', pid)}>
-            {`Alle ${list.length} Aussagen von ${pid} anzeigen`}
+            {allLabel}
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m6 9 6 6 6-6" />
             </svg>
@@ -921,6 +935,9 @@ export default function Notes() {
     );
   };
   const cardFolded = fold.folded.includes('aussagen');
+  const surveyFolded = fold.folded.includes('umfrage');
+  // (the search widens while typing, over "Alle auswählen" and "Aktionen")
+  const [searching, setSearching] = useState(false);
   const plus = (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
       <path d="M12 5v14M5 12h14" />
@@ -1021,13 +1038,13 @@ export default function Notes() {
         </div>
       )}
 
-      <section className={`st-lcard${cardFolded ? ' is-folded' : ''}`} data-nav="Aussagen" aria-label="Aussagen">
+      <section className={`st-lcard${cardFolded ? ' is-folded' : ''}`} data-nav="Beobachtungen & Feedback" aria-label="Beobachtungen & Feedback">
         <div className="st-lc-title">
           <h2>
-            Aussagen <span className="st-lc-count">{`(${live.length})`}</span>
+            Beobachtungen & Feedback <span className="st-lc-count">{`(${liveMain.length})`}</span>
           </h2>
           <span className="st-muted st-lc-who">{onePid ? (scope.kind === 'link' ? scope.id : onePid) : `Alle (${allPersons.length})`}</span>
-          <FoldBtn folded={cardFolded} label="Aussagen" onClick={() => flip('folded', 'aussagen')} />
+          <FoldBtn folded={cardFolded} label="Beobachtungen & Feedback" onClick={() => flip('folded', 'aussagen')} />
         </div>
         {!cardFolded && (
         <>
@@ -1057,7 +1074,7 @@ export default function Notes() {
           </button>
           {busy && <span className="st-muted">{busy}</span>}
         </div>
-        <div className="st-lc-search">
+        <div className={`st-lc-search${searching ? ' is-searching' : ''}`}>
           {onePid ? (
             <button type="button" className="st-lc-add" onClick={() => addFor(onePid)} aria-label="Aussage hinzufügen" title="Aussage hinzufügen">
               {plus}
@@ -1065,13 +1082,27 @@ export default function Notes() {
           ) : (
             <MoreMenu label={plus} title="Aussage hinzufügen" icon className="st-lc-add" actions={allPersons.map((pid) => [`Aussage für ${pid}`, () => addFor(pid)] as [string, () => unknown])} />
           )}
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Aussagen durchsuchen …" aria-label="Aussagen durchsuchen" />
-        </div>
-        <div className="st-lc-filters">
-        <div className="st-lc-sel">
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onFocus={() => setSearching(true)}
+            onBlur={() => setSearching(false)}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            placeholder="Suchen …"
+            aria-label="Aussagen durchsuchen"
+          />
+          <span className="st-lc-sel">
           <label className="st-lc-selall">
             <input type="checkbox" className="st-round" checked={allSel} disabled={!shown.length} onChange={() => (allSel ? setSel(new Set()) : selectAll(shown))} />
-            {selShown.length ? `${selShown.length} ausgewählt` : 'Alle auswählen'}
+            {selShown.length ? (
+              `${selShown.length} ausgewählt`
+            ) : (
+              <>
+                <span className="st-lc-long">Alle auswählen</span>
+                <span className="st-lc-short">Alle</span>
+              </>
+            )}
           </label>
           <MoreMenu
             label={
@@ -1103,7 +1134,7 @@ export default function Notes() {
             ]}
             note={selShown.length ? undefined : 'Erst Aussagen auswählen'}
           />
-        </div>
+          </span>
         </div>
         <DashFilterBar model={model} live={live} f={dash} setF={setDash} />
         <div className="st-tabs st-lc-tabs" role="tablist" aria-label="Anzeigen">
@@ -1114,7 +1145,7 @@ export default function Notes() {
           ))}
         </div>
         <div className="st-tabpanel st-lc-panel" role="tabpanel">
-          {!shown.length && <p className="st-muted st-lc-empty">Keine Aussage passt zu Suche und Filtern.</p>}
+          {!shownMain.length && <p className="st-muted st-lc-empty">{shown.length ? 'Keine Beobachtung passt zu Suche und Filtern – Treffer unter „Umfrage-Antworten“.' : 'Keine Aussage passt zu Suche und Filtern.'}</p>}
           {onePid
             ? rows(mineOf(onePid))
             : byPerson.map((pid) => (
@@ -1133,6 +1164,33 @@ export default function Notes() {
         </>
         )}
       </section>
+
+      {liveSurvey.length > 0 && (
+        <section className={`st-lcard st-lc-survey${surveyFolded ? ' is-folded' : ''}`} data-nav="Umfrage" aria-label="Umfrage-Antworten (Tally)">
+          <div className="st-lc-title">
+            <h2>
+              Umfrage-Antworten (Tally) <span className="st-lc-count">{`(${liveSurvey.length})`}</span>
+            </h2>
+            <span className="st-muted st-lc-who">{`${new Set(liveSurvey.map((i) => i.question?.trim() || '')).size} ${new Set(liveSurvey.map((i) => i.question?.trim() || '')).size === 1 ? 'Frage' : 'Fragen'} · Freitext`}</span>
+            <FoldBtn folded={surveyFolded} label="Umfrage-Antworten" onClick={() => flip('folded', 'umfrage')} />
+          </div>
+          {!surveyFolded && (
+            <div className="st-tabpanel st-lc-panel">
+              {narrowed && <p className="st-muted st-lc-note">Suche, Filter und Reiter oben gelten auch hier.</p>}
+              {!byQuestion.length && <p className="st-muted st-lc-empty">Keine Umfrage-Antwort passt zu Suche und Filtern.</p>}
+              {byQuestion.map(([qn, list]) => (
+                <section key={qn} className="st-notes-person st-survey-q" data-anchor={`q-${qn}`}>
+                  <p className="st-survey-qh">
+                    <strong>{qn}</strong>
+                    <span className="st-muted">{`${list.length} ${list.length === 1 ? 'Antwort' : 'Antworten'}`}</span>
+                  </p>
+                  {onePid ? rows(list) : personRows(`q:${qn}`, list, `Alle ${list.length} Antworten anzeigen`)}
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {selShown.length > 0 && (
         <div className="st-selbar" role="region" aria-label="Auswahl">

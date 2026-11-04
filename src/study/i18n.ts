@@ -72,6 +72,12 @@ const EN: Record<string, string> = {
   Ausklappen: 'Expand',
   'Filtern:': 'Filter:',
   Filtern: 'Filter',
+  'Beobachtungen & Feedback': 'Observations & feedback',
+  'Umfrage-Antworten (Tally)': 'Survey answers (Tally)',
+  'Suchen …': 'Search …',
+  'Suche, Filter und Reiter oben gelten auch hier.': 'The search, filters and tabs above apply here too.',
+  'Keine Umfrage-Antwort passt zu Suche und Filtern.': 'No survey answer matches the search and filters.',
+  'Keine Beobachtung passt zu Suche und Filtern – Treffer unter „Umfrage-Antworten“.': 'No observation matches the search and filters – matches under "Survey answers".',
   // Crafting UX · UX-Problemanalyse & Lösungsentwicklung
   'betroffen ·': 'affected ·',
   'zentral ·': 'central ·',
@@ -1340,6 +1346,9 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^(\d+) Fragen? · Freitext$/, '$1 questions · free text'],
+  [/^Alle (\d+) Antworten anzeigen$/, 'Show all $1 answers'],
+  [/^(\d+) Antworten?$/, '$1 answers'],
   [/^Alle (\d+) Aussagen von (P\d+) anzeigen$/, 'Show all $1 statements of $2'],
   [/^(\d+) Aussagen? · eingeklappt$/, '$1 statements · folded'],
   [/^(.+) einklappen$/, 'Fold $1'],

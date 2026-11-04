@@ -7228,3 +7228,79 @@ body:has(.st-root) {
   position: relative;
   z-index: 9;
 }
+/* the search row: + · search (short) · Alle auswählen · Aktionen; typing widens the search over the two */
+.st-root .st-lc-search {
+  align-items: center;
+  border-bottom: 1px solid var(--st-line);
+  margin-bottom: 0;
+}
+.st-root .st-lc-search input[type='search'] {
+  flex: 0 1 340px;
+  transition: flex-basis 0.15s ease;
+}
+.st-root .st-lc-search.is-searching input[type='search'] {
+  flex: 1 1 auto;
+}
+.st-lc-search > .st-lc-sel {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 10px;
+}
+.st-lc-search.is-searching > .st-lc-sel {
+  display: none;
+}
+.st-lc-selall {
+  white-space: nowrap;
+}
+.st-lc-short {
+  display: none;
+}
+/* the Tally answers, by question */
+.st-survey-qh {
+  margin: 0;
+  padding: 14px 18px 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13.5px;
+  border-bottom: 1px solid var(--st-line);
+}
+.st-survey-qh strong {
+  font-weight: 600;
+}
+.st-survey-qh span {
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.st-lc-note {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+}
+.st-lc-survey {
+  margin-top: 18px;
+}
+@media (max-width: 640px) {
+  .st-root .st-lc-search input[type='search'] {
+    flex-basis: 120px;
+  }
+  .st-lc-long {
+    display: none;
+  }
+  .st-lc-short {
+    display: inline;
+  }
+  .st-lc-search > .st-lc-sel {
+    gap: 6px;
+  }
+}
+@media (max-width: 640px) {
+  .st-lc-survey .st-lc-title {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .st-lc-survey .st-lc-title h2 {
+    flex: 1 1 100%;
+  }
+}

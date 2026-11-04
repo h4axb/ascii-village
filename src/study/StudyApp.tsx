@@ -60,7 +60,7 @@ const PAGES: Page[] = [
   { id: 'ergebnisse', title: 'Ergebnisse & Export' },
 ];
 // (the page itself, when it has sub-pages: what its first view is called)
-const SUB_TITLE: Record<string, string> = { qualitativ: 'Aussagen', daten: 'Hochladen' };
+const SUB_TITLE: Record<string, string> = { qualitativ: 'Beobachtungen & Feedback', daten: 'Hochladen' };
 
 function readHash(): [string, string] {
   const [p, s] = window.location.hash.replace(/^#/, '').split('/');

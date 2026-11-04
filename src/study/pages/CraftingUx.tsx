@@ -20,6 +20,7 @@ import { itemText, useContentView } from '../translations';
 import { Empty, logChange, useCtx } from '../ui';
 
 const TAB_KEY = 'asciia-study-cx-tab';
+const QUEUE_KEY = 'asciia-study-cx-queue';
 const readLocal = (k: string, d: string) => {
   try {
     return localStorage.getItem(k) ?? d;
@@ -144,6 +145,12 @@ export function Classification() {
   const [at, setAt] = useState<string | null>(null); // the statement in the drawer
   const [busy, setBusy] = useState<string | null>(null);
   const [more, setMore] = useState(40);
+  // the queue "Zu prüfen": folded until opened (remembered)
+  const [qOpen, setQOpen] = useState(() => readLocal(QUEUE_KEY, '0') === '1');
+  const toggleQ = () => {
+    setQOpen(!qOpen);
+    writeLocal(QUEUE_KEY, qOpen ? '0' : '1');
+  };
   const group = craftGroup(model)!;
   const items = slice.items;
   const dist = distribution(model, items);
@@ -259,21 +266,29 @@ export function Classification() {
         )}
       </section>
 
-      <section className="st-cx-card" aria-label="Zu prüfen">
+      <section className={`st-cx-card${qOpen ? '' : ' is-folded'}`} aria-label="Zu prüfen">
         <h3>
-          Zu prüfen
-          <Seg
-            value={filter}
-            label="Aussagen"
-            options={[
-              ['open', `Offen ${dist.open}`],
-              ['all', `Alle ${items.length}`],
-            ]}
-            onChange={(v) => (setFilter(v), setMore(40))}
-          />
+          <button type="button" className="st-cx-qtoggle" aria-expanded={qOpen} onClick={toggleQ}>
+            Zu prüfen
+            <small>{`${dist.open} offen`}</small>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={qOpen ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />
+            </svg>
+          </button>
+          {qOpen && (
+            <Seg
+              value={filter}
+              label="Aussagen"
+              options={[
+                ['open', `Offen ${dist.open}`],
+                ['all', `Alle ${items.length}`],
+              ]}
+              onChange={(v) => (setFilter(v), setMore(40))}
+            />
+          )}
         </h3>
         {busy && <p className="st-cx-note" role="status">{busy}</p>}
-        {list.length ? (
+        {!qOpen ? null : list.length ? (
           <ul className="st-cx-q">
             {list.slice(0, more).map((i) => {
               const rel = relOf(model, i);
@@ -307,11 +322,12 @@ export function Classification() {
         ) : (
           <p className="st-cx-note">{filter === 'open' ? 'Alle Aussagen sind eingeordnet.' : 'Keine Aussagen.'}</p>
         )}
-        {list.length > more && (
+        {qOpen && list.length > more && (
           <button type="button" className="st-linkbtn" onClick={() => setMore(more + 40)}>
             {`${list.length - more} weitere anzeigen`}
           </button>
         )}
+        {qOpen && (
         <div className="st-cx-qfoot">
           <span className="st-cx-note">Vorschläge zählen erst nach dem Übernehmen.</span>
           <span className="st-cx-actions">
@@ -327,6 +343,7 @@ export function Classification() {
             )}
           </span>
         </div>
+        )}
       </section>
 
       {cur && <ReviewDrawer key={cur.id} item={cur} pos={ids.indexOf(cur.id)} count={ids.length} onClose={() => setAt(null)} onStep={step} onAssign={(r) => (assign([cur.id], () => r), filter === 'open' && ids[ids.indexOf(cur.id) + 1] ? setAt(ids[ids.indexOf(cur.id) + 1]) : filter === 'open' ? setAt(null) : undefined)} />}

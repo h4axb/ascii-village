@@ -14,7 +14,7 @@ import { RewriteReview, TagReview, workingText, type Rewrite, type TagProposal }
 import { designOfItem } from './Codes';
 import { itemText, translateNotes, useContentView } from '../translations';
 import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
-import { DashFilterBar, dashActive, FoldBtn, matchDash, NO_DASH, NotesDashboard, type DashFilter } from '../notesDashboard';
+import { dashActive, FoldBtn, matchDash, NO_DASH, NotesDashboard, type DashFilter } from '../notesDashboard';
 import { Classification } from './CraftingUx';
 import { craftGroup } from '../crafting';
 import { AbSection, type AbView } from '../abCompare';
@@ -1152,7 +1152,6 @@ export default function Notes() {
           />
           </span>
         </div>
-        <DashFilterBar model={model} live={live} f={dash} setF={setDash} />
         <div className="st-tabs st-lc-tabs" role="tablist" aria-label="Anzeigen">
           {tabs.map(([k, l, n]) => (
             <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)}>

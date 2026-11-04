@@ -1405,6 +1405,7 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^(\d+) offen$/, '$1 open'],
   [/^Mehrheit ([AB]) · p = (.+)$/, 'majority $1 · p = $2'],
   [/^(\d+) für Redesign$/, '$1 for redesign'],
   [/^von (\d+) Personen$/, 'of $1 people'],

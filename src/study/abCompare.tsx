@@ -72,13 +72,36 @@ function useAb() {
   return { doc, latest, save };
 }
 
-type View = 'A' | 'B' | 'hyp' | 'red' | null;
+export type AbView = 'A' | 'B' | 'hyp' | 'red' | null;
+type View = AbView;
 
-export function AbSection({ folded, onFold }: { folded: boolean; onFold: () => void }) {
+// the figures for the tiles: people preferring A or B (in the preference
+// question), hypotheses (and those chosen for the redesign), decisions
+export function useAbSummary() {
+  const { slice } = useCtx();
+  const { doc } = useAb();
+  const results = useMemo(() => part1(slice.survey).filter((r) => r.n), [slice.survey]);
+  const prefQ = doc.prefQ && results.some((r) => r.question === doc.prefQ) ? doc.prefQ : (results.find((r) => PREF_RE.test(r.question)) ?? results[results.length - 1])?.question;
+  const rows = slice.survey.filter((r) => r.person && prefQ && r.p1[prefQ] != null);
+  const hyps = doc.hyps ?? [];
+  return {
+    results: results.length,
+    of: rows.length,
+    A: rows.filter((r) => r.p1[prefQ!] === 'A').length,
+    B: rows.filter((r) => r.p1[prefQ!] === 'B').length,
+    hyps: hyps.length,
+    selected: hyps.filter((h) => h.status === 'selected').length,
+    decisions: (doc.decisions ?? []).length,
+  };
+}
+
+export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { folded: boolean; onFold: () => void; show?: AbView; setShow?: (v: AbView) => void }) {
   const { slice, study } = useCtx();
   const view = useContentView();
   const { doc, latest, save } = useAb();
-  const [show, setShow] = useState<View>(null);
+  const [own, setOwn] = useState<View>(null);
+  const show = shown !== undefined ? shown : own;
+  const setShow = setShown ?? setOwn;
   const [dim, setDim] = useState<string | null>(null);
   const [rename, setRename] = useState<string | null>(null);
   const results = useMemo(() => part1(slice.survey).filter((r) => r.n), [slice.survey]);

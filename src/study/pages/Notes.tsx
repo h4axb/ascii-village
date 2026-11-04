@@ -17,7 +17,7 @@ import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
 import { DashFilterBar, dashActive, FoldBtn, matchDash, NO_DASH, NotesDashboard, type DashFilter } from '../notesDashboard';
 import { Classification } from './CraftingUx';
 import { craftGroup } from '../crafting';
-import { AbSection } from '../abCompare';
+import { AbSection, type AbView } from '../abCompare';
 
 // ---- chip logic ----
 const groupOfChip = (tags: TagGroup[], chip: string) => tags.find((g) => g.chips.some((c) => c.id === chip));
@@ -938,6 +938,7 @@ export default function Notes() {
     );
   };
   const cardFolded = fold.folded.includes('aussagen');
+  const [abShow, setAbShow] = useState<AbView>(null);
   const surveyFolded = fold.folded.includes('umfrage');
   // (the search widens while typing, over "Alle auswählen" and "Aktionen")
   const [searching, setSearching] = useState(false);
@@ -963,7 +964,19 @@ export default function Notes() {
     <>
       <PageIntro />
       {onePid && <div data-nav="Profil">{pFolded(onePid) ? <div className="st-pfold-wrap">{foldedBar(onePid, live.length)}</div> : card(onePid)}</div>}
-      <NotesDashboard model={model} live={live} f={dash} setF={setDash} />
+      <NotesDashboard
+        model={model}
+        live={live}
+        f={dash}
+        setF={setDash}
+        abShow={abShow}
+        onAb={(v) => {
+          setAbShow(v);
+          // (the A/B section shows it: opened, and scrolled to)
+          if (fold.folded.includes('ab')) flip('folded', 'ab');
+          if (v) window.setTimeout(() => document.querySelector('.st-ab')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+        }}
+      />
       {showCriteria && (
         <div className="st-criteria">
           <label className="st-fprop-field">
@@ -1211,7 +1224,7 @@ export default function Notes() {
         </section>
       )}
 
-      <AbSection folded={fold.folded.includes('ab')} onFold={() => flip('folded', 'ab')} />
+      <AbSection folded={fold.folded.includes('ab')} onFold={() => flip('folded', 'ab')} show={abShow} setShow={setAbShow} />
 
       {selShown.length > 0 && (
         <div className="st-selbar" role="region" aria-label="Auswahl">

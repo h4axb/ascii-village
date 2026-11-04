@@ -5,7 +5,8 @@
 import { useState } from 'react';
 import type { ChipRole, ItemDoc, TagGroup } from './types';
 import { effectiveChips, shortName, type Model } from './model';
-import { relOf } from './crafting';
+import { craftGroup, relOf } from './crafting';
+import { useAbSummary, type AbView } from './abCompare';
 
 export type Kpi = 'problem' | 'essential' | 'tbd' | 'nice' | 'unchecked';
 // the Crafting-Bezug (Klassifizierung des Feedbacks): only the game, crafting
@@ -42,7 +43,7 @@ export function matchDash(m: Model, i: ItemDoc, f: DashFilter, skip?: 'kpi' | 'p
 }
 
 const PICK_KEY = 'asciia-study-dash-group';
-const MORE_KEY = 'asciia-study-dash-more';
+const TAB_KEY = 'asciia-study-dash-tab';
 const FOLD_KEY = 'asciia-study-dash-folded';
 const read = (k: string) => {
   try {
@@ -79,12 +80,12 @@ function Bars({ rows, on, onPick, label }: { rows: { id: string; label: string; 
   );
 }
 
-export function NotesDashboard({ model, live, f, setF }: { model: Model; live: ItemDoc[]; f: DashFilter; setF: (f: DashFilter) => void }) {
+export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: Model; live: ItemDoc[]; f: DashFilter; setF: (f: DashFilter) => void; abShow: AbView; onAb: (v: AbView) => void }) {
   const artGroup = model.tags.find((g) => g.chips.some((c) => c.role === 'problem'));
   const prioGroup = model.tags.find((g) => g.chips.some((c) => c.role === 'essential'));
   const groups = model.tags.filter((g) => g !== artGroup && g !== prioGroup && g.chips.length);
   const [pick, setPick] = useState(() => read(PICK_KEY) ?? '');
-  const [more, setMore] = useState(() => read(MORE_KEY) === '1');
+  const [tab, setTab] = useState<DashTab>(() => (read(TAB_KEY) as DashTab) || 'probleme');
   const [folded, setFolded] = useState(() => read(FOLD_KEY) === '1');
   const group: TagGroup | undefined = groups.find((g) => g.id === pick) ?? groups.find((g) => g.id === 'thema') ?? groups[0];
 
@@ -121,105 +122,152 @@ export function NotesDashboard({ model, live, f, setF }: { model: Model; live: I
   })();
 
   const kpiName = KPI_NAME(model);
+  const ab = useAbSummary();
+  const hasRel = !!craftGroup(model);
+  const tabs = TABS.filter((t) => t.id !== 'klass' || hasRel);
+  const cur = tabs.find((t) => t.id === tab) ?? tabs[0];
+  const pickTab = (t: DashTab) => {
+    setTab(t);
+    write(TAB_KEY, t);
+    if (folded) toggleFold();
+  };
+  const toggleFold = () => {
+    setFolded(!folded);
+    write(FOLD_KEY, folded ? '0' : '1');
+  };
+  // the statements by Crafting-Bezug (a click filters: Kern and Integration together as Crafting)
+  const relRows = (() => {
+    const base = live.filter((i) => matchDash(model, i, f, 'rel'));
+    const of = (r: string) => base.filter((i) => relOf(model, { chips: chipsOf(model, i) }) === r).length;
+    return [
+      { id: 'core', label: 'Generator & Interface', n: of('core'), rel: 'craft' as Rel },
+      { id: 'integration', label: 'Crafting–Spiel-Integration', n: of('integration'), rel: 'craft' as Rel },
+      { id: 'game', label: 'Nur Spiel', n: of('game'), rel: 'game' as Rel },
+      { id: 'unclear', label: 'Unklar', n: of('unclear'), rel: 'unclear' as Rel },
+      { id: 'open', label: 'Noch nicht eingeordnet', n: of('open'), rel: 'unclear' as Rel },
+    ].sort((x, y) => y.n - x.n);
+  })();
+  const abTile = (v: AbView, label: string, n: number, sub: string) => (
+    <button key={v} type="button" className={`st-dash-kpi${abShow === v ? ' is-on' : ''}`} aria-pressed={abShow === v} onClick={() => onAb(abShow === v ? null : v)} title="Anklicken: im Bereich A/B-Vergleich anzeigen">
+      <span className="st-dash-kpilabel">{label}</span>
+      <span className="st-dash-kpivalue">{n}</span>
+      <span className="st-dash-kpisub">{sub}</span>
+    </button>
+  );
   return (
-    <section className={`st-dash${folded ? ' is-folded' : ''}`} aria-label="Probleme" data-nav="Probleme">
-      <div className="st-foldhead">
-        <h2>Probleme</h2>
-        <FoldBtn
-          folded={folded}
-          label="Probleme"
-          onClick={() => {
-            setFolded(!folded);
-            write(FOLD_KEY, folded ? '0' : '1');
-          }}
-        />
-      </div>
-      {!folded && (
-      <>
-      <div className="st-dash-kpis">
-        {tile('problem', kpiName.problem, 'Aussagen mit der Art „Problem“ – anklicken zum Filtern')}
-        {tile('essential', kpiName.essential, 'Probleme mit der Priorität „Essenziell“ – anklicken zum Filtern')}
-        {tile('tbd', kpiName.tbd, 'Probleme, deren Priorität noch offen ist – anklicken zum Filtern')}
-        {/* (the review progress, set apart from the three problem figures) */}
-        {tile('unchecked', kpiName.unchecked, 'Noch nicht geprüfte Aussagen oder solche mit offenen KI-Vorschlägen – anklicken zum Filtern')}
-      </div>
-      {/* (the Crafting-Bezug, as in the Klassifizierung des Feedbacks) */}
-      <div className="st-dash-kpis is-rel">
-        {REL_TILES.map(([r, label, sub, hint]) => {
-          const base = live.filter((i) => matchDash(model, i, f, 'rel'));
-          const n = base.filter((i) => relOk(model, chipsOf(model, i), r)).length;
-          const on = f.rel === r;
-          return (
-            <button key={r} type="button" className={`st-dash-kpi${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => setF({ ...f, rel: on ? undefined : r })} title={hint}>
-              <span className="st-dash-kpilabel">{label}</span>
-              <span className="st-dash-kpivalue">{n}</span>
-              <span className="st-dash-kpisub">{sub(base.length)}</span>
-            </button>
-          );
-        })}
-      </div>
-
-        <div className="st-dash-card">
-          <div className="st-dash-cardhead">
-            <h3>
-              Probleme nach{' '}
-              {groups.length > 1 ? (
-                <select
-                  value={group?.id ?? ''}
-                  aria-label="Kategorie"
-                  onChange={(e) => {
-                    setPick(e.target.value);
-                    write(PICK_KEY, e.target.value);
-                  }}
-                >
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                group?.name
-              )}
-            </h3>
-            <span className="st-muted">Anklicken zum Filtern</span>
-          </div>
-          {group ? <Bars rows={byGroup(group, true)} on={f.tags[group.id]} onPick={(c) => setTag(group.id, c)} label={`Probleme nach ${group.name}`} /> : <p className="st-muted">Keine Kategorie</p>}
-          <button
-            type="button"
-            className="st-linkbtn st-dash-more"
-            aria-expanded={more}
-            onClick={() => {
-              setMore(!more);
-              write(MORE_KEY, more ? '0' : '1');
-            }}
-          >
-            {`Weitere Auswertungen · ${more ? 'Weniger anzeigen' : 'Mehr anzeigen'}`}
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m6 9 6 6 6-6" />
+    <section className={`st-dash2${folded ? ' is-folded' : ''}`} aria-label="Dashboard" data-nav="Dashboard">
+      <div className="st-dash2-tabs" role="tablist" aria-label="Auswertung">
+        {tabs.map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={t.id === cur.id} aria-label={t.label} title={t.label} className={`st-dash2-tab${t.id === cur.id ? ' is-on' : ''}`} onClick={() => pickTab(t.id)}>
+            <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={t.icon} />
             </svg>
+            {t.id === cur.id && <span>{t.label}</span>}
           </button>
-          {more && (
-            <div className="st-dash-moregrid">
-              {artGroup && (
-                <div>
-                  <h4>{`Aussagen nach ${artGroup.name}`}</h4>
-                  <Bars rows={byGroup(artGroup, false)} on={f.tags[artGroup.id]} onPick={(c) => setTag(artGroup.id, c)} label={`Aussagen nach ${artGroup.name}`} />
-                </div>
-              )}
-              <div>
-                <h4>Probleme je Teilnehmende</h4>
-                <Bars rows={people} on={f.person} onPick={(p) => setF({ ...f, person: f.person === p ? undefined : p })} label="Probleme je Teilnehmende" />
-              </div>
+        ))}
+      </div>
+      <div className="st-dash2-card" role="tabpanel" aria-label={cur.label}>
+        <h2>{cur.label}</h2>
+        {!folded && cur.id === 'probleme' && (
+          <>
+            <div className="st-dash-kpis">
+              {tile('problem', kpiName.problem, 'Aussagen mit der Art „Problem“ – anklicken zum Filtern')}
+              {tile('essential', kpiName.essential, 'Probleme mit der Priorität „Essenziell“ – anklicken zum Filtern')}
+              {tile('tbd', kpiName.tbd, 'Probleme, deren Priorität noch offen ist – anklicken zum Filtern')}
+              {/* (the review progress, set apart from the three problem figures) */}
+              {tile('unchecked', kpiName.unchecked, 'Noch nicht geprüfte Aussagen oder solche mit offenen KI-Vorschlägen – anklicken zum Filtern')}
             </div>
-          )}
-        </div>
-
-      </>
-      )}
+            <div className="st-dash2-sec">
+              <h3>
+                Probleme nach{' '}
+                {groups.length > 1 ? (
+                  <select
+                    value={group?.id ?? ''}
+                    aria-label="Kategorie"
+                    onChange={(e) => {
+                      setPick(e.target.value);
+                      write(PICK_KEY, e.target.value);
+                    }}
+                  >
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  group?.name
+                )}
+              </h3>
+              {group ? <Bars rows={byGroup(group, true)} on={f.tags[group.id]} onPick={(c) => setTag(group.id, c)} label={`Probleme nach ${group.name}`} /> : <p className="st-muted">Keine Kategorie</p>}
+            </div>
+            {artGroup && (
+              <div className="st-dash2-sec">
+                <h3>{`Aussagen nach ${artGroup.name}`}</h3>
+                <Bars rows={byGroup(artGroup, false)} on={f.tags[artGroup.id]} onPick={(c) => setTag(artGroup.id, c)} label={`Aussagen nach ${artGroup.name}`} />
+              </div>
+            )}
+          </>
+        )}
+        {!folded && cur.id === 'klass' && (
+          <>
+            <div className="st-dash-kpis is-rel">
+              {REL_TILES.map(([r, label, sub, hint]) => {
+                const base = live.filter((i) => matchDash(model, i, f, 'rel'));
+                const n = base.filter((i) => relOk(model, chipsOf(model, i), r)).length;
+                const on = f.rel === r;
+                return (
+                  <button key={r} type="button" className={`st-dash-kpi${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => setF({ ...f, rel: on ? undefined : r })} title={hint}>
+                    <span className="st-dash-kpilabel">{label}</span>
+                    <span className="st-dash-kpivalue">{n}</span>
+                    <span className="st-dash-kpisub">{sub(base.length)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="st-dash2-sec">
+              <h3>Aussagen nach Crafting-Bezug</h3>
+              <Bars rows={relRows} on={relRows.find((r) => r.rel === f.rel)?.id} onPick={(id) => { const r = relRows.find((x) => x.id === id)!.rel; setF({ ...f, rel: f.rel === r ? undefined : r }); }} label="Aussagen nach Crafting-Bezug" />
+            </div>
+          </>
+        )}
+        {!folded && cur.id === 'people' && (
+          <div className="st-dash2-sec is-first">
+            <h3>Probleme je Teilnehmende</h3>
+            <Bars rows={people} on={f.person} onPick={(p) => setF({ ...f, person: f.person === p ? undefined : p })} label="Probleme je Teilnehmende" />
+          </div>
+        )}
+        {!folded && cur.id === 'ab' && (
+          <>
+            <div className="st-dash-kpis is-ab">
+              {abTile('A', 'Präferenz A', ab.A, `von ${ab.of} Personen`)}
+              {abTile('B', 'Präferenz B', ab.B, `von ${ab.of} Personen`)}
+              {abTile('hyp', 'Hypothesen', ab.hyps, `${ab.selected} für Redesign`)}
+              {abTile('red', 'Redesign', ab.decisions, ab.decisions === 1 ? 'Maßnahme' : 'Maßnahmen')}
+            </div>
+            <p className="st-muted st-dash2-note">{ab.results ? 'Anklicken zeigt es im Bereich „A/B-Vergleich & Gestaltungsableitung“.' : 'Noch keine Tally-Vergleichsfragen (Teil 1) zugeordnet.'}</p>
+          </>
+        )}
+        <button type="button" className="st-dash2-foot" aria-expanded={!folded} onClick={toggleFold}>
+          {folded ? 'Filter einblenden' : 'Filter ausblenden'}
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d={folded ? 'm6 9 6 6 6-6' : 'm6 15 6-6 6 6'} />
+          </svg>
+        </button>
+      </div>
     </section>
   );
 }
+
+export type DashTab = 'probleme' | 'klass' | 'people' | 'ab';
+// the tabs, each with an icon for its topic: a warning sign for the problems,
+// a tag for the classification, people, two arrows for the A/B comparison
+const TABS: { id: DashTab; label: string; icon: string }[] = [
+  { id: 'probleme', label: 'Probleme', icon: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01' },
+  { id: 'klass', label: 'Klassifizierung', icon: 'M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8zM7 7h.01' },
+  { id: 'people', label: 'Teilnehmende', icon: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20a6 6 0 0 1 12 0M17 11a3 3 0 0 0 0-6M21 20a6 6 0 0 0-4-5.6' },
+  { id: 'ab', label: 'A/B-Vergleich', icon: 'M16 3l4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16' },
+];
 
 const KPI_NAME = (model: Model): Record<Kpi, string> => ({ problem: 'Probleme', essential: shortName(model, 'essential', 'Essenziell'), tbd: shortName(model, 'tbd', 'Offen'), nice: shortName(model, 'nice', 'Nice-to-have'), unchecked: 'Ungeprüft' });
 

@@ -11,7 +11,6 @@ import { linkLabelOf, parseNotes, planNotes } from '../notes';
 import type { Change } from '../changes';
 import { applyChanges, ChangeModal } from '../ChangeModal';
 import { RewriteReview, TagReview, workingText, type Rewrite, type TagProposal } from '../AiReview';
-import { planFreeText } from '../tallyPlan';
 import { designOfItem } from './Codes';
 import { itemText, translateNotes, useContentView } from '../translations';
 import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
@@ -210,36 +209,13 @@ export function NotesImport() {
   );
 }
 
-// the Tally free-text answers as statements (section "Umfrage")
+// the Tally free-text answers as statements (section "Umfrage"): they follow the
+// matching by themselves (surveySync.ts), so only a note is shown
 function TallyFreeText() {
-  const { study, model } = useCtx();
-  const [plan, setPlan] = useState<Change[] | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const cols = model.mapping.map((m, j) => (m.role === 'text' ? { j, label: m.label } : null)).filter((x): x is { j: number; label: string } => !!x);
-  if (!cols.length) return null;
-  // (shown as changes first: a statement that no longer matches its participant's answer is a conflict)
-  const build = (): Change[] => planFreeText(study.latest(), model);
-  return (
-    <>
-      <button type="button" onClick={() => setPlan(build())} title="Freitext-Antworten der Umfrage als Aussagen anlegen bzw. an die aktuelle Zuordnung anpassen">
-        Umfrage-Aussagen abgleichen …
-      </button>
-      {plan && (
-        <ChangeModal
-          title="Umfrage-Aussagen abgleichen"
-          changes={plan}
-          busy={busy}
-          onCancel={() => setPlan(null)}
-          onApply={(choices) => {
-            setBusy('Wird übernommen …');
-            void applyChanges(study, plan, choices, 'Tally-Freitexte')
-              .then(() => setPlan(null))
-              .finally(() => setBusy(null));
-          }}
-        />
-      )}
-    </>
-  );
+  const { model } = useCtx();
+  const cols = model.mapping.filter((m) => m.role === 'text').length;
+  if (!cols) return null;
+  return <span className="st-muted" title="Jede Freitext-Antwort gehört zu ihrer Tally-Zeile; wird die Zeile einer anderen Person zugeordnet, wandert die Aussage mit ihren Tags dorthin. Neue Antworten erscheinen von selbst.">Umfrage-Aussagen folgen der Zuordnung automatisch</span>;
 }
 
 // ---- one statement, Excel-like: text | a cell of chips per tag group | finding ----

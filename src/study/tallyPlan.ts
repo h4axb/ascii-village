@@ -263,36 +263,8 @@ export function planAssign(docs: StudyDocs, game: GameData, pid: string, row: nu
 // in this model: a statement from an earlier pairing that no longer matches
 // is a conflict (taking it keeps tags and edits), a missing one is new, one
 // whose participant has no answer any more is asked to keep or remove
-export function planFreeText(docs: StudyDocs, m: Model): Change[] {
-  const cols = m.mapping.map((c, j) => (c.role === 'text' ? { j, label: c.label } : null)).filter((x): x is { j: number; label: string } => !!x);
-  if (!cols.length) return [];
-  const out: Change[] = [];
-  const answerOf = new Map(m.survey.filter((r) => r.person).map((r) => [r.person!, r]));
-  for (const p of m.included)
-    for (const c of cols) {
-      const id = `s-${p.id}-${c.j}`;
-      const old = docs.items[id];
-      const text = answerOf.get(p.id)?.text[c.label];
-      if (old && text && old.text === text) continue;
-      if (!old && !text) continue;
-      if (!old && text) {
-        out.push({ id: `ft:${id}`, kind: 'neu', group: p.id, label: `Umfrage-Aussage „${c.label}“`, incoming: { text }, choice: 'neu', apply: (ch, w) => void (ch === 'neu' && (w.items[id] = { id, person: p.id, section: 'survey', question: c.label, text, order: 1000 + c.j, chips: [], suggested: [] })) });
-        continue;
-      }
-      out.push({
-        id: `ft:${id}`,
-        kind: 'konflikt',
-        group: p.id,
-        label: text ? `Umfrage-Aussage „${c.label}“ passt nicht mehr zur Zuordnung` : `Umfrage-Aussage „${c.label}“: ${p.id} hat keine Antwort mehr`,
-        current: { text: old!.text, note: old!.chips.length ? `${old!.chips.length} Tags` : undefined },
-        incoming: text ? { text, note: 'Tags und Bearbeitungen bleiben; die deutsche Fassung wird zur Prüfung markiert' } : undefined,
-        choice: 'alt',
-        apply: (ch, w) => {
-          if (ch !== 'neu') return;
-          if (!text) delete w.items[id];
-          else w.items[id] = { ...(w.items[id] ?? old!), text, original: text, status: 'changed', confirmed: false, deStale: !!old!.de };
-        },
-      });
-    }
-  return out;
+// (the survey statements follow the matching by themselves, surveySync.ts:
+// nothing is left to decide here)
+export function planFreeText(_docs: StudyDocs, _m: Model): Change[] {
+  return [];
 }

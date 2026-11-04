@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { setLang, useLang, useTranslator } from './i18n';
 import { buildModel, omit, slice as sliceOf, type Scope } from './model';
 import { useStudy } from './store';
-import { StudyCtx } from './ui';
+import { logChange, StudyCtx } from './ui';
 import Overview from './pages/Overview';
 import Survey from './pages/Survey';
 import Notes, { Priority, Tags } from './pages/Notes';
@@ -227,6 +227,32 @@ export default function StudyApp() {
   }, [ready]);
 
   const model = useMemo(() => buildModel(study.docs, study.game), [study.docs, study.game]);
+  // the survey statements follow the live Tally matching: what moved (with its
+  // tags), was re-texted or is new is stored; a version is saved before the
+  // first move of this session (never while looking at a saved version)
+  const syncing = useRef(false);
+  const versioned = useRef(false);
+  useEffect(() => {
+    const s = model.surveySync;
+    const put = [...s.changed, ...s.created];
+    if (study.state !== 'ready' || study.viewing || !put.length || syncing.current) return;
+    syncing.current = true;
+    void (async () => {
+      try {
+        if (s.moved.length && !versioned.current) {
+          await study.saveVersion(`vor dem Abgleich der Umfrage-Aussagen mit der Zuordnung (${s.moved.length} verschoben)`);
+          versioned.current = true;
+        }
+        study.commit(put.map((i) => ({ coll: 'items' as const, id: i.id, data: i })));
+        const what = [s.moved.length ? `${s.moved.length} verschoben (${s.moved.map((x) => `${x.from} → ${x.to}`).join(', ')})` : '', s.created.length ? `${s.created.length} neu` : '', s.orphaned.length ? `${s.orphaned.length} ohne Zuordnung ausgeblendet` : ''].filter(Boolean).join(' · ');
+        if (what) logChange(study, `Umfrage-Aussagen folgen der Zuordnung: ${what}`);
+      } catch {
+        /* the store reports a failed save */
+      } finally {
+        syncing.current = false;
+      }
+    })();
+  }, [model]);
   const scope: Scope = useMemo(() => {
     if (scopeKey === 'all') return { kind: 'all' };
     const link = model.links.find((l) => l.key === scopeKey);

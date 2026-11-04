@@ -147,6 +147,10 @@ export interface ItemDoc {
   confirmed?: boolean; // the statement has been checked
   status?: 'changed' | 'new' | 'removed'; // after re-importing the notes
   manual?: boolean; // added by hand (kept on re-import)
+  // a survey statement's answer: its Tally row (Submission ID, else the row) and
+  // column; its participant is whoever that row is matched to now (surveySync.ts)
+  src?: { key: string; col: string };
+  orphan?: boolean; // hidden while its row is matched to nobody
 }
 
 export type BuiltinRole = 'game' | 'survey' | 'process' | 'problem' | 'positive' | 'surprise' | 'remark' | 'intervention' | 'essential' | 'tbd' | 'nice' | 'rejected' | CraftRole;

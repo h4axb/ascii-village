@@ -2,6 +2,7 @@
 // (Tally, notes, tags, corrections) plus the game's own data, recomputed on
 // every change. Views read only from here, so a correction (A/B swapped,
 // a participant excluded, the run-time rule) reaches every figure at once.
+import { syncSurvey, type SurveySync } from './surveySync';
 import { designOf, type FeedbackRecord } from '../feedback/schema';
 import { attemptTiming, timingOf, type Timing } from './timing';
 import type { RunEvent } from '../quest/runlog';
@@ -96,6 +97,7 @@ export interface Model {
   feedback: FeedbackRecord[];
   items: ItemDoc[]; // confirmed statements of included persons
   allItems: ItemDoc[];
+  surveySync: SurveySync; // the survey statements' live owners, and what is left to store
   tags: TagGroup[];
   chipRole: Map<string, ChipRole | undefined>;
   meanings: Meaning[]; // every tag meaning, as named by the user
@@ -392,7 +394,9 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
       chipRole.set(c.id, c.role);
       chipLabel.set(c.id, c.label);
     }
-  const allItems = Object.values(docs.items).sort((a, b) => a.person.localeCompare(b.person) || a.order - b.order);
+  // (the survey statements follow the live matching of their Tally rows)
+  const surveySync = syncSurvey(docs, rowOwner);
+  const allItems = Object.values(surveySync.items).sort((a, b) => a.person.localeCompare(b.person) || a.order - b.order);
   // (for the analysis: the tags of categories that do not apply are left out, e.g. a priority left from an earlier "Problem")
   const items = allItems
     .filter((i) => incIds.has(i.person) && i.status !== 'removed' && !i.chips.some((c) => chipRole.get(c) === 'rejected'))
@@ -418,6 +422,7 @@ export function buildModel(docs: StudyDocs, game: GameData, opts: { ignoreManual
     events: game.events.filter((e) => incIds.has(e.participant) && inRun(e)),
     feedback: game.feedback.filter((r) => !!r.participant && incIds.has(r.participant) && inRun(r)),
     items,
+    surveySync,
     allItems,
     tags,
     chipRole,

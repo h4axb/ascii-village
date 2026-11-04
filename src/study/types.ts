@@ -63,11 +63,17 @@ export interface PersonDoc {
   craftingUx?: CraftingUxDoc;
 }
 
-// the participant's biggest Crafting UX problem, as decided by hand (Crafting UX
-// page): a shared problem group (or one statement, when not grouped yet), or one
-// of the special cases; unset = not decided (the page may propose one)
+// the participant's central Crafting UX problems, as decided by hand (Crafting UX
+// page): up to three, by weight, each a shared problem group (or one statement,
+// when not grouped yet), or one of the special cases; unset = not decided (the
+// page may propose one)
+export interface CraftingUxPick {
+  problem?: string | null;
+  item?: string | null;
+}
 export interface CraftingUxDoc {
-  problem?: string | null; // a shared Crafting UX problem (settings/craftingProblems)
+  picks?: CraftingUxPick[]; // ranked, at most three
+  problem?: string | null; // (the first pick; older decisions had only this)
   finding?: string | null; // (older decisions: a recurring finding)
   item?: string | null;
   special?: 'none' | 'multiple' | 'insufficient' | null;

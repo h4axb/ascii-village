@@ -6425,3 +6425,414 @@ body:has(.st-root) {
     grid-column: 3;
   }
 }
+
+/* UX-Problemanalyse & Lösungsentwicklung: the workflow, step by step */
+.st-cx-flowhead {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0 0 8px;
+}
+.st-cx-flowhead h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+.st-cx-flowhead span {
+  font-size: 12px;
+  color: var(--st-muted);
+}
+.st-cx-flow {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  background: var(--st-paper);
+  border: 1px solid var(--st-line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.st-cx-flow > li {
+  padding: 10px 12px;
+  border-left: 1px solid var(--st-line);
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  min-width: 0;
+}
+.st-cx-flow > li:first-child {
+  border-left: 0;
+}
+.st-cx-flow b {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.st-cx-flow b i {
+  font-style: normal;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  background: var(--st-soft);
+}
+.st-cx-flow li.is-done b i {
+  background: #61a051;
+  color: #fff;
+}
+.st-cx-flow em {
+  font-style: normal;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.st-cx-flow small {
+  font-size: 11.5px;
+  color: var(--st-muted);
+  line-height: 1.3;
+}
+@media (max-width: 1180px) {
+  .st-cx-flow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .st-cx-flow > li:nth-child(4) {
+    border-left: 0;
+  }
+  .st-cx-flow > li:nth-child(n + 4) {
+    border-top: 1px solid var(--st-line);
+  }
+}
+@media (max-width: 600px) {
+  .st-cx-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .st-cx-flow > li {
+    border-left: 0;
+    border-top: 1px solid var(--st-line);
+  }
+  .st-cx-flow > li:nth-child(2n) {
+    border-left: 1px solid var(--st-line);
+  }
+  .st-cx-flow > li:nth-child(-n + 2) {
+    border-top: 0;
+  }
+}
+/* the compact list: name, then "6 betroffen · 3× zentral · 2 Lösungen" */
+.st-cx-rname > span {
+  display: block;
+}
+.st-cx-rsub {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--st-muted);
+  margin-top: 2px;
+}
+.st-cx-rsub b {
+  color: var(--st-ink);
+  font-weight: 600;
+}
+.st-cx-row > .st-cx-stat {
+  margin-left: 0;
+  white-space: nowrap;
+}
+.st-cx-legend2 .is-wide {
+  width: 100%;
+}
+/* the open problem: tags, then the two blocks */
+.st-cx-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.st-cx-tag {
+  font-size: 11.5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--st-soft);
+  color: var(--st-ink);
+  white-space: nowrap;
+}
+.st-cx-tag.is-core {
+  background: var(--st-ink);
+  color: #fff;
+}
+.st-cx-tag.is-integration {
+  background: #e9e4f6;
+  color: #4b3a86;
+}
+.st-cx-tag.is-cat {
+  background: #e5eef9;
+  color: #1f4f8f;
+}
+.st-cx-tags .st-cx-note {
+  margin-left: 4px;
+}
+.st-cx-dbtns {
+  display: inline-flex;
+  gap: 6px;
+  flex: none;
+}
+.st-cx-names {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 6px;
+}
+.st-cx-names input {
+  min-width: 0;
+}
+.st-cx-blk {
+  border: 1px solid var(--st-line);
+  border-radius: 10px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.st-cx-blk > h4 {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--st-muted);
+  background: var(--st-soft);
+  border-bottom: 1px solid var(--st-line);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.st-cx-blk > h4 span {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.st-cx-blk > .st-cx-f {
+  padding: 11px 12px;
+}
+.st-cx-blk > h4 + .st-cx-f {
+  border-top: 0;
+}
+.st-cx-txt {
+  white-space: pre-wrap;
+}
+.st-cx-chip.is-ctx {
+  color: var(--st-muted);
+  border-style: dashed;
+  font-weight: 500;
+}
+.st-cx-qc.is-ctx {
+  background: transparent;
+  border: 1px dashed var(--st-line);
+}
+.st-cx-qc small {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.st-root button.st-cx-role {
+  all: unset;
+  cursor: pointer;
+  flex: none;
+  font-size: 11px;
+  border-radius: 999px;
+  padding: 1px 8px;
+  border: 1px solid var(--st-ink);
+  background: var(--st-ink);
+  color: #fff;
+}
+.st-root button.st-cx-role.is-context {
+  background: transparent;
+  color: var(--st-muted);
+  border-color: var(--st-line);
+}
+.st-root button.st-cx-role:focus-visible {
+  outline: 2px solid var(--st-accent);
+}
+.st-cx-sols {
+  display: grid;
+  gap: 8px;
+}
+.st-cx-solc {
+  border: 1px solid var(--st-line);
+  border-radius: 9px;
+  padding: 9px 11px;
+  display: grid;
+  gap: 6px;
+}
+.st-cx-solc.is-rejected > .st-cx-txt {
+  text-decoration: line-through;
+  color: var(--st-muted);
+}
+.st-cx-solc textarea {
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  padding: 6px 9px;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  background: var(--st-paper);
+  color: var(--st-ink);
+}
+.st-cx-solh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--st-muted);
+}
+.st-cx-solh > span {
+  flex: 1;
+}
+.st-root select.st-cx-solst {
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--st-line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  min-height: 0;
+  background: var(--st-paper);
+  color: var(--st-ink);
+  width: auto;
+}
+.st-root select.st-cx-solst.is-chosen {
+  color: #9a3b0c;
+  border-color: #f1c9a5;
+  background: #fdf0e4;
+}
+.st-root select.st-cx-solst.is-implemented,
+.st-root select.st-cx-solst.is-tested {
+  color: #3f7a33;
+  border-color: #c6dfbf;
+  background: #e8f3e5;
+}
+.st-cx-ev {
+  font-size: 12px;
+  color: var(--st-muted);
+  border-top: 1px dashed var(--st-line);
+  padding-top: 6px;
+}
+.st-cx-ev b {
+  color: var(--st-ink);
+  font-weight: 600;
+}
+/* the drawer: up to three central problems, ranked */
+.st-cx-lab small {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.st-cx-lab > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.st-cx-picks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.st-cx-pick {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 11px;
+  border: 1px solid var(--st-line);
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+.st-root button.st-cx-opt.st-cx-pick {
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+}
+.st-root button.st-cx-opt.st-cx-pick:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.st-cx-pick.is-on {
+  border-color: var(--st-ink);
+  box-shadow: 0 0 0 1px var(--st-ink);
+}
+.st-cx-pick.is-bad {
+  border-color: #d9822b;
+  box-shadow: 0 0 0 1px #d9822b;
+}
+.st-cx-pick small {
+  display: block;
+  color: var(--st-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+.st-root .st-cx-rank {
+  all: unset;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid #c9c9cf;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.st-root button.st-cx-rank {
+  cursor: pointer;
+}
+.st-cx-pick.is-on .st-cx-rank {
+  background: var(--st-ink);
+  border-color: var(--st-ink);
+  color: #fff;
+}
+.st-cx-mv {
+  display: inline-flex;
+  gap: 2px;
+}
+.st-root .st-cx-mv button {
+  all: unset;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--st-line);
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  color: var(--st-muted);
+}
+.st-root .st-cx-mv button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+@media (max-width: 640px) {
+  .st-cx-dettools {
+    flex-wrap: wrap;
+  }
+  .st-cx-names {
+    grid-template-columns: 1fr;
+  }
+  .st-root button.st-cx-row > .st-cx-stat {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .st-cx-pick {
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+  }
+  .st-cx-pick > .st-cx-ai {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

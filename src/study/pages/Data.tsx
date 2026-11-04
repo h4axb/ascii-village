@@ -164,7 +164,7 @@ export function useChecks(): Check[] {
     add('Crafting UX', 'Aussagen mit Crafting-Bezug', !noRel.length, noRel.length ? `${noRel.length} von ${model.items.length} noch nicht eingeordnet (Crafting UX → Klassifizierung)` : `${model.items.length} eingeordnet`);
     const probs = craftItems(model, model.items, 'extended');
     const bad = model.included.filter((p) => mainOf(p, candidatesOf(model, p.id, probs, cxProblemsOf(study.docs.settings)), cxProblemsOf(study.docs.settings), study.docs.items).status === 'invalid');
-    add('Crafting UX', 'Hauptprobleme durch eigene Aussagen belegt', !bad.length, bad.length ? `${bad.map((p) => p.id).join(', ')}: gewähltes Problem gehört nicht mehr zu einer eigenen Crafting-Aussage (oder wurde früher auf einen Befund gesetzt)` : '');
+    add('Crafting UX', 'Zentrale Probleme durch eigene Aussagen belegt', !bad.length, bad.length ? `${bad.map((p) => p.id).join(', ')}: ein gewähltes zentrales Problem gehört nicht mehr zu einer eigenen Crafting-Aussage (oder wurde früher auf einen Befund gesetzt)` : '');
   }
   return out;
 }

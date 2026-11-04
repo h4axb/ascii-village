@@ -4,7 +4,7 @@
 // participants (the recurring findings, limited to the crafting statements).
 // Only confirmed tags count (suggestions never do); people are counted once
 // however many statements they made.
-import type { CraftRole, CraftingUxDoc, ItemDoc } from './types';
+import type { CraftRole, CraftingUxDoc, CraftingUxPick, ItemDoc } from './types';
 import { designOfItem } from './pages/Codes';
 import type { Model, Person } from './model';
 
@@ -75,8 +75,12 @@ export const CX_STATUS: [CxStatus, string][] = [
 export interface CxSolution {
   id: string;
   text: string;
-  status: 'idea' | 'chosen';
+  status: CxStatus; // Idee › Ausgewählt › Umgesetzt › Getestet, or Verworfen
+  evaluation?: string; // what a later test showed about it
 }
+// how a statement counts for a problem: as evidence of the difficulty, or as
+// context only (a preference, a neutral remark: never counted as affected)
+export type CxRole = 'evidence' | 'context';
 export interface CxProblem {
   id: string;
   name: string;
@@ -85,16 +89,30 @@ export interface CxProblem {
   requirement?: string; // the design requirement it leads to
   solutions?: CxSolution[];
   status?: CxStatus;
+  category?: string; // e.g. Verständlichkeit, Kontrolle
+  evaluation?: string; // the evaluation result: did later testing support the solution
   items: string[]; // statement ids
+  roles?: Record<string, CxRole>; // set by hand, else by the statement's Art
   auto?: boolean; // created from an AI proposal
 }
+// a statement's role in a problem: set by hand, else a positive reaction or a
+// remark is context, everything else (a problem, a surprise, untagged) evidence
+export function roleIn(m: Model, g: CxProblem, i: ItemDoc): CxRole {
+  const r = g.roles?.[i.id];
+  if (r) return r;
+  return i.chips.some((c) => ['positive', 'remark'].includes(roleOf(m, c) ?? '')) ? 'context' : 'evidence';
+}
+// (older solutions: 'chosen' stays Ausgewählt; anything unknown is an idea)
+export const solStatus = (s: CxSolution): CxStatus => (CX_STATUS.some(([k]) => k === s.status) ? s.status : 'idea');
 export const cxProblemsOf = (settings: Record<string, unknown>): CxProblem[] => ((settings.craftingProblems as { list?: CxProblem[] } | undefined)?.list ?? []);
 export const groupsOfItem = (problems: CxProblem[], id: string) => problems.filter((g) => g.items.includes(id));
 
 export interface SharedIssue {
   problem: CxProblem;
   items: ItemDoc[]; // its crafting statements in the current view
-  persons: string[];
+  evidence: ItemDoc[]; // those that document the difficulty
+  persons: string[]; // the people affected: with evidence (context never counts)
+  context: string[]; // people with context statements only
   a: number; // people with statements about variant A only
   b: number; // B only
   both: number;
@@ -108,17 +126,19 @@ export function sharedIssues(m: Model, inView: ItemDoc[], problems: CxProblem[])
   return problems
     .map((g) => {
       const items = g.items.map((id) => byId.get(id)).filter((i): i is ItemDoc => !!i);
-      const persons = [...new Set(items.map((i) => i.person))].sort();
+      const evidence = items.filter((i) => roleIn(m, g, i) === 'evidence');
+      const persons = [...new Set(evidence.map((i) => i.person))].sort();
+      const context = [...new Set(items.map((i) => i.person))].filter((p) => !persons.includes(p)).sort();
       let a = 0, b = 0, both = 0, none = 0;
       for (const p of persons) {
-        const ds = new Set(items.filter((i) => i.person === p).map(designOfItem));
+        const ds = new Set(evidence.filter((i) => i.person === p).map(designOfItem));
         const hasA = ds.has('A'), hasB = ds.has('B');
         if (hasA && hasB) both++;
         else if (hasA) a++;
         else if (hasB) b++;
         else none++;
       }
-      return { problem: g, items, persons, a, b, both, none, rels: [...new Set(items.map((i) => relOf(m, i)))] };
+      return { problem: g, items, evidence, persons, context, a, b, both, none, rels: [...new Set(evidence.map((i) => relOf(m, i)))] };
     })
     .sort((x, y) => y.persons.length - x.persons.length || y.items.length - x.items.length || x.problem.name.localeCompare(y.problem.name));
 }
@@ -146,26 +166,51 @@ export function candidatesOf(m: Model, person: string, crafting: ItemDoc[], prob
 
 export const SPECIAL_LABEL: Record<NonNullable<CraftingUxDoc['special']>, string> = { none: 'Kein Crafting-Problem', multiple: 'Mehrere gleich wichtig', insufficient: 'Zu wenig Belege' };
 
+export const MAX_PICKS = 3;
+export const pickKey = (x: CraftingUxPick) => (x.problem ? `p:${x.problem}` : `i:${x.item}`);
+// a decision's picks, in their order (older decisions: the one problem / statement)
+export function picksOf(doc: CraftingUxDoc | null | undefined): CraftingUxPick[] {
+  if (!doc || doc.special) return [];
+  if (doc.picks?.length) return doc.picks.filter((x) => x.problem || x.item).slice(0, MAX_PICKS);
+  return doc.problem || doc.item ? [{ problem: doc.problem, item: doc.item }] : [];
+}
+export interface MainPick {
+  key: string;
+  label: string;
+  ok: boolean; // its evidence is still there
+}
 export interface MainState {
   status: 'confirmed' | 'suggested' | 'open' | 'invalid';
   label: string;
-  key: string | null; // the chosen / proposed candidate
+  key: string | null; // the first chosen / the proposed candidate
+  picks: MainPick[]; // the central problems chosen, by weight
   doc: CraftingUxDoc | null;
 }
-// what the page shows for a person: the decision stored, else a proposal (the
-// candidate with the highest priority and most statements), else open; a
-// stored decision whose evidence is gone is flagged
+// what the page shows for a person: the decision stored (up to three central
+// problems, or a special case), else a proposal (the candidate with the highest
+// priority and most statements), else open; a stored pick whose evidence is
+// gone is flagged
 export function mainOf(p: Person, cands: Candidate[], problems: CxProblem[], items: Record<string, ItemDoc>): MainState {
   const doc = p.doc.craftingUx ?? null;
-  if (doc && (doc.special || doc.problem || doc.item || doc.finding)) {
-    if (doc.special) return { status: 'confirmed', label: SPECIAL_LABEL[doc.special], key: null, doc };
+  const picks = picksOf(doc);
+  if (doc && (doc.special || picks.length || doc.finding)) {
+    if (doc.special) return { status: 'confirmed', label: SPECIAL_LABEL[doc.special], key: null, picks: [], doc };
     // (a decision made on a recurring finding, before the problem groups: to choose again)
-    if (!doc.problem && !doc.item) return { status: 'invalid', label: 'früher auf einen Befund gesetzt – neu wählen', key: null, doc };
-    const key = doc.problem ? `p:${doc.problem}` : `i:${doc.item}`;
-    const label = doc.problem ? problems.find((g) => g.id === doc.problem)?.name ?? 'Problem-Gruppe gelöscht' : items[doc.item!]?.de || items[doc.item!]?.text || 'Aussage gelöscht';
-    return { status: cands.some((c) => c.key === key) ? 'confirmed' : 'invalid', label, key, doc };
+    if (!picks.length) return { status: 'invalid', label: 'früher auf einen Befund gesetzt – neu wählen', key: null, picks: [], doc };
+    const out = picks.map((x) => {
+      const key = pickKey(x);
+      const label = x.problem ? problems.find((g) => g.id === x.problem)?.name ?? 'Problem-Gruppe gelöscht' : items[x.item!]?.de || items[x.item!]?.text || 'Aussage gelöscht';
+      return { key, label, ok: cands.some((c) => c.key === key) };
+    });
+    return { status: out.every((x) => x.ok) ? 'confirmed' : 'invalid', label: out.map((x) => x.label).join(' · '), key: out[0].key, picks: out, doc };
   }
   const top = cands[0];
-  if (top) return { status: 'suggested', label: top.problem?.name ?? (top.item!.de || top.item!.text), key: top.key, doc: null };
-  return { status: 'open', label: 'keine Crafting-Aussage erfasst', key: null, doc: null };
+  if (top) return { status: 'suggested', label: top.problem?.name ?? (top.item!.de || top.item!.text), key: top.key, picks: [], doc: null };
+  return { status: 'open', label: 'keine Crafting-Aussage erfasst', key: null, picks: [], doc: null };
 }
+// the people a problem group is central to, with its rank among their picks (1–3)
+export const centralTo = (gid: string, people: { p: Person; main: MainState }[]) =>
+  people.flatMap(({ p, main }) => {
+    const r = main.picks.findIndex((x) => x.ok && x.key === `p:${gid}`);
+    return r >= 0 ? [{ person: p.id, rank: r + 1 }] : [];
+  });

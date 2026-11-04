@@ -5,25 +5,37 @@
 import { useState } from 'react';
 import type { ChipRole, ItemDoc, TagGroup } from './types';
 import { effectiveChips, shortName, type Model } from './model';
+import { relOf } from './crafting';
 
 export type Kpi = 'problem' | 'essential' | 'tbd' | 'nice' | 'unchecked';
+// the Crafting-Bezug (Klassifizierung des Feedbacks): only the game, crafting
+// (generator & interface or its integration in the game), or not settled
+// (no confirmed Crafting-Bezug, or Unklar)
+export type Rel = 'game' | 'craft' | 'unclear';
 export interface DashFilter {
   kpi?: Kpi;
+  rel?: Rel;
   tags: Record<string, string>; // group id → tag id
   person?: string;
 }
 export const NO_DASH: DashFilter = { tags: {} };
-export const dashActive = (f: DashFilter) => !!f.kpi || !!f.person || Object.keys(f.tags).length > 0;
+export const dashActive = (f: DashFilter) => !!f.kpi || !!f.rel || !!f.person || Object.keys(f.tags).length > 0;
 
 const unchecked = (i: ItemDoc) => !i.confirmed || i.suggested.length > 0;
 const chipsOf = (m: Model, i: ItemDoc) => effectiveChips(i.chips, m.tags, m.chipRole);
 const hasRole = (m: Model, chips: string[], r: ChipRole) => chips.some((c) => m.chipRole.get(c) === r);
 const kpiOk = (m: Model, i: ItemDoc, chips: string[], k: Kpi) => (k === 'unchecked' ? unchecked(i) : hasRole(m, chips, k));
 
+export const relOk = (m: Model, chips: string[], r: Rel) => {
+  const x = relOf(m, { chips });
+  return r === 'game' ? x === 'game' : r === 'craft' ? x === 'core' || x === 'integration' : x === 'open' || x === 'unclear';
+};
+
 // skip: the part of the filter left out (a figure counts against the other filters, never its own)
 export function matchDash(m: Model, i: ItemDoc, f: DashFilter, skip?: 'kpi' | 'person' | string): boolean {
   const chips = chipsOf(m, i);
   if (f.kpi && skip !== 'kpi' && !kpiOk(m, i, chips, f.kpi)) return false;
+  if (f.rel && skip !== 'rel' && !relOk(m, chips, f.rel)) return false;
   if (f.person && skip !== 'person' && i.person !== f.person) return false;
   for (const [g, c] of Object.entries(f.tags)) if (g !== skip && !chips.includes(c)) return false;
   return true;
@@ -131,6 +143,21 @@ export function NotesDashboard({ model, live, f, setF }: { model: Model; live: I
         {/* (the review progress, set apart from the three problem figures) */}
         {tile('unchecked', kpiName.unchecked, 'Noch nicht geprüfte Aussagen oder solche mit offenen KI-Vorschlägen – anklicken zum Filtern')}
       </div>
+      {/* (the Crafting-Bezug, as in the Klassifizierung des Feedbacks) */}
+      <div className="st-dash-kpis is-rel">
+        {REL_TILES.map(([r, label, sub, hint]) => {
+          const base = live.filter((i) => matchDash(model, i, f, 'rel'));
+          const n = base.filter((i) => relOk(model, chipsOf(model, i), r)).length;
+          const on = f.rel === r;
+          return (
+            <button key={r} type="button" className={`st-dash-kpi${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => setF({ ...f, rel: on ? undefined : r })} title={hint}>
+              <span className="st-dash-kpilabel">{label}</span>
+              <span className="st-dash-kpivalue">{n}</span>
+              <span className="st-dash-kpisub">{sub(base.length)}</span>
+            </button>
+          );
+        })}
+      </div>
 
         <div className="st-dash-card">
           <div className="st-dash-cardhead">
@@ -230,6 +257,17 @@ export function DashFilterBar({ model, live, f, setF }: { model: Model; live: It
           </button>
         );
       })}
+      {REL_TILES.map(([r, l]) => {
+        const relBase = live.filter((i) => matchDash(model, i, f, 'rel'));
+        const n = relBase.filter((i) => relOk(model, chipsOf(model, i), r)).length;
+        const on = f.rel === r;
+        return (
+          <button key={r} type="button" className={`st-fchip is-rel${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => setF({ ...f, rel: on ? undefined : r })}>
+            {l}
+            <small>{n}</small>
+          </button>
+        );
+      })}
       {Object.entries(f.tags).map(([g, c]) => (
         <button key={g} type="button" className="st-fchip is-on" onClick={() => { const tags = { ...f.tags }; delete tags[g]; setF({ ...f, tags }); }} aria-label={`Filter ${groupName(g)}: ${label(c)} entfernen`}>
           {`${groupName(g)}: ${label(c)} ×`}
@@ -248,3 +286,9 @@ export function DashFilterBar({ model, live, f, setF }: { model: Model; live: It
     </div>
   );
 }
+
+export const REL_TILES: [Rel, string, (n: number) => string, string][] = [
+  ['game', 'Nur Spiel', (n) => `von ${n} Aussagen`, 'Aussagen, die ausschließlich das allgemeine Spiel betreffen – anklicken zum Filtern'],
+  ['craft', 'Crafting', () => 'Generator · Interface · Integration', 'Aussagen zu Generator/Interface und Crafting–Spiel-Integration – anklicken zum Filtern'],
+  ['unclear', 'Ungeklärt', () => 'ohne bestätigte Relevanz', 'Aussagen ohne abschließend bestätigte Relevanzklassifizierung (noch offen oder „Unklar“) – anklicken zum Filtern'],
+];

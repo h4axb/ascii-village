@@ -135,7 +135,7 @@ function DistBar({ dist, total }: { dist: Record<Rel, number>; total: number }) 
   );
 }
 
-function Classification() {
+export function Classification() {
   const ctx = useCtx();
   const { study, model, slice } = ctx;
   const view = useContentView();

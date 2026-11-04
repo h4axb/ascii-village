@@ -15,6 +15,9 @@ import { designOfItem } from './Codes';
 import { itemText, translateNotes, useContentView } from '../translations';
 import { Empty, LazyArea, logChange, Section, useCtx, type Ctx } from '../ui';
 import { DashFilterBar, dashActive, FoldBtn, matchDash, NO_DASH, NotesDashboard, type DashFilter } from '../notesDashboard';
+import { Classification } from './CraftingUx';
+import { craftGroup } from '../crafting';
+import { AbSection } from '../abCompare';
 
 // ---- chip logic ----
 const groupOfChip = (tags: TagGroup[], chip: string) => tags.find((g) => g.chips.some((c) => c.id === chip));
@@ -1165,6 +1168,22 @@ export default function Notes() {
         )}
       </section>
 
+      {/* the Crafting-Bezug of every statement, as under Crafting UX → Klassifizierung (same data and settings) */}
+      {craftGroup(model) && (
+        <section className={`st-lcard st-lc-class${fold.folded.includes('klassifizierung') ? ' is-folded' : ''}`} data-nav="Klassifizierung" aria-label="Klassifizierung des Feedbacks">
+          <div className="st-lc-title">
+            <h2>Klassifizierung des Feedbacks</h2>
+            <span className="st-muted st-lc-who">Crafting-Bezug je Aussage</span>
+            <FoldBtn folded={fold.folded.includes('klassifizierung')} label="Klassifizierung" onClick={() => flip('folded', 'klassifizierung')} />
+          </div>
+          {!fold.folded.includes('klassifizierung') && (
+            <div className="st-cx st-lc-classbody">
+              <Classification />
+            </div>
+          )}
+        </section>
+      )}
+
       {liveSurvey.length > 0 && (
         <section className={`st-lcard st-lc-survey${surveyFolded ? ' is-folded' : ''}`} data-nav="Umfrage" aria-label="Umfrage-Antworten (Tally)">
           <div className="st-lc-title">
@@ -1191,6 +1210,8 @@ export default function Notes() {
           )}
         </section>
       )}
+
+      <AbSection folded={fold.folded.includes('ab')} onFold={() => flip('folded', 'ab')} />
 
       {selShown.length > 0 && (
         <div className="st-selbar" role="region" aria-label="Auswahl">

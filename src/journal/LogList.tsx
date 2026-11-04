@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { readLog, writeLog, type LogImport } from './logImport';
 import type { JournalStore, Put } from './store';
-import { ENTRY_STATUS, ENTRY_TYPES, SECTIONS, blockKinds, fmtDate, itemSections, itemText, itemTopics, sectionItems, type Entry, type LogItem } from './types';
+import { ENTRY_STATUS, ENTRY_TYPES, SECTIONS, blockKinds, fmtDate, itemSections, itemText, itemTopics, sectionBlockTitle, sectionItems, type Entry, type LogItem } from './types';
 import { allTopics, sectionTitle } from './EntryEditor';
 import { taskTime } from './EntryForm';
 import { EntryCard, ImportDialog, PageHead, TaskCard } from './pages';
@@ -41,6 +41,7 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
   const [menu, setMenu] = useState(false);
   const [importing, setImporting] = useState<{ name: string; data: LogImport } | null>(null);
   const isSection = SECTIONS.some((s) => s.id === page);
+  const kinds = blockKinds(store.docs.settings);
   const all = Object.values(store.docs.entries);
   const list = useMemo(
     () =>
@@ -273,7 +274,7 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
           <ul className="jr-cards">
             {shown.map((i) => (
               <li key={i.key} className={isSel(i) ? 'is-selected' : ''}>
-                {i.t ? <TaskCard store={store} e={i.e} t={i.t} onOpen={() => open(i)} /> : <EntryCard store={store} e={i.e} onOpen={() => open(i)} />}
+                {i.t ? <TaskCard store={store} e={i.e} t={i.t} title={page === 'methodology' ? sectionBlockTitle(i, page, kinds) : ''} onOpen={() => open(i)} /> : <EntryCard store={store} e={i.e} title={page === 'methodology' ? sectionBlockTitle(i, page, kinds) : ''} onOpen={() => open(i)} />}
               </li>
             ))}
           </ul>
@@ -301,8 +302,12 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
             {shown.map((i) => {
               const e = i.e;
               const secs = itemSections(i);
+              // Methods & Methodology: the method block's own title, the log's below it
+              const own = page === 'methodology' ? sectionBlockTitle(i, page, kinds) : '';
               const tasks = e.tasks ?? [];
-              const sub = i.t
+              const sub = own
+                ? [i.t ? i.t.title : '', e.title, i.t ? taskTime(i.t) : ''].filter(Boolean).join(' · ')
+                : i.t
                 ? [e.title, taskTime(i.t)].filter(Boolean).join(' · ')
                 : [ENTRY_TYPES.find((t) => t.id === e.type)?.label, e.status !== 'none' ? ENTRY_STATUS.find((s) => s.id === e.status)?.label : '', tasks.length ? `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}` : ''].filter(Boolean).join(' · ');
               return (
@@ -314,7 +319,7 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
                     {e.date ? fmtDate(e.date, e.dateEnd) : '–'}
                   </span>
                   <button type="button" className="jr-cell-title" role="cell" onClick={(x) => (x.stopPropagation(), open(i))} aria-current={isSel(i) ? 'true' : undefined}>
-                    {i.t ? i.t.title || 'Untitled task' : e.title}
+                    {own || (i.t ? i.t.title || 'Untitled task' : e.title)}
                     <small>{sub}</small>
                   </button>
                   <span className="jr-cell-sections" role="cell">

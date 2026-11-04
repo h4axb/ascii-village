@@ -339,6 +339,13 @@ export function sectionItems(entries: Entry[], section: string): LogItem[] {
   }
   return out;
 }
+// on a section page (e.g. Methods & Methodology): the own titles of the item's
+// blocks of that section's category (a "Method" block's title), else none
+export function sectionBlockTitle(i: LogItem, section: string, kinds: BlockKind[]): string {
+  const blocks = i.t ? i.t.blocks ?? [] : i.e.blocks;
+  const titles = blocks.filter((b) => kindOf(kinds, b).section === section).map((b) => blockTitle(b).trim()).filter(Boolean);
+  return [...new Set(titles)].join(' · ');
+}
 export const itemSections = (i: LogItem) => (i.t ? i.t.sections ?? [] : entrySections(i.e));
 export const itemTopics = (i: LogItem) => (i.t ? i.t.topics ?? [] : entryTopics(i.e));
 export const itemText = (i: LogItem) =>

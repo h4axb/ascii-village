@@ -35,15 +35,16 @@ export function PageHead({ store, id, fallbackTitle, fallbackDescription, action
   );
 }
 
-export function EntryCard({ store, e, onOpen }: { store: JournalStore; e: Entry; onOpen: () => void }) {
+export function EntryCard({ store, e, title, onOpen }: { store: JournalStore; e: Entry; title?: string; onOpen: () => void }) {
   const tasks = e.tasks ?? [];
   const first = plainText([...e.blocks.map((b) => b.md), ...tasks.map((t) => t.title)].join('\n'));
   return (
     <button type="button" className="jr-entry" onClick={onOpen}>
       <span className="jr-entry-title">
         {e.status !== 'none' && <span className={`jr-box is-${e.status === 'passed' ? 'pass' : e.status}`} aria-hidden="true" />}
-        {e.title}
+        {title || e.title}
       </span>
+      {title && <span className="jr-entry-log">{e.title}</span>}
       <EntryMeta store={store} e={e} />
       {first && <span className="jr-entry-text">{first.length > 220 ? `${first.slice(0, 220)} …` : first}</span>}
     </button>
@@ -51,11 +52,12 @@ export function EntryCard({ store, e, onOpen }: { store: JournalStore; e: Entry;
 }
 
 // one task of a day, on a section page
-export function TaskCard({ store, e, t, onOpen }: { store: JournalStore; e: Entry; t: Task; onOpen: () => void }) {
+export function TaskCard({ store, e, t, title, onOpen }: { store: JournalStore; e: Entry; t: Task; title?: string; onOpen: () => void }) {
   const text = plainText((t.blocks ?? []).map((b) => b.md).join('\n'));
   return (
     <button type="button" className="jr-entry" onClick={onOpen}>
-      <span className="jr-entry-title">{t.title || 'Untitled task'}</span>
+      <span className="jr-entry-title">{title || t.title || 'Untitled task'}</span>
+      {title && <span className="jr-entry-log">{t.title}</span>}
       <div className="jr-meta">
         <span className="jr-date">{fmtDate(e.date)}</span>
         <span className="jr-type">{[e.title, taskTime(t)].filter(Boolean).join(' · ')}</span>

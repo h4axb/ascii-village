@@ -7,7 +7,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { plainText } from './markdown';
 import type { JournalStore } from './store';
-import { fmtDate, sectionItems, MILESTONE_STATUS, newId, REASON_MAX, today, type Deadline, type FocusItem, type Milestone, type OverviewSection } from './types';
+import { blockKinds, fmtDate, sectionBlockTitle, sectionItems, MILESTONE_STATUS, newId, REASON_MAX, today, type Deadline, type FocusItem, type Milestone, type OverviewSection } from './types';
 import { Attachments, Icon, IconBtn, InlineText, MdField, VisibilitySwitch } from './ui';
 import { PageHead, pageConfig } from './pages';
 import { blankMilestone, endOf, MilestoneDialog, MilestoneTimeline, startOf } from './MilestoneTimeline';
@@ -225,6 +225,7 @@ function Highlights({ store, sec, save, openEntry, newEntry, go }: { store: Jour
       .slice(0, 3);
   const card = (section: string, label: string, icon: IconName, row: 'dot' | 'doc') => {
     const list = latest(section);
+    const kinds = blockKinds(store.docs.settings);
     const page = pageConfig(store, section);
     return (
       <div className="jr-hl">
@@ -243,7 +244,7 @@ function Highlights({ store, sec, save, openEntry, newEntry, go }: { store: Jour
               <li key={key}>
                 <button type="button" className="jr-hl-item" onClick={() => openEntry(e.id, t?.id)}>
                   {row === 'dot' ? <span className={`jr-hl-dot is-${e.status}`} aria-hidden="true" /> : <Icon name="clip" />}
-                  <span className="jr-hl-title">{t ? t.title || e.title : e.title}</span>
+                  <span className="jr-hl-title">{(section === 'methodology' && sectionBlockTitle({ key, e, t }, section, kinds)) || (t ? t.title || e.title : e.title)}</span>
                   <span className="jr-hl-date">{e.date ? fmtDate(e.date) : ''}</span>
                 </button>
               </li>

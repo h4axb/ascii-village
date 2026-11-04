@@ -3818,3 +3818,12 @@ h3.jr-inline {
 .jr-gt.is-compact button.jr-gt-edge {
   max-width: 150px;
 }
+/* a card on Methods & Methodology titled by its method block: the log's title below */
+.jr-entry-log {
+  font-size: 12px;
+  color: var(--jr-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: -2px;
+}

@@ -447,6 +447,16 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
           </button>
           <span className="st-ab-calc" role="tooltip" id={`calc-${r.key}`}>
             <b>So berechnet</b>
+            {r.scale && (
+              <span className="st-ab-cscale">
+                <span>
+                  <b>1</b> {r.scale.low}
+                </span>
+                <span>
+                  <b>5</b> {r.scale.high}
+                </span>
+              </span>
+            )}
             <span className="st-muted">{r.scale?.lower ? 'je Person: der niedrigere Wert gewinnt' : 'je Person: der höhere Wert gewinnt'}</span>
             <span className="st-ab-ctbl">
               {r.calc.map((c) => (

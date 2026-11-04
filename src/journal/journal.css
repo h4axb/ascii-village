@@ -1592,6 +1592,9 @@ h3.jr-inline {
   height: 10px;
   stroke-width: 3;
 }
+.jr-gt-state.is-deadline.is-done {
+  background: #c9c8c2;
+}
 .jr-gt-state.is-deadline {
   border: 0;
   border-radius: 2px;
@@ -1728,9 +1731,31 @@ h3.jr-inline {
   justify-content: flex-start;
   box-shadow: 0 1px 2px rgba(29, 29, 27, 0.12);
 }
-.jr-root button.jr-gt-beam.is-short {
-  padding: 0;
-  justify-content: center;
+.jr-gt-beam.is-deadline {
+  position: absolute;
+  top: calc(50% - 11px);
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--k);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  z-index: 2;
+  box-sizing: border-box;
+}
+.jr-gt-beam.is-deadline svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.jr-gt-beam.is-deadline:focus-visible {
+  outline: 2px solid var(--jr-ink);
+  outline-offset: 2px;
 }
 .jr-root button.jr-gt-beam svg {
   flex: none;
@@ -1747,18 +1772,39 @@ h3.jr-inline {
   outline: 2px solid var(--jr-ink);
   outline-offset: 2px;
 }
-.jr-gt-side {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--jr-ink);
-  z-index: 2;
-  pointer-events: none;
+.jr-root button.jr-gt-beam > .jr-gt-fade {
+  flex: 0 1 auto;
+}
+/* the deadlines: a small heading row, then one row each */
+.jr-gt-row.is-group {
+  min-height: 30px;
+  background: var(--jr-soft);
+}
+.jr-gt-row.is-group .jr-gt-label {
+  background: var(--jr-soft);
+  box-shadow: none;
+  font-size: 11.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--jr-muted);
+}
+.jr-gt-row.is-group .jr-gt-label > span:first-child {
+  flex: 1;
+}
+.jr-gt-row.is-group .jr-gt-period {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.jr-gt-row.is-deadline {
+  --jr-gt-row: 40px;
+}
+.jr-gt.is-compact .jr-gt-row.is-deadline {
+  --jr-gt-row: 44px;
+}
+.jr-gt-row.is-deadline.is-done .jr-gt-name {
+  color: var(--jr-muted);
 }
 .jr-root button.jr-gt-point,
 .jr-gt-point {

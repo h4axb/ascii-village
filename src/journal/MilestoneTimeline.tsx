@@ -57,15 +57,6 @@ const DEFAULT_ZOOM = 3; // a week ≈ 91 px
 const weekStart = (d: Date) => new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * DAY); // its Monday
 const md = (d: Date) => `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 const colorOf = (m: Milestone, i: number) => m.color ?? PALETTE[i % PALETTE.length];
-// a beam title's width in px (as the CSS sets it: Inter 600 12.5px)
-let ctx: CanvasRenderingContext2D | null = null;
-function textW(s: string): number {
-  ctx ??= document.createElement('canvas').getContext('2d');
-  if (!ctx) return s.length * 7;
-  ctx.font = "600 12.5px Inter, system-ui, sans-serif";
-  return ctx.measureText(s).width;
-}
-
 // a text that fades out at its end only when it is too long for its place
 function Fade({ children }: { children: string }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -193,13 +184,6 @@ export function MilestoneTimeline({ store, editing, openMilestone }: { store: Jo
     void store.commit(put);
   };
   const lastDay = new Date(range.first.getTime() + (range.weeks * 7 - 1) * DAY);
-  // deadline labels only where the next one leaves room
-  const dlLabel = (i: number) => {
-    const d = deadlines[i];
-    if (d.done) return false;
-    const next = deadlines.slice(i + 1).find((n) => !n.done);
-    return !next || x(startOf(next.date)!) - x(startOf(d.date)!) > d.label.length * 6.6 + 24;
-  };
   const weekLabel = (w: Date) => {
     if (ppd >= 12) {
       const e = new Date(w.getTime() + 6 * DAY);
@@ -252,10 +236,6 @@ export function MilestoneTimeline({ store, editing, openMilestone }: { store: Jo
             const w = a && b ? Math.max(24, x(new Date(b.getTime() + DAY)) - left) : 0;
             const done = m.status === 'completed';
             const t = { id: m.id, title: m.name, when: `${a ? period(m.start, m.end) : 'no date'} · ${status}`, left: timeLeft(now, a, b, done), color };
-            // the title inside the beam when it fits (a long one fades out in a long
-            // beam), beside the beam when the beam is short
-            const need = textW(m.name) + 24 + (done ? 19 : 0);
-            const inside = w >= need || w >= 160;
             return (
               <div key={m.id} className={`jr-gt-row is-${m.status}`} role="row" style={{ '--k': color } as React.CSSProperties}>
                 <div className="jr-gt-label" role="rowheader">
@@ -278,15 +258,11 @@ export function MilestoneTimeline({ store, editing, openMilestone }: { store: Jo
                   <span className="jr-gt-now" style={{ left: todayX }} aria-hidden="true" />
                   {a && b && (
                     <>
-                      <button type="button" className={`jr-gt-beam${inside ? '' : ' is-short'}`} style={{ left, width: w }} aria-label={`${m.name} · ${t.when} · ${t.left}`} {...hover(t, () => openMilestone(m))}>
+                      {/* the title always inside, fading out when the beam is too short for it */}
+                      <button type="button" className="jr-gt-beam" style={{ left, width: w }} aria-label={`${m.name} · ${t.when} · ${t.left}`} {...hover(t, () => openMilestone(m))}>
                         {done && <Icon name="check" />}
-                        {inside && <Fade>{m.name}</Fade>}
+                        <Fade>{m.name}</Fade>
                       </button>
-                      {!inside && (
-                        <span className="jr-gt-side" style={{ left: left + w + 6 }} aria-hidden="true">
-                          {m.name}
-                        </span>
-                      )}
                     </>
                   )}
                   {a && !b && (
@@ -300,30 +276,53 @@ export function MilestoneTimeline({ store, editing, openMilestone }: { store: Jo
             );
           })}
           {deadlines.length > 0 && (
-            <div className="jr-gt-row is-deadlines" role="row">
+            <div className="jr-gt-row is-group" role="row">
               <div className="jr-gt-label" role="rowheader">
-                <span className="jr-gt-state is-deadline" aria-hidden="true" />
-                <span className="jr-gt-name is-static">
-                  <Fade>Deadlines</Fade>
-                  <small>{`${deadlines.filter((d) => !d.done).length} open`}</small>
-                </span>
+                <span>Deadlines</span>
                 <span className="jr-gt-period">{`${deadlines.filter((d) => !d.done).length} open`}</span>
               </div>
               <div className="jr-gt-track" style={{ width: track }} role="cell">
                 <span className="jr-gt-now" style={{ left: todayX }} aria-hidden="true" />
-                {deadlines.map((d, i) => {
-                  const at = startOf(d.date)!;
-                  const t = { id: d.id, title: d.label, when: fmtDate(d.date), left: timeLeft(now, at, null, d.done).replace('Completed', 'Done'), color: d.done ? '#9a9a94' : 'var(--jr-warn)' };
-                  return (
-                    <span key={d.id} tabIndex={0} className={`jr-gt-point is-deadline${d.done ? ' is-done' : ''}`} style={{ left: x(at) + ppd / 2 }} aria-label={`${d.label} · ${t.when} · ${t.left}`} {...hover(t)}>
-                      <span className="jr-gt-diamond" aria-hidden="true" />
-                      {dlLabel(i) && <span>{d.label}</span>}
-                    </span>
-                  );
-                })}
               </div>
             </div>
           )}
+          {deadlines.map((d) => {
+            // each deadline in a row of its own: a diamond on its date, or a beam
+            // when it spans several days
+            const at = startOf(d.date)!;
+            const end = d.dateEnd ? startOf(d.dateEnd) : null;
+            const span = end && end > at ? end : null;
+            const range = d.dateEnd && span ? period(d.date, d.dateEnd) : fmtDate(d.date);
+            const t = { id: d.id, title: d.label, when: `${range}${d.done ? ' · Done' : ''}`, left: timeLeft(now, at, span, d.done).replace('Completed', 'Done'), color: d.done ? '#9a9a94' : '#9a3b0c' };
+            const left = x(at);
+            const w = span ? Math.max(24, x(new Date(span.getTime() + DAY)) - left) : 0;
+            return (
+              <div key={d.id} className={`jr-gt-row is-deadline${d.done ? ' is-done' : ''}`} role="row" style={{ '--k': t.color } as React.CSSProperties}>
+                <div className="jr-gt-label" role="rowheader">
+                  <span className={`jr-gt-state is-deadline${d.done ? ' is-done' : ''}`} aria-label={d.done ? 'Done' : 'Open'} role="img" />
+                  <span className="jr-gt-name is-static">
+                    <Fade>{d.label}</Fade>
+                    <small>{range}</small>
+                  </span>
+                  <span className="jr-gt-period">{range}</span>
+                </div>
+                <div className="jr-gt-track" style={{ width: track }} role="cell">
+                  <span className="jr-gt-now" style={{ left: todayX }} aria-hidden="true" />
+                  {span ? (
+                    <span tabIndex={0} className="jr-gt-beam is-deadline" style={{ left, width: w }} aria-label={`${d.label} · ${t.when} · ${t.left}`} {...hover(t)}>
+                      {d.done && <Icon name="check" />}
+                      <Fade>{d.label}</Fade>
+                    </span>
+                  ) : (
+                    <span tabIndex={0} className={`jr-gt-point is-deadline${d.done ? ' is-done' : ''}`} style={{ left: left + ppd / 2 }} aria-label={`${d.label} · ${t.when} · ${t.left}`} {...hover(t)}>
+                      <span className="jr-gt-diamond" aria-hidden="true" />
+                      <span>{d.label}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
           {!list.length && <p className="jr-muted jr-gt-empty">No milestones yet – add the first one with “Add milestone”.</p>}
         </div>
       </div>

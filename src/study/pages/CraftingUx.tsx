@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { CraftingUxDoc, ItemDoc } from '../types';
 import { SECTION_LABEL } from '../types';
-import { artOf, candidatesOf, craftGroup, craftItems, cxProblemsOf, type CxProblem, distribution, mainOf, prioOf, relChip, relOf, REL_HINT, REL_LABEL, REL_SHORT, sharedIssues, SPECIAL_LABEL, suggestedRel, type Candidate, type CraftScope, type MainState, type Rel, type SharedIssue } from '../crafting';
+import { artOf, candidatesOf, craftGroup, craftItems, cxProblemsOf, CX_STATUS, type CxProblem, type CxSolution, distribution, mainOf, prioOf, relChip, relOf, REL_HINT, REL_LABEL, REL_SHORT, sharedIssues, SPECIAL_LABEL, suggestedRel, type Candidate, type CraftScope, type MainState, type Rel, type SharedIssue } from '../crafting';
 import { designOfItem } from './Codes';
 import { itemText, useContentView } from '../translations';
 import { Empty, logChange, useCtx } from '../ui';
@@ -415,12 +415,13 @@ function Analysis() {
   const [variant, setVariant] = useState<'all' | 'A' | 'B'>('all');
   const [person, setPerson] = useState<string | null>(null);
   const [issue, setIssue] = useState<string | null>(null);
-  const [mobile, setMobile] = useState<'people' | 'issues'>('people');
+  const [mobile, setMobile] = useState<'people' | 'issues'>('issues');
   const [editing, setEditing] = useState<string | null>(null);
   const [naming, setNaming] = useState<string | null>(null); // a new group's name
+  const [find, setFind] = useState<string | null>(null); // the search, when open
   const [clusterOpen, setClusterOpen] = useState(false);
   const inView = useMemo(() => craftItems(model, slice.items, scope, variant), [model, slice.items, scope, variant]);
-  const issues = useMemo(() => sharedIssues(model, inView, groups), [model, inView, groups]);
+  const issuesAll = useMemo(() => sharedIssues(model, inView, groups), [model, inView, groups]);
   const withItems = new Set(inView.map((i) => i.person)).size;
   // a person's main problem is decided over all their crafting statements (not the filter)
   const allCrafting = useMemo(() => craftItems(model, slice.items, 'extended'), [model, slice.items]);
@@ -428,17 +429,24 @@ function Analysis() {
     const cands = candidatesOf(model, p.id, allCrafting, groups);
     return { p, cands, main: mainOf(p, cands, groups, study.docs.items) };
   });
-  const sel = issue ? issues.find((x) => x.problem.id === issue) ?? null : null;
-  const personIssues = person ? new Set(issues.filter((x) => x.persons.includes(person)).map((x) => x.problem.id)) : null;
-  const mainOfPerson = person ? people.find((x) => x.p.id === person)?.main : null;
+  const words = (find ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (x: SharedIssue) => !words.length || words.every((w) => `${x.problem.name} ${x.problem.description ?? ''} ${x.items.map((i) => `${i.person} ${i.text} ${i.de ?? ''}`).join(' ')}`.toLowerCase().includes(w));
+  const issues = issuesAll.filter(matches);
+  const sel = issue ? issuesAll.find((x) => x.problem.id === issue) ?? null : null;
   const mainsBy = (gid: string) => people.filter((x) => x.main.status === 'confirmed' && x.main.key === `p:${gid}`).map((x) => x.p.id);
-  const counts = { confirmed: people.filter((x) => x.main.status === 'confirmed').length, suggested: people.filter((x) => x.main.status === 'suggested').length };
   const editP = editing ? people.find((x) => x.p.id === editing) : null;
   const ungrouped = inView.filter((i) => !groups.some((g) => g.items.includes(i.id)));
   const create = (name: string, items: string[] = []) => {
-    const g: CxProblem = { id: `cx${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, name: name.trim(), items };
+    const g: CxProblem = { id: `cx${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, name: name.trim(), items, status: 'idea' };
     save([...latest(), g], `Problem „${g.name}“ angelegt`);
     return g;
+  };
+  // a person's dots: one per problem group they are in (their main problem coloured by its state)
+  const dotsOf = (pid: string, main: MainState) => {
+    const mine = issuesAll.filter((x) => x.persons.includes(pid));
+    const out = mine.map((x) => ({ id: x.problem.id, name: x.problem.name, cls: main.key === `p:${x.problem.id}` ? (main.status === 'confirmed' ? 'is-ok' : main.status === 'invalid' ? 'is-bad' : 'is-sug') : '' }));
+    if (main.status === 'invalid' && !out.some((d) => d.cls === 'is-bad')) out.unshift({ id: 'bad', name: main.label, cls: 'is-bad' });
+    return out.sort((a, b) => (b.cls ? 1 : 0) - (a.cls ? 1 : 0));
   };
 
   return (
@@ -450,133 +458,141 @@ function Analysis() {
           <Seg value={mobile} label="Ansicht" options={[['people', 'Personen'], ['issues', 'Probleme']]} onChange={setMobile} />
         </span>
       </div>
-      <div className={`st-cx-split is-${mobile}`}>
+      <div className={`st-cx-split2 is-${mobile}`}>
         <section className="st-cx-card st-cx-people" aria-label="Teilnehmende">
           <h3>
             Teilnehmende
-            <small>
-              {person || issue ? (
-                <button type="button" className="st-linkbtn" onClick={() => (setPerson(null), setIssue(null))}>
-                  Auswahl aufheben
-                </button>
-              ) : (
-                <>
-                  {`${counts.confirmed} bestätigt · ${counts.suggested} Vorschläge`}
-                  <Info text="Hauptproblem je Person: eine eigene Einschätzung nach Auswirkung auf die Aufgabe, Beleg (beobachtet / ausdrücklich berichtet), Wiederholung und Forschungsbezug – nicht einfach die meisten Aussagen oder die höchste Priorität." />
-                </>
-              )}
-            </small>
+            {person || issue ? (
+              <button type="button" className="st-linkbtn st-small" onClick={() => (setPerson(null), setIssue(null))}>
+                Auswahl aufheben
+              </button>
+            ) : (
+              <Info text="Ein Punkt je Problem-Gruppe der Person; farbig ist ihr Hauptproblem. Zeile anklicken: ihre Probleme hervorheben; › : Hauptproblem festlegen." />
+            )}
           </h3>
-          <ul className="st-cx-pl">
+          <ul className="st-cx-pl2">
             {people.map(({ p, main }) => {
               const cls = person === p.id ? 'is-sel' : sel ? (sel.persons.includes(p.id) ? 'is-hl' : 'is-dim') : '';
+              const dots = dotsOf(p.id, main);
               return (
                 <li key={p.id} className={cls}>
-                  <button type="button" className="st-cx-prow" aria-pressed={person === p.id} onClick={() => (setIssue(null), setPerson(person === p.id ? null : p.id))}>
+                  <button type="button" className="st-cx-prow2" aria-pressed={person === p.id} title={`Hauptproblem: ${main.label}`} onClick={() => (setIssue(null), setPerson(person === p.id ? null : p.id), setMobile('issues'))}>
                     <span className="st-cx-pid">{p.id}</span>
-                    <span className={`st-cx-t${main.status === 'confirmed' || main.status === 'suggested' ? '' : ' is-none'}${main.doc?.special ? ' is-none' : ''}`}>{main.label}</span>
-                    <span className={`st-cx-dot is-${main.status}`} title={{ confirmed: 'bestätigt', suggested: 'Vorschlag – prüfen', open: 'offen', invalid: 'Beleg fehlt – prüfen' }[main.status]} />
+                    <span className="st-cx-dots" aria-label={`${dots.length} ${dots.length === 1 ? 'Problem' : 'Probleme'}`}>
+                      {dots.slice(0, 6).map((d) => (
+                        <i key={d.id} className={d.cls} title={d.name} />
+                      ))}
+                      {dots.length > 6 && <small>{`+${dots.length - 6}`}</small>}
+                    </span>
                   </button>
-                  <button type="button" className="st-cx-edit" aria-label={`Hauptproblem von ${p.id} festlegen`} title="Hauptproblem festlegen" onClick={() => setEditing(p.id)}>
-                    ✎
+                  <button type="button" className="st-cx-open" aria-label={`Hauptproblem von ${p.id} festlegen`} title="Hauptproblem festlegen" onClick={() => setEditing(p.id)}>
+                    <Ico n="chev" />
                   </button>
                 </li>
               );
             })}
           </ul>
-          <div className="st-cx-legend">
+          <div className="st-cx-legend st-cx-legend2">
             <span>
-              <span className="st-cx-dot is-confirmed" />
+              <i className="st-cx-d is-ok" />
               bestätigt
             </span>
             <span>
-              <span className="st-cx-dot is-suggested" />
+              <i className="st-cx-d is-sug" />
               Vorschlag
             </span>
             <span>
-              <span className="st-cx-dot is-invalid" />
+              <i className="st-cx-d is-bad" />
               Beleg fehlt
+            </span>
+            <span>
+              <i className="st-cx-d" />
+              weiteres Problem
             </span>
           </div>
         </section>
 
-        <section className="st-cx-card st-cx-issues" aria-label="Gemeinsame Probleme">
+        <section className="st-cx-card st-cx-issues2" aria-label="Gemeinsame Probleme">
           <h3>
             <span>
               Gemeinsame Probleme
               <Info text="Eigene Problem-Gruppen nur für Crafting UX, unabhängig von den Wiederkehrenden Befunden. Gezählt werden verschiedene Personen (eine Person mit fünf Aussagen = 1)." />
             </span>
-            <small>{person ? `bei ${person} hervorgehoben` : sel ? 'Betroffene links hervorgehoben' : `n = ${withItems} ${withItems === 1 ? 'Person' : 'Personen'} mit Crafting-Aussagen`}</small>
+            <span className="st-cx-tools">
+              <button type="button" aria-label="Problem anlegen" title="Problem anlegen" onClick={() => setNaming(naming == null ? '' : null)}>
+                <Ico n="plus" />
+              </button>
+              <button type="button" aria-label="KI: ähnliche Aussagen bündeln" title="KI: ähnliche Aussagen bündeln" disabled={inView.length < 2} onClick={() => setClusterOpen(true)}>
+                <Ico n="tree" />
+              </button>
+              <button type="button" aria-label="Suchen" title="Suchen" aria-pressed={find != null} onClick={() => setFind(find == null ? '' : null)}>
+                <Ico n="search" />
+              </button>
+            </span>
           </h3>
-          <div className="st-cx-gtools">
-            {naming == null ? (
-              <button type="button" className="st-cx-btn" onClick={() => setNaming('')}>
-                + Problem anlegen
+          {naming != null && (
+            <div className="st-cx-bar2">
+              <input
+                autoFocus
+                value={naming}
+                maxLength={120}
+                placeholder="Name, z. B. Pre-Clarification-Optionen unklar"
+                aria-label="Name des neuen Problems"
+                onChange={(e) => setNaming(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && naming.trim()) (setIssue(create(naming).id), setNaming(null));
+                  if (e.key === 'Escape') (e.stopPropagation(), setNaming(null));
+                }}
+              />
+              <button type="button" className="st-cx-btn is-pri" disabled={!naming.trim()} onClick={() => (setIssue(create(naming).id), setNaming(null))}>
+                Anlegen
               </button>
-            ) : (
-              <span className="st-cx-newg">
-                <input
-                  autoFocus
-                  value={naming}
-                  maxLength={120}
-                  placeholder="Name, z. B. Pre-Clarification-Optionen unklar"
-                  aria-label="Name des neuen Problems"
-                  onChange={(e) => setNaming(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && naming.trim()) (setIssue(create(naming).id), setNaming(null));
-                    if (e.key === 'Escape') (e.stopPropagation(), setNaming(null));
-                  }}
-                />
-                <button type="button" className="st-cx-btn is-pri" disabled={!naming.trim()} onClick={() => (setIssue(create(naming).id), setNaming(null))}>
-                  Anlegen
-                </button>
-                <button type="button" className="st-linkbtn" onClick={() => setNaming(null)}>
-                  Abbrechen
-                </button>
-              </span>
-            )}
-            {naming == null && inView.length >= 2 && (
-              <button type="button" className="st-cx-btn" onClick={() => setClusterOpen(true)}>
-                KI: ähnliche Aussagen bündeln …
-              </button>
-            )}
-          </div>
-          {issues.length ? (
-            <ul className="st-cx-il">
-              {issues.map((x) => {
-                const id = x.problem.id;
-                const cls = person ? (personIssues!.has(id) ? 'is-hl' : 'is-dim') : sel ? (id === issue ? 'is-hl' : 'is-dim') : '';
-                const isMain = person && mainOfPerson?.status === 'confirmed' && mainOfPerson.key === `p:${id}`;
-                return (
-                  <li key={id} className={cls}>
-                    <IssueRow x={x} total={withItems} open={issue === id} isMain={!!isMain} onToggle={() => (setPerson(null), setIssue(issue === id ? null : id))} />
-                    {issue === id && <IssueDetail x={x} mains={mainsBy(id)} inView={inView} view={view} />}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="st-cx-note">{inView.length ? 'Noch keine gemeinsamen Probleme. „+ Problem anlegen“ oder die KI ähnliche Aussagen bündeln lassen.' : 'Noch keine Aussagen mit diesem Crafting-Bezug.'}</p>
+            </div>
           )}
-          <div className="st-cx-legend">
-            <span>
-              <b className="a-a" />
-              nur Variante A
-            </span>
-            <span>
-              <b className="a-b" />
-              nur Variante B
-            </span>
-            <span>
-              <b className="a-both" />
-              beide
-            </span>
-            <span>
-              <b className="a-none" />
-              ohne Variante
-            </span>
-          </div>
-          <NoGroup items={ungrouped} total={inView.length} person={person} view={view} onCreate={create} />
+          {find != null && (
+            <div className="st-cx-bar2">
+              <input type="search" autoFocus value={find} placeholder="Probleme und Aussagen durchsuchen …" aria-label="Probleme durchsuchen" onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setFind(null))} />
+              <span className="st-cx-note">{`${issues.length} von ${issuesAll.length}`}</span>
+            </div>
+          )}
+          <ul className="st-cx-il2">
+            {issues.map((x) => {
+              const id = x.problem.id;
+              const mains = mainsBy(id);
+              const cls = person ? (x.persons.includes(person) ? 'is-hl' : 'is-dim') : sel ? (id === issue ? '' : 'is-dim') : '';
+              return (
+                <li key={id} className={cls}>
+                  <button type="button" className={`st-cx-row${issue === id ? ' is-open' : ''}`} aria-expanded={issue === id} onClick={() => (setPerson(null), setIssue(issue === id ? null : id))}>
+                    <Ico n={issue === id ? 'down' : 'chev'} />
+                    <span className="st-cx-rname">
+                      {x.problem.name}
+                      {person && mains.includes(person) && <span className="st-cx-star">★ Hauptproblem</span>}
+                      {x.persons.length === 1 && <span className="st-cx-single">Einzelbefund</span>}
+                      {x.problem.status && x.problem.status !== 'idea' && <span className={`st-cx-stat is-${x.problem.status}`}>{CX_STATUS.find(([k]) => k === x.problem.status)?.[1]}</span>}
+                    </span>
+                    <span className="st-cx-cnt">
+                      <span title="betroffene Personen">
+                        <Ico n="people" />
+                        {x.persons.length}
+                      </span>
+                      <span className="is-star" title="Hauptproblem bei">
+                        <Ico n="star" />
+                        {mains.length}
+                      </span>
+                      <span title="Aussagen">
+                        <Ico n="docs" />
+                        {x.items.length}
+                      </span>
+                    </span>
+                  </button>
+                  {issue === id && <IssueDetail x={x} mains={mains} inView={inView} view={view} total={withItems} />}
+                </li>
+              );
+            })}
+            <NoGroup items={ungrouped} total={inView.length} person={person} view={view} onCreate={create} />
+          </ul>
+          {!issuesAll.length && <p className="st-cx-note st-cx-pad">{inView.length ? 'Noch keine gemeinsamen Probleme: mit ＋ anlegen oder die KI ähnliche Aussagen bündeln lassen.' : 'Noch keine Aussagen mit diesem Crafting-Bezug.'}</p>}
+          <p className="st-cx-note st-cx-foot2">{`n = ${withItems} ${withItems === 1 ? 'Person' : 'Personen'} mit Crafting-Aussagen${person ? ` · Probleme von ${person} hervorgehoben` : sel ? ' · Betroffene in der Personenliste hervorgehoben' : ''}`}</p>
         </section>
       </div>
       {editP && <MainDrawer key={editP.p.id} person={editP.p.id} doc={editP.p.doc} cands={editP.cands} main={editP.main} group={editP.p.group} onClose={() => setEditing(null)} />}
@@ -585,93 +601,251 @@ function Analysis() {
   );
 }
 
-function IssueRow({ x, total, open, isMain, onToggle }: { x: SharedIssue; total: number; open: boolean; isMain: boolean; onToggle: () => void }) {
-  const n = x.persons.length;
-  const w = (k: number) => `${(k / Math.max(1, total)) * 100}%`;
+const ICONS: Record<string, string> = {
+  plus: 'M12 5v14M5 12h14',
+  tree: 'M12 3v6M6 15v-3h12v3M4 15h4v5H4zM10 15h4v5h-4zM16 15h4v5h-4z',
+  search: 'M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4',
+  people: 'M9 11a3 3 0 100-6 3 3 0 000 6zM3 20a6 6 0 0112 0M17 11a3 3 0 000-6M21 20a6 6 0 00-4-5.6',
+  star: 'M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z',
+  docs: 'M8 4h9l3 3v13H8zM4 8v12h11',
+  chev: 'M9 6l6 6-6 6',
+  down: 'M6 9l6 6 6-6',
+  warn: 'M12 4l9 16H3zM12 10v4M12 17h.01',
+  bulb: 'M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z',
+  cause: 'M12 8v4l3 2M12 3a9 9 0 100 18 9 9 0 000-18z',
+  target: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 8a4 4 0 100 8 4 4 0 000-8z',
+  quote: 'M7 17c-2 0-3-1.5-3-4 0-3 2-6 5-7M17 17c-2 0-3-1.5-3-4 0-3 2-6 5-7',
+  flag: 'M5 21V4h11l-2 4 2 4H5',
+  pen: 'M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4',
+};
+function Ico({ n, s = 15 }: { n: string; s?: number }) {
   return (
-    <button type="button" className="st-cx-ir" aria-expanded={open} onClick={onToggle}>
-      <span className="st-cx-iname">
-        {x.problem.name}
-        {isMain && <span className="st-cx-star">★ Hauptproblem</span>}
-        {n === 1 && <span className="st-cx-single">Einzelbefund</span>}
-        {n === 0 && <span className="st-cx-single">leer</span>}
-      </span>
-      <span className="st-cx-ab" role="img" aria-label={`A ${x.a}, B ${x.b}, beide ${x.both}, ohne Variante ${x.none}`}>
-        {x.a > 0 && <i className="a-a" style={{ width: w(x.a) }} />}
-        {x.b > 0 && <i className="a-b" style={{ width: w(x.b) }} />}
-        {x.both > 0 && <i className="a-both" style={{ width: w(x.both) }} />}
-        {x.none > 0 && <i className="a-none" style={{ width: w(x.none) }} />}
-      </span>
-      <span className="st-cx-n">{`${n}/${total}`}</span>
-      <span className="st-cx-chev" aria-hidden="true">
-        {open ? '▾' : '▸'}
-      </span>
-    </button>
+    <svg className="st-cx-ico" viewBox="0 0 24 24" width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={ICONS[n]} />
+    </svg>
   );
 }
 
-// an open problem: its name and description, every statement (taken out with
-// ×), statements added by search, the group deleted
-function IssueDetail({ x, mains, inView, view }: { x: SharedIssue; mains: string[]; inView: ItemDoc[]; view: ReturnType<typeof useContentView> }) {
+// an open problem, as fields: problem, possible cause, design requirement,
+// the people affected by Crafting-Bezug, the people it is central to, the
+// evidence, solutions and status. ✎ edits the texts and the statements; the
+// solutions' and the problem's status change with one click.
+function IssueDetail({ x, mains, inView, view, total }: { x: SharedIssue; mains: string[]; inView: ItemDoc[]; view: ReturnType<typeof useContentView>; total: number }) {
   const { model } = useCtx();
   const { save, latest } = useGroups();
-  const [q, setQ] = useState('');
   const g = x.problem;
+  const [edit, setEdit] = useState(false);
+  const [draft, setDraft] = useState({ name: g.name, description: g.description ?? '', cause: g.cause ?? '', requirement: g.requirement ?? '', solutions: g.solutions ?? [] });
+  const [all, setAll] = useState(false);
+  const [q, setQ] = useState('');
   const patch = (p: Partial<CxProblem>, what: string) => save(latest().map((y) => (y.id === g.id ? { ...y, ...p } : y)), what);
-  const codes = [...new Set(x.items.flatMap((i) => i.chips).filter((c) => model.tags.find((t) => t.id === 'code')?.chips.some((k) => k.id === c)))].map((c) => model.chipLabel.get(c));
-  const designs = [...new Set(x.items.map(designOfItem))];
-  // (every word of the search somewhere in the person, the text or its German version)
+  const start = () => (setDraft({ name: g.name, description: g.description ?? '', cause: g.cause ?? '', requirement: g.requirement ?? '', solutions: g.solutions ?? [] }), setEdit(true));
+  const commit = () => {
+    patch({ name: draft.name.trim() || g.name, description: draft.description.trim() || undefined, cause: draft.cause.trim() || undefined, requirement: draft.requirement.trim() || undefined, solutions: draft.solutions.filter((s) => s.text.trim()).map((s) => ({ ...s, text: s.text.trim() })) }, `Problem „${draft.name.trim() || g.name}“ bearbeitet`);
+    setEdit(false);
+  };
+  const solutions = edit ? draft.solutions : g.solutions ?? [];
+  const setSol = (id: string, p: Partial<CxSolution>) => (edit ? setDraft({ ...draft, solutions: draft.solutions.map((s) => (s.id === id ? { ...s, ...p } : s)) }) : patch({ solutions: (g.solutions ?? []).map((s) => (s.id === id ? { ...s, ...p } : s)) }, `Lösung in „${g.name}“ geändert`));
+  // the people affected, by their statements' Crafting-Bezug, each with the variant(s) they spoke about
+  const byRel = (['core', 'integration'] as const).map((r) => {
+    const its = x.items.filter((i) => relOf(model, i) === r);
+    const ps = [...new Set(its.map((i) => i.person))].sort();
+    return { r, ps: ps.map((p) => ({ p, v: [...new Set(its.filter((i) => i.person === p).map(designOfItem).filter(Boolean))].join('/') })) };
+  }).filter((x2) => x2.ps.length);
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const hits = q.trim().length >= 2 ? inView.filter((i) => !g.items.includes(i.id) && words.every((w) => `${i.person} ${i.text} ${i.de ?? ''}`.toLowerCase().includes(w))).slice(0, 8) : [];
   const hidden = g.items.length - x.items.length; // in the group, but outside the current view
+  const shown = all || edit ? x.items : x.items.slice(0, 4);
+  const field = (k: 'description' | 'cause' | 'requirement', placeholder: string) =>
+    edit ? <textarea rows={Math.min(8, Math.max(2, Math.ceil(draft[k].length / 46) + 1))} value={draft[k]} placeholder={placeholder} aria-label={placeholder} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} /> : g[k] ? <span>{g[k]}</span> : <span className="st-cx-empty">–</span>;
   return (
-    <div className="st-cx-ix">
-      <input className="st-cx-gname" defaultValue={g.name} aria-label="Name des Problems" maxLength={120} onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== g.name && patch({ name: e.target.value.trim() }, `Problem umbenannt: „${e.target.value.trim()}“`)} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
-      <textarea className="st-cx-gdesc" rows={2} defaultValue={g.description ?? ''} placeholder="Beschreibung (optional): das gemeinsame Muster, neutral formuliert" aria-label="Beschreibung des Problems" onBlur={(e) => e.target.value !== (g.description ?? '') && patch({ description: e.target.value.trim() || undefined }, `Beschreibung von „${g.name}“ geändert`)} />
-      {x.items.length > 0 && (
-        <div className="st-cx-tags">
-          {x.rels.map((r) => (
-            <span key={r} className="st-cx-tag">
-              {REL_SHORT[r]}
+    <div className="st-cx-det">
+      <div className="st-cx-dettools">
+        {edit ? (
+          <input className="st-cx-gname" value={draft.name} aria-label="Name des Problems" maxLength={120} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        ) : (
+          <span className="st-cx-note">{`${x.persons.length}/${total} Personen · ${x.items.length} ${x.items.length === 1 ? 'Aussage' : 'Aussagen'}${hidden > 0 ? ` · ${hidden} weitere außerhalb der Auswahl` : ''}${x.persons.length === 1 ? ' · nur eine Person: nicht wiederkehrend' : ''}`}</span>
+        )}
+        {!edit && (
+          <button type="button" className="st-cx-btn" onClick={start}>
+            <Ico n="pen" s={13} /> Bearbeiten
+          </button>
+        )}
+      </div>
+      <div className="st-cx-f">
+        <Ico n="warn" />
+        <b>Problem</b>
+        {field('description', 'Das gemeinsame Problem, neutral formuliert')}
+      </div>
+      <div className="st-cx-f">
+        <Ico n="cause" />
+        <b>Mögliche Ursache</b>
+        {field('cause', 'Was das Problem auslösen könnte')}
+      </div>
+      <div className="st-cx-f">
+        <Ico n="target" />
+        <b>Designanforderung</b>
+        {field('requirement', 'Was eine Lösung erfüllen muss')}
+      </div>
+      <div className="st-cx-f">
+        <Ico n="people" />
+        <b>
+          Betroffene
+          <small>nach Crafting-Bezug</small>
+        </b>
+        <div>
+          {byRel.length ? (
+            byRel.map(({ r, ps }) => (
+              <div key={r} className="st-cx-cat">
+                <span>
+                  <b className={`k-${r}`} />
+                  {REL_SHORT[r]}
+                </span>
+                <span className="st-cx-chips">
+                  {ps.map(({ p, v }) => (
+                    <span key={p} className="st-cx-chip">
+                      {p}
+                      {v && <small>{v}</small>}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            ))
+          ) : (
+            <span className="st-cx-empty">–</span>
+          )}
+        </div>
+      </div>
+      <div className="st-cx-f">
+        <Ico n="star" />
+        <b>Zentral bei</b>
+        <span className="st-cx-chips">
+          {mains.length ? (
+            <>
+              {mains.map((p) => (
+                <span key={p} className="st-cx-chip is-dark">
+                  {p}
+                </span>
+              ))}
+              <small className="st-cx-note">als Hauptproblem bestätigt</small>
+            </>
+          ) : (
+            <span className="st-cx-empty">bei niemandem als Hauptproblem bestätigt</span>
+          )}
+        </span>
+      </div>
+      <div className="st-cx-f">
+        <Ico n="quote" />
+        <b>
+          Belege <small>{x.items.length}</small>
+        </b>
+        <div>
+          {edit ? (
+            <Quotes items={shown} view={view} onRemove={(i) => patch({ items: g.items.filter((id) => id !== i.id) }, `Aussage aus „${g.name}“ genommen`)} />
+          ) : (
+            <div className="st-cx-qgrid">
+              {shown.map((i) => (
+                <div key={i.id} className="st-cx-qc">
+                  {`„${itemText(view, i)}“`}
+                  <small>{[i.person, artOf(model, i), REL_SHORT[relOf(model, i)], designOfItem(i) ? `Variante ${designOfItem(i)}` : ''].filter(Boolean).join(' · ')}</small>
+                </div>
+              ))}
+            </div>
+          )}
+          {!edit && x.items.length > 4 && (
+            <button type="button" className="st-linkbtn st-cx-more2" onClick={() => setAll(!all)}>
+              {all ? 'Weniger anzeigen' : `Alle ${x.items.length} Belege anzeigen`}
+            </button>
+          )}
+          {edit && (
+            <>
+              <label className="st-cx-add">
+                <span className="st-cx-lab">Aussage zuordnen</span>
+                <input type="search" value={q} placeholder="Suchen: P-ID oder Wort …" onChange={(e) => setQ(e.target.value)} />
+              </label>
+              {hits.length > 0 && (
+                <ul className="st-cx-hits">
+                  {hits.map((i) => (
+                    <li key={i.id}>
+                      <span>
+                        <small>{[i.person, artOf(model, i), REL_SHORT[relOf(model, i)]].filter(Boolean).join(' · ')}</small>
+                        {itemText(view, i)}
+                      </span>
+                      <button type="button" className="st-cx-btn" onClick={() => (patch({ items: [...g.items, i.id] }, `Aussage zu „${g.name}“`), setQ(''))}>
+                        Zuordnen
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {q.trim().length >= 2 && !hits.length && <span className="st-cx-note">Keine passende Crafting-Aussage (außerhalb der Auswahl oder schon zugeordnet).</span>}
+            </>
+          )}
+        </div>
+      </div>
+      <div className="st-cx-f">
+        <Ico n="bulb" />
+        <b>Lösungen</b>
+        <div>
+          {solutions.length ? (
+            <ol className="st-cx-sol">
+              {solutions.map((sol, k) => (
+                <li key={sol.id}>
+                  <span className="st-cx-num">{k + 1}</span>
+                  {edit ? <input value={sol.text} aria-label={`Lösung ${k + 1}`} placeholder="Lösungsidee …" onChange={(e) => setSol(sol.id, { text: e.target.value })} /> : <span>{sol.text}</span>}
+                  <button type="button" className={`st-cx-pill is-${sol.status}`} title="Status umschalten" onClick={() => setSol(sol.id, { status: sol.status === 'idea' ? 'chosen' : 'idea' })}>
+                    {sol.status === 'chosen' ? 'Ausgewählt' : 'Idee'}
+                  </button>
+                  {edit && (
+                    <button type="button" className="st-cx-x is-small" aria-label={`Lösung ${k + 1} entfernen`} onClick={() => setDraft({ ...draft, solutions: draft.solutions.filter((s) => s.id !== sol.id) })}>
+                      ×
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            !edit && <span className="st-cx-empty">Noch keine Lösungsidee.</span>
+          )}
+          {edit && (
+            <button type="button" className="st-linkbtn st-cx-more2" onClick={() => setDraft({ ...draft, solutions: [...draft.solutions, { id: `sol${Date.now().toString(36)}`, text: '', status: 'idea' }] })}>
+              + Lösung hinzufügen
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="st-cx-f">
+        <Ico n="flag" />
+        <b>Status</b>
+        <span className="st-cx-steps" role="radiogroup" aria-label="Status des Problems">
+          {CX_STATUS.map(([k, l], n) => (
+            <span key={k} className="st-cx-stepw">
+              {n > 0 && n < 4 && <i aria-hidden="true">›</i>}
+              <button type="button" role="radio" aria-checked={(g.status ?? 'idea') === k} className={`st-cx-step${(g.status ?? 'idea') === k ? ' is-on' : ''}${k === 'rejected' ? ' is-rej' : ''}`} onClick={() => patch({ status: k }, `Status von „${g.name}“: ${l}`)}>
+                {l}
+              </button>
             </span>
           ))}
-          {codes.map((c) => (
-            <span key={c} className="st-cx-tag">
-              {c}
-            </span>
-          ))}
-          <span className="st-cx-tag">{designs.includes('A') && designs.includes('B') ? 'A und B' : designs.includes('A') ? 'nur Variante A' : designs.includes('B') ? 'nur Variante B' : 'Variante nicht zugeordnet'}</span>
+        </span>
+      </div>
+      {edit && (
+        <div className="st-cx-editfoot">
+          <button
+            type="button"
+            className="st-linkbtn st-cx-del"
+            onClick={() => confirm(`Problem „${g.name}“ löschen? Die Aussagen bleiben erhalten; ein darauf gesetztes Hauptproblem muss neu gewählt werden.`) && save(latest().filter((y) => y.id !== g.id), `Problem „${g.name}“ gelöscht`)}
+          >
+            Problem löschen
+          </button>
+          <span className="st-cx-sp" />
+          <button type="button" className="st-cx-btn" onClick={() => setEdit(false)}>
+            Abbrechen
+          </button>
+          <button type="button" className="st-cx-btn is-pri" onClick={commit}>
+            Speichern
+          </button>
         </div>
       )}
-      <span className="st-cx-note">{`${x.items.length} ${x.items.length === 1 ? 'Aussage' : 'Aussagen'}${x.persons.length ? ` · ${x.persons.join(', ')}` : ''}${mains.length ? ` · Hauptproblem bei ${mains.join(', ')}` : ''}${x.persons.length === 1 ? ' · nur eine Person: nicht wiederkehrend' : ''}${hidden > 0 ? ` · ${hidden} weitere außerhalb der Auswahl` : ''}`}</span>
-      <Quotes items={x.items} view={view} onRemove={(i) => patch({ items: g.items.filter((id) => id !== i.id) }, `Aussage aus „${g.name}“ genommen`)} />
-      <label className="st-cx-add">
-        <span className="st-cx-lab">Aussage zuordnen</span>
-        <input type="search" value={q} placeholder="Suchen: P-ID oder Wort …" onChange={(e) => setQ(e.target.value)} />
-      </label>
-      {hits.length > 0 && (
-        <ul className="st-cx-hits">
-          {hits.map((i) => (
-            <li key={i.id}>
-              <span>
-                <small>{[i.person, artOf(model, i), REL_SHORT[relOf(model, i)]].filter(Boolean).join(' · ')}</small>
-                {itemText(view, i)}
-              </span>
-              <button type="button" className="st-cx-btn" onClick={() => (patch({ items: [...g.items, i.id] }, `Aussage zu „${g.name}“`), setQ(''))}>
-                Zuordnen
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {q.trim().length >= 2 && !hits.length && <span className="st-cx-note">Keine passende Crafting-Aussage (außerhalb der Auswahl oder schon zugeordnet).</span>}
-      <button
-        type="button"
-        className="st-linkbtn st-cx-del"
-        onClick={() => confirm(`Problem „${g.name}“ löschen? Die Aussagen bleiben erhalten; ein darauf gesetztes Hauptproblem muss neu gewählt werden.`) && save(latest().filter((y) => y.id !== g.id), `Problem „${g.name}“ gelöscht`)}
-      >
-        Problem löschen
-      </button>
     </div>
   );
 }
@@ -714,20 +888,22 @@ function NoGroup({ items, total, person, view, onCreate }: { items: ItemDoc[]; t
     if (g) save(latest().map((x) => (x.id === v ? { ...x, items: [...x.items, i.id] } : x)), `Aussage zu „${g.name}“`);
   };
   return (
-    <div className="st-cx-nof">
-      <button type="button" className="st-cx-ir is-plain" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className="st-cx-iname">
+    <li className="st-cx-nof2">
+      <button type="button" className={`st-cx-row is-plain${open ? ' is-open' : ''}`} aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Ico n={open ? 'down' : 'chev'} />
+        <span className="st-cx-rname">
           Ohne Problem-Gruppe
           {person && own > 0 && <span className="st-cx-star">{`${own} von ${person}`}</span>}
         </span>
-        <span className="st-cx-note">{`${items.length} von ${total} Crafting-Aussagen`}</span>
-        <span />
-        <span className="st-cx-chev" aria-hidden="true">
-          {open ? '▾' : '▸'}
+        <span className="st-cx-cnt">
+          <span title={`${items.length} von ${total} Crafting-Aussagen`}>
+            <Ico n="docs" />
+            {items.length}
+          </span>
         </span>
       </button>
       {open && (
-        <div className="st-cx-ix">
+        <div className="st-cx-det">
           {items.length ? (
             <Quotes
               items={items}
@@ -750,7 +926,7 @@ function NoGroup({ items, total, person, view, onCreate }: { items: ItemDoc[]; t
           )}
         </div>
       )}
-    </div>
+    </li>
   );
 }
 

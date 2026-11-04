@@ -279,13 +279,13 @@ export const BLOCK_KINDS: BlockKind[] = [
   { id: 'method', label: 'Method', color: '#2f6fd6', section: 'methodology' },
   { id: 'decision', label: 'Decision', color: '#7a4fd0', section: 'decisions' },
   { id: 'rationale', label: 'Rationale', color: '#1f8a84', section: 'decisions' },
-  { id: 'outcome', label: 'Outcome', color: '#2f8a4a', section: 'research' },
+  { id: 'outcome', label: 'Outcome', color: '#61a051', section: 'research' },
   { id: 'reflection', label: 'Reflection', color: '#c68a12', section: 'personal' },
   { id: 'context', label: 'Context', color: '#6b6b66' },
   { id: 'notes', label: 'Notes', color: '#9a9a94' },
 ];
 // the colours to choose from (icon nodes and categories)
-export const PALETTE = ['#2f6fd6', '#7a4fd0', '#1f8a84', '#2f8a4a', '#c68a12', '#c2571a', '#c23b3b', '#d14d8a', '#6b6b66', '#1d1d1b'];
+export const PALETTE = ['#2f6fd6', '#7a4fd0', '#1f8a84', '#61a051', '#c68a12', '#c2571a', '#c23b3b', '#d14d8a', '#6b6b66', '#1d1d1b'];
 // the icons a day's entry can show on its node
 export const ENTRY_ICONS = ['doc', 'user', 'flask', 'branch', 'chat', 'target', 'layers', 'grid', 'search', 'flag', 'sprout', 'check', 'calendar', 'clip', 'note', 'scale', 'trash'] as const;
 

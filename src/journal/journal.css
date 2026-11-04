@@ -33,7 +33,7 @@
   --jr-accent: #c2571a;
   --jr-accent-soft: #f6e6dc;
   --jr-warn: #9a3b0c;
-  --jr-good: #2f6b3a;
+  --jr-good: #61a051;
   --jr-side: 232px;
 }
 /* the game's styles.css locks the page; this one scrolls */
@@ -630,7 +630,7 @@ h3.jr-inline {
 }
 .jr-vis.is-shared {
   color: var(--jr-good);
-  border-color: #cfe3d2 !important;
+  border-color: #c6dfbf !important;
 }
 .jr-addrow {
   display: flex;
@@ -831,7 +831,7 @@ h3.jr-inline {
   color: var(--jr-good);
 }
 .jr-status.is-done {
-  background: #e6efe7;
+  background: #e8f3e5;
   color: var(--jr-good);
 }
 .jr-status.is-open {
@@ -1399,7 +1399,7 @@ h3.jr-inline {
   color: var(--jr-accent);
 }
 .jr-stat-icon.is-good {
-  background: #e6efe7;
+  background: #e8f3e5;
   color: var(--jr-good);
 }
 .jr-stat-label {
@@ -1429,7 +1429,7 @@ h3.jr-inline {
   color: var(--jr-warn);
 }
 .jr-pill.is-completed {
-  background: #e6efe7;
+  background: #e8f3e5;
   color: var(--jr-good);
 }
 .jr-progress {

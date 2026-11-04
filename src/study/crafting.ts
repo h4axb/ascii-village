@@ -64,10 +64,27 @@ export const artOf = (m: Model, i: ItemDoc) => {
 
 // a shared Crafting UX problem: a group of crafting statements of its own,
 // kept apart from the recurring findings (settings/craftingProblems)
+export type CxStatus = 'idea' | 'chosen' | 'implemented' | 'tested' | 'rejected';
+export const CX_STATUS: [CxStatus, string][] = [
+  ['idea', 'Idee'],
+  ['chosen', 'Ausgewählt'],
+  ['implemented', 'Umgesetzt'],
+  ['tested', 'Getestet'],
+  ['rejected', 'Verworfen'],
+];
+export interface CxSolution {
+  id: string;
+  text: string;
+  status: 'idea' | 'chosen';
+}
 export interface CxProblem {
   id: string;
   name: string;
-  description?: string;
+  description?: string; // the problem, neutrally worded
+  cause?: string; // a possible cause
+  requirement?: string; // the design requirement it leads to
+  solutions?: CxSolution[];
+  status?: CxStatus;
   items: string[]; // statement ids
   auto?: boolean; // created from an AI proposal
 }

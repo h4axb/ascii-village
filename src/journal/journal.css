@@ -3751,3 +3751,70 @@ h3.jr-inline {
     grid-row: 1;
   }
 }
+/* the beams hold their whole title: never shorter than it, and it moves along
+   when the beam's start is scrolled out of view */
+.jr-root button.jr-gt-beam,
+.jr-gt-beam.is-deadline {
+  min-width: max-content;
+  box-sizing: border-box;
+}
+.jr-gt-beamtext {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  will-change: transform;
+}
+.jr-gt-beamtext svg {
+  flex: none;
+}
+/* an item outside the view: a small pointer at the edge, a click brings it in */
+.jr-root button.jr-gt-edge {
+  all: unset;
+  position: absolute;
+  top: calc(50% - 11px);
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  padding: 0 8px;
+  border: 1px solid var(--jr-line);
+  border-radius: 999px;
+  background: var(--jr-paper);
+  color: var(--jr-ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  z-index: 3;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(29, 29, 27, 0.08);
+}
+.jr-root button.jr-gt-edge.is-after {
+  transform: translateX(-100%);
+}
+.jr-root button.jr-gt-edge:hover {
+  border-color: var(--k);
+}
+.jr-root button.jr-gt-edge:focus-visible {
+  outline: 2px solid var(--jr-accent);
+}
+.jr-gt-edge > i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--k);
+}
+.jr-gt-edge.is-done {
+  color: var(--jr-muted);
+}
+.jr-gt-edgename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jr-gt.is-compact .jr-root button.jr-gt-edge,
+.jr-gt.is-compact button.jr-gt-edge {
+  max-width: 150px;
+}

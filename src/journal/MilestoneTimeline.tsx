@@ -77,6 +77,39 @@ function Fade({ children }: { children: string }) {
   );
 }
 
+// a rough width of a title in the beams (12.5 px, semibold)
+const textW = (t: string) => Math.ceil(t.length * 7.3);
+
+// a beam: never shorter than its title (so the title always fits inside it),
+// and the title moves along when the beam's start is scrolled out of view
+function Beam({ deadline, left, w, view, label, children, ...on }: { deadline?: boolean; left: number; w: number; view: { from: number; to: number }; label: string; children: React.ReactNode } & React.HTMLAttributes<HTMLElement>) {
+  const ref = useRef<HTMLElement>(null);
+  const text = useRef<HTMLSpanElement>(null);
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const t = text.current;
+    if (!el || !t) return;
+    const pad = deadline ? 10 : 12;
+    const s = Math.round(Math.max(0, Math.min(view.from - left + 6, el.offsetWidth - t.offsetWidth - 2 * pad)));
+    setShift((o) => (o === s ? o : s));
+  }, [view.from, left, w, deadline]);
+  const inner = (
+    <span ref={text} className="jr-gt-beamtext" style={shift ? { transform: `translateX(${shift}px)` } : undefined}>
+      {children}
+    </span>
+  );
+  return deadline ? (
+    <span ref={ref} tabIndex={0} className="jr-gt-beam is-deadline" style={{ left, width: w }} aria-label={label} {...on}>
+      {inner}
+    </span>
+  ) : (
+    <button ref={ref as React.RefObject<HTMLButtonElement>} type="button" className="jr-gt-beam" style={{ left, width: w }} aria-label={label} {...on}>
+      {inner}
+    </button>
+  );
+}
+
 interface Tip {
   x: number;
   y: number;
@@ -97,6 +130,18 @@ export function MilestoneTimeline({ store, editing, openMilestone }: { store: Jo
   const [tip, setTip] = useState<(Tip & { id: string }) | null>(null);
   const touch = useRef(false);
   const ppd = ZOOM[zoom];
+  // the part of the time axis in view (track coordinates): the beams keep their
+  // titles in it, and whatever lies outside gets a small pointer at the edge
+  const [view, setView] = useState({ from: 0, to: 0 });
+  const measure = () => {
+    const el = scroll.current;
+    const tr = el?.querySelector<HTMLElement>('.jr-gt-row.is-head .jr-gt-track');
+    const lb = el?.querySelector<HTMLElement>('.jr-gt-row.is-head .jr-gt-label');
+    if (!el || !tr || !lb) return;
+    const t = tr.getBoundingClientRect().left;
+    const v = { from: Math.round(lb.getBoundingClientRect().right - t), to: Math.round(el.getBoundingClientRect().right - t) };
+    setView((o) => (o.from === v.from && o.to === v.to ? o : v));
+  };
 
   useLayoutEffect(() => {
     const el = scroll.current;
@@ -146,10 +191,36 @@ export function MilestoneTimeline({ store, editing, openMilestone }: { store: Jo
   // (the tooltip goes when the axis scrolls)
   useEffect(() => {
     const el = scroll.current;
-    const off = () => setTip(null);
+    let raf = 0;
+    const off = () => {
+      setTip(null);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(measure);
+    };
     el?.addEventListener('scroll', off, { passive: true });
-    return () => el?.removeEventListener('scroll', off);
+    return () => (el?.removeEventListener('scroll', off), cancelAnimationFrame(raf));
   }, []);
+  useLayoutEffect(measure, [width, ppd, range]);
+  // a pointer at the edge of the view for an item outside it; a click brings it in
+  const edge = (from: number, to: number, label: string, color: string, done?: boolean) => {
+    if (!view.to || (to >= view.from && from <= view.to)) return null;
+    const before = to < view.from;
+    return (
+      <button
+        type="button"
+        className={`jr-gt-edge${before ? ' is-before' : ' is-after'}${done ? ' is-done' : ''}`}
+        style={{ left: before ? view.from + 6 : view.to - 6, '--k': color } as React.CSSProperties}
+        aria-label={`Show ${label}`}
+        title={`Show ${label}`}
+        onClick={() => scroll.current?.scrollBy({ left: before ? from - view.from - 24 : to - view.to + 24, behavior: 'smooth' })}
+      >
+        {before && <span aria-hidden="true">‹</span>}
+        <i aria-hidden="true" />
+        <span className="jr-gt-edgename">{label}</span>
+        {!before && <span aria-hidden="true">›</span>}
+      </button>
+    );
+  };
 
   const show = (el: HTMLElement, t: Omit<Tip, 'x' | 'y'> & { id: string }) => {
     const box = root.current?.getBoundingClientRect();
@@ -259,10 +330,11 @@ export function MilestoneTimeline({ store, editing, openMilestone }: { store: Jo
                   {a && b && (
                     <>
                       {/* the title always inside, fading out when the beam is too short for it */}
-                      <button type="button" className="jr-gt-beam" style={{ left, width: w }} aria-label={`${m.name} · ${t.when} · ${t.left}`} {...hover(t, () => openMilestone(m))}>
+                      <Beam left={left} w={w} view={view} label={`${m.name} · ${t.when} · ${t.left}`} {...hover(t, () => openMilestone(m))}>
                         {done && <Icon name="check" />}
-                        <Fade>{m.name}</Fade>
-                      </button>
+                        <span>{m.name}</span>
+                      </Beam>
+                      {edge(left, left + Math.max(w, textW(m.name) + (done ? 44 : 26)), m.name, color, done)}
                     </>
                   )}
                   {a && !b && (
@@ -271,6 +343,7 @@ export function MilestoneTimeline({ store, editing, openMilestone }: { store: Jo
                       <span>{m.name}</span>
                     </button>
                   )}
+                  {a && !b && edge(left, left + 24 + textW(m.name), m.name, color, done)}
                 </div>
               </div>
             );
@@ -309,16 +382,17 @@ export function MilestoneTimeline({ store, editing, openMilestone }: { store: Jo
                 <div className="jr-gt-track" style={{ width: track }} role="cell">
                   <span className="jr-gt-now" style={{ left: todayX }} aria-hidden="true" />
                   {span ? (
-                    <span tabIndex={0} className="jr-gt-beam is-deadline" style={{ left, width: w }} aria-label={`${d.label} · ${t.when} · ${t.left}`} {...hover(t)}>
+                    <Beam deadline left={left} w={w} view={view} label={`${d.label} · ${t.when} · ${t.left}`} {...hover(t)}>
                       {d.done && <Icon name="check" />}
-                      <Fade>{d.label}</Fade>
-                    </span>
+                      <span>{d.label}</span>
+                    </Beam>
                   ) : (
                     <span tabIndex={0} className={`jr-gt-point is-deadline${d.done ? ' is-done' : ''}`} style={{ left: left + ppd / 2 }} aria-label={`${d.label} · ${t.when} · ${t.left}`} {...hover(t)}>
                       <span className="jr-gt-diamond" aria-hidden="true" />
                       <span>{d.label}</span>
                     </span>
                   )}
+                  {edge(left, left + Math.max(w, 24 + textW(d.label)), d.label, t.color, d.done)}
                 </div>
               </div>
             );

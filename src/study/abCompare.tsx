@@ -125,7 +125,6 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const nextCode = () => `H${Math.max(0, ...hyps.map((h) => Number(h.code.replace(/\D/g, '')) || 0)) + 1}`;
   const [fresh, setFresh] = useState<string | null>(null);
   const [src, setSrc] = useState<'tally' | 'game'>('tally');
-  const [crit, setCrit] = useState('');
   const game = useMemo(() => gameVotes(slice.feedback), [slice.feedback]);
   const tallyRows: Vote[] = results.map((r) => ({
     key: r.question,
@@ -164,14 +163,6 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
             <i>1</i>
             <b>Einzelbewertungen</b>
             <span className="st-ab-rtools">
-              <select value={crit} aria-label="Kriterium" onChange={(e) => setCrit(e.target.value)}>
-                <option value="">Alle Kriterien</option>
-                {rows.map((r) => (
-                  <option key={r.key} value={r.key}>
-                    {r.title}
-                  </option>
-                ))}
-              </select>
               <span className="st-seg st-cx-seg" role="group" aria-label="Quelle">
                 {(
                   [
@@ -179,7 +170,7 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
                     ['game', 'In-Game'],
                   ] as const
                 ).map(([v, l]) => (
-                  <button key={v} type="button" className={src === v ? 'is-on' : ''} aria-pressed={src === v} onClick={() => (setSrc(v), setCrit(''))}>
+                  <button key={v} type="button" className={src === v ? 'is-on' : ''} aria-pressed={src === v} onClick={() => setSrc(v)}>
                     {l}
                   </button>
                 ))}
@@ -189,9 +180,7 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
           {rows.length ? (
             <>
               <div className="st-ab-rows">
-                {rows
-                  .filter((r) => !crit || r.key === crit)
-                  .map((r) =>
+                {rows.map((r) =>
                     src === 'tally' ? (
                       <VoteRow
                         key={r.key}
@@ -354,9 +343,12 @@ interface Vote {
   nHyp?: number;
   hint?: string;
   means?: { A: number | null; B: number | null; nA: number; nB: number };
+  scale?: { low: string; high: string; lower?: boolean }; // in-game: what 1 and 5 mean
+  calc?: { who: string; a: number; b: number; v: 'A' | 'B' | null }[]; // in-game: the comparison per person
 }
 const lead2 = (v: Pick<Vote, 'A' | 'B'>) => (v.A > v.B ? 'A' : v.B > v.A ? 'B' : null);
 const num = (x: number | null) => (x == null ? '–' : x.toFixed(1).replace('.', ','));
+const val = (x: number) => (Number.isInteger(x) ? String(x) : num(x)); // a person's rating (a mean if rated twice)
 
 // the in-game rating questions: per person the mean of each design's ratings,
 // the higher one is a vote for that design (frustration: the lower one)
@@ -372,9 +364,9 @@ export function gameVotes(feedback: { participant?: string; rating?: Record<stri
   }
   const avg = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : null);
   return RATING_QUESTIONS.map((q) => {
-    const out: Vote = { key: q.id, title: RATING_LABEL[q.id] ?? q.id, sub: q.id === 'frustration' ? `${q.text} · niedriger ist besser` : q.text, A: 0, B: 0, tie: 0 };
+    const out: Vote = { key: q.id, title: RATING_LABEL[q.id] ?? q.id, sub: q.text, A: 0, B: 0, tie: 0, scale: { low: q.low, high: q.high, lower: q.id === 'frustration' }, calc: [] };
     const all = { A: [] as number[], B: [] as number[] };
-    for (const p of per.values()) {
+    for (const [who, p] of [...per.entries()].sort(([x], [y]) => x.localeCompare(y))) {
       const x = p[q.id];
       if (!x) continue;
       all.A.push(...x.A);
@@ -386,6 +378,7 @@ export function gameVotes(feedback: { participant?: string; rating?: Record<stri
       if (d > 0) out.B++;
       else if (d < 0) out.A++;
       else out.tie++;
+      out.calc!.push({ who, a, b, v: d > 0 ? 'B' : d < 0 ? 'A' : null });
     }
     out.means = { A: avg(all.A), B: avg(all.B), nA: all.A.length, nB: all.B.length };
     return out;
@@ -436,7 +429,42 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
           {r.sub}
         </span>
       </span>
-      <span className={`st-ab-win is-${w ?? 'tie'}`}>{w ?? 'Gleich'}</span>
+      {r.scale && (
+        <span className="st-ab-scale" aria-label={`Skala 1 bis 5: 1 = ${r.scale.low}, 5 = ${r.scale.high}`}>
+          <span>
+            <b>1</b> {r.scale.low}
+          </span>
+          <span>
+            <b>5</b> {r.scale.high}
+          </span>
+          {r.scale.lower && <em>niedriger ist besser</em>}
+        </span>
+      )}
+      {r.calc ? (
+        <span className="st-ab-wwrap">
+          <button type="button" className={`st-ab-win is-${w ?? 'tie'}`} aria-describedby={`calc-${r.key}`}>
+            {w ?? 'Gleich'}
+          </button>
+          <span className="st-ab-calc" role="tooltip" id={`calc-${r.key}`}>
+            <b>So berechnet</b>
+            <span className="st-muted">{r.scale?.lower ? 'je Person: der niedrigere Wert gewinnt' : 'je Person: der höhere Wert gewinnt'}</span>
+            <span className="st-ab-ctbl">
+              {r.calc.map((c) => (
+                <span key={c.who} className="st-ab-crow">
+                  <span>{c.who}</span>
+                  <span>{`A ${val(c.a)}`}</span>
+                  <span>{c.v === 'A' ? (r.scale?.lower ? '<' : '>') : c.v === 'B' ? (r.scale?.lower ? '>' : '<') : '='}</span>
+                  <span>{`B ${val(c.b)}`}</span>
+                  <span className={`st-ab-cv is-${c.v ?? 'tie'}`}>{`→ ${c.v ?? 'Gleich'}`}</span>
+                </span>
+              ))}
+            </span>
+            <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
+          </span>
+        </span>
+      ) : (
+        <span className={`st-ab-win is-${w ?? 'tie'}`}>{w ?? 'Gleich'}</span>
+      )}
       <span className="st-ab-count">
         {`A ${r.A} · Gleich ${r.tie} · B ${r.B}`}
         {r.means && <small title="Mittelwert aller Bewertungen (1–5) je Variante">{`Ø A ${num(r.means.A)} (n=${r.means.nA}) · Ø B ${num(r.means.B)} (n=${r.means.nB})`}</small>}
@@ -448,7 +476,7 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
       </span>
     </>
   );
-  if (!onClick) return <div className="st-ab-r">{body}</div>;
+  if (!onClick) return <div className={`st-ab-r${r.scale ? ' is-game' : ''}`}>{body}</div>;
   return (
     <div className={`st-ab-r is-click${on ? ' is-on' : ''}`} title={r.hint}>
       <button type="button" className="st-ab-rbtn" aria-pressed={on} aria-label={`${r.title}: Hypothesen filtern`} onClick={renaming ? undefined : onClick} />

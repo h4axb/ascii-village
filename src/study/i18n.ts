@@ -140,8 +140,6 @@ const EN: Record<string, string> = {
   // A/B-Vergleich: Gesamt- und Einzelbewertungen
   Gesamtbewertung: 'Overall rating',
   Einzelbewertungen: 'Individual ratings',
-  'Alle Kriterien': 'All criteria',
-  Kriterium: 'Criterion',
   Gleich: 'Tie',
   'Direkte Nutzungspräferenz': 'Direct use preference',
   'Crafting-Erfahrung 1–5 · Gesamteindruck': 'Crafting experience 1–5 · overall impression',
@@ -150,6 +148,11 @@ const EN: Record<string, string> = {
   'Je Person gezählt: die höhere Bewertung ist eine Stimme für die Variante, bei Frustration die niedrigere. Gleiche Werte zählen als „Gleich“.': 'Counted per person: the higher rating is a vote for that variant, for frustration the lower one. Equal ratings count as “Tie”.',
   'Noch keine In-Game-Bewertungen (die 5 Fragen nach jeder Variante).': 'No in-game ratings yet (the 5 questions after each variant).',
   'Mittelwert aller Bewertungen (1–5) je Variante': 'Mean of all ratings (1–5) per variant',
+  'So berechnet': 'How it was calculated',
+  'je Person: der höhere Wert gewinnt': 'per person: the higher value wins',
+  'je Person: der niedrigere Wert gewinnt': 'per person: the lower value wins',
+  'niedriger ist besser': 'lower is better',
+  '→ Gleich': '→ tie',
   // Crafting UX · UX-Problemanalyse & Lösungsentwicklung
   'betroffen ·': 'affected ·',
   'zentral ·': 'central ·',
@@ -1418,6 +1421,9 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^A (\d+) · Gleich (\d+) · B (\d+) → Variante ([AB])$/, 'A $1 · tie $2 · B $3 → variant $4'],
+  [/^A (\d+) · Gleich (\d+) · B (\d+) → Gleichstand$/, 'A $1 · tie $2 · B $3 → tie'],
+  [/^Skala 1 bis 5: 1 = (.+), 5 = (.+)$/, 'Scale 1 to 5: 1 = $1, 5 = $2'],
   [/^Variante ([AB]) · (\d+) von (\d+) Person(?:en)?$/, 'Variant $1 · $2 of $3 people'],
   [/^Gleichstand · A (\d+) · Gleich (\d+) · B (\d+)$/, 'Tie · A $1 · tie $2 · B $3'],
   [/^A (\d+) · Gleich (\d+) · B (\d+)$/, 'A $1 · tie $2 · B $3'],

@@ -100,6 +100,7 @@ export interface Milestone {
   order: number;
   related: string[]; // entry ids
   visibility: Visibility;
+  color?: string; // its bar's colour (else one by its place in the list)
 }
 
 // a deadline moved to another date: when, from, to, and why (one short sentence)

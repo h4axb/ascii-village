@@ -677,7 +677,7 @@ function KindManager({ store, onClose }: { store: JournalStore; onClose: () => v
   );
 }
 
-function Swatches({ value, label, onPick }: { value: string; label: string; onPick: (c: string) => void }) {
+export function Swatches({ value, label, onPick }: { value: string; label: string; onPick: (c: string) => void }) {
   return (
     <span className="jr-swatches" role="radiogroup" aria-label={label}>
       {PALETTE.map((c) => (

@@ -115,11 +115,6 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
       .filter((r) => r.n > 0 || !onlyProblems)
       .sort((a, b) => b.n - a.n);
   };
-  const people = (() => {
-    const base = live.filter((i) => matchDash(model, i, f, 'person') && hasRole(model, chipsOf(model, i), 'problem'));
-    const ids = [...new Set(live.map((i) => i.person))].sort();
-    return ids.map((p) => ({ id: p, label: p, n: base.filter((i) => i.person === p).length })).sort((a, b) => b.n - a.n || a.label.localeCompare(b.label));
-  })();
 
   const kpiName = KPI_NAME(model);
   const ab = useAbSummary();
@@ -167,7 +162,6 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
         ))}
       </div>
       <div className="st-dash2-card" role="tabpanel" aria-label={cur.label}>
-        <h2>{cur.label}</h2>
         {!folded && cur.id === 'probleme' && (
           <>
             <div className="st-dash-kpis">
@@ -231,12 +225,6 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
             </div>
           </>
         )}
-        {!folded && cur.id === 'people' && (
-          <div className="st-dash2-sec is-first">
-            <h3>Probleme je Teilnehmende</h3>
-            <Bars rows={people} on={f.person} onPick={(p) => setF({ ...f, person: f.person === p ? undefined : p })} label="Probleme je Teilnehmende" />
-          </div>
-        )}
         {!folded && cur.id === 'ab' && (
           <>
             <div className="st-dash-kpis is-ab">
@@ -259,13 +247,13 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
   );
 }
 
-export type DashTab = 'probleme' | 'klass' | 'people' | 'ab';
-// the tabs, each with an icon for its topic: a warning sign for the problems,
-// a tag for the classification, people, two arrows for the A/B comparison
+export type DashTab = 'probleme' | 'klass' | 'ab';
+// the three tabs, each with an icon for its topic (no title in the card: the
+// active tab names it): a warning sign for the problems, a tag for the
+// classification, two arrows for the A/B comparison
 const TABS: { id: DashTab; label: string; icon: string }[] = [
   { id: 'probleme', label: 'Probleme', icon: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01' },
   { id: 'klass', label: 'Klassifizierung', icon: 'M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8zM7 7h.01' },
-  { id: 'people', label: 'Teilnehmende', icon: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20a6 6 0 0 1 12 0M17 11a3 3 0 0 0 0-6M21 20a6 6 0 0 0-4-5.6' },
   { id: 'ab', label: 'A/B-Vergleich', icon: 'M16 3l4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16' },
 ];
 

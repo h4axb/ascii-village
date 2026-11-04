@@ -7952,3 +7952,8 @@ body:has(.st-root) {
   field-sizing: content;
   min-width: 0;
 }
+/* (no title in the card: a little more room above the tiles) */
+.st-dash2-card {
+  padding-top: 22px;
+}
+

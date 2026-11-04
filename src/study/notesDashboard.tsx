@@ -237,11 +237,11 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
 
 export type DashTab = 'probleme' | 'klass' | 'ab';
 // the three tabs, each with an icon for its topic (no title in the card: the
-// active tab names it): a warning sign for the problems, a tag for the
-// classification, two arrows for the A/B comparison
+// active tab names it): a warning sign for the problems, a magnifier with a
+// check for the classification, two arrows for the A/B comparison
 const TABS: { id: DashTab; label: string; icon: string }[] = [
   { id: 'probleme', label: 'Probleme', icon: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01' },
-  { id: 'klass', label: 'Klassifizierung', icon: 'M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8zM7 7h.01' },
+  { id: 'klass', label: 'Klassifizierung', icon: 'M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM21 21l-4.35-4.35M7.5 11l2.5 2.5 4.5-4.5' },
   { id: 'ab', label: 'A/B-Vergleich', icon: 'M16 3l4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16' },
 ];
 

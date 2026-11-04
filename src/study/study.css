@@ -8023,3 +8023,63 @@ body:has(.st-root) {
 .st-cx-card.is-folded > h3 {
   margin-bottom: 0;
 }
+/* A/B: nothing wider than its card (long Tally questions, inputs, buttons) */
+.st-ab-card,
+.st-ab-person {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.st-ab-card > *,
+.st-ab-person > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.st-ab-chead .st-ab-in {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 160px;
+}
+.st-root .st-ab-chips .st-fchip,
+.st-ab-tag,
+.st-ab-ans {
+  white-space: normal;
+  text-align: left;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.st-ab-under {
+  min-width: 0;
+}
+.st-ab-prefsel {
+  flex-wrap: wrap;
+  max-width: 100%;
+  min-width: 0;
+}
+.st-ab-prefsel select {
+  max-width: 100%;
+  min-width: 0;
+}
+.st-ab-foot,
+.st-ab-row {
+  min-width: 0;
+}
+.st-ab-picker .st-ab-pickbar input {
+  min-width: 0;
+}
+@media (max-width: 420px) {
+  .st-ab-prefsel select {
+    flex: 1 1 100%;
+  }
+  .st-ab-foot .st-cx-sp {
+    display: none;
+  }
+}
+/* narrow phones: the card title row wraps, its fold button shows the arrow only,
+   and the "Bearbeiten ⋯" menu opens leftwards inside the screen */
+@media (max-width: 420px) {
+  .st-lc-title { flex-wrap: wrap; row-gap: 8px; }
+  .st-lc-title > * { min-width: 0; }
+  .st-root .st-lc-title button.st-foldtoggle { padding: 4px 8px; }
+  .st-root .st-lc-title button.st-foldtoggle span { display: none; }
+  .st-item-side .st-more-list { left: auto; right: 0; max-width: calc(100vw - 32px); }
+}

@@ -1,7 +1,8 @@
 // Qualitatives Feedback: a filter-first overview above the statements: what
 // problems dominate and what to look into. Every tile and bar is a filter for the
 // statements below; the same filters (and the active ones) sit in the Aussagen
-// card as chips (DashFilterBar). The section can be folded.
+// card as chips (DashFilterBar). Under the problem figures, the problems of
+// every category (Thema …) can be shown.
 import { useState } from 'react';
 import type { ChipRole, ItemDoc, TagGroup } from './types';
 import { effectiveChips, shortName, type Model } from './model';
@@ -42,9 +43,8 @@ export function matchDash(m: Model, i: ItemDoc, f: DashFilter, skip?: 'kpi' | 'p
   return true;
 }
 
-const PICK_KEY = 'asciia-study-dash-group';
 const TAB_KEY = 'asciia-study-dash-tab';
-const FOLD_KEY = 'asciia-study-dash-folded';
+const OPEN_KEY = 'asciia-study-dash-filters';
 const read = (k: string) => {
   try {
     return localStorage.getItem(k);
@@ -84,10 +84,9 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
   const artGroup = model.tags.find((g) => g.chips.some((c) => c.role === 'problem'));
   const prioGroup = model.tags.find((g) => g.chips.some((c) => c.role === 'essential'));
   const groups = model.tags.filter((g) => g !== artGroup && g !== prioGroup && g.chips.length);
-  const [pick, setPick] = useState(() => read(PICK_KEY) ?? '');
   const [tab, setTab] = useState<DashTab>(() => (read(TAB_KEY) as DashTab) || 'probleme');
-  const [folded, setFolded] = useState(() => read(FOLD_KEY) === '1');
-  const group: TagGroup | undefined = groups.find((g) => g.id === pick) ?? groups.find((g) => g.id === 'thema') ?? groups[0];
+  // (the problems by category: hidden until shown)
+  const [open, setOpen] = useState(() => read(OPEN_KEY) === '1');
 
   const tile = (k: Kpi, label: string, hint: string) => {
     const base = live.filter((i) => matchDash(model, i, f, 'kpi'));
@@ -124,11 +123,10 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
   const pickTab = (t: DashTab) => {
     setTab(t);
     write(TAB_KEY, t);
-    if (folded) toggleFold();
   };
-  const toggleFold = () => {
-    setFolded(!folded);
-    write(FOLD_KEY, folded ? '0' : '1');
+  const toggleOpen = () => {
+    setOpen(!open);
+    write(OPEN_KEY, open ? '0' : '1');
   };
   // the statements by Crafting-Bezug (a click filters: Kern and Integration together as Crafting)
   const relRows = (() => {
@@ -150,7 +148,7 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
     </button>
   );
   return (
-    <section className={`st-dash2${folded ? ' is-folded' : ''}`} aria-label="Dashboard" data-nav="Dashboard">
+    <section className="st-dash2" aria-label="Dashboard" data-nav="Dashboard">
       <div className="st-dash2-tabs" role="tablist" aria-label="Auswertung">
         {tabs.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={t.id === cur.id} aria-label={t.label} title={t.label} className={`st-dash2-tab${t.id === cur.id ? ' is-on' : ''}`} onClick={() => pickTab(t.id)}>
@@ -162,7 +160,7 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
         ))}
       </div>
       <div className="st-dash2-card" role="tabpanel" aria-label={cur.label}>
-        {!folded && cur.id === 'probleme' && (
+        {cur.id === 'probleme' && (
           <>
             <div className="st-dash-kpis">
               {tile('problem', kpiName.problem, 'Aussagen mit der Art „Problem“ – anklicken zum Filtern')}
@@ -171,39 +169,35 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
               {/* (the review progress, set apart from the three problem figures) */}
               {tile('unchecked', kpiName.unchecked, 'Noch nicht geprüfte Aussagen oder solche mit offenen KI-Vorschlägen – anklicken zum Filtern')}
             </div>
-            <div className="st-dash2-sec">
-              <h3>
-                Probleme nach{' '}
-                {groups.length > 1 ? (
-                  <select
-                    value={group?.id ?? ''}
-                    aria-label="Kategorie"
-                    onChange={(e) => {
-                      setPick(e.target.value);
-                      write(PICK_KEY, e.target.value);
-                    }}
-                  >
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  group?.name
+            {/* (under the figures: every category's problems, shown on demand) */}
+            <button type="button" className="st-dash2-more" aria-expanded={open} onClick={toggleOpen}>
+              {open ? 'Filter ausblenden' : 'Filter einblenden'}
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d={open ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />
+              </svg>
+            </button>
+            {open && (
+              <>
+                {groups.map((g) => {
+                  const rows = byGroup(g, true);
+                  return rows.length ? (
+                    <div key={g.id} className="st-dash2-sec">
+                      <h3>{`Probleme nach ${g.name}`}</h3>
+                      <Bars rows={rows} on={f.tags[g.id]} onPick={(c) => setTag(g.id, c)} label={`Probleme nach ${g.name}`} />
+                    </div>
+                  ) : null;
+                })}
+                {artGroup && (
+                  <div className="st-dash2-sec">
+                    <h3>{`Aussagen nach ${artGroup.name}`}</h3>
+                    <Bars rows={byGroup(artGroup, false)} on={f.tags[artGroup.id]} onPick={(c) => setTag(artGroup.id, c)} label={`Aussagen nach ${artGroup.name}`} />
+                  </div>
                 )}
-              </h3>
-              {group ? <Bars rows={byGroup(group, true)} on={f.tags[group.id]} onPick={(c) => setTag(group.id, c)} label={`Probleme nach ${group.name}`} /> : <p className="st-muted">Keine Kategorie</p>}
-            </div>
-            {artGroup && (
-              <div className="st-dash2-sec">
-                <h3>{`Aussagen nach ${artGroup.name}`}</h3>
-                <Bars rows={byGroup(artGroup, false)} on={f.tags[artGroup.id]} onPick={(c) => setTag(artGroup.id, c)} label={`Aussagen nach ${artGroup.name}`} />
-              </div>
+              </>
             )}
           </>
         )}
-        {!folded && cur.id === 'klass' && (
+        {cur.id === 'klass' && (
           <>
             <div className="st-dash-kpis is-rel">
               {REL_TILES.map(([r, label, sub, hint]) => {
@@ -225,7 +219,7 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
             </div>
           </>
         )}
-        {!folded && cur.id === 'ab' && (
+        {cur.id === 'ab' && (
           <>
             <div className="st-dash-kpis is-ab">
               {abTile('A', 'Präferenz A', ab.A, `von ${ab.of} Personen`)}
@@ -236,12 +230,6 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
             <p className="st-muted st-dash2-note">{ab.results ? 'Anklicken zeigt es im Bereich „A/B-Vergleich & Gestaltungsableitung“.' : 'Noch keine Tally-Vergleichsfragen (Teil 1) zugeordnet.'}</p>
           </>
         )}
-        <button type="button" className="st-dash2-foot" aria-expanded={!folded} onClick={toggleFold}>
-          {folded ? 'Filter einblenden' : 'Filter ausblenden'}
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d={folded ? 'm6 9 6 6 6-6' : 'm6 15 6-6 6 6'} />
-          </svg>
-        </button>
       </div>
     </section>
   );

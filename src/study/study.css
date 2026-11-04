@@ -7957,3 +7957,40 @@ body:has(.st-root) {
   padding-top: 22px;
 }
 
+/* (no footer any more: the card closes below its content) */
+.st-dash2-card {
+  padding-bottom: 20px;
+}
+.st-root button.st-dash2-more {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin: 16px 0 0;
+  padding: 10px;
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--st-ink);
+  background: var(--st-soft);
+}
+.st-root button.st-dash2-more:hover {
+  background: #ececef;
+}
+.st-root button.st-dash2-more:focus-visible {
+  outline: 2px solid var(--st-accent);
+}
+.st-dash2-card .st-dash2-sec:last-child {
+  margin-bottom: 0;
+}
+.st-dash2-note:last-child {
+  margin-bottom: 0;
+}
+@media (max-width: 700px) {
+  .st-dash2-card {
+    padding-bottom: 16px;
+  }
+}

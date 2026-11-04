@@ -44,6 +44,14 @@ export function useLang(): Lang {
 
 // ---- the English dictionary (German interface text → English) ----
 const EN: Record<string, string> = {
+  'Nicht übernehmen': 'Do not accept',
+  'Alle nicht übernehmen': 'Accept none',
+  'Hinweis ausblenden': 'Hide notice',
+  'Bis zum Neuladen ausblenden': 'Hide until reload',
+  'Meldung schließen': 'Close message',
+  'Wieder zum Prüfen anzeigen': 'Show again for checking',
+  '1 neues Ereignis': '1 new event',
+  '1 neue Bewertung': '1 new rating',
   // Crafting UX · UX-Problemanalyse & Lösungsentwicklung
   'betroffen ·': 'affected ·',
   'zentral ·': 'central ·',
@@ -1312,6 +1320,8 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^Spieldaten: (\d+) Änderungen? nicht übernommen\.?$/, 'Game data: $1 changes not accepted.'],
+  [/^(\d+) Datens(?:atz|ätze) nicht übernommen\.$/, '$1 records not accepted.'],
   [/^(P\d+) · Zentrale Probleme$/, '$1 · central problems'],
   [/^bis zu (\d+) zentrale Probleme je Person$/, 'up to $1 central problems per person'],
   [/^bis zu (\d+) je Person$/, 'up to $1 per person'],

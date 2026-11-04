@@ -1609,6 +1609,27 @@ body:has(.st-root) {
   flex: 1;
   min-width: 0;
 }
+.st-root button.st-gamebar-x {
+  min-width: 32px;
+  padding: 4px 8px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--st-muted);
+  background: transparent;
+  border-color: transparent;
+}
+@media (max-width: 640px) {
+  .st-gamebar > span {
+    flex-basis: 100%;
+  }
+  .st-root button.st-gamebar-x {
+    margin-left: auto;
+  }
+}
+.st-root button.st-gamebar-x:hover {
+  color: var(--st-ink);
+  background: rgba(0, 0, 0, 0.05);
+}
 
 /* the check's last step: what will be applied, what stays, what was already so */
 .st-review {

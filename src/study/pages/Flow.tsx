@@ -176,7 +176,9 @@ function RunColumns({ items }: { items: CraftItem[] }) {
   const designOfRun = (list: CraftItem[]) => list.find((x) => x.design)?.design;
   return (
     <div className="st-runs">
-      {runs.map((list, i) => col(list, `${i + 1}. Durchgang${designOfRun(list) ? ` · Variante ${designOfRun(list)}` : ''}`))}
+      {runs.map((list, i) => (
+        <Fragment key={i}>{col(list, `${i + 1}. Durchgang${designOfRun(list) ? ` · Variante ${designOfRun(list)}` : ''}`)}</Fragment>
+      ))}
       {other.length > 0 && col(other, 'Ohne Zuordnung')}
     </div>
   );

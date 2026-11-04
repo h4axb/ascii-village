@@ -95,6 +95,7 @@ export function ChangeModal({
   busy,
   names = ['Aktuell', 'Neu'],
   intro = 'Alle Änderungen sind vorausgewählt: abwählen oder „Aktuell behalten“ wählen, was nicht übernommen werden soll. Vor dem Übernehmen wird der jetzige Stand gesichert.',
+  onDeclineAll,
 }: {
   title: string;
   changes: Change[];
@@ -103,6 +104,7 @@ export function ChangeModal({
   busy?: string | null;
   names?: [string, string]; // the two sides (a restore: current and saved)
   intro?: string;
+  onDeclineAll?: () => void; // "Alle nicht übernehmen": nothing is taken over (asked first)
 }) {
   // every change starts selected (the new side); what should not be applied is deselected
   const [choices, setChoices] = useState<Record<string, Choice | undefined>>(() => Object.fromEntries(changes.map((c) => [c.id, c.kind === 'gleich' ? 'alt' : 'neu'])));
@@ -273,6 +275,11 @@ export function ChangeModal({
               <button type="button" onClick={onCancel} disabled={!!busy}>
                 Abbrechen
               </button>
+              {onDeclineAll && (
+                <button type="button" onClick={onDeclineAll} disabled={!!busy}>
+                  Alle nicht übernehmen
+                </button>
+              )}
               {open > 0 && <span className="st-flag">{open === 1 ? 'Noch 1 Konflikt zu entscheiden' : `Noch ${open} Konflikte zu entscheiden`}</span>}
               <button type="button" className="is-primary" onClick={() => setReview(true)} disabled={!!busy || !actionable || open > 0}>
                 {`${applied.length} Änderungen übernehmen …`}

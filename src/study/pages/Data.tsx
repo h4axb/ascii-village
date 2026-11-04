@@ -294,6 +294,8 @@ function Uploads({ failed }: { failed: number }) {
   const { study, model } = useCtx();
   const tally = study.docs.tally.main;
   const notes = study.docs.notes.main;
+  // game records declined at the check ("nicht übernommen"), by kind
+  const declined = Object.values((study.docs.settings.gameKept ?? {}) as Record<string, Record<string, string>>).reduce((a, v) => a + Object.keys(v ?? {}).length, 0);
   const when = (t: number) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   // a coding file: read, then every differing statement in the review window
   const [codes, setCodes] = useState<{ proposals: TagProposal[]; source: TagSource; skipped: string[] } | null>(null);
@@ -397,6 +399,22 @@ function Uploads({ failed }: { failed: number }) {
             {study.stand ? ` · Stand vom ${when(study.stand.at)}` : ''}
           </p>
           <p className="st-muted">Kommen automatisch aus dem Spiel. Neue Daten erscheinen oben auf jeder Seite zum Prüfen.</p>
+          {declined > 0 && (
+            <p className="st-muted">
+              {`${declined} ${declined === 1 ? 'Datensatz' : 'Datensätze'} nicht übernommen. `}
+              <button
+                type="button"
+                className="st-linkbtn"
+                onClick={() => {
+                  if (!confirm('Die nicht übernommenen Spieldaten wieder zum Prüfen anzeigen? Am übernommenen Stand ändert sich dadurch nichts.')) return;
+                  study.commit([{ coll: 'settings', id: 'gameKept', data: {} }]);
+                  logChange(study, 'Spieldaten: nicht übernommene wieder zum Prüfen angezeigt');
+                }}
+              >
+                Wieder zum Prüfen anzeigen
+              </button>
+            </p>
+          )}
         </div>
       </div>
     </Section>

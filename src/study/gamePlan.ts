@@ -92,7 +92,7 @@ export function planGame(stand: GameData, live: GameData, kept: GameKept = {}): 
         id: cid,
         kind: 'neu',
         group: person,
-        label: `${rs.length} neue ${k === 'events' ? 'Ereignisse' : 'Bewertungen'}`,
+        label: rs.length === 1 ? (k === 'events' ? '1 neues Ereignis' : '1 neue Bewertung') : `${rs.length} neue ${k === 'events' ? 'Ereignisse' : 'Bewertungen'}`,
         incoming: {
           fields: [
             ['Zeitraum', ats.length ? `${when(Math.min(...ats))} – ${when(Math.max(...ats))}` : '–'],

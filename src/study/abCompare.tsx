@@ -354,6 +354,11 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
     tie: r.neutral,
     pref: r.question === prefQ,
     hint: r.winner ? `Mehrheit ${r.winner} · ${pText(r.p)}` : 'keine Mehrheit',
+    tcalc: slice.survey
+      .filter((x) => x.p1[r.question] != null)
+      .map((x) => ({ who: x.person ?? `Zeile ${x.row + 1}`, v: x.p1[r.question] === 'A' ? ('A' as const) : x.p1[r.question] === 'B' ? ('B' as const) : null, swapped: x.swapped }))
+      .sort((a, b) => a.who.localeCompare(b.who)),
+    test: r.decided ? `Binomialtest (ohne „Gleich“): ${r.k} von ${r.decided} · ${pText(r.p)}` : undefined,
   }));
   const rows = src === 'tally' ? tallyRows : game;
   const tallyAll = tallyRows.find((r) => r.pref) ?? null;
@@ -576,6 +581,8 @@ interface Vote {
   means?: { A: number | null; B: number | null; nA: number; nB: number };
   scale?: { low: string; high: string; lower?: boolean }; // in-game: what 1 and 5 mean
   calc?: { who: string; a: number; b: number; v: 'A' | 'B' | null }[]; // in-game: the comparison per person
+  tcalc?: { who: string; v: 'A' | 'B' | null; swapped: boolean }[]; // Tally: each person's answer
+  test?: string; // Tally: the binomial test of the majority
 }
 const lead2 = (v: Pick<Vote, 'A' | 'B'>) => (v.A > v.B ? 'A' : v.B > v.A ? 'B' : null);
 const num = (x: number | null) => (x == null ? '–' : x.toFixed(1).replace('.', ','));
@@ -690,6 +697,27 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
               ))}
             </span>
             <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
+          </span>
+        </span>
+      ) : r.tcalc ? (
+        <span className="st-ab-wwrap">
+          <button type="button" className={`st-ab-win is-${w ?? 'tie'}`} aria-describedby={`calc-${r.key}`}>
+            {w ?? 'Gleich'}
+          </button>
+          <span className="st-ab-calc" role="tooltip" id={`calc-${r.key}`}>
+            <b>So berechnet</b>
+            <span className="st-muted">je Person: ihre Antwort in der Umfrage (Teil 1) ist eine Stimme; die Variante mit mehr Stimmen gewinnt</span>
+            <span className="st-ab-ctbl is-tally">
+              {r.tcalc.map((c, i) => (
+                <span key={`${c.who}-${i}`} className="st-ab-crow">
+                  <span>{c.who}</span>
+                  <span>{c.swapped ? 'A/B getauscht' : ''}</span>
+                  <span className={`st-ab-cv is-${c.v ?? 'tie'}`}>{`→ ${c.v ?? 'Gleich'}`}</span>
+                </span>
+              ))}
+            </span>
+            <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
+            {r.test && <span className="st-muted">{r.test}</span>}
           </span>
         </span>
       ) : (

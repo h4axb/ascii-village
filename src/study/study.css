@@ -8137,6 +8137,8 @@ body:has(.st-root) {
 .st-ab-ctbl { display: grid; gap: 2px; max-height: 220px; overflow-y: auto; }
 .st-ab-crow { display: grid; grid-template-columns: auto auto auto auto auto; gap: 0 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .st-ab-crow > :first-child { color: #b9b8b1; }
+.st-ab-ctbl.is-tally .st-ab-crow { grid-template-columns: 52px minmax(0, 1fr) auto; }
+.st-ab-ctbl.is-tally .st-ab-crow > :nth-child(2) { color: #b9b8b1; font-size: 11px; }
 .st-ab-cv { font-weight: 600; }
 .st-ab-cv.is-B { color: #f0a06f; }
 .st-ab-cv.is-tie { color: #b9b8b1; font-weight: 500; }

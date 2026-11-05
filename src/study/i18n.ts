@@ -167,6 +167,8 @@ const EN: Record<string, string> = {
   Allgemein: 'General',
   Person: 'Person',
   'Art des Belegs': 'Kind of evidence',
+  'je Person: ihre Antwort in der Umfrage (Teil 1) ist eine Stimme; die Variante mit mehr Stimmen gewinnt': 'per person: their answer in the survey (part 1) is one vote; the variant with more votes wins',
+  'A/B getauscht': 'A/B swapped',
   'Wie steht diese Aussage zur Interpretation?': 'How does this statement relate to the interpretation?',
   'Andere Aussage wählen': 'Choose another statement',
   Auswählen: 'Choose',

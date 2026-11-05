@@ -107,12 +107,25 @@ const SECTION_LINKS: { id: string; title: string; caption: string; nav: string }
   { id: 'rueckmeldungen', title: 'Usability-Probleme & Rückmeldungen', caption: 'Kritische Usability-Probleme, positive Rückmeldungen, unerwartete Beobachtungen und Moderationseingriffe.', nav: 'Qualitatives Feedback' },
 ];
 // every link target, grouped by page (in the dashboard's order)
-type LinkTarget = { id: string; title: string; caption: string; label: string; page: string };
+// (name: the sidebar page · the category in its page head · the figure's name · its number)
+type LinkTarget = { id: string; title: string; caption: string; label: string; page: string; cat: string; name: string };
 const pageOf = (id: string) => ({ uebersicht: 'Übersicht', quantitativ: 'Quantitative Analyse' } as Record<string, string>)[FIG_ROUTE[id] ?? 'quantitativ'] ?? 'Qualitatives Feedback';
+const catOf = (id: string) =>
+  id === 'ablauf' ? 'Spielablauf'
+  : pageOf(id) === 'Übersicht' ? 'Teilnehmerprofil'
+  : id === 'befunde' ? 'Wiederkehrende Befunde'
+  : id.startsWith('teil1') ? 'Teil 1: Direkter Vergleich'
+  : id.startsWith('teil2') ? 'Teil 2: Likert-Skala'
+  : id.startsWith('teil3') ? 'Teil 3: UEQ-S'
+  : 'In-Game-Ratings und Telemetrie';
+const figTarget = (f: (typeof FIGURES)[number]): LinkTarget => {
+  const page = pageOf(f.id), cat = catOf(f.id), label = `Abb. ${figNumber(f.id)}`;
+  return { ...f, label, page, cat, name: `${page} · ${cat} · ${f.title} · ${label}` };
+};
 const LINK_TARGETS: LinkTarget[] = [
-  ...FIGURES.filter((f) => pageOf(f.id) === 'Übersicht').map((f) => ({ ...f, label: `Abb. ${figNumber(f.id)}`, page: 'Übersicht' })),
-  ...SECTION_LINKS.map((x) => ({ id: x.id, title: x.title, caption: x.caption, label: 'Abschnitt', page: 'Übersicht' })),
-  ...FIGURES.filter((f) => pageOf(f.id) !== 'Übersicht').map((f) => ({ ...f, label: `Abb. ${figNumber(f.id)}`, page: pageOf(f.id) })),
+  ...FIGURES.filter((f) => pageOf(f.id) === 'Übersicht').map(figTarget),
+  ...SECTION_LINKS.map((x) => ({ id: x.id, title: x.title, caption: x.caption, label: 'Abschnitt', page: 'Übersicht', cat: x.title, name: `Übersicht · ${x.title} · Abschnitt` })),
+  ...FIGURES.filter((f) => pageOf(f.id) !== 'Übersicht').map(figTarget),
 ];
 const linkTarget = (id: string) => LINK_TARGETS.find((x) => x.id === id);
 export function goFigure(id: string) {
@@ -139,7 +152,7 @@ function RichText({ text }: { text: string }) {
     if (m.index! > last) out.push(text.slice(last, m.index));
     const f = linkTarget(m[2]);
     out.push(
-      <button key={m.index} type="button" className="st-ab-lk is-fig" title={f ? `${f.label} · ${f.title}` : 'Abbildung'} onClick={() => goFigure(m[2])}>
+      <button key={m.index} type="button" className="st-ab-lk is-fig" title={f ? f.name : 'Abbildung'} onClick={() => goFigure(m[2])}>
         {m[1]}
       </button>,
     );
@@ -160,8 +173,7 @@ function FigPicker({ onClose, onPick }: { onClose: () => void; onPick: (id: stri
     return () => window.removeEventListener('keydown', k);
   }, [onClose]);
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const hits = LINK_TARGETS.filter((f) => words.every((w) => `${f.title} ${f.caption} ${f.label} ${f.page}`.toLowerCase().includes(w)));
-  const pages = [...new Set(hits.map((f) => f.page))];
+  const hits = LINK_TARGETS.filter((f) => words.every((w) => `${f.name} ${f.caption}`.toLowerCase().includes(w)));
   return (
     <div className="st-modal-back" role="presentation" onClick={onClose}>
       <div className="st-modal st-ab-picker" role="dialog" aria-modal="true" aria-label="Abbildung verlinken" onClick={(e) => e.stopPropagation()}>
@@ -173,26 +185,19 @@ function FigPicker({ onClose, onPick }: { onClose: () => void; onPick: (id: stri
         </header>
         <div className="st-modal-body">
           {!hits.length && <p className="st-muted">Keine Abbildung gefunden.</p>}
-          {pages.map((pg) => (
-            <section key={pg} className="st-ab-hitgroup" aria-label={pg}>
-              <h3>{pg}</h3>
-              <ul className="st-ab-hits">
-                {hits
-                  .filter((f) => f.page === pg)
-                  .map((f) => (
-                    <li key={f.id}>
-                      <span>
-                        <small>{f.label}</small>
-                        {f.title}
-                      </span>
-                      <button type="button" className="st-cx-btn is-pri" onClick={() => onPick(f.id)}>
-                        Verlinken
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            </section>
-          ))}
+          <ul className="st-ab-hits">
+            {hits.map((f) => (
+              <li key={f.id}>
+                <span>
+                  <small>{`${f.page} · ${f.cat}`}</small>
+                  {f.label === 'Abschnitt' ? `${f.title} · Abschnitt` : `${f.title} · ${f.label}`}
+                </span>
+                <button type="button" className="st-cx-btn is-pri" onClick={() => onPick(f.id)}>
+                  Verlinken
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </div>

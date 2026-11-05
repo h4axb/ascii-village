@@ -7721,15 +7721,6 @@ body:has(.st-root) {
   padding: 8px 10px;
   font-size: 13px;
 }
-.st-ab-hitgroup + .st-ab-hitgroup {
-  margin-top: 16px;
-}
-.st-ab-hitgroup h3 {
-  margin: 0 0 6px;
-  font-size: var(--st-fs-meta);
-  font-weight: 600;
-  color: var(--st-muted);
-}
 .st-ab-hits small {
   display: block;
   font-size: 11px;

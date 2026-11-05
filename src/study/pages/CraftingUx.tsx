@@ -672,7 +672,7 @@ const ICONS: Record<string, string> = {
   target: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 8a4 4 0 100 8 4 4 0 000-8z',
   quote: 'M7 17c-2 0-3-1.5-3-4 0-3 2-6 5-7M17 17c-2 0-3-1.5-3-4 0-3 2-6 5-7',
   flag: 'M5 21V4h11l-2 4 2 4H5',
-  pen: 'M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4',
+  pen: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z', // the dashboard's one pen
   up: 'M6 15l6-6 6 6',
   eval: 'M4 19h16M7 16V9M12 16V5M17 16v-4',
 };

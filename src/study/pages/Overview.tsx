@@ -297,8 +297,8 @@ function Profile({ fields }: { fields: P4Field[] }) {
         const rowsOf = (f: P4Field) => {
           const missing = persons.filter((p) => !answerOf(p, f.label)).length;
           return [
-            ...f.counts.map(([v, c]) => ({ label: T(v), values: [c], color: aq === f.label ? (v === av ? SERIES.B : '#c9c8c2') : undefined })),
-            ...(missing ? [{ label: 'keine Angabe', values: [missing], color: '#c9c8c2' }] : []),
+            ...f.counts.map(([v, c]) => ({ label: T(v), values: [c], color: aq === f.label ? (v === av ? SERIES.B : '#b9b9c0') : undefined })),
+            ...(missing ? [{ label: 'keine Angabe', values: [missing], color: '#b9b9c0' }] : []),
           ];
         };
         return (

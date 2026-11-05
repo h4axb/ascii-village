@@ -7,9 +7,9 @@ import { fmt } from './stats';
 import { getLang, tr } from './i18n';
 
 export const INK = '#1d1d1b';
-export const MUTED = '#6b6b66';
-export const GRID = '#e4e3de';
-export const SERIES = { A: '#4b4b48', B: '#c2571a' } as const; // variant A grey, B the accent
+export const MUTED = '#6f6f78';
+export const GRID = '#e3e3e7';
+export const SERIES = { A: '#4b4b48', B: '#d9822b' } as const; // variant A grey, B the accent
 export const NEUTRAL = '#bdbcb5';
 const FONT = "'Inter', system-ui, Arial, sans-serif";
 
@@ -215,7 +215,7 @@ export interface SegRow {
   note?: string;
   estimated?: boolean; // drawn hatched: not measured by the game's clock
 }
-const SEG_COLORS = ['#3f3f3c', '#7d7c77', '#aeada6', '#cfcec8', '#e2e1dc'];
+const SEG_COLORS = ['#3f3f3c', '#7d7c77', '#aeada6', '#b9b9c0', '#e3e3e7'];
 export function Segments({ rows, unit = '', digits = 0, legend }: { rows: SegRow[]; unit?: string; digits?: number; legend?: string[] }) {
   const [ref, w] = useWidth<HTMLDivElement>();
   const col = labelColumn(rows.map((r) => r.label), w, 0.3);

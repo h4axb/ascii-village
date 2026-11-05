@@ -8623,3 +8623,110 @@ body:has(.st-root) {
   border-radius: 8px;
   background: var(--st-paper);
 }
+
+/* ---- A/B: Beleg links in an interpretation ---- */
+/* a linked Beleg: the word marked in the colour of its kind */
+.st-root button.st-ab-lk.is-bel {
+  color: var(--st-ink);
+  text-decoration: none;
+  border-radius: 4px;
+  padding: 0 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.st-root button.st-ab-lk.is-bel.is-support {
+  background: var(--st-ok-soft);
+  box-shadow: inset 0 -2px 0 var(--st-ok);
+}
+.st-root button.st-ab-lk.is-bel.is-contra {
+  background: #fdeceb;
+  box-shadow: inset 0 -2px 0 #e08f88;
+}
+.st-root button.st-ab-lk.is-bel.is-extra {
+  background: var(--st-soft);
+  box-shadow: inset 0 -2px 0 var(--st-line-strong);
+}
+.st-ab-bel {
+  transition: box-shadow 0.2s;
+}
+.st-ab-bel.is-flash {
+  box-shadow: 0 0 0 2px var(--st-ink);
+}
+/* the popover under a field with a selected word: link it to a figure or a Beleg */
+.st-ab-selpop {
+  justify-self: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  max-width: 100%;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--st-paper);
+  border: 1px solid var(--st-line);
+  box-shadow: 0 6px 18px rgba(29, 29, 27, 0.12);
+}
+.st-ab-selword {
+  font-size: var(--st-fs-small);
+  color: var(--st-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* a Beleg from a statement (editor): the statement, not editable */
+.st-ab-belro {
+  display: grid;
+  gap: 2px;
+  padding: 2px 2px 0;
+}
+.st-ab-belro p {
+  margin: 0;
+  font-size: var(--st-fs-small);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+/* the picker's second step: the kind of the chosen statement */
+.st-ab-askkind {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.st-ab-chosen {
+  justify-self: stretch;
+  border: 1px solid var(--st-line);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: var(--st-fs-small);
+}
+.st-ab-chosen small {
+  display: block;
+  font-size: var(--st-fs-micro);
+  color: var(--st-muted);
+}
+.st-ab-kindbtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.st-ab-kindbtns .st-cx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.st-ab-kindbtns i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--st-line);
+}
+.st-ab-kindbtns i.is-support {
+  background: var(--st-ok-soft);
+  border-color: var(--st-ok);
+}
+.st-ab-kindbtns i.is-contra {
+  background: #fdeceb;
+  border-color: #e08f88;
+}
+.st-ab-kindbtns i.is-extra {
+  background: var(--st-paper);
+  border-color: var(--st-line-strong);
+}

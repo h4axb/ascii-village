@@ -144,18 +144,33 @@ export function goFigure(id: string) {
   };
   window.setTimeout(step, 350);
 }
-const LINK_RE = /\[([^\]]+)\]\(abb:([a-z0-9]+)\)/g;
-function RichText({ text }: { text: string }) {
+// [word](abb:id) links a figure, [word](bel:id) a Beleg of the same hypothesis
+const LINK_RE = /\[([^\]]+)\]\((abb|bel):([a-z0-9]+)\)/g;
+function RichText({ text, belege, onBeleg }: { text: string; belege?: AbBeleg[]; onBeleg?: (id: string) => void }) {
   const out: React.ReactNode[] = [];
   let last = 0;
   for (const m of text.matchAll(LINK_RE)) {
     if (m.index! > last) out.push(text.slice(last, m.index));
-    const f = linkTarget(m[2]);
-    out.push(
-      <button key={m.index} type="button" className="st-ab-lk is-fig" title={f ? f.name : 'Abbildung'} onClick={() => goFigure(m[2])}>
-        {m[1]}
-      </button>,
-    );
+    if (m[2] === 'abb') {
+      const f = linkTarget(m[3]);
+      out.push(
+        <button key={m.index} type="button" className="st-ab-lk is-fig" title={f ? f.name : 'Abbildung'} onClick={() => goFigure(m[3])}>
+          {m[1]}
+        </button>,
+      );
+    } else {
+      // (a Beleg removed since: the word stays, without the link)
+      const bel = belege?.find((x) => x.id === m[3]);
+      out.push(
+        bel && onBeleg ? (
+          <button key={m.index} type="button" className={`st-ab-lk is-bel ${KIND_FILL[bel.kind]}`} title={`Beleg: ${EV_KIND.find(([k]) => k === bel.kind)?.[1] ?? ''}`} onClick={() => onBeleg(bel.id)}>
+            {m[1]}
+          </button>
+        ) : (
+          m[1]
+        ),
+      );
+    }
     last = m.index! + m[0].length;
   }
   if (last < text.length) out.push(text.slice(last));
@@ -204,32 +219,56 @@ function FigPicker({ onClose, onPick }: { onClose: () => void; onPick: (id: stri
   );
 }
 
-// a text field that can link a word to a figure: the selected word, or the figure's name
-function LinkText({ value, onChange, rows, label, placeholder }: { value: string; onChange: (v: string) => void; rows: number; label: string; placeholder?: string }) {
+// a text field that can link a word to a figure: the selected word, or the figure's name.
+// With belegPicker, a selected word shows a popover: link it to a figure or to a Beleg
+// (belegPicker gets link(id) – the text with the word linked – and close)
+function LinkText({ value, onChange, rows, label, placeholder, belegPicker }: { value: string; onChange: (v: string) => void; rows: number; label: string; placeholder?: string; belegPicker?: (link: (id: string) => string, close: () => void) => React.ReactNode }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [pick, setPick] = useState(false);
+  const [pick, setPick] = useState<'fig' | 'bel' | null>(null);
+  const [hasSel, setHasSel] = useState(false);
   const sel = useRef<[number, number]>([value.length, value.length]);
-  const remember = () => ref.current && (sel.current = [ref.current.selectionStart, ref.current.selectionEnd]);
+  const remember = () => {
+    if (!ref.current) return;
+    sel.current = [ref.current.selectionStart, ref.current.selectionEnd];
+    setHasSel(ref.current.selectionEnd > ref.current.selectionStart && !!value.slice(ref.current.selectionStart, ref.current.selectionEnd).trim());
+  };
+  const linked = (kind: 'abb' | 'bel', id: string, fallback: string) => {
+    const [a, b] = sel.current;
+    const word = value.slice(a, b).trim() || fallback;
+    return `${value.slice(0, a)}[${word}](${kind}:${id})${value.slice(b)}`;
+  };
+  const close = () => (setPick(null), setHasSel(false));
+  const word = value.slice(...sel.current).trim();
   return (
     <div className="st-ab-ltext">
-      <textarea ref={ref} rows={rows} value={value} placeholder={placeholder} aria-label={label} onChange={(e) => onChange(e.target.value)} onSelect={remember} onKeyUp={remember} onMouseUp={remember} />
-      <button type="button" className="st-linkbtn st-ab-figbtn" onMouseDown={remember} onClick={() => setPick(true)}>
+      <textarea ref={ref} rows={rows} value={value} placeholder={placeholder} aria-label={label} onChange={(e) => (onChange(e.target.value), setHasSel(false))} onSelect={remember} onKeyUp={remember} onMouseUp={remember} onBlur={() => window.setTimeout(() => document.activeElement !== ref.current && !pick && setHasSel(false), 150)} />
+      {belegPicker && hasSel && !pick && (
+        <div className="st-ab-selpop" role="toolbar" aria-label={`„${word}“ verlinken`}>
+          <span className="st-ab-selword">{`„${word.length > 28 ? `${word.slice(0, 28)} …` : word}“ verlinken:`}</span>
+          <button type="button" className="st-cx-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => setPick('fig')}>
+            Abbildung
+          </button>
+          <button type="button" className="st-cx-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => setPick('bel')}>
+            Beleg
+          </button>
+        </div>
+      )}
+      <button type="button" className="st-linkbtn st-ab-figbtn" onMouseDown={remember} onClick={() => setPick('fig')}>
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M3 3v18h18M7 15l4-4 3 3 5-6" />
         </svg>
         Abbildung verlinken
       </button>
-      {pick && (
+      {pick === 'fig' && (
         <FigPicker
-          onClose={() => setPick(false)}
+          onClose={close}
           onPick={(id) => {
-            const [a, b] = sel.current;
-            const word = value.slice(a, b).trim() || linkTarget(id)?.title || 'Abbildung';
-            onChange(`${value.slice(0, a)}[${word}](abb:${id})${value.slice(b)}`);
-            setPick(false);
+            onChange(linked('abb', id, linkTarget(id)?.title || 'Abbildung'));
+            close();
           }}
         />
       )}
+      {pick === 'bel' && belegPicker?.((id) => linked('bel', id, 'Beleg'), close)}
     </div>
   );
 }
@@ -716,6 +755,7 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
   const [draft, setDraft] = useState(h);
   const [pick, setPick] = useState<string | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [flash, setFlash] = useState<string | null>(null);
   const itemOf = (id?: string) => (id ? (items.get(id) ?? allItems[id]) : undefined);
   const interps = interpsOf(h);
   const dInterps = interpsOf(draft);
@@ -777,7 +817,31 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
               )}
             </div>
             {personPick(x.person, (p) => setI(x.id, { person: p }), `Testperson der Interpretation ${n + 1}`)}
-            <LinkText rows={3} value={x.text} label={`Interpretation ${n + 1}`} placeholder="Was die Ergebnisse erklären könnte – als Annahme formuliert" onChange={(v) => setI(x.id, { text: v })} />
+            <LinkText
+              rows={3}
+              value={x.text}
+              label={`Interpretation ${n + 1}`}
+              placeholder="Was die Ergebnisse erklären könnte – als Annahme formuliert"
+              onChange={(v) => setI(x.id, { text: v })}
+              belegPicker={(link, close) => (
+                <EvidencePicker
+                  h={draft}
+                  askKind
+                  linked={new Set(x.belege.map((b) => b.item).filter((v): v is string => !!v))}
+                  start={x.person ?? ''}
+                  items={[...items.values()]}
+                  onClose={close}
+                  onPick={(item, kind) => {
+                    // (a statement already a Beleg here: that Beleg, with the kind now chosen)
+                    const had = x.belege.find((b) => b.item === item);
+                    const id = had?.id ?? uid('b');
+                    const belege = had ? x.belege.map((b) => (b.id === id ? { ...b, kind } : b)) : [...x.belege, { id, item, person: itemOf(item)?.person, kind, text: '' }];
+                    setI(x.id, { text: link(id), belege });
+                    close();
+                  }}
+                />
+              )}
+            />
             {x.belege.map((b) => {
               const it = itemOf(b.item);
               return (
@@ -803,12 +867,21 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
                         </button>
                       ))}
                     </span>
-                    {it && <span className="st-muted st-ab-belsrc">{`Aussage: ${SECTION_LABEL[it.section]} · „${itemText(view, it).slice(0, 48)}${itemText(view, it).length > 48 ? ' …' : ''}“`}</span>}
+                    {it && <span className="st-muted st-ab-belsrc">{SECTION_LABEL[it.section]}</span>}
+                    {!it && b.item && <span className="st-muted st-ab-belsrc">Aussage gelöscht</span>}
                     <button type="button" className="st-cx-x is-small" aria-label="Beleg entfernen" title="Beleg entfernen" onClick={() => setI(x.id, { belege: x.belege.filter((y) => y.id !== b.id) })}>
                       ×
                     </button>
                   </div>
-                  <LinkText rows={2} value={b.text} label={`Beleg ${who(b) ?? ''}`} placeholder="Was dieser Beleg für die Interpretation zeigt" onChange={(v) => setB(x.id, b.id, { text: v })} />
+                  {/* (a Beleg from a statement: the statement itself, not editable) */}
+                  {it ? (
+                    <div className="st-ab-belro" aria-label={`Aussage ${it.person}`}>
+                      {questionOf(it) && <p className="st-ab-belq" data-notr>{questionOf(it)}</p>}
+                      <p>{`„${itemText(view, it)}“`}</p>
+                    </div>
+                  ) : (
+                    <LinkText rows={2} value={b.text} label={`Beleg ${who(b) ?? ''}`} placeholder="Was dieser Beleg für die Interpretation zeigt" onChange={(v) => setB(x.id, b.id, { text: v })} />
+                  )}
                 </div>
               );
             })}
@@ -836,6 +909,19 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
       </div>
     );
   const pickFor = interps.find((x) => x.id === pick);
+  // a Beleg link: unfold the interpretation's Belege, scroll to the Beleg, mark it briefly
+  const goBeleg = (iid: string, id: string) => {
+    setOpen((o) => new Set(o).add(iid));
+    window.setTimeout(() => {
+      const el = document.querySelector(`[data-bel="${id}"]`);
+      if (!el) return;
+      const head = document.querySelector('.st-pagehead');
+      const top = window.scrollY + el.getBoundingClientRect().top - (head ? head.getBoundingClientRect().height : 0) - 24;
+      window.scrollTo({ top, behavior: 'smooth' });
+      setFlash(id);
+      window.setTimeout(() => setFlash(null), 1400);
+    }, 60);
+  };
   return (
     <article className={`st-ab-hyp is-${h.status}`}>
       <span className="st-ab-hcode">{hcode(h.code)}</span>
@@ -854,7 +940,7 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
                 <span className="st-ab-ichip">{x.person}</span>
               </span>
             )}
-            <p className="st-ab-htext">{x.text ? <RichText text={x.text} /> : <span className="st-muted">Noch kein Text.</span>}</p>
+            <p className="st-ab-htext">{x.text ? <RichText text={x.text} belege={x.belege} onBeleg={(id) => goBeleg(x.id, id)} /> : <span className="st-muted">Noch kein Text.</span>}</p>
             <span className="st-ab-tipwrap st-ab-hplus">
               <button type="button" className="st-lc-add" aria-label="Beleg hinzufügen" onClick={() => setPick(x.id)}>
                 <PlusIcon />
@@ -868,19 +954,23 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
                 {x.belege.map((b) => {
                   const it = itemOf(b.item);
                   return (
-                    <div key={b.id} className={`st-ab-bel ${KIND_FILL[b.kind]}`}>
+                    <div key={b.id} className={`st-ab-bel ${KIND_FILL[b.kind]}${flash === b.id ? ' is-flash' : ''}`} data-bel={b.id}>
                       <div className="st-ab-belhead">
                         {(it?.person || b.person) && <span className="st-ab-ichip">{it?.person || b.person}</span>}
                         {it && SECTION_LABEL[it.section]}
                         <span className="st-ab-vh">{EV_KIND.find(([k]) => k === b.kind)?.[1]}</span>
                       </div>
                       {questionOf(it) && <p className="st-ab-belq" data-notr>{questionOf(it)}</p>}
-                      {b.text && (
-                        <p className="st-ab-beltext">
-                          <RichText text={b.text} />
-                        </p>
+                      {/* (a Beleg from a statement: the statement; otherwise its own text) */}
+                      {it ? (
+                        <p className="st-ab-beltext">{`„${itemText(view, it)}“`}</p>
+                      ) : (
+                        b.text && (
+                          <p className="st-ab-beltext">
+                            <RichText text={b.text} />
+                          </p>
+                        )
                       )}
-                      {it && <span className="st-ab-src">{`„${itemText(view, it)}“`}</span>}
                       {!it && b.item && <span className="st-ab-src">Aussage gelöscht</span>}
                     </div>
                   );
@@ -926,10 +1016,12 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
 }
 
 // a small search over Beobachtungen & Feedback to link statements
-function EvidencePicker({ h, items, linked, start = '', onClose, onPick }: { h: AbHyp; items: ItemDoc[]; linked: Set<string>; start?: string; onClose: () => void; onPick: (item: string, kind: EvKind) => void }) {
+// (askKind: a statement is picked first, then its kind is asked)
+function EvidencePicker({ h, items, linked, start = '', askKind, onClose, onPick }: { h: AbHyp; items: ItemDoc[]; linked: Set<string>; start?: string; askKind?: boolean; onClose: () => void; onPick: (item: string, kind: EvKind) => void }) {
   const view = useContentView();
   const [q, setQ] = useState(start);
   const [kind, setKind] = useState<EvKind>('support');
+  const [chosen, setChosen] = useState<ItemDoc | null>(null);
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', k);
@@ -944,15 +1036,37 @@ function EvidencePicker({ h, items, linked, start = '', onClose, onPick }: { h: 
           <h2>{`Beleg hinzufügen · ${hcode(h.code)}${h.title ? ` · ${h.title}` : ''}`}</h2>
           <div className="st-ab-pickbar">
             <input type="search" autoFocus value={q} placeholder="Suchen: P-ID oder Wort …" aria-label="Aussagen durchsuchen" onChange={(e) => setQ(e.target.value)} />
-            <span className="st-ab-chips" role="radiogroup" aria-label="Art des Belegs">
+            {!askKind && (
+              <span className="st-ab-chips" role="radiogroup" aria-label="Art des Belegs">
+                {EV_KIND.map(([k, l]) => (
+                  <button key={k} type="button" role="radio" aria-checked={kind === k} className={`st-fchip${kind === k ? ' is-on' : ''}`} onClick={() => setKind(k)}>
+                    {l}
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
+        </header>
+        {chosen ? (
+          <div className="st-modal-body st-ab-askkind">
+            <div className="st-ab-chosen">
+              <small>{`${chosen.person} · ${SECTION_LABEL[chosen.section]}`}</small>
+              {itemText(view, chosen)}
+            </div>
+            <span className="st-cx-lab">Wie steht diese Aussage zur Interpretation?</span>
+            <div className="st-ab-kindbtns">
               {EV_KIND.map(([k, l]) => (
-                <button key={k} type="button" role="radio" aria-checked={kind === k} className={`st-fchip${kind === k ? ' is-on' : ''}`} onClick={() => setKind(k)}>
+                <button key={k} type="button" className="st-cx-btn" onClick={() => onPick(chosen.id, k)}>
+                  <i className={KIND_FILL[k]} />
                   {l}
                 </button>
               ))}
-            </span>
+            </div>
+            <button type="button" className="st-linkbtn" onClick={() => setChosen(null)}>
+              Andere Aussage wählen
+            </button>
           </div>
-        </header>
+        ) : (
         <div className="st-modal-body">
           {!hits.length && <p className="st-muted">Keine Aussage gefunden.</p>}
           <ul className="st-ab-hits">
@@ -962,18 +1076,19 @@ function EvidencePicker({ h, items, linked, start = '', onClose, onPick }: { h: 
                   <small>{`${i.person} · ${SECTION_LABEL[i.section]}`}</small>
                   {itemText(view, i)}
                 </span>
-                <button type="button" className={`st-cx-btn${linked.has(i.id) ? '' : ' is-pri'}`} onClick={() => onPick(i.id, kind)}>
-                  {linked.has(i.id) ? 'Verknüpft ✓' : 'Verknüpfen'}
+                <button type="button" className={`st-cx-btn${linked.has(i.id) && !askKind ? '' : ' is-pri'}`} onClick={() => (askKind ? setChosen(i) : onPick(i.id, kind))}>
+                  {askKind ? 'Auswählen' : linked.has(i.id) ? 'Verknüpft ✓' : 'Verknüpfen'}
                 </button>
               </li>
             ))}
           </ul>
         </div>
+        )}
         <footer className="st-modal-foot">
-          <span className="st-muted">{`${linked.size} verknüpft`}</span>
+          <span className="st-muted">{askKind ? 'Die Aussage wird als Beleg hinzugefügt und verlinkt.' : `${linked.size} verknüpft`}</span>
           <span className="st-selbar-gap" />
           <button type="button" onClick={onClose}>
-            Fertig
+            {askKind ? 'Abbrechen' : 'Fertig'}
           </button>
         </footer>
       </div>

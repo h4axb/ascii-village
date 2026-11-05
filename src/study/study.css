@@ -8143,3 +8143,380 @@ body:has(.st-root) {
 /* the 1–5 scale inside the calculation popup */
 .st-ab-cscale { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; color: #dcdbd5; }
 .st-ab-cscale b { display: inline-grid; place-items: center; min-width: 16px; height: 16px; margin-right: 4px; border: 1px solid #55554f; border-radius: 4px; font-size: 10.5px; font-weight: 600; color: #fff; }
+/* ---- A/B-Vergleich · Hypothesen & Belege (head: title · search · +) ---- */
+.st-ab-hhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 12px;
+  padding-right: 15px;
+}
+.st-root .st-ab-hhead h3 {
+  margin: 0 auto 0 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.st-ab-hsearch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 300px;
+  min-width: 0;
+  transition: flex-basis 0.15s ease;
+}
+.st-ab-hsearch > svg {
+  position: absolute;
+  left: 14px;
+  color: var(--st-muted);
+  pointer-events: none;
+}
+.st-root .st-ab-hsearch input[type='search'] {
+  width: 100%;
+  height: 40px;
+  padding: 0 16px 0 38px;
+  border: 1px solid #e3e3e7;
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 13.5px;
+}
+.st-ab-hhead.is-searching .st-ab-hsearch {
+  flex: 1 1 auto;
+}
+.st-ab-hhead.is-searching .st-ab-hsearch > svg,
+.st-ab-hhead.is-searching .st-ab-tipwrap {
+  display: none;
+}
+.st-root .st-ab-hhead.is-searching .st-ab-hsearch input[type='search'] {
+  padding-left: 16px;
+  border-color: var(--st-ink);
+}
+/* the hover text of the + buttons (the dashboard's dark popup) */
+.st-ab-tipwrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.st-ab-tip {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 8px);
+  right: 0;
+  white-space: nowrap;
+  background: #1f1f1d;
+  color: #f4f4f2;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.st-ab-tipwrap:hover .st-ab-tip,
+.st-ab-tipwrap:focus-within .st-ab-tip {
+  opacity: 1;
+}
+/* a hypothesis: light transparent grey, no outline; the pen and the + in one column */
+.st-ab-hyp {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 6px 0;
+  padding: 14px 14px 14px 16px;
+  border-radius: 12px;
+  background: rgba(29, 29, 27, 0.035);
+  margin-bottom: 12px;
+}
+.st-ab-hyp > * {
+  grid-column: 1;
+  min-width: 0;
+}
+.st-ab-hcode {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--st-muted);
+  letter-spacing: 0.02em;
+}
+.st-root .st-ab-hyp .st-ab-hedit {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-self: end;
+  align-self: start;
+  width: 40px;
+  height: 40px;
+}
+.st-root .st-ab-htitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.st-ab-htext {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.st-ab-hyp > .st-ab-hplus {
+  grid-column: 2;
+  grid-row: 3;
+  justify-self: end;
+  align-self: start;
+}
+.st-ab-hyp > .st-ab-belege,
+.st-ab-hyp > .st-ab-unfold {
+  grid-column: 1 / -1;
+}
+/* a link to a figure: blue, underlined */
+.st-root button.st-ab-lk {
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.st-root button.st-ab-lk.is-fig {
+  color: #1f4f8f;
+  text-decoration-color: #1f4f8f;
+}
+.st-root button.st-ab-lk:focus-visible {
+  outline: 2px solid #1f4f8f;
+  border-radius: 3px;
+}
+/* Belege: a box filled in the colour of its kind */
+.st-ab-belege {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+.st-ab-bel {
+  border-radius: 10px;
+  padding: 10px 14px 12px;
+  display: grid;
+  gap: 4px;
+}
+.st-ab-bel.is-support,
+.st-ab-beled.is-support {
+  background: #e8f3e5;
+}
+.st-ab-bel.is-contra,
+.st-ab-beled.is-contra {
+  background: #fdeceb;
+}
+.st-ab-bel.is-extra,
+.st-ab-beled.is-extra {
+  background: var(--st-paper);
+}
+.st-ab-belhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--st-muted);
+}
+.st-ab-belhead b {
+  font-weight: 700;
+  color: var(--st-ink);
+}
+.st-ab-vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.st-ab-beltext {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.st-ab-src {
+  font-size: 12px;
+  color: var(--st-muted);
+}
+/* folded (from two Belege): the first fades out from its middle, the arrow over it */
+.st-ab-belege.is-folded .st-ab-bel:not(:first-child) {
+  display: none;
+}
+.st-ab-belege.is-folded .st-ab-bel:first-child {
+  -webkit-mask-image: linear-gradient(#000 45%, transparent 100%);
+  mask-image: linear-gradient(#000 45%, transparent 100%);
+  max-height: 118px;
+  overflow: hidden;
+}
+.st-ab-unfold {
+  display: flex;
+  justify-content: center;
+  margin-top: -40px;
+  position: relative;
+  z-index: 2;
+}
+.st-ab-belege:not(.is-folded) + .st-ab-unfold {
+  margin-top: 0;
+}
+.st-root .st-ab-unfold .st-iconbtn {
+  color: var(--st-ink);
+}
+/* the editor: the same grey, no outline; inputs white */
+.st-ab-hyp.is-edit {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.st-ab-hyp.is-edit textarea,
+.st-ab-hyp.is-edit .st-ab-in {
+  background: var(--st-paper);
+}
+.st-ab-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 11.5px;
+  color: var(--st-muted);
+}
+.st-ab-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.st-ab-legend i,
+.st-root .st-ab-kinds i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: block;
+  border: 1px solid var(--st-line);
+}
+.st-ab-legend i.is-support,
+.st-root .st-ab-kinds i.is-support {
+  background: #e8f3e5;
+  border-color: #c6dfbf;
+}
+.st-ab-legend i.is-contra,
+.st-root .st-ab-kinds i.is-contra {
+  background: #fdeceb;
+  border-color: #f2c6c2;
+}
+.st-ab-legend i.is-extra,
+.st-root .st-ab-kinds i.is-extra {
+  background: #fff;
+}
+.st-ab-legend i.is-fig {
+  width: 16px;
+  height: 0;
+  border: 0;
+  border-top: 2px solid #1f4f8f;
+  border-radius: 0;
+}
+.st-ab-beled {
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+.st-ab-beledhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.st-root .st-ab-beledhead select {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 3px 8px;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  background: #fff;
+  width: auto;
+}
+.st-ab-kinds {
+  display: inline-flex;
+  gap: 6px;
+}
+.st-root .st-ab-kinds button {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: #fff;
+  border: 1px solid var(--st-line);
+  box-sizing: border-box;
+}
+.st-root .st-ab-kinds i {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+.st-root .st-ab-kinds button.is-on {
+  border-color: var(--st-ink);
+  box-shadow: 0 0 0 1px var(--st-ink);
+}
+.st-root .st-ab-kinds button:focus-visible {
+  outline: 2px solid var(--st-ink);
+  outline-offset: 2px;
+}
+.st-ab-belsrc {
+  margin-left: auto;
+  font-size: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.st-ab-ltext {
+  display: grid;
+  gap: 4px;
+}
+.st-root button.st-ab-figbtn {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #1f4f8f;
+}
+@media (max-width: 640px) {
+  .st-ab-hhead {
+    flex-wrap: wrap;
+  }
+  .st-root .st-ab-hhead h3 {
+    flex: 1 1 100%;
+  }
+  .st-ab-hsearch {
+    flex: 1 1 auto;
+  }
+  .st-ab-beledhead .st-cx-x {
+    margin-left: auto;
+    order: 3;
+  }
+  .st-ab-beledhead > .st-ab-belsrc {
+    order: 4;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+}
+/* A/B · In-Game: the 1–5 scale only in the popup, which opens to the right of the letter */
+.st-root .st-ab-r.is-game {
+  grid-template-columns: minmax(0, 1fr) 70px minmax(0, 180px) 120px;
+}
+.st-root .st-ab-wwrap .st-ab-calc {
+  left: calc(100% + 10px);
+  top: -10px;
+  transform: none;
+}
+.st-ab-r.is-click:hover {
+  background: transparent;
+}
+@media (max-width: 640px) {
+  .st-root .st-ab-r.is-game {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .st-root .st-ab-wwrap .st-ab-calc {
+    left: auto;
+    right: 0;
+    top: calc(100% + 6px);
+  }
+}

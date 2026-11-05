@@ -13,12 +13,12 @@
 //                       and why; a hypothesis can also be "Nicht berücksichtigt"
 // The dashboard's A/B tiles can show the people with preference A or B.
 // Stored in settings/abCompare.
-import { useEffect, useMemo, useState } from 'react';
-import { part1, type P1Result } from './analysis';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { part1 } from './analysis';
 import type { ItemDoc } from './types';
 import { SECTION_LABEL } from './types';
 import { itemText, useContentView } from './translations';
-import { logChange, useCtx } from './ui';
+import { FIGURES, figNumber, logChange, useCtx } from './ui';
 import { FoldBtn } from './notesDashboard';
 import { RATING_LABEL, scopeLabel } from './model';
 import { designOf } from '../feedback/schema';
@@ -36,14 +36,25 @@ export const HYP_STATUS: [HypStatus, string][] = [
   ['selected', 'Für Redesign ausgewählt'],
   ['rejected', 'Nicht berücksichtigt'],
 ];
+// a Beleg of a hypothesis: a person, how it bears on the hypothesis (stützend,
+// ergänzend, widersprechend), its own interpretation text and, optionally,
+// the statement from Beobachtungen & Feedback it rests on
+export interface AbBeleg {
+  id: string;
+  item?: string;
+  person?: string;
+  kind: EvKind;
+  text: string;
+}
 export interface AbHyp {
   id: string;
   code: string; // H1, H2 …
   title: string;
-  dims: string[]; // the Tally questions (research dimensions) it is about
-  factors: string[]; // possible influences, e.g. Outputqualität
+  dims: string[]; // (older: the Tally questions it was about; hypotheses are general now)
+  factors: string[]; // (older: possible influences; no longer shown)
   text: string; // the interpretation
-  evidence: { item: string; kind: EvKind }[];
+  evidence: { item: string; kind: EvKind }[]; // kept in step with belege, for older readers
+  belege?: AbBeleg[];
   status: HypStatus;
   reason?: string; // why not considered
 }
@@ -59,6 +70,118 @@ interface AbDoc {
   prefQ?: string; // the overall preference question
   hyps?: AbHyp[];
   decisions?: AbDecision[];
+}
+
+
+// a hypothesis's Belege (older hypotheses: their linked statements)
+export const belegeOf = (h: AbHyp): AbBeleg[] => h.belege ?? h.evidence.map((e, i) => ({ id: `e${i}`, item: e.item, kind: e.kind, text: '' }));
+const withBelege = (h: AbHyp, belege: AbBeleg[]): AbHyp => ({ ...h, belege, evidence: belege.filter((b) => b.item).map((b) => ({ item: b.item!, kind: b.kind })) });
+const hcode = (c: string) => `H${(c.replace(/\D/g, '') || '0').padStart(2, '0')}`;
+
+// links to the dashboard's figures in a text: [Wort](abb:teil1)
+const FIG_ROUTE: Record<string, string> = { alter: 'uebersicht', gruppe: 'uebersicht', laufzeit: 'uebersicht', teil4: 'uebersicht', ablauf: 'uebersicht', kategorien: 'uebersicht', befunde: 'qualitativ/befunde' };
+export function goFigure(id: string) {
+  const n = figNumber(id);
+  if (!n) return;
+  window.location.hash = `#${FIG_ROUTE[id] ?? 'quantitativ'}`;
+  const until = Date.now() + 3000;
+  const step = () => {
+    const el = document.querySelector(`[data-anchor="fig-${n}"], [data-anchor^="fig-${n}."]`);
+    if (el) {
+      const head = document.querySelector('.st-pagehead');
+      window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - (head ? head.getBoundingClientRect().height : 0) - 12, behavior: 'smooth' });
+    } else if (Date.now() < until) window.setTimeout(step, 120);
+  };
+  window.setTimeout(step, 350);
+}
+const LINK_RE = /\[([^\]]+)\]\(abb:([a-z0-9]+)\)/g;
+function RichText({ text }: { text: string }) {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(LINK_RE)) {
+    if (m.index! > last) out.push(text.slice(last, m.index));
+    const f = FIGURES.find((x) => x.id === m[2]);
+    out.push(
+      <button key={m.index} type="button" className="st-ab-lk is-fig" title={f ? `Abb. ${figNumber(f.id)} · ${f.title}` : 'Abbildung'} onClick={() => goFigure(m[2])}>
+        {m[1]}
+      </button>,
+    );
+    last = m.index! + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return <>{out}</>;
+}
+// (for search and previews: the text without the link syntax)
+const plain = (t: string) => t.replace(LINK_RE, '$1');
+
+// a small search over the dashboard's figures
+function FigPicker({ onClose, onPick }: { onClose: () => void; onPick: (id: string) => void }) {
+  const [q, setQ] = useState('');
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [onClose]);
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = FIGURES.filter((f) => words.every((w) => `${f.title} ${f.caption} abb. ${figNumber(f.id)}`.toLowerCase().includes(w)));
+  return (
+    <div className="st-modal-back" role="presentation" onClick={onClose}>
+      <div className="st-modal st-ab-picker" role="dialog" aria-modal="true" aria-label="Abbildung verlinken" onClick={(e) => e.stopPropagation()}>
+        <header className="st-modal-head">
+          <h2>Abbildung verlinken</h2>
+          <div className="st-ab-pickbar">
+            <input type="search" autoFocus value={q} placeholder="Suchen, z. B. Direkter Vergleich …" aria-label="Abbildungen durchsuchen" onChange={(e) => setQ(e.target.value)} />
+          </div>
+        </header>
+        <div className="st-modal-body">
+          {!hits.length && <p className="st-muted">Keine Abbildung gefunden.</p>}
+          <ul className="st-ab-hits">
+            {hits.map((f) => (
+              <li key={f.id}>
+                <span>
+                  <small>{`Abb. ${figNumber(f.id)}`}</small>
+                  {f.title}
+                </span>
+                <button type="button" className="st-cx-btn is-pri" onClick={() => onPick(f.id)}>
+                  Verlinken
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// a text field that can link a word to a figure: the selected word, or the figure's name
+function LinkText({ value, onChange, rows, label, placeholder }: { value: string; onChange: (v: string) => void; rows: number; label: string; placeholder?: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const [pick, setPick] = useState(false);
+  const sel = useRef<[number, number]>([value.length, value.length]);
+  const remember = () => ref.current && (sel.current = [ref.current.selectionStart, ref.current.selectionEnd]);
+  return (
+    <div className="st-ab-ltext">
+      <textarea ref={ref} rows={rows} value={value} placeholder={placeholder} aria-label={label} onChange={(e) => onChange(e.target.value)} onSelect={remember} onKeyUp={remember} onMouseUp={remember} />
+      <button type="button" className="st-linkbtn st-ab-figbtn" onMouseDown={remember} onClick={() => setPick(true)}>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3 3v18h18M7 15l4-4 3 3 5-6" />
+        </svg>
+        Abbildung verlinken
+      </button>
+      {pick && (
+        <FigPicker
+          onClose={() => setPick(false)}
+          onPick={(id) => {
+            const [a, b] = sel.current;
+            const word = value.slice(a, b).trim() || FIGURES.find((f) => f.id === id)?.title || 'Abbildung';
+            onChange(`${value.slice(0, a)}[${word}](abb:${id})${value.slice(b)}`);
+            setPick(false);
+          }}
+        />
+      )}
+    </div>
+  );
 }
 
 const uid = (p: string) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -107,7 +230,8 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const [own, setOwn] = useState<View>(null);
   const show = shown !== undefined ? shown : own;
   const setShow = setShown ?? setOwn;
-  const [dim, setDim] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  const [searching, setSearching] = useState(false);
   const [rename, setRename] = useState<string | null>(null);
   const results = useMemo(() => part1(slice.survey).filter((r) => r.n), [slice.survey]);
   const label = (q: string) => doc.dims?.[q]?.trim() || lead(q);
@@ -117,7 +241,13 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const items = useMemo(() => new Map(slice.items.map((i) => [i.id, i])), [slice.items]);
   const allItems = study.docs.items;
   const byPref = (v: 'A' | 'B') => slice.survey.filter((r) => r.person && prefQ && r.p1[prefQ] === v);
-  const shownHyps = dim ? hyps.filter((h) => h.dims.includes(dim)) : hyps;
+  const qWords = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shownHyps = qWords.length
+    ? hyps.filter((h) => {
+        const hay = [h.code, hcode(h.code), h.title, plain(h.text), ...belegeOf(h).flatMap((b) => [b.person ?? '', plain(b.text), b.item ? (items.get(b.item) ?? allItems[b.item])?.text ?? '' : ''])].join(' ').toLowerCase();
+        return qWords.every((w) => hay.includes(w));
+      })
+    : hyps;
   const putHyp = (h: AbHyp, what: string) => save({ hyps: (latest().hyps ?? []).some((x) => x.id === h.id) ? (latest().hyps ?? []).map((x) => (x.id === h.id ? h : x)) : [...(latest().hyps ?? []), h] }, what);
   const delHyp = (h: AbHyp) =>
     save({ hyps: (latest().hyps ?? []).filter((x) => x.id !== h.id), decisions: (latest().decisions ?? []).map((d) => ({ ...d, hyps: d.hyps.filter((x) => x !== h.id) })) }, `Hypothese ${h.code} gelöscht`);
@@ -134,7 +264,6 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
     B: r.B,
     tie: r.neutral,
     pref: r.question === prefQ,
-    nHyp: hyps.filter((h) => h.dims.includes(r.question)).length,
     hint: r.winner ? `Mehrheit ${r.winner} · ${pText(r.p)}` : 'keine Mehrheit',
   }));
   const rows = src === 'tally' ? tallyRows : game;
@@ -185,9 +314,7 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
                       <VoteRow
                         key={r.key}
                         r={r}
-                        on={dim === r.key}
                         renaming={rename === r.key}
-                        onClick={() => setDim(dim === r.key ? null : r.key)}
                         onRename={() => setRename(r.key)}
                         onRenamed={(v) => {
                           setRename(null);
@@ -202,7 +329,7 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
               <div className="st-ab-under">
                 <span className="st-muted">
                   {src === 'tally'
-                    ? 'Werte aus Tally, hier nicht veränderbar. Zeile anklicken filtert die Hypothesen.'
+                    ? 'Werte aus Tally, hier nicht veränderbar.'
                     : 'Je Person gezählt: die höhere Bewertung ist eine Stimme für die Variante, bei Frustration die niedrigere. Gleiche Werte zählen als „Gleich“.'}
                 </span>
                 {src === 'tally' && (
@@ -216,11 +343,6 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
                       ))}
                     </select>
                   </label>
-                )}
-                {dim && (
-                  <button type="button" className="st-fchip is-on" onClick={() => setDim(null)}>
-                    {`${label(dim)} ×`}
-                  </button>
                 )}
               </div>
             </>
@@ -241,7 +363,7 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
               </div>
               {!byPref(show).length && <p className="st-muted st-ab-empty">Niemand mit dieser Präferenz.</p>}
               {byPref(show).map((row) => {
-                const linked = hyps.flatMap((h) => h.evidence.filter((e) => (items.get(e.item) ?? allItems[e.item])?.person === row.person).map((e) => ({ h, e, i: items.get(e.item) ?? allItems[e.item] })));
+                const linked = hyps.flatMap((h) => belegeOf(h).filter((b) => b.item && (items.get(b.item) ?? allItems[b.item])?.person === row.person).map((b) => ({ h, e: { item: b.item!, kind: b.kind }, i: items.get(b.item!) ?? allItems[b.item!] })));
                 return (
                   <div key={row.person!} className="st-ab-person">
                     <div className="st-ab-phead">
@@ -259,7 +381,7 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
                       <ul className="st-ab-evlist">
                         {linked.map(({ h, e, i }) => (
                           <li key={`${h.id}-${e.item}`}>
-                            <span className="st-ab-code">{h.code}</span>
+                            <span className="st-ab-code">{hcode(h.code)}</span>
                             <span>{i ? itemText(view, i) : 'Aussage gelöscht'}</span>
                             <span className={`st-ab-kind is-${e.kind}`}>{EV_KIND.find(([k]) => k === e.kind)?.[1]}</span>
                           </li>
@@ -276,25 +398,45 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
 
           {(show === null || show === 'hyp') && (
             <>
-              <div className="st-ab-step">
-                <i>2</i>
-                <b>Hypothesen & Belege</b>
-                <span className="st-muted">eigene Interpretation · Aussagen verknüpfen</span>
-                <button
-                  type="button"
-                  className="st-cx-btn st-ab-add"
-                  onClick={() => {
-                    const h: AbHyp = { id: uid('h'), code: nextCode(), title: '', dims: dim ? [dim] : [], factors: [], text: '', evidence: [], status: 'open' };
-                    putHyp(h, `Hypothese ${h.code} angelegt`);
-                    setFresh(h.id);
-                  }}
-                >
-                  + Hypothese
-                </button>
+              <div className={`st-ab-hhead${searching ? ' is-searching' : ''}`}>
+                <h3>Hypothesen &amp; Belege</h3>
+                <label className="st-ab-hsearch">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-3.5-3.5" />
+                  </svg>
+                  <input
+                    type="search"
+                    value={q}
+                    placeholder="Suchen …"
+                    aria-label="Hypothesen durchsuchen"
+                    onChange={(e) => setQ(e.target.value)}
+                    onFocus={() => setSearching(true)}
+                    onBlur={() => setSearching(false)}
+                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                  />
+                </label>
+                <span className="st-ab-tipwrap">
+                  <button
+                    type="button"
+                    className="st-lc-add"
+                    aria-label="Hypothese hinzufügen"
+                    onClick={() => {
+                      const h: AbHyp = { id: uid('h'), code: nextCode(), title: '', dims: [], factors: [], text: '', evidence: [], belege: [], status: 'open' };
+                      putHyp(h, `Hypothese ${h.code} angelegt`);
+                      setFresh(h.id);
+                    }}
+                  >
+                    <PlusIcon />
+                  </button>
+                  <span className="st-ab-tip" role="tooltip">
+                    Hypothese hinzufügen
+                  </span>
+                </span>
               </div>
-              {!shownHyps.length && <p className="st-muted st-ab-empty">{dim ? 'Keine Hypothese zu dieser Forschungsdimension.' : 'Noch keine Hypothese: mit „+ Hypothese“ anlegen.'}</p>}
+              {!shownHyps.length && <p className="st-muted st-ab-empty">{qWords.length ? 'Keine Hypothese gefunden.' : 'Noch keine Hypothese: mit + anlegen.'}</p>}
               {shownHyps.map((h) => (
-                <HypCard key={h.id} h={h} results={results} label={label} items={items} allItems={allItems} startEdit={fresh === h.id} onSave={(x, what) => putHyp(x, what)} onDelete={() => delHyp(h)} />
+                <HypCard key={h.id} h={h} items={items} allItems={allItems} persons={slice.persons.map((x) => x.id)} startEdit={fresh === h.id} onSave={(x, what) => putHyp(x, what)} onDelete={() => delHyp(h)} />
               ))}
               <p className="st-muted st-ab-note">Hypothesen sind Interpretationen, keine bestätigten Erkenntnisse. Tally-Werte und Originalaussagen bleiben unverändert.</p>
             </>
@@ -429,17 +571,6 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
           {r.sub}
         </span>
       </span>
-      {r.scale && (
-        <span className="st-ab-scale" aria-label={`Skala 1 bis 5: 1 = ${r.scale.low}, 5 = ${r.scale.high}`}>
-          <span>
-            <b>1</b> {r.scale.low}
-          </span>
-          <span>
-            <b>5</b> {r.scale.high}
-          </span>
-          {r.scale.lower && <em>niedriger ist besser</em>}
-        </span>
-      )}
       {r.calc ? (
         <span className="st-ab-wwrap">
           <button type="button" className={`st-ab-win is-${w ?? 'tie'}`} aria-describedby={`calc-${r.key}`}>
@@ -486,10 +617,10 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
       </span>
     </>
   );
-  if (!onClick) return <div className={`st-ab-r${r.scale ? ' is-game' : ''}`}>{body}</div>;
+  if (!onRename) return <div className={`st-ab-r${r.scale ? ' is-game' : ''}`}>{body}</div>;
+  // a Tally row: its short name can be changed (the pen, light like every edit icon)
   return (
-    <div className={`st-ab-r is-click${on ? ' is-on' : ''}`} title={r.hint}>
-      <button type="button" className="st-ab-rbtn" aria-pressed={on} aria-label={`${r.title}: Hypothesen filtern`} onClick={renaming ? undefined : onClick} />
+    <div className={`st-ab-r is-click${on ? ' is-on' : ''}`} title={r.hint} onDoubleClick={onClick}>
       {body}
       <button
         type="button"
@@ -498,75 +629,101 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
         title="Kurzname ändern"
         onClick={(e) => {
           e.stopPropagation();
-          onRename?.();
+          onRename();
         }}
       >
-        ✎
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg>
       </button>
     </div>
   );
 }
 
-// a hypothesis: its dimensions, influences, interpretation, the linked
-// statements (each supporting, contradicting or complementary) and its status
-function HypCard({ h, results, label, items, allItems, startEdit, onSave, onDelete }: { h: AbHyp; results: P1Result[]; label: (q: string) => string; items: Map<string, ItemDoc>; allItems: Record<string, ItemDoc>; startEdit: boolean; onSave: (h: AbHyp, what: string) => void; onDelete: () => void }) {
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+const PenIcon = () => (
+  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
+const KIND_FILL: Record<EvKind, string> = { support: 'is-support', extra: 'is-extra', contra: 'is-contra' };
+
+// a hypothesis: H01, its title and interpretation (with links to figures), and its
+// Belege as boxes in the colour of their kind; from two Belege on, the list is
+// folded (the first fades out, the arrow over it); the pen edits this one
+function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: { h: AbHyp; items: Map<string, ItemDoc>; allItems: Record<string, ItemDoc>; persons: string[]; startEdit: boolean; onSave: (h: AbHyp, what: string) => void; onDelete: () => void }) {
   const view = useContentView();
   const [edit, setEdit] = useState(startEdit);
   const [draft, setDraft] = useState(h);
-  const [factor, setFactor] = useState('');
   const [pick, setPick] = useState(false);
-  const itemOf = (id: string) => items.get(id) ?? allItems[id];
-  const sup = h.evidence.filter((e) => e.kind === 'support');
-  const supPeople = new Set(sup.map((e) => itemOf(e.item)?.person).filter(Boolean)).size;
-  const weak = supPeople < 2;
-  const st = HYP_STATUS.find(([k]) => k === h.status)?.[1];
-  const start = () => (setDraft(h), setEdit(true));
+  const [open, setOpen] = useState(false);
+  const itemOf = (id?: string) => (id ? (items.get(id) ?? allItems[id]) : undefined);
+  const belege = belegeOf(h);
+  const dBelege = belegeOf(draft);
+  const folded = belege.length >= 2 && !open;
+  const start = () => (setDraft(withBelege(h, belegeOf(h))), setEdit(true));
+  const setB = (id: string, p: Partial<AbBeleg>) => setDraft(withBelege(draft, dBelege.map((b) => (b.id === id ? { ...b, ...p } : b))));
   const commit = () => {
-    onSave({ ...draft, title: draft.title.trim() || 'Ohne Titel', text: draft.text.trim(), reason: draft.reason?.trim() || undefined }, `Hypothese ${h.code} bearbeitet`);
+    onSave(withBelege({ ...draft, title: draft.title.trim() || 'Ohne Titel', text: draft.text.trim(), reason: draft.reason?.trim() || undefined }, dBelege.map((b) => ({ ...b, text: b.text.trim() }))), `Hypothese ${h.code} bearbeitet`);
     setEdit(false);
   };
+  const who = (b: AbBeleg) => b.person ?? itemOf(b.item)?.person;
   if (edit)
     return (
-      <div className="st-ab-card is-edit">
+      <div className="st-ab-hyp is-edit">
         <div className="st-ab-chead">
-          <span className="st-ab-code">{h.code}</span>
+          <span className="st-ab-code">{hcode(h.code)}</span>
           <input className="st-ab-in" value={draft.title} placeholder="Kurzer Titel, z. B. Präferenz durch Ergebnisqualität beeinflusst" aria-label="Titel der Hypothese" autoFocus onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
         </div>
-        <span className="st-cx-lab">Forschungsdimension</span>
-        <div className="st-ab-chips">
-          {results.map((r) => {
-            const on = draft.dims.includes(r.question);
-            return (
-              <button key={r.question} type="button" className={`st-fchip${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => setDraft({ ...draft, dims: on ? draft.dims.filter((x) => x !== r.question) : [...draft.dims, r.question] })}>
-                {label(r.question)}
-              </button>
-            );
-          })}
-        </div>
-        <span className="st-cx-lab">Mögliche Einflussfaktoren</span>
-        <div className="st-ab-chips">
-          {draft.factors.map((f) => (
-            <button key={f} type="button" className="st-fchip" onClick={() => setDraft({ ...draft, factors: draft.factors.filter((x) => x !== f) })} aria-label={`${f} entfernen`}>
-              {`${f} ×`}
-            </button>
-          ))}
-          <input
-            className="st-ab-in is-small"
-            value={factor}
-            placeholder="+ Faktor, Enter"
-            aria-label="Einflussfaktor hinzufügen"
-            onChange={(e) => setFactor(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && factor.trim()) {
-                e.preventDefault();
-                if (!draft.factors.includes(factor.trim())) setDraft({ ...draft, factors: [...draft.factors, factor.trim()] });
-                setFactor('');
-              }
-            }}
-          />
-        </div>
         <span className="st-cx-lab">Interpretation</span>
-        <textarea rows={3} value={draft.text} placeholder="Was die Ergebnisse erklären könnte – als Annahme formuliert" aria-label="Interpretation" onChange={(e) => setDraft({ ...draft, text: e.target.value })} />
+        <LinkText rows={3} value={draft.text} label="Interpretation" placeholder="Was die Ergebnisse erklären könnte – als Annahme formuliert" onChange={(v) => setDraft({ ...draft, text: v })} />
+        <span className="st-cx-lab">Belege</span>
+        <div className="st-ab-legend">
+          {EV_KIND.map(([k, l]) => (
+            <span key={k}>
+              <i className={KIND_FILL[k]} />
+              {l}
+            </span>
+          ))}
+          <span>
+            <i className="is-fig" />
+            verlinkte Abbildung
+          </span>
+        </div>
+        {!dBelege.length && <p className="st-muted st-ab-empty">Noch kein Beleg: mit + an der Hypothese hinzufügen.</p>}
+        {dBelege.map((b) => {
+          const it = itemOf(b.item);
+          return (
+            <div key={b.id} className={`st-ab-beled ${KIND_FILL[b.kind]}`}>
+              <div className="st-ab-beledhead">
+                <select value={b.person ?? it?.person ?? ''} aria-label="Person" onChange={(e) => setB(b.id, { person: e.target.value || undefined })}>
+                  <option value="">Allgemein</option>
+                  {[...new Set([...persons, ...(it?.person ? [it.person] : [])])].map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                <span className="st-ab-kinds" role="radiogroup" aria-label="Art des Belegs">
+                  {EV_KIND.map(([k, l]) => (
+                    <button key={k} type="button" role="radio" aria-checked={b.kind === k} className={b.kind === k ? 'is-on' : ''} title={l} aria-label={l} onClick={() => setB(b.id, { kind: k })}>
+                      <i className={KIND_FILL[k]} />
+                    </button>
+                  ))}
+                </span>
+                {it && <span className="st-muted st-ab-belsrc">{`Aussage: ${SECTION_LABEL[it.section]} · „${itemText(view, it).slice(0, 48)}${itemText(view, it).length > 48 ? ' …' : ''}“`}</span>}
+                <button type="button" className="st-cx-x is-small" aria-label="Beleg entfernen" title="Beleg entfernen" onClick={() => setDraft(withBelege(draft, dBelege.filter((x) => x.id !== b.id)))}>
+                  ×
+                </button>
+              </div>
+              <LinkText rows={2} value={b.text} label={`Beleg ${who(b) ?? ''}`} placeholder="Was dieser Beleg für die Hypothese zeigt" onChange={(v) => setB(b.id, { text: v })} />
+            </div>
+          );
+        })}
         <span className="st-cx-lab">Status</span>
         <span className="st-ab-chips" role="radiogroup" aria-label="Status der Hypothese">
           {HYP_STATUS.map(([k, l]) => (
@@ -577,7 +734,7 @@ function HypCard({ h, results, label, items, allItems, startEdit, onSave, onDele
         </span>
         {draft.status === 'rejected' && <textarea rows={2} value={draft.reason ?? ''} placeholder="Warum nicht berücksichtigt (z. B. zu wenig Evidenz, Projektumfang)" aria-label="Grund" onChange={(e) => setDraft({ ...draft, reason: e.target.value })} />}
         <div className="st-ab-foot">
-          <button type="button" className="st-linkbtn st-cx-del" onClick={() => confirm(`Hypothese ${h.code} löschen? Sie wird auch aus den Redesign-Entscheidungen genommen.`) && onDelete()}>
+          <button type="button" className="st-linkbtn st-cx-del" onClick={() => confirm(`Hypothese ${hcode(h.code)} löschen? Sie wird auch aus den Redesign-Entscheidungen genommen.`) && onDelete()}>
             Löschen
           </button>
           <span className="st-cx-sp" />
@@ -591,61 +748,75 @@ function HypCard({ h, results, label, items, allItems, startEdit, onSave, onDele
       </div>
     );
   return (
-    <div className={`st-ab-card is-${h.status}`}>
-      <div className="st-ab-chead">
-        <span className="st-ab-code">{h.code}</span>
-        <strong>{h.title || 'Ohne Titel'}</strong>
-        {h.dims.map((d) => (
-          <span key={d} className="st-ab-tag is-dim">
-            {label(d)}
-          </span>
-        ))}
-        {h.factors.map((f) => (
-          <span key={f} className="st-ab-tag">
-            {f}
-          </span>
-        ))}
-        <span className={`st-ab-status is-${h.status}`}>{st}</span>
-      </div>
-      {h.text && <p className="st-ab-text">{h.text}</p>}
+    <article className={`st-ab-hyp is-${h.status}`}>
+      <span className="st-ab-hcode">{hcode(h.code)}</span>
+      <button type="button" className="st-iconbtn st-ab-hedit" aria-label={`${hcode(h.code)} bearbeiten`} title="Bearbeiten" onClick={start}>
+        <PenIcon />
+      </button>
+      <h4 className="st-ab-htitle">{h.title || 'Ohne Titel'}</h4>
+      {h.text ? (
+        <p className="st-ab-htext">
+          <RichText text={h.text} />
+        </p>
+      ) : (
+        <p className="st-ab-htext st-muted">Noch keine Interpretation.</p>
+      )}
       {h.status === 'rejected' && h.reason && <p className="st-ab-reason">{`Nicht berücksichtigt: ${h.reason}`}</p>}
-      {weak && <p className="st-ab-weak">{`Unzureichend belegt: ${sup.length} ${sup.length === 1 ? 'stützender Beleg' : 'stützende Belege'} (${supPeople} ${supPeople === 1 ? 'Person' : 'Personen'})`}</p>}
-      {h.evidence.length > 0 && (
-        <ul className="st-ab-evlist">
-          {h.evidence.map((e) => {
-            const i = itemOf(e.item);
+      <span className="st-ab-tipwrap st-ab-hplus">
+        <button type="button" className="st-lc-add" aria-label="Beleg hinzufügen" onClick={() => setPick(true)}>
+          <PlusIcon />
+        </button>
+        <span className="st-ab-tip" role="tooltip">
+          Beleg hinzufügen
+        </span>
+      </span>
+      {belege.length > 0 && (
+        <div className={`st-ab-belege${folded ? ' is-folded' : ''}`}>
+          {belege.map((b) => {
+            const it = itemOf(b.item);
             return (
-              <li key={e.item}>
-                <strong>{i?.person ?? '–'}</strong>
-                <span>
-                  <small>{i ? SECTION_LABEL[i.section] : ''}</small>
-                  {i ? itemText(view, i) : 'Aussage gelöscht'}
-                </span>
-                <select className={`st-ab-kind is-${e.kind}`} value={e.kind} aria-label={`Art des Belegs von ${i?.person ?? ''}`} onChange={(ev) => onSave({ ...h, evidence: h.evidence.map((x) => (x.item === e.item ? { ...x, kind: ev.target.value as EvKind } : x)) }, `Beleg in ${h.code} geändert`)}>
-                  {EV_KIND.map(([k, l]) => (
-                    <option key={k} value={k}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" className="st-cx-x is-small" aria-label={`Beleg von ${i?.person ?? ''} entfernen`} onClick={() => onSave({ ...h, evidence: h.evidence.filter((x) => x.item !== e.item) }, `Beleg aus ${h.code} genommen`)}>
-                  ×
-                </button>
-              </li>
+              <div key={b.id} className={`st-ab-bel ${KIND_FILL[b.kind]}`}>
+                <div className="st-ab-belhead">
+                  <b>{who(b) ?? 'Allgemein'}</b>
+                  {it && SECTION_LABEL[it.section]}
+                  <span className="st-ab-vh">{EV_KIND.find(([k]) => k === b.kind)?.[1]}</span>
+                </div>
+                {b.text && (
+                  <p className="st-ab-beltext">
+                    <RichText text={b.text} />
+                  </p>
+                )}
+                {it && <span className="st-ab-src">{`„${itemText(view, it)}“`}</span>}
+                {!it && b.item && <span className="st-ab-src">Aussage gelöscht</span>}
+              </div>
             );
           })}
-        </ul>
+        </div>
       )}
-      <div className="st-ab-row">
-        <button type="button" className="st-cx-btn" onClick={() => setPick(true)}>
-          + Beleg verknüpfen
-        </button>
-        <button type="button" className="st-cx-btn" onClick={start}>
-          Bearbeiten
-        </button>
-      </div>
-      {pick && <EvidencePicker h={h} items={[...items.values()]} onClose={() => setPick(false)} onPick={(item, kind) => onSave({ ...h, evidence: [...h.evidence.filter((x) => x.item !== item), { item, kind }] }, `Beleg zu ${h.code}`)} />}
-    </div>
+      {belege.length >= 2 && (
+        <div className="st-ab-unfold">
+          <button type="button" className="st-iconbtn" aria-expanded={open} aria-label={open ? 'Belege einklappen' : `Alle ${belege.length} Belege anzeigen`} title={open ? 'Einklappen' : `Alle ${belege.length} Belege anzeigen`} onClick={() => setOpen(!open)}>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={open ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />
+            </svg>
+          </button>
+        </div>
+      )}
+      {pick && (
+        <EvidencePicker
+          h={h}
+          items={[...items.values()]}
+          onClose={() => {
+            setPick(false);
+          }}
+          onPick={(item, kind) => {
+            const cur = belegeOf(h);
+            const next = cur.some((b) => b.item === item) ? cur.map((b) => (b.item === item ? { ...b, kind } : b)) : [...cur, { id: uid('b'), item, person: itemOf(item)?.person, kind, text: '' }];
+            onSave(withBelege(h, next), `Beleg zu ${h.code}`);
+          }}
+        />
+      )}
+    </article>
   );
 }
 
@@ -660,13 +831,13 @@ function EvidencePicker({ h, items, onClose, onPick }: { h: AbHyp; items: ItemDo
     return () => window.removeEventListener('keydown', k);
   }, [onClose]);
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const linked = new Set(h.evidence.map((e) => e.item));
+  const linked = new Set(belegeOf(h).map((b) => b.item).filter(Boolean));
   const hits = items.filter((i) => words.every((w) => `${i.person} ${i.text} ${i.de ?? ''} ${i.question ?? ''}`.toLowerCase().includes(w))).slice(0, 40);
   return (
     <div className="st-modal-back" role="presentation" onClick={onClose}>
-      <div className="st-modal st-ab-picker" role="dialog" aria-modal="true" aria-label={`Belege für ${h.code}`} onClick={(e) => e.stopPropagation()}>
+      <div className="st-modal st-ab-picker" role="dialog" aria-modal="true" aria-label={`Belege für ${hcode(h.code)}`} onClick={(e) => e.stopPropagation()}>
         <header className="st-modal-head">
-          <h2>{`Belege für ${h.code}${h.title ? ` · ${h.title}` : ''}`}</h2>
+          <h2>{`Beleg hinzufügen · ${hcode(h.code)}${h.title ? ` · ${h.title}` : ''}`}</h2>
           <div className="st-ab-pickbar">
             <input type="search" autoFocus value={q} placeholder="Suchen: P-ID oder Wort …" aria-label="Aussagen durchsuchen" onChange={(e) => setQ(e.target.value)} />
             <span className="st-ab-chips" role="radiogroup" aria-label="Art des Belegs">
@@ -695,7 +866,7 @@ function EvidencePicker({ h, items, onClose, onPick }: { h: AbHyp; items: ItemDo
           </ul>
         </div>
         <footer className="st-modal-foot">
-          <span className="st-muted">{`${h.evidence.length} verknüpft`}</span>
+          <span className="st-muted">{`${linked.size} verknüpft`}</span>
           <span className="st-selbar-gap" />
           <button type="button" onClick={onClose}>
             Fertig
@@ -713,7 +884,7 @@ function DecCard({ d, hyps, startEdit, onSave, onDelete }: { d: AbDecision; hyps
   const [copied, setCopied] = useState(false);
   const linked = hyps.filter((h) => d.hyps.includes(h.id));
   const copy = async () => {
-    const t = [`Redesign: ${d.title || 'Ohne Titel'}`, `Berücksichtigte Hypothesen: ${linked.map((h) => `${h.code} ${h.title}`).join('; ') || '–'}`, `Gestaltungsvorschlag: ${d.proposal || '–'}`, `Begründung: ${d.why || '–'}`].join('\n');
+    const t = [`Redesign: ${d.title || 'Ohne Titel'}`, `Berücksichtigte Hypothesen: ${linked.map((h) => `${hcode(h.code)} ${h.title}`).join('; ') || '–'}`, `Gestaltungsvorschlag: ${d.proposal || '–'}`, `Begründung: ${d.why || '–'}`].join('\n');
     try {
       await navigator.clipboard.writeText(t);
       setCopied(true);
@@ -732,7 +903,7 @@ function DecCard({ d, hyps, startEdit, onSave, onDelete }: { d: AbDecision; hyps
             const on = draft.hyps.includes(h.id);
             return (
               <button key={h.id} type="button" className={`st-fchip${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => setDraft({ ...draft, hyps: on ? draft.hyps.filter((x) => x !== h.id) : [...draft.hyps, h.id] })}>
-                {`${h.code} · ${h.title || 'Ohne Titel'}`}
+                {`${hcode(h.code)} · ${h.title || 'Ohne Titel'}`}
               </button>
             );
           })}
@@ -773,7 +944,7 @@ function DecCard({ d, hyps, startEdit, onSave, onDelete }: { d: AbDecision; hyps
         {linked.length ? (
           linked.map((h) => (
             <span key={h.id} className="st-ab-tag is-dim">
-              {`${h.code} · ${h.title || 'Ohne Titel'}`}
+              {`${hcode(h.code)} · ${h.title || 'Ohne Titel'}`}
             </span>
           ))
         ) : (

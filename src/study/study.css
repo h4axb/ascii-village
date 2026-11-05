@@ -8768,21 +8768,33 @@ body:has(.st-root) {
   text-overflow: ellipsis;
   max-width: 170px;
 }
-/* the Tally row that decides the Gesamtbewertung */
-.st-ab-prefchip {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--st-ink);
-  color: #fff;
-  font-size: var(--st-fs-micro);
-  font-weight: 600;
-  line-height: 1.7;
-  vertical-align: 2px;
+/* the Gesamtbewertung title: its hover text explains what it means */
+.st-ab-ohead b {
+  cursor: help;
+  border-bottom: 1px dashed var(--st-line-strong);
 }
-.st-ab-cbasis {
+.st-ab-ohead b:focus-visible {
+  outline: 2px solid var(--st-info);
+  border-radius: 3px;
+}
+.st-root .st-ab-ohead .st-ab-tip {
+  left: 0;
+  right: auto;
+  width: max-content;
+  max-width: min(340px, calc(100vw - 48px));
+  white-space: normal;
+  line-height: 1.45;
+  font-weight: 400;
+}
+/* the criteria behind a Gesamtbewertung */
+.st-ab-ctbl.is-crit .st-ab-crow {
+  grid-template-columns: minmax(0, 150px) auto auto;
+}
+.st-ab-ctbl.is-crit .st-ab-crow > :first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st-ab-ctbl.is-crit .st-ab-crow > :nth-child(2) {
+  color: #b9b8b1;
   font-size: 11px;
-  color: #f4f4f2;
-  overflow-wrap: anywhere;
 }

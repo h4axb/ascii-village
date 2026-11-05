@@ -276,11 +276,13 @@ function LinkText({ value, onChange, rows, label, placeholder, belegPicker }: { 
 const uid = (p: string) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 const pText = (p: number) => (Number.isFinite(p) ? `p = ${p < 0.001 ? '< 0,001' : p.toFixed(2).replace('.', ',')}` : '');
 const lead = (q: string) => q.replace(/[\s?:.]+$/, '');
-const PREF_RE = /insgesamt|gefallen|präferenz|bevorzug|lieber|overall|prefer/i;
-// (the direct question on continued use comes first: "which would you prefer to use")
-const USE_RE = /prefer to use|continued? (playing|use)|weiter(spielen|nutzen)|weiterhin nutzen/i;
-const pickPref = (results: { question: string }[], stored?: string) =>
-  stored && results.some((r) => r.question === stored) ? stored : (results.find((r) => USE_RE.test(r.question)) ?? results.find((r) => PREF_RE.test(r.question)) ?? results[results.length - 1])?.question;
+// a person's preference across the Teil 1 questions: the variant they chose more often
+const personPref = (r: { p1: Record<string, string | null | undefined> }) => {
+  const v = Object.values(r.p1);
+  const a = v.filter((x) => x === 'A').length;
+  const b = v.filter((x) => x === 'B').length;
+  return a > b ? 'A' : b > a ? 'B' : null;
+};
 
 function useAb() {
   const { study } = useCtx();
@@ -302,14 +304,13 @@ export function useAbSummary() {
   const { slice } = useCtx();
   const { doc } = useAb();
   const results = useMemo(() => part1(slice.survey).filter((r) => r.n), [slice.survey]);
-  const prefQ = pickPref(results, doc.prefQ);
-  const rows = slice.survey.filter((r) => r.person && prefQ && r.p1[prefQ] != null);
+  const rows = slice.survey.filter((r) => r.person && Object.values(r.p1).some((a) => a != null));
   const hyps = doc.hyps ?? [];
   return {
     results: results.length,
     of: rows.length,
-    A: rows.filter((r) => r.p1[prefQ!] === 'A').length,
-    B: rows.filter((r) => r.p1[prefQ!] === 'B').length,
+    A: rows.filter((r) => personPref(r) === 'A').length,
+    B: rows.filter((r) => personPref(r) === 'B').length,
     hyps: hyps.length,
     selected: hyps.filter((h) => h.status === 'selected').length,
     decisions: (doc.decisions ?? []).length,
@@ -328,12 +329,11 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const [rename, setRename] = useState<string | null>(null);
   const results = useMemo(() => part1(slice.survey).filter((r) => r.n), [slice.survey]);
   const label = (q: string) => doc.dims?.[q]?.trim() || lead(q);
-  const prefQ = pickPref(results, doc.prefQ);
   const hyps = doc.hyps ?? [];
   const decisions = doc.decisions ?? [];
   const items = useMemo(() => new Map(slice.items.map((i) => [i.id, i])), [slice.items]);
   const allItems = study.docs.items;
-  const byPref = (v: 'A' | 'B') => slice.survey.filter((r) => r.person && prefQ && r.p1[prefQ] === v);
+  const byPref = (v: 'A' | 'B') => slice.survey.filter((r) => r.person && personPref(r) === v);
   const qWords = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const shownHyps = qWords.length
     ? hyps.filter((h) => {
@@ -356,7 +356,6 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
     A: r.A,
     B: r.B,
     tie: r.neutral,
-    pref: r.question === prefQ,
     hint: r.winner ? `Mehrheit ${r.winner} · ${pText(r.p)}` : 'keine Mehrheit',
     tcalc: slice.survey
       .filter((x) => x.p1[r.question] != null)
@@ -389,8 +388,8 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
       .filter((v): v is Vote => !!v);
   }, [slice.survey, doc.dims]);
   const rows = src === 'tally' ? [...tallyRows, ...timingRows] : game;
-  const tallyAll = tallyRows.find((r) => r.pref) ?? null;
-  const gameAll = game.find((r) => r.key === 'overall') ?? null;
+  const tallyAll = acrossCriteria('all-tally', tallyRows); // (the five Teil 1 questions; the timing question is shown, not counted)
+  const gameAll = acrossCriteria('all-game', game);
   const nPeople = new Set([...slice.survey.filter((r) => r.person && Object.keys(r.p1).length).map((r) => r.person), ...slice.feedback.filter((r) => r.rating && r.participant).map((r) => r.participant)]).size;
 
   return (
@@ -403,11 +402,18 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
       {!folded && (
         <>
           <div className="st-ab-step">
-            <b>Gesamtbewertung</b>
+            <span className="st-ab-tipwrap st-ab-ohead">
+              <b tabIndex={0} aria-describedby="ab-overall-tip">
+                Gesamtbewertung
+              </b>
+              <span className="st-ab-tip" role="tooltip" id="ab-overall-tip">
+                Kriterienübergreifende Präferenz: Welche Variante schneidet über die verschiedenen untersuchten UX-Aspekte hinweg häufiger positiv ab?
+              </span>
+            </span>
           </div>
           <div className="st-ab-tiles is-two">
-            <OverallTile source="Tally" v={tallyAll} unit="Person" what={prefQ ? label(prefQ) : 'Direkte Nutzungspräferenz'} />
-            <OverallTile source="In-Game" v={gameAll} unit="Person" what="Crafting-Erfahrung 1–5 · Gesamteindruck" />
+            <OverallTile source="Tally" v={tallyAll} what={`über ${tallyAll ? tallyAll.A + tallyAll.B + tallyAll.tie : 0} Tally-Kriterien`} />
+            <OverallTile source="In-Game" v={gameAll} what={`über ${gameAll ? gameAll.A + gameAll.B + gameAll.tie : 0} In-Game-Kriterien (Bewertung 1–5)`} />
           </div>
 
           <div className="st-ab-step st-ab-rhead">
@@ -454,18 +460,6 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
                     ? 'Werte aus Tally, hier nicht veränderbar.'
                     : 'Je Person gezählt: die höhere Bewertung ist eine Stimme für die Variante, bei Frustration die niedrigere. Gleiche Werte zählen als „Gleich“.'}
                 </span>
-                {src === 'tally' && (
-                  <label className="st-ab-prefsel">
-                    Präferenzfrage
-                    <select value={prefQ ?? ''} onChange={(e) => save({ prefQ: e.target.value }, 'Präferenzfrage gewählt')}>
-                      {results.map((r) => (
-                        <option key={r.question} value={r.question}>
-                          {label(r.question)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
               </div>
             </>
           ) : (
@@ -611,6 +605,7 @@ interface Vote {
   calc?: { who: string; a: number; b: number; v: 'A' | 'B' | null }[]; // in-game: the comparison per person
   tcalc?: { who: string; v: 'A' | 'B' | null; swapped: boolean; answer?: string; none?: boolean }[]; // Tally: each person's answer
   none?: number; // a choice question: "neither" (no vote, not a tie)
+  ccalc?: { name: string; v: 'A' | 'B' | null; counts: string }[]; // Gesamtbewertung: the winner per criterion
   test?: string; // Tally: the binomial test of the majority
 }
 const TIMING_Q = /when would you .*prefer to receive|wann .*unterstützung/i;
@@ -632,9 +627,9 @@ function strength(v: Vote) {
   const share = k / n;
   const label = share >= 0.8 ? 'deutlich' : share >= 0.6 ? 'mäßig' : 'schwach';
   const rest = [v.tie && `${v.tie} Gleich`, v.none && `${v.none} keine`, v[w === 'A' ? 'B' : 'A'] && `${v[w === 'A' ? 'B' : 'A']} ${w === 'A' ? 'B' : 'A'}`].filter(Boolean).join(', ');
-  return { label, text: `${k} von ${n} für ${w} (${Math.round(share * 100)} %)${rest ? ` · ${rest}` : ''}`, k, n };
+  return { label, text: `${k} von ${n}${v.ccalc ? (n === 1 ? ' Kriterium' : ' Kriterien') : ''} für ${w} (${Math.round(share * 100)} %)${rest ? ` · ${rest}` : ''}`, k, n };
 }
-const lead2 = (v: Pick<Vote, 'A' | 'B'>) => (v.A > v.B ? 'A' : v.B > v.A ? 'B' : null);
+const lead2 = (v: Pick<Vote, 'A' | 'B'>): 'A' | 'B' | null => (v.A > v.B ? 'A' : v.B > v.A ? 'B' : null);
 const num = (x: number | null) => (x == null ? '–' : x.toFixed(1).replace('.', ','));
 const val = (x: number) => (Number.isInteger(x) ? String(x) : num(x)); // a person's rating (a mean if rated twice)
 
@@ -673,13 +668,13 @@ export function gameVotes(feedback: { participant?: string; rating?: Record<stri
   }).filter((v) => v.A + v.B + v.tie > 0);
 }
 
-function OverallTile({ source, v, unit, what }: { source: string; v: Vote | null; unit: string; what: string }) {
+function OverallTile({ source, v, what }: { source: string; v: Vote | null; what: string }) {
   const of = v ? v.A + v.B + v.tie : 0;
   const w = v ? lead2(v) : null;
   return (
     <div className="st-ab-otile">
       <span className="st-ab-olabel">{source}</span>
-      {of && v && (v.calc || v.tcalc) ? (
+      {of && v && (v.calc || v.tcalc || v.ccalc) ? (
         <span className="st-ab-wwrap st-ab-owrap">
           <button type="button" className={`st-ab-ovalue is-${w ?? 'tie'}`} aria-describedby={`ocalc-${v.key}`}>
             {w ?? '='}
@@ -689,12 +684,19 @@ function OverallTile({ source, v, unit, what }: { source: string; v: Vote | null
       ) : (
         <span className={`st-ab-ovalue is-${w ?? 'tie'}`}>{!of ? '–' : (w ?? '=')}</span>
       )}
-      <span className="st-ab-otext">{!of ? 'noch keine Antworten' : w ? `Variante ${w} · ${v![w]} von ${of} ${of === 1 ? unit : `${unit}en`}` : `Gleichstand · A ${v!.A} · Gleich ${v!.tie} · B ${v!.B}`}</span>
+      <span className="st-ab-otext">{!of ? 'noch keine Antworten' : w ? `Variante ${w} · ${v![w]} von ${of} ${of === 1 ? 'Kriterium' : 'Kriterien'} gewonnen` : `Gleichstand · A ${v!.A} · Gleich ${v!.tie} · B ${v!.B}`}</span>
       <span className="st-muted st-ab-owhat">{what}</span>
     </div>
   );
 }
 
+// the Gesamtbewertung: each criterion (a row) is won by A, by B or tied; the
+// variant that wins more criteria leads
+function acrossCriteria(key: string, rows: Vote[]): Vote | null {
+  const won = rows.filter((r) => r.A + r.B + r.tie + (r.none ?? 0) > 0).map((r) => ({ name: r.title, v: lead2(r), counts: counts(r) }));
+  if (!won.length) return null;
+  return { key, title: 'Gesamtbewertung', sub: '', A: won.filter((x) => x.v === 'A').length, B: won.filter((x) => x.v === 'B').length, tie: won.filter((x) => !x.v).length, ccalc: won };
+}
 const counts = (r: Vote) => `A ${r.A} · Gleich ${r.tie} · B ${r.B}${r.none ? ` · Keine ${r.none}` : ''}`;
 // how telling the result is (the popup's last line)
 function Strength({ r }: { r: Vote }) {
@@ -704,7 +706,7 @@ function Strength({ r }: { r: Vote }) {
     <span className="st-ab-cstr">
       <b>{`Aussagekraft: ${st.label}`}</b>
       <span>{st.text}</span>
-      {st.n < 10 && <span className="st-muted">{`kleine Stichprobe (n = ${st.n})`}</span>}
+      {st.n < 10 && !r.ccalc && <span className="st-muted">{`kleine Stichprobe (n = ${st.n})`}</span>}
     </span>
   );
 }
@@ -712,6 +714,24 @@ function Strength({ r }: { r: Vote }) {
 // comparison per person, Tally each person's answer
 function CalcPop({ r, id }: { r: Vote; id: string }) {
   const w = lead2(r);
+  if (r.ccalc)
+    return (
+      <span className="st-ab-calc" role="tooltip" id={id}>
+        <b>So berechnet</b>
+        <span className="st-muted">je Kriterium gewinnt die Variante mit mehr Stimmen; die Variante mit mehr gewonnenen Kriterien liegt vorn</span>
+        <span className="st-ab-ctbl is-crit">
+          {r.ccalc.map((c, i) => (
+            <span key={`${c.name}-${i}`} className="st-ab-crow">
+              <span title={c.name}>{c.name}</span>
+              <span>{c.counts}</span>
+              <span className={`st-ab-cv is-${c.v ?? 'tie'}`}>{`→ ${c.v ?? 'Gleich'}`}</span>
+            </span>
+          ))}
+        </span>
+        <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} Kriterien → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
+        <Strength r={r} />
+      </span>
+    );
   if (r.calc)
     return (
 <span className="st-ab-calc" role="tooltip" id={id}>
@@ -746,7 +766,6 @@ function CalcPop({ r, id }: { r: Vote; id: string }) {
   return (
 <span className="st-ab-calc" role="tooltip" id={id}>
             <b>So berechnet</b>
-            {r.pref && <span className="st-ab-cbasis">{`Gesamtbewertung = Antworten auf die Präferenzfrage „${r.sub}“`}</span>}
             <span className="st-muted">
               {r.none != null
                 ? 'je Person: ihre Antwort (Teil 2) ist eine Stimme – vorher = A, nachher = B, beides = Gleich, keines = keine Stimme'
@@ -792,7 +811,6 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
         ) : (
           <b>
             {r.title}
-            {r.pref && <span className="st-ab-prefchip" title="Diese Frage bestimmt die Tally-Gesamtbewertung oben (unten unter „Präferenzfrage“ wählbar)">Gesamtbewertung</span>}
             {(r.nHyp ?? 0) > 0 && <span className="st-ab-nh">{`${r.nHyp} H`}</span>}
           </b>
         )}

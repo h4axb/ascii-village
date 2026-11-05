@@ -155,6 +155,10 @@ const EN: Record<string, string> = {
   '→ Gleich': '→ tie',
   // A/B-Vergleich · Hypothesen & Belege
   'Hypothese hinzufügen': 'Add hypothesis',
+  'Noch kein Text.': 'No text yet.',
+  'Interpretation entfernen': 'Remove interpretation',
+  'Status (Redesign, für die ganze Hypothese)': 'Status (redesign, for the whole hypothesis)',
+  'Was dieser Beleg für die Interpretation zeigt': 'What this evidence shows for the interpretation',
   'Beleg hinzufügen': 'Add evidence',
   'Hypothesen durchsuchen': 'Search hypotheses',
   'Keine Hypothese gefunden.': 'No hypothesis found.',
@@ -1446,6 +1450,9 @@ const EN: Record<string, string> = {
 
 // texts with numbers or names in them: [pattern, English]
 const PATTERNS: [RegExp, string][] = [
+  [/^Interpretation (\d+)$/, 'Interpretation $1'],
+  [/^Interpretation (\d+) entfernen$/, 'Remove interpretation $1'],
+  [/^Testperson der Interpretation (\d+)$/, 'Test person of interpretation $1'],
   [/^Alle (\d+) Belege anzeigen$/, 'Show all $1 pieces of evidence'],
   [/^Beleg hinzufügen · (.+)$/, 'Add evidence · $1'],
   [/^Aussage: (.+)$/, 'Statement: $1'],

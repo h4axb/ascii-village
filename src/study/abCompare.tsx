@@ -46,6 +46,14 @@ export interface AbBeleg {
   kind: EvKind;
   text: string;
 }
+// an interpretation of a hypothesis: for one test person (or general), its text
+// and its own Belege
+export interface AbInterp {
+  id: string;
+  person?: string;
+  text: string;
+  belege: AbBeleg[];
+}
 export interface AbHyp {
   id: string;
   code: string; // H1, H2 …
@@ -53,8 +61,10 @@ export interface AbHyp {
   dims: string[]; // (older: the Tally questions it was about; hypotheses are general now)
   factors: string[]; // (older: possible influences; no longer shown)
   text: string; // the interpretation
-  evidence: { item: string; kind: EvKind }[]; // kept in step with belege, for older readers
-  belege?: AbBeleg[];
+  evidence: { item: string; kind: EvKind }[]; // kept in step with the interpretations' Belege, for older readers
+  belege?: AbBeleg[]; // (all Belege, kept in step)
+  interps?: AbInterp[]; // the interpretations, each for a person, each with its own Belege
+
   status: HypStatus;
   reason?: string; // why not considered
 }
@@ -74,8 +84,15 @@ interface AbDoc {
 
 
 // a hypothesis's Belege (older hypotheses: their linked statements)
-export const belegeOf = (h: AbHyp): AbBeleg[] => h.belege ?? h.evidence.map((e, i) => ({ id: `e${i}`, item: e.item, kind: e.kind, text: '' }));
-const withBelege = (h: AbHyp, belege: AbBeleg[]): AbHyp => ({ ...h, belege, evidence: belege.filter((b) => b.item).map((b) => ({ item: b.item!, kind: b.kind })) });
+const oldBelege = (h: AbHyp): AbBeleg[] => h.belege ?? h.evidence.map((e, i) => ({ id: `e${i}`, item: e.item, kind: e.kind, text: '' }));
+// a hypothesis's interpretations (older ones: its text and Belege as one, general)
+export const interpsOf = (h: AbHyp): AbInterp[] => h.interps ?? (h.text || oldBelege(h).length ? [{ id: 'i0', text: h.text, belege: oldBelege(h) }] : []);
+export const belegeOf = (h: AbHyp): AbBeleg[] => interpsOf(h).flatMap((x) => x.belege);
+// the interpretations, with the text, Belege and statements kept in step for older readers
+const withInterps = (h: AbHyp, interps: AbInterp[]): AbHyp => {
+  const belege = interps.flatMap((x) => x.belege);
+  return { ...h, interps, text: interps.map((x) => x.text).filter(Boolean).join('\n\n'), belege, evidence: belege.filter((b) => b.item).map((b) => ({ item: b.item!, kind: b.kind })) };
+};
 const hcode = (c: string) => `H${(c.replace(/\D/g, '') || '0').padStart(2, '0')}`;
 
 // links to the dashboard's figures in a text: [Wort](abb:teil1)
@@ -244,7 +261,7 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const qWords = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const shownHyps = qWords.length
     ? hyps.filter((h) => {
-        const hay = [h.code, hcode(h.code), h.title, plain(h.text), ...belegeOf(h).flatMap((b) => [b.person ?? '', plain(b.text), b.item ? (items.get(b.item) ?? allItems[b.item])?.text ?? '' : ''])].join(' ').toLowerCase();
+        const hay = [h.code, hcode(h.code), h.title, ...interpsOf(h).flatMap((x) => [x.person ?? '', plain(x.text)]), ...belegeOf(h).flatMap((b) => [b.person ?? '', plain(b.text), b.item ? (items.get(b.item) ?? allItems[b.item])?.text ?? '' : ''])].join(' ').toLowerCase();
         return qWords.every((w) => hay.includes(w));
       })
     : hyps;
@@ -422,7 +439,7 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
                     className="st-lc-add"
                     aria-label="Hypothese hinzufügen"
                     onClick={() => {
-                      const h: AbHyp = { id: uid('h'), code: nextCode(), title: '', dims: [], factors: [], text: '', evidence: [], belege: [], status: 'open' };
+                      const h: AbHyp = { id: uid('h'), code: nextCode(), title: '', dims: [], factors: [], text: '', evidence: [], belege: [], interps: [{ id: uid('i'), text: '', belege: [] }], status: 'open' };
                       putHyp(h, `Hypothese ${h.code} angelegt`);
                       setFresh(h.id);
                     }}
@@ -652,26 +669,37 @@ const PenIcon = () => (
 );
 const KIND_FILL: Record<EvKind, string> = { support: 'is-support', extra: 'is-extra', contra: 'is-contra' };
 
-// a hypothesis: H01, its title and interpretation (with links to figures), and its
-// Belege as boxes in the colour of their kind; from two Belege on, the list is
-// folded (the first fades out, the arrow over it); the pen edits this one
+// a hypothesis: H01, its title, and its interpretations – each for a test person
+// (the chip before its first line), with its own Belege as boxes in the colour
+// of their kind (from two on folded: the first fades out, the arrow over it);
+// the + beside an interpretation adds a Beleg to it; the pen edits this one;
+// the status (Redesign) is the whole hypothesis's
 function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: { h: AbHyp; items: Map<string, ItemDoc>; allItems: Record<string, ItemDoc>; persons: string[]; startEdit: boolean; onSave: (h: AbHyp, what: string) => void; onDelete: () => void }) {
   const view = useContentView();
   const [edit, setEdit] = useState(startEdit);
   const [draft, setDraft] = useState(h);
-  const [pick, setPick] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [pick, setPick] = useState<string | null>(null);
+  const [open, setOpen] = useState<Set<string>>(new Set());
   const itemOf = (id?: string) => (id ? (items.get(id) ?? allItems[id]) : undefined);
-  const belege = belegeOf(h);
-  const dBelege = belegeOf(draft);
-  const folded = belege.length >= 2 && !open;
-  const start = () => (setDraft(withBelege(h, belegeOf(h))), setEdit(true));
-  const setB = (id: string, p: Partial<AbBeleg>) => setDraft(withBelege(draft, dBelege.map((b) => (b.id === id ? { ...b, ...p } : b))));
+  const interps = interpsOf(h);
+  const dInterps = interpsOf(draft);
+  const start = () => (setDraft(withInterps(h, interpsOf(h))), setEdit(true));
+  const setI = (id: string, p: Partial<AbInterp>) => setDraft(withInterps(draft, dInterps.map((x) => (x.id === id ? { ...x, ...p } : x))));
+  const setB = (iid: string, bid: string, p: Partial<AbBeleg>) => setDraft(withInterps(draft, dInterps.map((x) => (x.id === iid ? { ...x, belege: x.belege.map((b) => (b.id === bid ? { ...b, ...p } : b)) } : x))));
   const commit = () => {
-    onSave(withBelege({ ...draft, title: draft.title.trim() || 'Ohne Titel', text: draft.text.trim(), reason: draft.reason?.trim() || undefined }, dBelege.map((b) => ({ ...b, text: b.text.trim() }))), `Hypothese ${h.code} bearbeitet`);
+    onSave(withInterps({ ...draft, title: draft.title.trim() || 'Ohne Titel', reason: draft.reason?.trim() || undefined }, dInterps.map((x) => ({ ...x, text: x.text.trim(), belege: x.belege.map((b) => ({ ...b, text: b.text.trim() })) }))), `Hypothese ${h.code} bearbeitet`);
     setEdit(false);
   };
   const who = (b: AbBeleg) => b.person ?? itemOf(b.item)?.person;
+  const personChips = (value: string | undefined, onPick: (p: string | undefined) => void, label: string) => (
+    <span className="st-ab-chips st-ab-pchips" role="radiogroup" aria-label={label}>
+      {[undefined, ...persons].map((p) => (
+        <button key={p ?? '-'} type="button" role="radio" aria-checked={value === p} className={`st-fchip${value === p ? ' is-on' : ''}`} onClick={() => onPick(p)}>
+          {p ?? 'Allgemein'}
+        </button>
+      ))}
+    </span>
+  );
   if (edit)
     return (
       <div className="st-ab-hyp is-edit">
@@ -679,9 +707,6 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
           <span className="st-ab-code">{hcode(h.code)}</span>
           <input className="st-ab-in" value={draft.title} placeholder="Kurzer Titel, z. B. Präferenz durch Ergebnisqualität beeinflusst" aria-label="Titel der Hypothese" autoFocus onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
         </div>
-        <span className="st-cx-lab">Interpretation</span>
-        <LinkText rows={3} value={draft.text} label="Interpretation" placeholder="Was die Ergebnisse erklären könnte – als Annahme formuliert" onChange={(v) => setDraft({ ...draft, text: v })} />
-        <span className="st-cx-lab">Belege</span>
         <div className="st-ab-legend">
           {EV_KIND.map(([k, l]) => (
             <span key={k}>
@@ -694,37 +719,55 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
             verlinkte Abbildung
           </span>
         </div>
-        {!dBelege.length && <p className="st-muted st-ab-empty">Noch kein Beleg: mit + an der Hypothese hinzufügen.</p>}
-        {dBelege.map((b) => {
-          const it = itemOf(b.item);
-          return (
-            <div key={b.id} className={`st-ab-beled ${KIND_FILL[b.kind]}`}>
-              <div className="st-ab-beledhead">
-                <select value={b.person ?? it?.person ?? ''} aria-label="Person" onChange={(e) => setB(b.id, { person: e.target.value || undefined })}>
-                  <option value="">Allgemein</option>
-                  {[...new Set([...persons, ...(it?.person ? [it.person] : [])])].map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-                <span className="st-ab-kinds" role="radiogroup" aria-label="Art des Belegs">
-                  {EV_KIND.map(([k, l]) => (
-                    <button key={k} type="button" role="radio" aria-checked={b.kind === k} className={b.kind === k ? 'is-on' : ''} title={l} aria-label={l} onClick={() => setB(b.id, { kind: k })}>
-                      <i className={KIND_FILL[k]} />
-                    </button>
-                  ))}
-                </span>
-                {it && <span className="st-muted st-ab-belsrc">{`Aussage: ${SECTION_LABEL[it.section]} · „${itemText(view, it).slice(0, 48)}${itemText(view, it).length > 48 ? ' …' : ''}“`}</span>}
-                <button type="button" className="st-cx-x is-small" aria-label="Beleg entfernen" title="Beleg entfernen" onClick={() => setDraft(withBelege(draft, dBelege.filter((x) => x.id !== b.id)))}>
+        {dInterps.map((x, n) => (
+          <div key={x.id} className="st-ab-ied">
+            <div className="st-ab-iedhead">
+              <span className="st-cx-lab">{dInterps.length > 1 ? `Interpretation ${n + 1}` : 'Interpretation'}</span>
+              {dInterps.length > 1 && (
+                <button type="button" className="st-cx-x is-small" aria-label={`Interpretation ${n + 1} entfernen`} title="Interpretation entfernen" onClick={() => setDraft(withInterps(draft, dInterps.filter((y) => y.id !== x.id)))}>
                   ×
                 </button>
-              </div>
-              <LinkText rows={2} value={b.text} label={`Beleg ${who(b) ?? ''}`} placeholder="Was dieser Beleg für die Hypothese zeigt" onChange={(v) => setB(b.id, { text: v })} />
+              )}
             </div>
-          );
-        })}
-        <span className="st-cx-lab">Status</span>
+            {personChips(x.person, (p) => setI(x.id, { person: p }), `Testperson der Interpretation ${n + 1}`)}
+            <LinkText rows={3} value={x.text} label={`Interpretation ${n + 1}`} placeholder="Was die Ergebnisse erklären könnte – als Annahme formuliert" onChange={(v) => setI(x.id, { text: v })} />
+            {x.belege.map((b) => {
+              const it = itemOf(b.item);
+              return (
+                <div key={b.id} className={`st-ab-beled ${KIND_FILL[b.kind]}`}>
+                  <div className="st-ab-beledhead">
+                    <select value={b.person ?? it?.person ?? ''} aria-label="Person" onChange={(e) => setB(x.id, b.id, { person: e.target.value || undefined })}>
+                      <option value="">Allgemein</option>
+                      {[...new Set([...persons, ...(it?.person ? [it.person] : [])])].map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="st-ab-kinds" role="radiogroup" aria-label="Art des Belegs">
+                      {EV_KIND.map(([k, l]) => (
+                        <button key={k} type="button" role="radio" aria-checked={b.kind === k} className={b.kind === k ? 'is-on' : ''} title={l} aria-label={l} onClick={() => setB(x.id, b.id, { kind: k })}>
+                          <i className={KIND_FILL[k]} />
+                        </button>
+                      ))}
+                    </span>
+                    {it && <span className="st-muted st-ab-belsrc">{`Aussage: ${SECTION_LABEL[it.section]} · „${itemText(view, it).slice(0, 48)}${itemText(view, it).length > 48 ? ' …' : ''}“`}</span>}
+                    <button type="button" className="st-cx-x is-small" aria-label="Beleg entfernen" title="Beleg entfernen" onClick={() => setI(x.id, { belege: x.belege.filter((y) => y.id !== b.id) })}>
+                      ×
+                    </button>
+                  </div>
+                  <LinkText rows={2} value={b.text} label={`Beleg ${who(b) ?? ''}`} placeholder="Was dieser Beleg für die Interpretation zeigt" onChange={(v) => setB(x.id, b.id, { text: v })} />
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        <div className="st-ab-row">
+          <button type="button" className="st-cx-btn" onClick={() => setDraft(withInterps(draft, [...dInterps, { id: uid('i'), text: '', belege: [] }]))}>
+            + Interpretation
+          </button>
+        </div>
+        <span className="st-cx-lab">Status (Redesign, für die ganze Hypothese)</span>
         <span className="st-ab-chips" role="radiogroup" aria-label="Status der Hypothese">
           {HYP_STATUS.map(([k, l]) => (
             <button key={k} type="button" role="radio" aria-checked={draft.status === k} className={`st-fchip${draft.status === k ? ' is-on' : ''}`} onClick={() => setDraft({ ...draft, status: k })}>
@@ -747,6 +790,7 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
         </div>
       </div>
     );
+  const pickFor = interps.find((x) => x.id === pick);
   return (
     <article className={`st-ab-hyp is-${h.status}`}>
       <span className="st-ab-hcode">{hcode(h.code)}</span>
@@ -754,65 +798,78 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
         <PenIcon />
       </button>
       <h4 className="st-ab-htitle">{h.title || 'Ohne Titel'}</h4>
-      {h.text ? (
-        <p className="st-ab-htext">
-          <RichText text={h.text} />
-        </p>
-      ) : (
-        <p className="st-ab-htext st-muted">Noch keine Interpretation.</p>
-      )}
+      {!interps.length && <p className="st-ab-htext st-muted">Noch keine Interpretation.</p>}
       {h.status === 'rejected' && h.reason && <p className="st-ab-reason">{`Nicht berücksichtigt: ${h.reason}`}</p>}
-      <span className="st-ab-tipwrap st-ab-hplus">
-        <button type="button" className="st-lc-add" aria-label="Beleg hinzufügen" onClick={() => setPick(true)}>
-          <PlusIcon />
-        </button>
-        <span className="st-ab-tip" role="tooltip">
-          Beleg hinzufügen
-        </span>
-      </span>
-      {belege.length > 0 && (
-        <div className={`st-ab-belege${folded ? ' is-folded' : ''}`}>
-          {belege.map((b) => {
-            const it = itemOf(b.item);
-            return (
-              <div key={b.id} className={`st-ab-bel ${KIND_FILL[b.kind]}`}>
-                <div className="st-ab-belhead">
-                  <b>{who(b) ?? 'Allgemein'}</b>
-                  {it && SECTION_LABEL[it.section]}
-                  <span className="st-ab-vh">{EV_KIND.find(([k]) => k === b.kind)?.[1]}</span>
-                </div>
-                {b.text && (
-                  <p className="st-ab-beltext">
-                    <RichText text={b.text} />
-                  </p>
-                )}
-                {it && <span className="st-ab-src">{`„${itemText(view, it)}“`}</span>}
-                {!it && b.item && <span className="st-ab-src">Aussage gelöscht</span>}
+      {interps.map((x) => {
+        const folded = x.belege.length >= 2 && !open.has(x.id);
+        return (
+          <div key={x.id} className="st-ab-interp">
+            <p className="st-ab-htext">
+              {x.person && <span className="st-ab-ichip">{x.person}</span>}
+              {x.text ? <RichText text={x.text} /> : <span className="st-muted">Noch kein Text.</span>}
+            </p>
+            <span className="st-ab-tipwrap st-ab-hplus">
+              <button type="button" className="st-lc-add" aria-label="Beleg hinzufügen" onClick={() => setPick(x.id)}>
+                <PlusIcon />
+              </button>
+              <span className="st-ab-tip" role="tooltip">
+                Beleg hinzufügen
+              </span>
+            </span>
+            {x.belege.length > 0 && (
+              <div className={`st-ab-belege${folded ? ' is-folded' : ''}`}>
+                {x.belege.map((b) => {
+                  const it = itemOf(b.item);
+                  return (
+                    <div key={b.id} className={`st-ab-bel ${KIND_FILL[b.kind]}`}>
+                      <div className="st-ab-belhead">
+                        <b>{who(b) ?? 'Allgemein'}</b>
+                        {it && SECTION_LABEL[it.section]}
+                        <span className="st-ab-vh">{EV_KIND.find(([k]) => k === b.kind)?.[1]}</span>
+                      </div>
+                      {b.text && (
+                        <p className="st-ab-beltext">
+                          <RichText text={b.text} />
+                        </p>
+                      )}
+                      {it && <span className="st-ab-src">{`„${itemText(view, it)}“`}</span>}
+                      {!it && b.item && <span className="st-ab-src">Aussage gelöscht</span>}
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-      )}
-      {belege.length >= 2 && (
-        <div className="st-ab-unfold">
-          <button type="button" className="st-iconbtn" aria-expanded={open} aria-label={open ? 'Belege einklappen' : `Alle ${belege.length} Belege anzeigen`} title={open ? 'Einklappen' : `Alle ${belege.length} Belege anzeigen`} onClick={() => setOpen(!open)}>
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d={open ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />
-            </svg>
-          </button>
-        </div>
-      )}
-      {pick && (
+            )}
+            {x.belege.length >= 2 && (
+              <div className="st-ab-unfold">
+                <button
+                  type="button"
+                  className="st-iconbtn"
+                  aria-expanded={!folded}
+                  aria-label={folded ? `Alle ${x.belege.length} Belege anzeigen` : 'Belege einklappen'}
+                  title={folded ? `Alle ${x.belege.length} Belege anzeigen` : 'Einklappen'}
+                  onClick={() => setOpen((o) => { const n = new Set(o); if (n.has(x.id)) n.delete(x.id); else n.add(x.id); return n; })}
+                >
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d={folded ? 'm6 9 6 6 6-6' : 'm6 15 6-6 6 6'} />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {pickFor && (
         <EvidencePicker
           h={h}
+          linked={new Set(pickFor.belege.map((b) => b.item).filter((v): v is string => !!v))}
+          start={pickFor.person ?? ''}
           items={[...items.values()]}
-          onClose={() => {
-            setPick(false);
-          }}
+          onClose={() => setPick(null)}
           onPick={(item, kind) => {
-            const cur = belegeOf(h);
-            const next = cur.some((b) => b.item === item) ? cur.map((b) => (b.item === item ? { ...b, kind } : b)) : [...cur, { id: uid('b'), item, person: itemOf(item)?.person, kind, text: '' }];
-            onSave(withBelege(h, next), `Beleg zu ${h.code}`);
+            const next = interpsOf(h).map((x) =>
+              x.id !== pickFor.id ? x : { ...x, belege: x.belege.some((b) => b.item === item) ? x.belege.map((b) => (b.item === item ? { ...b, kind } : b)) : [...x.belege, { id: uid('b'), item, person: itemOf(item)?.person, kind, text: '' }] },
+            );
+            onSave(withInterps(h, next), `Beleg zu ${h.code}`);
           }}
         />
       )}
@@ -821,9 +878,9 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
 }
 
 // a small search over Beobachtungen & Feedback to link statements
-function EvidencePicker({ h, items, onClose, onPick }: { h: AbHyp; items: ItemDoc[]; onClose: () => void; onPick: (item: string, kind: EvKind) => void }) {
+function EvidencePicker({ h, items, linked, start = '', onClose, onPick }: { h: AbHyp; items: ItemDoc[]; linked: Set<string>; start?: string; onClose: () => void; onPick: (item: string, kind: EvKind) => void }) {
   const view = useContentView();
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(start);
   const [kind, setKind] = useState<EvKind>('support');
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -831,7 +888,6 @@ function EvidencePicker({ h, items, onClose, onPick }: { h: AbHyp; items: ItemDo
     return () => window.removeEventListener('keydown', k);
   }, [onClose]);
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const linked = new Set(belegeOf(h).map((b) => b.item).filter(Boolean));
   const hits = items.filter((i) => words.every((w) => `${i.person} ${i.text} ${i.de ?? ''} ${i.question ?? ''}`.toLowerCase().includes(w))).slice(0, 40);
   return (
     <div className="st-modal-back" role="presentation" onClick={onClose}>

@@ -8533,3 +8533,56 @@ body:has(.st-root) {
 .st-root button.st-ab-ren:hover {
   color: var(--st-ink);
 }
+/* Hypothesen: several interpretations, each with its person chip and its Belege */
+.st-root .st-ab-hyp {
+  column-gap: 28px; /* room between the text and the +, so the text wraps earlier */
+}
+.st-ab-hyp > .st-ab-interp {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  column-gap: 28px;
+  row-gap: 6px;
+  align-items: start;
+  margin-top: 4px;
+}
+.st-ab-interp + .st-ab-interp {
+  margin-top: 14px;
+}
+.st-ab-interp > .st-ab-htext {
+  grid-column: 1;
+}
+.st-ab-interp > .st-ab-hplus {
+  grid-column: 2;
+  justify-self: end;
+}
+.st-ab-interp > .st-ab-belege,
+.st-ab-interp > .st-ab-unfold {
+  grid-column: 1 / -1;
+}
+.st-ab-ichip {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--st-paper);
+  border: 1px solid var(--st-line);
+  font-size: var(--st-fs-meta);
+  font-weight: 600;
+  line-height: 1.6;
+  vertical-align: 1px;
+}
+.st-ab-ied {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--st-line);
+}
+.st-ab-iedhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.st-ab-pchips {
+  gap: 6px;
+}

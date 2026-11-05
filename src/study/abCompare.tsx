@@ -862,7 +862,7 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
                         {it && SECTION_LABEL[it.section]}
                         <span className="st-ab-vh">{EV_KIND.find(([k]) => k === b.kind)?.[1]}</span>
                       </div>
-                      {questionOf(it) && <p className="st-ab-belq">{`Frage: ${questionOf(it)}`}</p>}
+                      {questionOf(it) && <p className="st-ab-belq" data-notr>{questionOf(it)}</p>}
                       {b.text && (
                         <p className="st-ab-beltext">
                           <RichText text={b.text} />

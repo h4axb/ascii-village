@@ -8339,6 +8339,7 @@ body:has(.st-root) {
   margin: 0;
   font-size: var(--st-fs-small);
   color: var(--st-muted);
+  font-style: italic;
   line-height: 1.45;
 }
 .st-ab-belhead b {

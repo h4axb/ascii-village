@@ -691,14 +691,16 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
     setEdit(false);
   };
   const who = (b: AbBeleg) => b.person ?? itemOf(b.item)?.person;
-  const personChips = (value: string | undefined, onPick: (p: string | undefined) => void, label: string) => (
-    <span className="st-ab-chips st-ab-pchips" role="radiogroup" aria-label={label}>
-      {[undefined, ...persons].map((p) => (
-        <button key={p ?? '-'} type="button" role="radio" aria-checked={value === p} className={`st-fchip${value === p ? ' is-on' : ''}`} onClick={() => onPick(p)}>
-          {p ?? 'Allgemein'}
-        </button>
+  // the test person of an interpretation: a dropdown, "Allgemein" by default
+  const personPick = (value: string | undefined, onPick: (p: string | undefined) => void, label: string) => (
+    <select className="st-ab-psel" value={value ?? ''} aria-label={label} onChange={(e) => onPick(e.target.value || undefined)}>
+      <option value="">Allgemein</option>
+      {[...new Set([...persons, ...(value ? [value] : [])])].map((p) => (
+        <option key={p} value={p}>
+          {p}
+        </option>
       ))}
-    </span>
+    </select>
   );
   if (edit)
     return (
@@ -729,7 +731,7 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
                 </button>
               )}
             </div>
-            {personChips(x.person, (p) => setI(x.id, { person: p }), `Testperson der Interpretation ${n + 1}`)}
+            {personPick(x.person, (p) => setI(x.id, { person: p }), `Testperson der Interpretation ${n + 1}`)}
             <LinkText rows={3} value={x.text} label={`Interpretation ${n + 1}`} placeholder="Was die Ergebnisse erklären könnte – als Annahme formuliert" onChange={(v) => setI(x.id, { text: v })} />
             {x.belege.map((b) => {
               const it = itemOf(b.item);

@@ -8599,3 +8599,16 @@ body:has(.st-root) {
 .st-ab-irow .st-ab-ichip {
   margin-right: 0;
 }
+/* the test person of an interpretation (editor): a dropdown */
+.st-root select.st-ab-psel {
+  justify-self: start;
+  width: auto;
+  min-width: 140px;
+  max-width: 100%;
+  font: inherit;
+  font-size: var(--st-fs-small);
+  padding: 5px 10px;
+  border: 1px solid var(--st-line);
+  border-radius: 8px;
+  background: var(--st-paper);
+}

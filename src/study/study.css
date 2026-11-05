@@ -34,6 +34,7 @@
   --st-accent: #c2571a;
   --st-accent-soft: #f6e6dc;
   --st-warn: #9a3b0c;
+  --st-ok: #3f7a33; /* done / confirmed (the dashboard's one green) */
 }
 /* the game's styles.css locks the page (height 100 %, overflow hidden);
    this page scrolls */
@@ -1445,15 +1446,15 @@ body:has(.st-root) {
 }
 .st-pane.is-current .st-pane-head {
   background: #e8f3e5;
-  color: #61a051;
+  color: var(--st-ok);
 }
 .st-pane.is-incoming .st-pane-head {
   background: #e2ecf8;
   color: #1f4f8a;
 }
 .st-pane.is-current.is-chosen {
-  border-color: #61a051;
-  box-shadow: 0 0 0 1px #61a051;
+  border-color: var(--st-ok);
+  box-shadow: 0 0 0 1px var(--st-ok);
 }
 .st-pane.is-incoming.is-chosen {
   border-color: #3b74c0;
@@ -1504,7 +1505,7 @@ body:has(.st-root) {
 }
 .st-diff-add {
   background: #dcecd7;
-  color: #61a051;
+  color: var(--st-ok);
   text-decoration: none;
 }
 /* a saved state opened by link */
@@ -1642,7 +1643,7 @@ body:has(.st-root) {
   border-left: 3px solid var(--st-line);
 }
 .st-review h3.is-applied {
-  border-left-color: #61a051;
+  border-left-color: var(--st-ok);
 }
 .st-review h3.is-stays {
   border-left-color: var(--st-muted);
@@ -2382,8 +2383,8 @@ body:has(.st-root) {
   padding: 6px 0;
 }
 .st-root .st-chip.is-added {
-  background: #61a051;
-  border-color: #61a051;
+  background: var(--st-ok);
+  border-color: var(--st-ok);
 }
 .st-root .st-chip-x {
   border: 0 !important;
@@ -4558,7 +4559,7 @@ body:has(.st-root) {
   border-color: transparent;
   background: transparent;
   padding-left: 0;
-  color: #61a051;
+  color: var(--st-ok);
 }
 /* all participants: a section per person inside the panel, its card first */
 .st-root .st-lc-panel .st-notes-person {
@@ -5405,8 +5406,8 @@ body:has(.st-root) {
   box-sizing: border-box;
 }
 .st-cx-dot.is-confirmed {
-  background: #61a051;
-  border-color: #61a051;
+  background: var(--st-ok);
+  border-color: var(--st-ok);
 }
 .st-cx-dot.is-suggested {
   border-color: var(--st-muted);
@@ -5702,7 +5703,7 @@ body:has(.st-root) {
 }
 .st-cx-ai.is-set {
   border-style: solid;
-  color: #61a051;
+  color: var(--st-ok);
 }
 .st-cx-stmt {
   background: var(--st-soft);
@@ -6006,7 +6007,7 @@ body:has(.st-root) {
 }
 .st-cx-dots i.is-ok,
 .st-cx-d.is-ok {
-  background: #61a051;
+  background: var(--st-ok);
 }
 .st-cx-dots i.is-sug,
 .st-cx-d.is-sug {
@@ -6166,7 +6167,7 @@ body:has(.st-root) {
 }
 .st-cx-stat.is-implemented,
 .st-cx-stat.is-tested {
-  color: #61a051;
+  color: var(--st-ok);
   border-color: #c6dfbf;
   background: #e8f3e5;
 }
@@ -6337,7 +6338,7 @@ body:has(.st-root) {
   border-color: #f3d9a8;
 }
 .st-root button.st-cx-pill.is-chosen {
-  color: #61a051;
+  color: var(--st-ok);
   background: #e8f3e5;
   border-color: #c6dfbf;
 }
@@ -6498,7 +6499,7 @@ body:has(.st-root) {
   background: var(--st-soft);
 }
 .st-cx-flow li.is-done b i {
-  background: #61a051;
+  background: var(--st-ok);
   color: #fff;
 }
 .st-cx-flow em {

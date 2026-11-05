@@ -736,8 +736,17 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
   if (edit)
     return (
       <div className="st-ab-hyp is-edit">
-        <div className="st-ab-chead">
+        <div className="st-ab-chead st-ab-edtop">
           <span className="st-ab-code">{hcode(h.code)}</span>
+          <span className="st-cx-sp" />
+          <button type="button" className="st-cx-btn" onClick={() => setEdit(false)}>
+            Abbrechen
+          </button>
+          <button type="button" className="st-cx-btn is-pri" onClick={commit}>
+            Speichern
+          </button>
+        </div>
+        <div className="st-ab-chead">
           <input className="st-ab-in" value={draft.title} placeholder="Kurzer Titel, z. B. Präferenz durch Ergebnisqualität beeinflusst" aria-label="Titel der Hypothese" autoFocus onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
         </div>
         <div className="st-ab-legend">
@@ -812,13 +821,6 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
         <div className="st-ab-foot">
           <button type="button" className="st-linkbtn st-cx-del" onClick={() => confirm(`Hypothese ${hcode(h.code)} löschen? Sie wird auch aus den Redesign-Entscheidungen genommen.`) && onDelete()}>
             Löschen
-          </button>
-          <span className="st-cx-sp" />
-          <button type="button" className="st-cx-btn" onClick={() => setEdit(false)}>
-            Abbrechen
-          </button>
-          <button type="button" className="st-cx-btn is-pri" onClick={commit}>
-            Speichern
           </button>
         </div>
       </div>

@@ -3925,10 +3925,6 @@ body:has(.st-root) {
   gap: 10px;
   min-width: 0;
 }
-.st-secnav-icon {
-  flex: none;
-  color: var(--st-muted);
-}
 .st-secnav-row {
   display: flex;
   gap: 6px;
@@ -3989,9 +3985,6 @@ body:has(.st-root) {
   }
   .st-root .st-secnav .st-chip {
     min-height: 36px;
-  }
-  .st-root .st-secnav-icon {
-    display: none;
   }
 }
 .st-root .st-dash-bars .st-dash-bar.is-on,

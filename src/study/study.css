@@ -8768,3 +8768,21 @@ body:has(.st-root) {
   text-overflow: ellipsis;
   max-width: 170px;
 }
+/* the Tally row that decides the Gesamtbewertung */
+.st-ab-prefchip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--st-ink);
+  color: #fff;
+  font-size: var(--st-fs-micro);
+  font-weight: 600;
+  line-height: 1.7;
+  vertical-align: 2px;
+}
+.st-ab-cbasis {
+  font-size: 11px;
+  color: #f4f4f2;
+  overflow-wrap: anywhere;
+}

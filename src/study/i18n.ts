@@ -169,6 +169,7 @@ const EN: Record<string, string> = {
   'Art des Belegs': 'Kind of evidence',
   'je Person: ihre Antwort in der Umfrage (Teil 1) ist eine Stimme; die Variante mit mehr Stimmen gewinnt': 'per person: their answer in the survey (part 1) is one vote; the variant with more votes wins',
   'A/B getauscht': 'A/B swapped',
+  'Diese Frage bestimmt die Tally-Gesamtbewertung oben (unten unter „Präferenzfrage“ wählbar)': 'This question decides the Tally overall rating above (chosen below under “Preference question”)',
   'Zeitpunkt der Unterstützung': 'Timing of the support',
   'je Person: ihre Antwort (Teil 2) ist eine Stimme – vorher = A, nachher = B, beides = Gleich, keines = keine Stimme': 'per person: their answer (part 2) is one vote – before = A, after = B, both = tie, neither = no vote',
   'Teil 2 · vorher = A, nachher = B, beides = Gleich': 'Part 2 · before = A, after = B, both = tie',
@@ -1490,6 +1491,7 @@ const PATTERNS: [RegExp, string][] = [
   [/^Aussagekraft: schwach$/, 'Strength: weak'],
   [/^Aussagekraft: keine Mehrheit$/, 'Strength: no majority'],
   [/^kleine Stichprobe \(n = (\d+)\)$/, 'small sample (n = $1)'],
+  [/^Gesamtbewertung = Antworten auf die Präferenzfrage „(.+)“$/s, 'Overall rating = the answers to the preference question “$1”'],
   [/^Ø A (.+) · Ø B (.+)$/, 'Mean A $1 · mean B $2'],
 
   [/^Alle · n = (\d+)$/, 'All · n = $1'],

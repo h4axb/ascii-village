@@ -277,6 +277,10 @@ const uid = (p: string) => `${p}${Date.now().toString(36)}${Math.random().toStri
 const pText = (p: number) => (Number.isFinite(p) ? `p = ${p < 0.001 ? '< 0,001' : p.toFixed(2).replace('.', ',')}` : '');
 const lead = (q: string) => q.replace(/[\s?:.]+$/, '');
 const PREF_RE = /insgesamt|gefallen|präferenz|bevorzug|lieber|overall|prefer/i;
+// (the direct question on continued use comes first: "which would you prefer to use")
+const USE_RE = /prefer to use|continued? (playing|use)|weiter(spielen|nutzen)|weiterhin nutzen/i;
+const pickPref = (results: { question: string }[], stored?: string) =>
+  stored && results.some((r) => r.question === stored) ? stored : (results.find((r) => USE_RE.test(r.question)) ?? results.find((r) => PREF_RE.test(r.question)) ?? results[results.length - 1])?.question;
 
 function useAb() {
   const { study } = useCtx();
@@ -298,7 +302,7 @@ export function useAbSummary() {
   const { slice } = useCtx();
   const { doc } = useAb();
   const results = useMemo(() => part1(slice.survey).filter((r) => r.n), [slice.survey]);
-  const prefQ = doc.prefQ && results.some((r) => r.question === doc.prefQ) ? doc.prefQ : (results.find((r) => PREF_RE.test(r.question)) ?? results[results.length - 1])?.question;
+  const prefQ = pickPref(results, doc.prefQ);
   const rows = slice.survey.filter((r) => r.person && prefQ && r.p1[prefQ] != null);
   const hyps = doc.hyps ?? [];
   return {
@@ -324,7 +328,7 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const [rename, setRename] = useState<string | null>(null);
   const results = useMemo(() => part1(slice.survey).filter((r) => r.n), [slice.survey]);
   const label = (q: string) => doc.dims?.[q]?.trim() || lead(q);
-  const prefQ = doc.prefQ && results.some((r) => r.question === doc.prefQ) ? doc.prefQ : (results.find((r) => PREF_RE.test(r.question)) ?? results[results.length - 1])?.question;
+  const prefQ = pickPref(results, doc.prefQ);
   const hyps = doc.hyps ?? [];
   const decisions = doc.decisions ?? [];
   const items = useMemo(() => new Map(slice.items.map((i) => [i.id, i])), [slice.items]);
@@ -347,8 +351,8 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const game = useMemo(() => gameVotes(slice.feedback), [slice.feedback]);
   const tallyRows: Vote[] = results.map((r) => ({
     key: r.question,
-    title: r.question === prefQ ? 'Gesamtbewertung' : label(r.question),
-    sub: r.question === prefQ ? label(r.question) : r.question,
+    title: label(r.question),
+    sub: r.question,
     A: r.A,
     B: r.B,
     tie: r.neutral,
@@ -742,6 +746,7 @@ function CalcPop({ r, id }: { r: Vote; id: string }) {
   return (
 <span className="st-ab-calc" role="tooltip" id={id}>
             <b>So berechnet</b>
+            {r.pref && <span className="st-ab-cbasis">{`Gesamtbewertung = Antworten auf die Präferenzfrage „${r.sub}“`}</span>}
             <span className="st-muted">
               {r.none != null
                 ? 'je Person: ihre Antwort (Teil 2) ist eine Stimme – vorher = A, nachher = B, beides = Gleich, keines = keine Stimme'
@@ -765,7 +770,7 @@ function CalcPop({ r, id }: { r: Vote; id: string }) {
 
 function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; on?: boolean; renaming?: boolean; onClick?: () => void; onRename?: () => void; onRenamed?: (v: string | null) => void }) {
   const [v, setV] = useState(r.title);
-  useEffect(() => setV(r.pref ? r.sub : r.title), [r.title, r.sub, r.pref, renaming]);
+  useEffect(() => setV(r.title), [r.title, renaming]);
   const of = r.A + r.B + r.tie + (r.none ?? 0);
   const w = lead2(r);
   const body = (
@@ -787,6 +792,7 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
         ) : (
           <b>
             {r.title}
+            {r.pref && <span className="st-ab-prefchip" title="Diese Frage bestimmt die Tally-Gesamtbewertung oben (unten unter „Präferenzfrage“ wählbar)">Gesamtbewertung</span>}
             {(r.nHyp ?? 0) > 0 && <span className="st-ab-nh">{`${r.nHyp} H`}</span>}
           </b>
         )}

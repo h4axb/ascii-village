@@ -8732,3 +8732,24 @@ body:has(.st-root) {
   background: var(--st-paper);
   border-color: var(--st-line-strong);
 }
+/* the Gesamtbewertung tiles: the big letter explains its calculation on hover */
+.st-root button.st-ab-ovalue {
+  all: unset;
+  cursor: help;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px dashed var(--st-line-strong);
+}
+.st-root button.st-ab-ovalue.is-B { color: var(--st-accent); }
+.st-root button.st-ab-ovalue.is-A { color: #4b4b48; }
+.st-root button.st-ab-ovalue.is-tie { color: var(--st-muted); }
+.st-root button.st-ab-ovalue:focus-visible { outline: 2px solid var(--st-info); border-radius: 3px; }
+@media (max-width: 640px) {
+  /* (the tile's letter sits on the left: its popup opens below, to the right) */
+  .st-root .st-ab-owrap .st-ab-calc {
+    left: 0;
+    right: auto;
+  }
+}

@@ -629,10 +629,72 @@ function OverallTile({ source, v, unit, what }: { source: string; v: Vote | null
   return (
     <div className="st-ab-otile">
       <span className="st-ab-olabel">{source}</span>
-      <span className={`st-ab-ovalue is-${w ?? 'tie'}`}>{!of ? '–' : (w ?? '=')}</span>
+      {of && v && (v.calc || v.tcalc) ? (
+        <span className="st-ab-wwrap st-ab-owrap">
+          <button type="button" className={`st-ab-ovalue is-${w ?? 'tie'}`} aria-describedby={`ocalc-${v.key}`}>
+            {w ?? '='}
+          </button>
+          <CalcPop r={v} id={`ocalc-${v.key}`} />
+        </span>
+      ) : (
+        <span className={`st-ab-ovalue is-${w ?? 'tie'}`}>{!of ? '–' : (w ?? '=')}</span>
+      )}
       <span className="st-ab-otext">{!of ? 'noch keine Antworten' : w ? `Variante ${w} · ${v![w]} von ${of} ${of === 1 ? unit : `${unit}en`}` : `Gleichstand · A ${v!.A} · Gleich ${v!.tie} · B ${v!.B}`}</span>
       <span className="st-muted st-ab-owhat">{what}</span>
     </div>
+  );
+}
+
+// how a result was calculated (the popup over a variant letter): in-game the
+// comparison per person, Tally each person's answer
+function CalcPop({ r, id }: { r: Vote; id: string }) {
+  const w = lead2(r);
+  if (r.calc)
+    return (
+<span className="st-ab-calc" role="tooltip" id={id}>
+            <b>So berechnet</b>
+            {r.scale && (
+              <span className="st-ab-cscale">
+                <span>
+                  <b>1</b> {r.scale.low}
+                </span>
+                <span>
+                  <b>5</b> {r.scale.high}
+                </span>
+              </span>
+            )}
+            <span className="st-muted">{r.scale?.lower ? 'je Person: der niedrigere Wert gewinnt' : 'je Person: der höhere Wert gewinnt'}</span>
+            <span className="st-ab-ctbl">
+              {r.calc.map((c) => (
+                <span key={c.who} className="st-ab-crow">
+                  <span>{c.who}</span>
+                  <span>{`A ${val(c.a)}`}</span>
+                  <span>{c.v === 'A' ? (r.scale?.lower ? '<' : '>') : c.v === 'B' ? (r.scale?.lower ? '>' : '<') : '='}</span>
+                  <span>{`B ${val(c.b)}`}</span>
+                  <span className={`st-ab-cv is-${c.v ?? 'tie'}`}>{`→ ${c.v ?? 'Gleich'}`}</span>
+                </span>
+              ))}
+            </span>
+            <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
+          </span>
+    );
+  if (!r.tcalc) return null;
+  return (
+<span className="st-ab-calc" role="tooltip" id={id}>
+            <b>So berechnet</b>
+            <span className="st-muted">je Person: ihre Antwort in der Umfrage (Teil 1) ist eine Stimme; die Variante mit mehr Stimmen gewinnt</span>
+            <span className="st-ab-ctbl is-tally">
+              {r.tcalc.map((c, i) => (
+                <span key={`${c.who}-${i}`} className="st-ab-crow">
+                  <span>{c.who}</span>
+                  <span>{c.swapped ? 'A/B getauscht' : ''}</span>
+                  <span className={`st-ab-cv is-${c.v ?? 'tie'}`}>{`→ ${c.v ?? 'Gleich'}`}</span>
+                </span>
+              ))}
+            </span>
+            <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
+            {r.test && <span className="st-muted">{r.test}</span>}
+          </span>
   );
 }
 
@@ -667,58 +729,12 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
           {r.sub}
         </span>
       </span>
-      {r.calc ? (
+      {r.calc || r.tcalc ? (
         <span className="st-ab-wwrap">
           <button type="button" className={`st-ab-win is-${w ?? 'tie'}`} aria-describedby={`calc-${r.key}`}>
             {w ?? 'Gleich'}
           </button>
-          <span className="st-ab-calc" role="tooltip" id={`calc-${r.key}`}>
-            <b>So berechnet</b>
-            {r.scale && (
-              <span className="st-ab-cscale">
-                <span>
-                  <b>1</b> {r.scale.low}
-                </span>
-                <span>
-                  <b>5</b> {r.scale.high}
-                </span>
-              </span>
-            )}
-            <span className="st-muted">{r.scale?.lower ? 'je Person: der niedrigere Wert gewinnt' : 'je Person: der höhere Wert gewinnt'}</span>
-            <span className="st-ab-ctbl">
-              {r.calc.map((c) => (
-                <span key={c.who} className="st-ab-crow">
-                  <span>{c.who}</span>
-                  <span>{`A ${val(c.a)}`}</span>
-                  <span>{c.v === 'A' ? (r.scale?.lower ? '<' : '>') : c.v === 'B' ? (r.scale?.lower ? '>' : '<') : '='}</span>
-                  <span>{`B ${val(c.b)}`}</span>
-                  <span className={`st-ab-cv is-${c.v ?? 'tie'}`}>{`→ ${c.v ?? 'Gleich'}`}</span>
-                </span>
-              ))}
-            </span>
-            <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
-          </span>
-        </span>
-      ) : r.tcalc ? (
-        <span className="st-ab-wwrap">
-          <button type="button" className={`st-ab-win is-${w ?? 'tie'}`} aria-describedby={`calc-${r.key}`}>
-            {w ?? 'Gleich'}
-          </button>
-          <span className="st-ab-calc" role="tooltip" id={`calc-${r.key}`}>
-            <b>So berechnet</b>
-            <span className="st-muted">je Person: ihre Antwort in der Umfrage (Teil 1) ist eine Stimme; die Variante mit mehr Stimmen gewinnt</span>
-            <span className="st-ab-ctbl is-tally">
-              {r.tcalc.map((c, i) => (
-                <span key={`${c.who}-${i}`} className="st-ab-crow">
-                  <span>{c.who}</span>
-                  <span>{c.swapped ? 'A/B getauscht' : ''}</span>
-                  <span className={`st-ab-cv is-${c.v ?? 'tie'}`}>{`→ ${c.v ?? 'Gleich'}`}</span>
-                </span>
-              ))}
-            </span>
-            <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
-            {r.test && <span className="st-muted">{r.test}</span>}
-          </span>
+          <CalcPop r={r} id={`calc-${r.key}`} />
         </span>
       ) : (
         <span className={`st-ab-win is-${w ?? 'tie'}`}>{w ?? 'Gleich'}</span>

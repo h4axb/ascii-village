@@ -1701,6 +1701,7 @@ const PATTERNS: [RegExp, string][] = [
   [/^Median der Dauer je Abschnitt in Minuten \(n = (\d+)\)\.$/, 'Median duration per section in minutes (n = $1).'],
   [/^Crafting-Ergebnisse \((\d+) \+ (\d+) abgebrochen\)$/, 'Crafting results ($1 + $2 aborted)'],
   [/^Crafting-Ergebnisse \((\d+)\)$/, 'Crafting results ($1)'],
+  [/^Frage: (.+)$/s, 'Question: $1'],
   [/^(\d+)\. Durchgang · Variante ([AB])$/, 'Run $1 · variant $2'],
   [/^(\d+)\. Durchgang$/, 'Run $1'],
   [/^(\d+) Ergebnis(?:se)?$/, '$1 result(s)'],

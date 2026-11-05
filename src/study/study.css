@@ -8331,6 +8331,16 @@ body:has(.st-root) {
   font-size: 12px;
   color: var(--st-muted);
 }
+.st-ab-belhead .st-ab-ichip {
+  margin-right: 0;
+  color: var(--st-ink);
+}
+.st-ab-belq {
+  margin: 0;
+  font-size: var(--st-fs-small);
+  color: var(--st-muted);
+  line-height: 1.45;
+}
 .st-ab-belhead b {
   font-weight: 700;
   color: var(--st-ink);

@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { part1 } from './analysis';
 import type { ItemDoc } from './types';
 import { SECTION_LABEL } from './types';
-import { itemText, useContentView } from './translations';
+import { itemText, memoryOf, pick as pickText, useContentView } from './translations';
 import { FIGURES, figNumber, logChange, useCtx } from './ui';
 import { FoldBtn } from './notesDashboard';
 import { RATING_LABEL, scopeLabel } from './model';
@@ -704,6 +704,9 @@ const KIND_FILL: Record<EvKind, string> = { support: 'is-support', extra: 'is-ex
 // the status (Redesign) is the whole hypothesis's
 function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: { h: AbHyp; items: Map<string, ItemDoc>; allItems: Record<string, ItemDoc>; persons: string[]; startEdit: boolean; onSave: (h: AbHyp, what: string) => void; onDelete: () => void }) {
   const view = useContentView();
+  const { study } = useCtx();
+  // (a survey free-text answer: the question it answers, in the chosen language)
+  const questionOf = (it?: ItemDoc) => (it?.section === 'survey' && it.question ? pickText(view, it.question, memoryOf(study)[it.question]?.de) : '');
   const [edit, setEdit] = useState(startEdit);
   const [draft, setDraft] = useState(h);
   const [pick, setPick] = useState<string | null>(null);
@@ -854,11 +857,12 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
                   const it = itemOf(b.item);
                   return (
                     <div key={b.id} className={`st-ab-bel ${KIND_FILL[b.kind]}`}>
-                      {/* (no P-ID here: the Beleg belongs to the interpretation above) */}
                       <div className="st-ab-belhead">
+                        {(b.person || it?.person) && <span className="st-ab-ichip">{b.person || it?.person}</span>}
                         {it && SECTION_LABEL[it.section]}
                         <span className="st-ab-vh">{EV_KIND.find(([k]) => k === b.kind)?.[1]}</span>
                       </div>
+                      {questionOf(it) && <p className="st-ab-belq">{`Frage: ${questionOf(it)}`}</p>}
                       {b.text && (
                         <p className="st-ab-beltext">
                           <RichText text={b.text} />

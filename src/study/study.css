@@ -8586,3 +8586,16 @@ body:has(.st-root) {
 .st-ab-pchips {
   gap: 6px;
 }
+/* the person chip in a row of its own, the text below it; the + beside both */
+.st-ab-interp > .st-ab-irow {
+  grid-column: 1;
+}
+.st-ab-interp > .st-ab-irow + .st-ab-htext {
+  margin-top: 0;
+}
+.st-ab-interp > .st-ab-irow ~ .st-ab-hplus {
+  grid-row: 1 / span 2;
+}
+.st-ab-irow .st-ab-ichip {
+  margin-right: 0;
+}

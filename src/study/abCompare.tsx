@@ -804,10 +804,12 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
         const folded = x.belege.length >= 2 && !open.has(x.id);
         return (
           <div key={x.id} className="st-ab-interp">
-            <p className="st-ab-htext">
-              {x.person && <span className="st-ab-ichip">{x.person}</span>}
-              {x.text ? <RichText text={x.text} /> : <span className="st-muted">Noch kein Text.</span>}
-            </p>
+            {x.person && (
+              <span className="st-ab-irow">
+                <span className="st-ab-ichip">{x.person}</span>
+              </span>
+            )}
+            <p className="st-ab-htext">{x.text ? <RichText text={x.text} /> : <span className="st-muted">Noch kein Text.</span>}</p>
             <span className="st-ab-tipwrap st-ab-hplus">
               <button type="button" className="st-lc-add" aria-label="Beleg hinzufügen" onClick={() => setPick(x.id)}>
                 <PlusIcon />
@@ -822,8 +824,8 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
                   const it = itemOf(b.item);
                   return (
                     <div key={b.id} className={`st-ab-bel ${KIND_FILL[b.kind]}`}>
+                      {/* (no P-ID here: the Beleg belongs to the interpretation above) */}
                       <div className="st-ab-belhead">
-                        <b>{who(b) ?? 'Allgemein'}</b>
                         {it && SECTION_LABEL[it.section]}
                         <span className="st-ab-vh">{EV_KIND.find(([k]) => k === b.kind)?.[1]}</span>
                       </div>

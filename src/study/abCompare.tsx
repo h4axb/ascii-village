@@ -97,13 +97,33 @@ const hcode = (c: string) => `H${(c.replace(/\D/g, '') || '0').padStart(2, '0')}
 
 // links to the dashboard's figures in a text: [Wort](abb:teil1)
 const FIG_ROUTE: Record<string, string> = { alter: 'uebersicht', gruppe: 'uebersicht', laufzeit: 'uebersicht', teil4: 'uebersicht', ablauf: 'uebersicht', kategorien: 'uebersicht', befunde: 'qualitativ/befunde' };
+// the Übersicht's other visuals (no figure number): linked by their section
+const SECTION_LINKS: { id: string; title: string; caption: string; nav: string }[] = [
+  { id: 'kennzahlen', title: 'Kennzahlen', caption: 'Teilnehmende, Testgruppen, Zeitraum und Spieldauer im Überblick.', nav: 'Kennzahlen' },
+  { id: 'umfrage', title: 'Umfrage', caption: 'Ergebnisse der Umfrage (Tally) je Teil.', nav: 'Umfrage' },
+  { id: 'tracking', title: 'Spiel-Tracking', caption: 'Kennzahlen des Spiel-Trackings je Variante.', nav: 'Spiel-Tracking' },
+  { id: 'spielverhalten', title: 'Spielverhalten', caption: 'Bewertungen, Like-Rate und Spielverhalten der Teilnehmenden.', nav: 'Spielverhalten' },
+  { id: 'crafting', title: 'Crafting-Ergebnisse', caption: 'Erzeugte Ergebnisse je Durchgang.', nav: 'Crafting-Ergebnisse' },
+  { id: 'rueckmeldungen', title: 'Usability-Probleme & Rückmeldungen', caption: 'Kritische Usability-Probleme, positive Rückmeldungen, unerwartete Beobachtungen und Moderationseingriffe.', nav: 'Qualitatives Feedback' },
+];
+// every link target, grouped by page (in the dashboard's order)
+type LinkTarget = { id: string; title: string; caption: string; label: string; page: string };
+const pageOf = (id: string) => ({ uebersicht: 'Übersicht', quantitativ: 'Quantitative Analyse' } as Record<string, string>)[FIG_ROUTE[id] ?? 'quantitativ'] ?? 'Qualitatives Feedback';
+const LINK_TARGETS: LinkTarget[] = [
+  ...FIGURES.filter((f) => pageOf(f.id) === 'Übersicht').map((f) => ({ ...f, label: `Abb. ${figNumber(f.id)}`, page: 'Übersicht' })),
+  ...SECTION_LINKS.map((x) => ({ id: x.id, title: x.title, caption: x.caption, label: 'Abschnitt', page: 'Übersicht' })),
+  ...FIGURES.filter((f) => pageOf(f.id) !== 'Übersicht').map((f) => ({ ...f, label: `Abb. ${figNumber(f.id)}`, page: pageOf(f.id) })),
+];
+const linkTarget = (id: string) => LINK_TARGETS.find((x) => x.id === id);
 export function goFigure(id: string) {
   const n = figNumber(id);
-  if (!n) return;
-  window.location.hash = `#${FIG_ROUTE[id] ?? 'quantitativ'}`;
+  const sec = SECTION_LINKS.find((x) => x.id === id);
+  if (!n && !sec) return;
+  window.location.hash = `#${sec ? 'uebersicht' : (FIG_ROUTE[id] ?? 'quantitativ')}`;
+  const sel = sec ? `[data-nav="${sec.nav}"]` : `[data-anchor="fig-${n}"], [data-anchor^="fig-${n}."]`;
   const until = Date.now() + 3000;
   const step = () => {
-    const el = document.querySelector(`[data-anchor="fig-${n}"], [data-anchor^="fig-${n}."]`);
+    const el = document.querySelector(sel);
     if (el) {
       const head = document.querySelector('.st-pagehead');
       window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - (head ? head.getBoundingClientRect().height : 0) - 12, behavior: 'smooth' });
@@ -117,9 +137,9 @@ function RichText({ text }: { text: string }) {
   let last = 0;
   for (const m of text.matchAll(LINK_RE)) {
     if (m.index! > last) out.push(text.slice(last, m.index));
-    const f = FIGURES.find((x) => x.id === m[2]);
+    const f = linkTarget(m[2]);
     out.push(
-      <button key={m.index} type="button" className="st-ab-lk is-fig" title={f ? `Abb. ${figNumber(f.id)} · ${f.title}` : 'Abbildung'} onClick={() => goFigure(m[2])}>
+      <button key={m.index} type="button" className="st-ab-lk is-fig" title={f ? `${f.label} · ${f.title}` : 'Abbildung'} onClick={() => goFigure(m[2])}>
         {m[1]}
       </button>,
     );
@@ -140,7 +160,8 @@ function FigPicker({ onClose, onPick }: { onClose: () => void; onPick: (id: stri
     return () => window.removeEventListener('keydown', k);
   }, [onClose]);
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const hits = FIGURES.filter((f) => words.every((w) => `${f.title} ${f.caption} abb. ${figNumber(f.id)}`.toLowerCase().includes(w)));
+  const hits = LINK_TARGETS.filter((f) => words.every((w) => `${f.title} ${f.caption} ${f.label} ${f.page}`.toLowerCase().includes(w)));
+  const pages = [...new Set(hits.map((f) => f.page))];
   return (
     <div className="st-modal-back" role="presentation" onClick={onClose}>
       <div className="st-modal st-ab-picker" role="dialog" aria-modal="true" aria-label="Abbildung verlinken" onClick={(e) => e.stopPropagation()}>
@@ -152,19 +173,26 @@ function FigPicker({ onClose, onPick }: { onClose: () => void; onPick: (id: stri
         </header>
         <div className="st-modal-body">
           {!hits.length && <p className="st-muted">Keine Abbildung gefunden.</p>}
-          <ul className="st-ab-hits">
-            {hits.map((f) => (
-              <li key={f.id}>
-                <span>
-                  <small>{`Abb. ${figNumber(f.id)}`}</small>
-                  {f.title}
-                </span>
-                <button type="button" className="st-cx-btn is-pri" onClick={() => onPick(f.id)}>
-                  Verlinken
-                </button>
-              </li>
-            ))}
-          </ul>
+          {pages.map((pg) => (
+            <section key={pg} className="st-ab-hitgroup" aria-label={pg}>
+              <h3>{pg}</h3>
+              <ul className="st-ab-hits">
+                {hits
+                  .filter((f) => f.page === pg)
+                  .map((f) => (
+                    <li key={f.id}>
+                      <span>
+                        <small>{f.label}</small>
+                        {f.title}
+                      </span>
+                      <button type="button" className="st-cx-btn is-pri" onClick={() => onPick(f.id)}>
+                        Verlinken
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </section>
+          ))}
         </div>
       </div>
     </div>
@@ -191,7 +219,7 @@ function LinkText({ value, onChange, rows, label, placeholder }: { value: string
           onClose={() => setPick(false)}
           onPick={(id) => {
             const [a, b] = sel.current;
-            const word = value.slice(a, b).trim() || FIGURES.find((f) => f.id === id)?.title || 'Abbildung';
+            const word = value.slice(a, b).trim() || linkTarget(id)?.title || 'Abbildung';
             onChange(`${value.slice(0, a)}[${word}](abb:${id})${value.slice(b)}`);
             setPick(false);
           }}

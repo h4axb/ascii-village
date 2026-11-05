@@ -360,7 +360,31 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
       .sort((a, b) => a.who.localeCompare(b.who)),
     test: r.decided ? `Binomialtest (ohne „Gleich“): ${r.k} von ${r.decided} · ${pText(r.p)}` : undefined,
   }));
-  const rows = src === 'tally' ? tallyRows : game;
+  // Teil 2's single-choice question on the timing of the support: "before
+  // generating" is Variante A (clarification first), "after seeing the result"
+  // Variante B (feedback after), "both" a tie, "neither" no vote
+  const timingRows: Vote[] = useMemo(() => {
+    const qs = [...new Set(slice.survey.flatMap((x) => Object.keys(x.choice)))];
+    return qs
+      .map((q) => {
+        const ans = slice.survey.filter((x) => x.choice[q]).map((x) => ({ x, a: x.choice[q], v: timingSide(x.choice[q]) }));
+        if (!ans.length || !TIMING_Q.test(q)) return null;
+        const v: Vote = {
+          key: q,
+          title: doc.dims?.[q]?.trim() || 'Zeitpunkt der Unterstützung',
+          sub: q,
+          A: ans.filter((y) => y.v === 'A').length,
+          B: ans.filter((y) => y.v === 'B').length,
+          tie: ans.filter((y) => y.v === 'tie').length,
+          none: ans.filter((y) => y.v === 'none').length,
+          hint: 'Teil 2 · vorher = A, nachher = B, beides = Gleich',
+          tcalc: ans.map((y) => ({ who: y.x.person ?? `Zeile ${y.x.row + 1}`, v: y.v === 'A' || y.v === 'B' ? y.v : null, swapped: false, answer: y.a, none: y.v === 'none' })).sort((a, b) => a.who.localeCompare(b.who)),
+        };
+        return v;
+      })
+      .filter((v): v is Vote => !!v);
+  }, [slice.survey, doc.dims]);
+  const rows = src === 'tally' ? [...tallyRows, ...timingRows] : game;
   const tallyAll = tallyRows.find((r) => r.pref) ?? null;
   const gameAll = game.find((r) => r.key === 'overall') ?? null;
   const nPeople = new Set([...slice.survey.filter((r) => r.person && Object.keys(r.p1).length).map((r) => r.person), ...slice.feedback.filter((r) => r.rating && r.participant).map((r) => r.participant)]).size;
@@ -581,8 +605,30 @@ interface Vote {
   means?: { A: number | null; B: number | null; nA: number; nB: number };
   scale?: { low: string; high: string; lower?: boolean }; // in-game: what 1 and 5 mean
   calc?: { who: string; a: number; b: number; v: 'A' | 'B' | null }[]; // in-game: the comparison per person
-  tcalc?: { who: string; v: 'A' | 'B' | null; swapped: boolean }[]; // Tally: each person's answer
+  tcalc?: { who: string; v: 'A' | 'B' | null; swapped: boolean; answer?: string; none?: boolean }[]; // Tally: each person's answer
+  none?: number; // a choice question: "neither" (no vote, not a tie)
   test?: string; // Tally: the binomial test of the majority
+}
+const TIMING_Q = /when would you .*prefer to receive|wann .*unterstützung/i;
+function timingSide(a: string): 'A' | 'B' | 'tie' | 'none' | null {
+  if (/neither|no additional|keine|weder/i.test(a)) return 'none';
+  if (/both|beides|depending/i.test(a)) return 'tie';
+  if (/before|vor (dem|der)|vorher/i.test(a)) return 'A';
+  if (/after|nach (dem|der)|nachher/i.test(a)) return 'B';
+  return null;
+}
+// how telling a result is: the leading variant's share of everyone who answered
+// (a tie, "neither" and the other variant all count against it)
+function strength(v: Vote) {
+  const n = v.A + v.B + v.tie + (v.none ?? 0);
+  const w = lead2(v);
+  if (!n) return null;
+  if (!w) return { label: 'keine Mehrheit', text: `${n} ${n === 1 ? 'Antwort' : 'Antworten'}, keine Variante vorn`, k: 0, n };
+  const k = v[w];
+  const share = k / n;
+  const label = share >= 0.8 ? 'deutlich' : share >= 0.6 ? 'mäßig' : 'schwach';
+  const rest = [v.tie && `${v.tie} Gleich`, v.none && `${v.none} keine`, v[w === 'A' ? 'B' : 'A'] && `${v[w === 'A' ? 'B' : 'A']} ${w === 'A' ? 'B' : 'A'}`].filter(Boolean).join(', ');
+  return { label, text: `${k} von ${n} für ${w} (${Math.round(share * 100)} %)${rest ? ` · ${rest}` : ''}`, k, n };
 }
 const lead2 = (v: Pick<Vote, 'A' | 'B'>) => (v.A > v.B ? 'A' : v.B > v.A ? 'B' : null);
 const num = (x: number | null) => (x == null ? '–' : x.toFixed(1).replace('.', ','));
@@ -645,6 +691,19 @@ function OverallTile({ source, v, unit, what }: { source: string; v: Vote | null
   );
 }
 
+const counts = (r: Vote) => `A ${r.A} · Gleich ${r.tie} · B ${r.B}${r.none ? ` · Keine ${r.none}` : ''}`;
+// how telling the result is (the popup's last line)
+function Strength({ r }: { r: Vote }) {
+  const st = strength(r);
+  if (!st) return null;
+  return (
+    <span className="st-ab-cstr">
+      <b>{`Aussagekraft: ${st.label}`}</b>
+      <span>{st.text}</span>
+      {st.n < 10 && <span className="st-muted">{`kleine Stichprobe (n = ${st.n})`}</span>}
+    </span>
+  );
+}
 // how a result was calculated (the popup over a variant letter): in-game the
 // comparison per person, Tally each person's answer
 function CalcPop({ r, id }: { r: Vote; id: string }) {
@@ -675,25 +734,31 @@ function CalcPop({ r, id }: { r: Vote; id: string }) {
                 </span>
               ))}
             </span>
-            <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
+            <span className="st-ab-csum">{`${counts(r)} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
+            <Strength r={r} />
           </span>
     );
   if (!r.tcalc) return null;
   return (
 <span className="st-ab-calc" role="tooltip" id={id}>
             <b>So berechnet</b>
-            <span className="st-muted">je Person: ihre Antwort in der Umfrage (Teil 1) ist eine Stimme; die Variante mit mehr Stimmen gewinnt</span>
+            <span className="st-muted">
+              {r.none != null
+                ? 'je Person: ihre Antwort (Teil 2) ist eine Stimme – vorher = A, nachher = B, beides = Gleich, keines = keine Stimme'
+                : 'je Person: ihre Antwort in der Umfrage (Teil 1) ist eine Stimme; die Variante mit mehr Stimmen gewinnt'}
+            </span>
             <span className="st-ab-ctbl is-tally">
               {r.tcalc.map((c, i) => (
                 <span key={`${c.who}-${i}`} className="st-ab-crow">
                   <span>{c.who}</span>
-                  <span>{c.swapped ? 'A/B getauscht' : ''}</span>
-                  <span className={`st-ab-cv is-${c.v ?? 'tie'}`}>{`→ ${c.v ?? 'Gleich'}`}</span>
+                  <span title={c.answer}>{c.answer ?? (c.swapped ? 'A/B getauscht' : '')}</span>
+                  <span className={`st-ab-cv is-${c.v ?? 'tie'}`}>{`→ ${c.v ?? (c.none ? 'Keine' : 'Gleich')}`}</span>
                 </span>
               ))}
             </span>
-            <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
+            <span className="st-ab-csum">{`${counts(r)} → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
             {r.test && <span className="st-muted">{r.test}</span>}
+            <Strength r={r} />
           </span>
   );
 }
@@ -701,7 +766,7 @@ function CalcPop({ r, id }: { r: Vote; id: string }) {
 function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; on?: boolean; renaming?: boolean; onClick?: () => void; onRename?: () => void; onRenamed?: (v: string | null) => void }) {
   const [v, setV] = useState(r.title);
   useEffect(() => setV(r.pref ? r.sub : r.title), [r.title, r.sub, r.pref, renaming]);
-  const of = r.A + r.B + r.tie;
+  const of = r.A + r.B + r.tie + (r.none ?? 0);
   const w = lead2(r);
   const body = (
     <>
@@ -740,13 +805,14 @@ function VoteRow({ r, on, renaming, onClick, onRename, onRenamed }: { r: Vote; o
         <span className={`st-ab-win is-${w ?? 'tie'}`}>{w ?? 'Gleich'}</span>
       )}
       <span className="st-ab-count">
-        {`A ${r.A} · Gleich ${r.tie} · B ${r.B}`}
+        {counts(r)}
         {r.means && <small title="Mittelwert aller Bewertungen (1–5) je Variante">{`Ø A ${num(r.means.A)} (n=${r.means.nA}) · Ø B ${num(r.means.B)} (n=${r.means.nB})`}</small>}
       </span>
       <span className="st-ab-bar" aria-hidden="true">
         <i className="is-a" style={{ width: `${of ? (r.A / of) * 100 : 0}%` }} />
         <i className="is-n" style={{ width: `${of ? (r.tie / of) * 100 : 0}%` }} />
         <i className="is-b" style={{ width: `${of ? (r.B / of) * 100 : 0}%` }} />
+        {!!r.none && <i className="is-x" style={{ width: `${(r.none / of) * 100}%` }} />}
       </span>
     </>
   );

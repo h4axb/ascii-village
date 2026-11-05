@@ -7456,6 +7456,9 @@ body:has(.st-root) {
 .st-ab-bar .is-n {
   background: #bdbcb5;
 }
+.st-ab-bar .is-x {
+  background: repeating-linear-gradient(135deg, #d6d6da 0 3px, transparent 3px 6px);
+}
 .st-ab-det {
   font-size: 12px;
   color: var(--st-muted);
@@ -8752,4 +8755,16 @@ body:has(.st-root) {
     left: 0;
     right: auto;
   }
+}
+/* the popup's last line: how telling the result is */
+.st-ab-cstr {
+  display: grid;
+  gap: 1px;
+  border-top: 1px solid #3a3a37;
+  padding-top: 6px;
+}
+.st-ab-ctbl.is-tally .st-ab-crow > :nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
 }

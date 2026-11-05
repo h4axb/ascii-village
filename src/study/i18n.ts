@@ -167,6 +167,7 @@ const EN: Record<string, string> = {
   Allgemein: 'General',
   Person: 'Person',
   'Art des Belegs': 'Kind of evidence',
+  'Testperson der Aussage': 'Participant of the statement',
   'Beleg entfernen': 'Remove evidence',
   'Was dieser Beleg für die Hypothese zeigt': 'What this evidence shows for the hypothesis',
   'Abbildung verlinken': 'Link a figure',

@@ -721,7 +721,7 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
     onSave(withInterps({ ...draft, title: draft.title.trim() || 'Ohne Titel', reason: draft.reason?.trim() || undefined }, dInterps.map((x) => ({ ...x, text: x.text.trim(), belege: x.belege.map((b) => ({ ...b, text: b.text.trim() })) }))), `Hypothese ${h.code} bearbeitet`);
     setEdit(false);
   };
-  const who = (b: AbBeleg) => b.person ?? itemOf(b.item)?.person;
+  const who = (b: AbBeleg) => itemOf(b.item)?.person ?? b.person;
   // the test person of an interpretation: a dropdown, "Allgemein" by default
   const personPick = (value: string | undefined, onPick: (p: string | undefined) => void, label: string) => (
     <select className="st-ab-psel" value={value ?? ''} aria-label={label} onChange={(e) => onPick(e.target.value || undefined)}>
@@ -778,14 +778,19 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
               return (
                 <div key={b.id} className={`st-ab-beled ${KIND_FILL[b.kind]}`}>
                   <div className="st-ab-beledhead">
-                    <select value={b.person ?? it?.person ?? ''} aria-label="Person" onChange={(e) => setB(x.id, b.id, { person: e.target.value || undefined })}>
-                      <option value="">Allgemein</option>
-                      {[...new Set([...persons, ...(it?.person ? [it.person] : [])])].map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
+                    {/* (a Beleg from a statement: its P-ID is the statement's, not editable) */}
+                    {it ? (
+                      <span className="st-ab-ichip" title="Testperson der Aussage">{it.person}</span>
+                    ) : (
+                      <select value={b.person ?? ''} aria-label="Person" onChange={(e) => setB(x.id, b.id, { person: e.target.value || undefined })}>
+                        <option value="">Allgemein</option>
+                        {persons.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <span className="st-ab-kinds" role="radiogroup" aria-label="Art des Belegs">
                       {EV_KIND.map(([k, l]) => (
                         <button key={k} type="button" role="radio" aria-checked={b.kind === k} className={b.kind === k ? 'is-on' : ''} title={l} aria-label={l} onClick={() => setB(x.id, b.id, { kind: k })}>
@@ -860,7 +865,7 @@ function HypCard({ h, items, allItems, persons, startEdit, onSave, onDelete }: {
                   return (
                     <div key={b.id} className={`st-ab-bel ${KIND_FILL[b.kind]}`}>
                       <div className="st-ab-belhead">
-                        {(b.person || it?.person) && <span className="st-ab-ichip">{b.person || it?.person}</span>}
+                        {(it?.person || b.person) && <span className="st-ab-ichip">{it?.person || b.person}</span>}
                         {it && SECTION_LABEL[it.section]}
                         <span className="st-ab-vh">{EV_KIND.find(([k]) => k === b.kind)?.[1]}</span>
                       </div>

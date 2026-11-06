@@ -8936,3 +8936,9 @@ body:has(.st-root) {
     grid-column: 2;
   }
 }
+/* a person in the combined classification: their two results */
+.st-ab-pcombo {
+  font-size: var(--st-fs-meta);
+  color: var(--st-muted);
+  white-space: nowrap;
+}

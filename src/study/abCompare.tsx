@@ -20,7 +20,7 @@ import { SECTION_LABEL } from './types';
 import { itemText, memoryOf, pick as pickText, useContentView } from './translations';
 import { FIGURES, figNumber, logChange, useCtx } from './ui';
 import { FoldBtn } from './notesDashboard';
-import { RATING_LABEL, scopeLabel } from './model';
+import { RATING_LABEL, scopeLabel, type Slice } from './model';
 import { designOf } from '../feedback/schema';
 import { RATING_QUESTIONS } from '../quest/quests';
 
@@ -297,22 +297,68 @@ function useAb() {
   return { doc, latest, save };
 }
 
-export type AbView = 'A' | 'B' | 'hyp' | 'red' | null;
+// the combined classification of a person: their Tally result (the variant they
+// chose more often) against their In-Game result (the variant that won more of
+// the five ratings)
+export type Combo = 'agreeA' | 'agreeB' | 'partA' | 'partB' | 'contra' | 'equal';
+export const COMBOS: [Combo, string, string][] = [
+  ['agreeA', 'Übereinstimmend A', 'Tally A · In-Game A'],
+  ['agreeB', 'Übereinstimmend B', 'Tally B · In-Game B'],
+  ['partA', 'Teilweise A', 'A und einmal Gleich'],
+  ['partB', 'Teilweise B', 'B und einmal Gleich'],
+  ['contra', 'Widersprüchlich', 'Tally und In-Game uneins'],
+  ['equal', 'Beide gleich', 'Tally Gleich · In-Game Gleich'],
+];
+type Side3 = 'A' | 'B' | 'tie';
+function comboOf(t: Side3, g: Side3): Combo {
+  if (t === g) return t === 'A' ? 'agreeA' : t === 'B' ? 'agreeB' : 'equal';
+  if (t === 'tie' || g === 'tie') return (t === 'tie' ? g : t) === 'A' ? 'partA' : 'partB';
+  return 'contra';
+}
+export interface PersonCombo {
+  person: string;
+  tally?: Side3;
+  game?: Side3;
+  combo?: Combo; // (both results known)
+}
+function personCombos(survey: Slice['survey'], feedback: Slice['feedback']): PersonCombo[] {
+  const out = new Map<string, PersonCombo>();
+  const get = (p: string) => out.get(p) ?? (out.set(p, { person: p }), out.get(p)!);
+  for (const r of survey) {
+    if (!r.person) continue;
+    const answered = Object.values(r.p1).some((a) => a != null) || Object.keys(r.choice).some((q) => TIMING_Q.test(q));
+    if (!answered) continue;
+    get(r.person).tally = personPref(r) ?? 'tie';
+  }
+  const wins = new Map<string, { A: number; B: number }>();
+  for (const q of gameVotes(feedback))
+    for (const c of q.calc ?? []) {
+      const w = wins.get(c.who) ?? { A: 0, B: 0 };
+      if (c.v) w[c.v]++;
+      wins.set(c.who, w);
+    }
+  for (const [p, w] of wins) get(p).game = w.A > w.B ? 'A' : w.B > w.A ? 'B' : 'tie';
+  for (const x of out.values()) if (x.tally && x.game) x.combo = comboOf(x.tally, x.game);
+  return [...out.values()].sort((a, b) => a.person.localeCompare(b.person));
+}
+
+export type AbView = Combo | 'hyp' | 'red' | null;
 type View = AbView;
 
-// the figures for the tiles: people preferring A or B (in the preference
-// question), hypotheses (and those chosen for the redesign), decisions
+// the figures for the tiles: people per combined classification (Tally and
+// In-Game), hypotheses (and those chosen for the redesign), decisions
 export function useAbSummary() {
   const { slice } = useCtx();
   const { doc } = useAb();
   const results = useMemo(() => part1(slice.survey).filter((r) => r.n), [slice.survey]);
-  const rows = slice.survey.filter((r) => r.person && Object.values(r.p1).some((a) => a != null));
+  const people = useMemo(() => personCombos(slice.survey, slice.feedback), [slice.survey, slice.feedback]);
+  const both = people.filter((x) => x.combo);
   const hyps = doc.hyps ?? [];
   return {
     results: results.length,
-    of: rows.length,
-    A: rows.filter((r) => personPref(r) === 'A').length,
-    B: rows.filter((r) => personPref(r) === 'B').length,
+    of: both.length,
+    incomplete: people.length - both.length,
+    combos: COMBOS.map(([k, l, hint]) => ({ k, label: l, hint, n: both.filter((x) => x.combo === k).length })),
     hyps: hyps.length,
     selected: hyps.filter((h) => h.status === 'selected').length,
     decisions: (doc.decisions ?? []).length,
@@ -337,7 +383,9 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const decisions = doc.decisions ?? [];
   const items = useMemo(() => new Map(slice.items.map((i) => [i.id, i])), [slice.items]);
   const allItems = study.docs.items;
-  const byPref = (v: 'A' | 'B') => slice.survey.filter((r) => r.person && personPref(r) === v);
+  const combos = useMemo(() => personCombos(slice.survey, slice.feedback), [slice.survey, slice.feedback]);
+  const comboOfPerson = (p: string) => combos.find((x) => x.person === p);
+  const byCombo = (v: Combo) => combos.filter((x) => x.combo === v).map((x) => slice.survey.find((r) => r.person === x.person) ?? { person: x.person, p1: {} as Record<string, string | null> });
   const qWords = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   // the order of the hypotheses: first created first (default) or last created first
   const [order, setOrder] = useState<'asc' | 'desc'>(() => {
@@ -500,22 +548,25 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
             </p>
           )}
 
-          {(show === 'A' || show === 'B') && (
+          {show && show !== 'hyp' && show !== 'red' && (
             <div className="st-ab-people">
               <div className="st-ab-step">
-                <b>{`Präferenz ${show}`}</b>
-                <span className="st-muted">{`${byPref(show).length} Personen · ihre Tally-Antworten und verknüpften Aussagen`}</span>
+                <b>{COMBOS.find(([k]) => k === show)?.[1]}</b>
+                <span className="st-muted">{`${byCombo(show).length} ${byCombo(show).length === 1 ? 'Person' : 'Personen'} · Tally- und In-Game-Ergebnis, Tally-Antworten und verknüpfte Aussagen`}</span>
                 <button type="button" className="st-cx-btn st-ab-add" onClick={() => setShow(null)}>
                   Schließen
                 </button>
               </div>
-              {!byPref(show).length && <p className="st-muted st-ab-empty">Niemand mit dieser Präferenz.</p>}
-              {byPref(show).map((row) => {
+              {!byCombo(show).length && <p className="st-muted st-ab-empty">Niemand mit dieser Einordnung.</p>}
+              {byCombo(show).map((row) => {
+                const c = comboOfPerson(row.person!);
+                const side = (x?: Side3) => (x === 'tie' ? 'Gleich' : (x ?? '–'));
                 const linked = hyps.flatMap((h) => belegeOf(h).filter((b) => b.item && (items.get(b.item) ?? allItems[b.item])?.person === row.person).map((b) => ({ h, e: { item: b.item!, kind: b.kind }, i: items.get(b.item!) ?? allItems[b.item!] })));
                 return (
                   <div key={row.person!} className="st-ab-person">
                     <div className="st-ab-phead">
                       <strong>{row.person}</strong>
+                      <span className="st-ab-pcombo">{`Tally ${side(c?.tally)} · In-Game ${side(c?.game)}`}</span>
                       <span className="st-ab-answers">
                         {results.map((r) => (
                           <span key={r.question} className={`st-ab-ans is-${row.p1[r.question] ?? 'none'}`} title={r.question}>

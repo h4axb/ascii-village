@@ -140,8 +140,8 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
       { id: 'open', label: 'Noch nicht eingeordnet', n: of('open'), rel: 'unclear' as Rel },
     ].sort((x, y) => y.n - x.n);
   })();
-  const abTile = (v: AbView, label: string, n: number, sub: string) => (
-    <button key={v} type="button" className={`st-dash-kpi${abShow === v ? ' is-on' : ''}`} aria-pressed={abShow === v} onClick={() => onAb(abShow === v ? null : v)} title="Anklicken: im Bereich A/B-Vergleich anzeigen">
+  const abTile = (v: AbView, label: string, n: number, sub: string, hint?: string) => (
+    <button key={v} type="button" className={`st-dash-kpi${abShow === v ? ' is-on' : ''}`} aria-pressed={abShow === v} onClick={() => onAb(abShow === v ? null : v)} title={`${hint ? `${hint} · ` : ''}Anklicken: im Bereich A/B-Vergleich anzeigen`}>
       <span className="st-dash-kpilabel">{label}</span>
       <span className="st-dash-kpivalue">{n}</span>
       <span className="st-dash-kpisub">{sub}</span>
@@ -222,12 +222,15 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
         {cur.id === 'ab' && (
           <>
             <div className="st-dash-kpis is-ab">
-              {abTile('A', 'Präferenz A', ab.A, `von ${ab.of} Personen`)}
-              {abTile('B', 'Präferenz B', ab.B, `von ${ab.of} Personen`)}
+              {ab.combos.map((c) => abTile(c.k, c.label, c.n, `von ${ab.of} ${ab.of === 1 ? 'Person' : 'Personen'}`, c.hint))}
               {abTile('hyp', 'Hypothesen', ab.hyps, `${ab.selected} für Redesign`)}
               {abTile('red', 'Redesign', ab.decisions, ab.decisions === 1 ? 'Maßnahme' : 'Maßnahmen')}
             </div>
-            <p className="st-muted st-dash2-note">{ab.results ? 'Anklicken zeigt es im Bereich „A/B-Vergleich & Gestaltungsableitung“.' : 'Noch keine Tally-Vergleichsfragen (Teil 1) zugeordnet.'}</p>
+            <p className="st-muted st-dash2-note">
+              {ab.results
+                ? `Je Person: Tally-Ergebnis (öfter gewählte Variante) gegen In-Game-Ergebnis (mehr gewonnene Bewertungen).${ab.incomplete ? ` ${ab.incomplete} ${ab.incomplete === 1 ? 'Person hat' : 'Personen haben'} nur eines der beiden Ergebnisse und ${ab.incomplete === 1 ? 'zählt' : 'zählen'} nicht.` : ''} Anklicken zeigt sie im Bereich „A/B-Vergleich & Gestaltungsableitung“.`
+                : 'Noch keine Tally-Vergleichsfragen (Teil 1) zugeordnet.'}
+            </p>
           </>
         )}
       </div>

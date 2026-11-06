@@ -318,7 +318,7 @@ export function useAbSummary() {
 }
 
 export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { folded: boolean; onFold: () => void; show?: AbView; setShow?: (v: AbView) => void }) {
-  const { slice, study, scope } = useCtx();
+  const { slice, study, scope, model } = useCtx();
   const view = useContentView();
   const { doc, latest, save } = useAb();
   const [own, setOwn] = useState<View>(null);
@@ -328,6 +328,8 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const [searching, setSearching] = useState(false);
   const [rename, setRename] = useState<string | null>(null);
   const results = useMemo(() => part1(slice.survey).filter((r) => r.n), [slice.survey]);
+  // (every Teil 1 question of the study is a criterion, also one nobody in the filter answered)
+  const allQs = useMemo(() => part1(model.survey).filter((r) => r.n).map((r) => r.question), [model.survey]);
   const label = (q: string) => doc.dims?.[q]?.trim() || lead(q);
   const hyps = doc.hyps ?? [];
   const decisions = doc.decisions ?? [];
@@ -388,7 +390,8 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
       .filter((v): v is Vote => !!v);
   }, [slice.survey, doc.dims]);
   const rows = src === 'tally' ? [...tallyRows, ...timingRows] : game;
-  const tallyAll = acrossCriteria('all-tally', tallyRows); // (the five Teil 1 questions; the timing question is shown, not counted)
+  // (in the study's order; a question nobody here answered is listed, not counted)
+  const tallyAll = acrossCriteria('all-tally', [...allQs.map((q): Vote => tallyRows.find((r) => r.key === q) ?? { key: q, title: label(q), sub: q, A: 0, B: 0, tie: 0 }), ...tallyRows.filter((r) => !allQs.includes(r.key))]); // (the five Teil 1 questions; the timing question is shown, not counted)
   const gameAll = acrossCriteria('all-game', game);
   const nPeople = new Set([...slice.survey.filter((r) => r.person && Object.keys(r.p1).length).map((r) => r.person), ...slice.feedback.filter((r) => r.rating && r.participant).map((r) => r.participant)]).size;
 
@@ -605,7 +608,7 @@ interface Vote {
   calc?: { who: string; a: number; b: number; v: 'A' | 'B' | null }[]; // in-game: the comparison per person
   tcalc?: { who: string; v: 'A' | 'B' | null; swapped: boolean; answer?: string; none?: boolean }[]; // Tally: each person's answer
   none?: number; // a choice question: "neither" (no vote, not a tie)
-  ccalc?: { name: string; v: 'A' | 'B' | null; counts: string }[]; // Gesamtbewertung: the winner per criterion
+  ccalc?: { name: string; v: 'A' | 'B' | null; counts: string; none?: boolean }[]; // Gesamtbewertung: the winner per criterion (none: not answered)
   test?: string; // Tally: the binomial test of the majority
 }
 const TIMING_Q = /when would you .*prefer to receive|wann .*unterstützung/i;
@@ -668,24 +671,33 @@ export function gameVotes(feedback: { participant?: string; rating?: Record<stri
   }).filter((v) => v.A + v.B + v.tie > 0);
 }
 
+const TENDENCY: Record<string, string> = { deutlich: 'Deutliche Tendenz', mäßig: 'Mäßige Tendenz', schwach: 'Schwache Tendenz', 'keine Mehrheit': 'Keine Mehrheit' };
 function OverallTile({ source, v, what }: { source: string; v: Vote | null; what: string }) {
   const of = v ? v.A + v.B + v.tie : 0;
   const w = v ? lead2(v) : null;
+  const st = v ? strength(v) : null;
+  const head = !of ? 'Noch keine Antworten' : w ? `Variante ${w}` : 'Gleichstand';
   return (
     <div className="st-ab-otile">
       <span className="st-ab-olabel">{source}</span>
-      {of && v && (v.calc || v.tcalc || v.ccalc) ? (
-        <span className="st-ab-wwrap st-ab-owrap">
-          <button type="button" className={`st-ab-ovalue is-${w ?? 'tie'}`} aria-describedby={`ocalc-${v.key}`}>
-            {w ?? '='}
-          </button>
-          <CalcPop r={v} id={`ocalc-${v.key}`} />
-        </span>
-      ) : (
-        <span className={`st-ab-ovalue is-${w ?? 'tie'}`}>{!of ? '–' : (w ?? '=')}</span>
-      )}
-      <span className="st-ab-otext">{!of ? 'noch keine Antworten' : w ? `Variante ${w} · ${v![w]} von ${of} ${of === 1 ? 'Kriterium' : 'Kriterien'} gewonnen` : `Gleichstand · A ${v!.A} · Gleich ${v!.tie} · B ${v!.B}`}</span>
-      <span className="st-muted st-ab-owhat">{what}</span>
+      <div className="st-ab-ohead2">
+        {of && v ? (
+          <span className="st-ab-wwrap st-ab-owrap">
+            <button type="button" className="st-ab-oname" aria-describedby={`ocalc-${v.key}`}>
+              {head}
+            </button>
+            <CalcPop r={v} id={`ocalc-${v.key}`} />
+          </span>
+        ) : (
+          <span className="st-ab-oname is-empty">{head}</span>
+        )}
+        {st && <span className={`st-ab-otend is-${w ?? 'tie'}`}>{TENDENCY[st.label]}</span>}
+      </div>
+      <span className="st-ab-obar" role="img" aria-label={of ? `${what}: A ${v!.A} · Gleich ${v!.tie} · B ${v!.B}` : what} title={of ? `${counts(v!)} · ${what}` : what}>
+        <i className="is-a" style={{ width: `${of ? (v!.A / of) * 100 : 0}%` }} />
+        <i className="is-b" style={{ width: `${of ? (v!.B / of) * 100 : 0}%` }} />
+        <i className="is-n" style={{ width: `${of ? (v!.tie / of) * 100 : 0}%` }} />
+      </span>
     </div>
   );
 }
@@ -693,9 +705,10 @@ function OverallTile({ source, v, what }: { source: string; v: Vote | null; what
 // the Gesamtbewertung: each criterion (a row) is won by A, by B or tied; the
 // variant that wins more criteria leads
 function acrossCriteria(key: string, rows: Vote[]): Vote | null {
-  const won = rows.filter((r) => r.A + r.B + r.tie + (r.none ?? 0) > 0).map((r) => ({ name: r.title, v: lead2(r), counts: counts(r) }));
+  const all = rows.map((r) => ({ name: r.title, v: lead2(r), counts: counts(r), none: r.A + r.B + r.tie + (r.none ?? 0) === 0 }));
+  const won = all.filter((x) => !x.none);
   if (!won.length) return null;
-  return { key, title: 'Gesamtbewertung', sub: '', A: won.filter((x) => x.v === 'A').length, B: won.filter((x) => x.v === 'B').length, tie: won.filter((x) => !x.v).length, ccalc: won };
+  return { key, title: 'Gesamtbewertung', sub: '', A: won.filter((x) => x.v === 'A').length, B: won.filter((x) => x.v === 'B').length, tie: won.filter((x) => !x.v).length, ccalc: all };
 }
 const counts = (r: Vote) => `A ${r.A} · Gleich ${r.tie} · B ${r.B}${r.none ? ` · Keine ${r.none}` : ''}`;
 // how telling the result is (the popup's last line)
@@ -716,20 +729,19 @@ function CalcPop({ r, id }: { r: Vote; id: string }) {
   const w = lead2(r);
   if (r.ccalc)
     return (
-      <span className="st-ab-calc" role="tooltip" id={id}>
-        <b>So berechnet</b>
-        <span className="st-muted">je Kriterium gewinnt die Variante mit mehr Stimmen; die Variante mit mehr gewonnenen Kriterien liegt vorn</span>
-        <span className="st-ab-ctbl is-crit">
+      <span className="st-ab-calc is-crit" role="tooltip" id={id}>
+        <b className="st-ab-ctitle">So berechnet</b>
+        <span className="st-ab-clist">
           {r.ccalc.map((c, i) => (
-            <span key={`${c.name}-${i}`} className="st-ab-crow">
-              <span title={c.name}>{c.name}</span>
-              <span>{c.counts}</span>
-              <span className={`st-ab-cv is-${c.v ?? 'tie'}`}>{`→ ${c.v ?? 'Gleich'}`}</span>
+            <span key={`${c.name}-${i}`} className="st-ab-citem">
+              <span className="st-ab-cname" title={c.name}>
+                {c.name}
+              </span>
+              <span className="st-ab-ccount">{c.none ? 'keine Antwort' : c.counts}</span>
+              <span className={`st-ab-cpill is-${c.none ? 'none' : (c.v ?? 'tie')}`}>{c.none ? '–' : (c.v ?? 'Gleich')}</span>
             </span>
           ))}
         </span>
-        <span className="st-ab-csum">{`A ${r.A} · Gleich ${r.tie} · B ${r.B} Kriterien → ${w ? `Variante ${w}` : 'Gleichstand'}`}</span>
-        <Strength r={r} />
       </span>
     );
   if (r.calc)

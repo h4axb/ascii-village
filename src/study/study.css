@@ -8942,3 +8942,72 @@ body:has(.st-root) {
   color: var(--st-muted);
   white-space: nowrap;
 }
+/* Dashboard · A/B: the hover of a combined classification – who is in it */
+.st-root .st-dash-kpi.st-ab-combo {
+  position: relative;
+}
+.st-ab-combopop {
+  display: none;
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  width: max-content;
+  min-width: 200px;
+  max-width: min(280px, calc(100vw - 40px));
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #1f1f1d;
+  color: #f4f4f2;
+  font-size: 12px;
+  font-weight: 400;
+  text-align: left;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  cursor: default;
+}
+.st-root .st-dash-kpi.st-ab-combo:hover .st-ab-combopop,
+.st-root .st-dash-kpi.st-ab-combo:focus-visible .st-ab-combopop {
+  display: grid;
+  gap: 6px;
+}
+.st-ab-combopop > b {
+  font-size: 13px;
+  font-weight: 600;
+}
+.st-ab-comborule {
+  color: #b9b8b1;
+  font-size: 11px;
+}
+.st-ab-combolist {
+  display: grid;
+  border-top: 1px solid #3a3a37;
+}
+.st-ab-comborow {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  justify-content: start;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid #3a3a37;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.st-ab-combopid {
+  font-weight: 600;
+  min-width: 34px;
+}
+/* (the last tile of a row opens to the left) */
+.st-root .st-dash-kpis.is-ab > .st-ab-combo:nth-child(4n) .st-ab-combopop {
+  left: auto;
+  right: 0;
+}
+@media (max-width: 700px) {
+  .st-root .st-dash-kpis.is-ab > .st-ab-combo:nth-child(4n) .st-ab-combopop {
+    left: 0;
+    right: auto;
+  }
+  .st-root .st-dash-kpis.is-ab > .st-ab-combo:nth-child(2n) .st-ab-combopop {
+    left: auto;
+    right: 0;
+  }
+}

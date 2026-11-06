@@ -222,7 +222,35 @@ export function NotesDashboard({ model, live, f, setF, abShow, onAb }: { model: 
         {cur.id === 'ab' && (
           <>
             <div className="st-dash-kpis is-ab">
-              {ab.combos.map((c) => abTile(c.k, c.label, c.n, `von ${ab.of} ${ab.of === 1 ? 'Person' : 'Personen'}`, c.hint))}
+              {ab.combos.map((c) => {
+                const on = abShow === c.k;
+                const side = (x?: string) => (x === 'tie' ? 'Gleich' : (x ?? '–'));
+                return (
+                  <button key={c.k} type="button" className={`st-dash-kpi st-ab-combo${on ? ' is-on' : ''}`} aria-pressed={on} aria-describedby={`combo-${c.k}`} onClick={() => onAb(on ? null : c.k)}>
+                    <span className="st-dash-kpilabel">{c.label}</span>
+                    <span className="st-dash-kpivalue">{c.n}</span>
+                    <span className="st-dash-kpisub">{`von ${ab.of} ${ab.of === 1 ? 'Person' : 'Personen'}`}</span>
+                    {/* (the hover: who is in it, with their two results) */}
+                    <span className="st-ab-combopop" role="tooltip" id={`combo-${c.k}`}>
+                      <b>{c.label}</b>
+                      <span className="st-ab-comborule">{c.hint}</span>
+                      {c.people.length ? (
+                        <span className="st-ab-combolist">
+                          {c.people.map((x) => (
+                            <span key={x.person} className="st-ab-comborow">
+                              <span className="st-ab-combopid">{x.person}</span>
+                              <span>{`Tally ${side(x.tally)}`}</span>
+                              <span>{`In-Game ${side(x.game)}`}</span>
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="st-ab-comborule">Niemand.</span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
               {abTile('hyp', 'Hypothesen', ab.hyps, `${ab.selected} für Redesign`)}
               {abTile('red', 'Redesign', ab.decisions, ab.decisions === 1 ? 'Maßnahme' : 'Maßnahmen')}
             </div>

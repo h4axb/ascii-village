@@ -358,7 +358,7 @@ export function useAbSummary() {
     results: results.length,
     of: both.length,
     incomplete: people.length - both.length,
-    combos: COMBOS.map(([k, l, hint]) => ({ k, label: l, hint, n: both.filter((x) => x.combo === k).length })),
+    combos: COMBOS.map(([k, l, hint]) => ({ k, label: l, hint, people: both.filter((x) => x.combo === k), n: both.filter((x) => x.combo === k).length })),
     hyps: hyps.length,
     selected: hyps.filter((h) => h.status === 'selected').length,
     decisions: (doc.decisions ?? []).length,

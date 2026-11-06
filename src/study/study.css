@@ -8509,7 +8509,7 @@ body:has(.st-root) {
     flex: 1 1 100%;
   }
   .st-ab-hsearch {
-    flex: 1 1 auto;
+    flex: 1 1 0;
   }
   .st-ab-beledhead .st-cx-x {
     margin-left: auto;

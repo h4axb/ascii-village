@@ -276,6 +276,7 @@ function LinkText({ value, onChange, rows, label, placeholder, belegPicker }: { 
 const uid = (p: string) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 const pText = (p: number) => (Number.isFinite(p) ? `p = ${p < 0.001 ? '< 0,001' : p.toFixed(2).replace('.', ',')}` : '');
 const lead = (q: string) => q.replace(/[\s?:.]+$/, '');
+const ORDER_KEY = 'asciia-study-hyp-order';
 // a person's preference across the Tally criteria: the variant they chose more often
 // (and the timing question of Teil 2: before = A, after = B)
 const personPref = (r: { p1: Record<string, string | null | undefined>; choice: Record<string, string> }) => {
@@ -338,12 +339,32 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const allItems = study.docs.items;
   const byPref = (v: 'A' | 'B') => slice.survey.filter((r) => r.person && personPref(r) === v);
   const qWords = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const shownHyps = qWords.length
+  // the order of the hypotheses: first created first (default) or last created first
+  const [order, setOrder] = useState<'asc' | 'desc'>(() => {
+    try {
+      return localStorage.getItem(ORDER_KEY) === 'desc' ? 'desc' : 'asc';
+    } catch {
+      return 'asc';
+    }
+  });
+  const flipOrder = () =>
+    setOrder((o) => {
+      const n = o === 'asc' ? 'desc' : 'asc';
+      try {
+        localStorage.setItem(ORDER_KEY, n);
+      } catch {
+        // (not remembered)
+      }
+      return n;
+    });
+  const filteredHyps = qWords.length
     ? hyps.filter((h) => {
         const hay = [h.code, hcode(h.code), h.title, ...interpsOf(h).flatMap((x) => [x.person ?? '', plain(x.text)]), ...belegeOf(h).flatMap((b) => [b.person ?? '', plain(b.text), b.item ? (items.get(b.item) ?? allItems[b.item])?.text ?? '' : ''])].join(' ').toLowerCase();
         return qWords.every((w) => hay.includes(w));
       })
     : hyps;
+  // (stored in the order they were created)
+  const shownHyps = order === 'desc' ? [...filteredHyps].reverse() : filteredHyps;
   const putHyp = (h: AbHyp, what: string) => save({ hyps: (latest().hyps ?? []).some((x) => x.id === h.id) ? (latest().hyps ?? []).map((x) => (x.id === h.id ? h : x)) : [...(latest().hyps ?? []), h] }, what);
   const delHyp = (h: AbHyp) =>
     save({ hyps: (latest().hyps ?? []).filter((x) => x.id !== h.id), decisions: (latest().decisions ?? []).map((d) => ({ ...d, hyps: d.hyps.filter((x) => x !== h.id) })) }, `Hypothese ${h.code} gelöscht`);
@@ -543,6 +564,16 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
                     onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   />
                 </label>
+                <span className="st-ab-tipwrap">
+                  <button type="button" className="st-lc-add st-ab-hsort" aria-label={order === 'asc' ? 'Reihenfolge: zuerst erstellte oben – umkehren' : 'Reihenfolge: zuletzt erstellte oben – umkehren'} onClick={flipOrder}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      {order === 'asc' ? <path d="M7 4v16M3 16l4 4 4-4M14 6h7M14 12h5M14 18h3" /> : <path d="M7 4v16M3 16l4 4 4-4M14 6h3M14 12h5M14 18h7" />}
+                    </svg>
+                  </button>
+                  <span className="st-ab-tip" role="tooltip">
+                    {order === 'asc' ? 'Zuerst erstellte oben · klicken: zuletzt erstellte oben' : 'Zuletzt erstellte oben · klicken: zuerst erstellte oben'}
+                  </span>
+                </span>
                 <span className="st-ab-tipwrap">
                   <button
                     type="button"

@@ -277,6 +277,7 @@ const uid = (p: string) => `${p}${Date.now().toString(36)}${Math.random().toStri
 const pText = (p: number) => (Number.isFinite(p) ? `p = ${p < 0.001 ? '< 0,001' : p.toFixed(2).replace('.', ',')}` : '');
 const lead = (q: string) => q.replace(/[\s?:.]+$/, '');
 const ORDER_KEY = 'asciia-study-hyp-order';
+const SUB_FOLD_KEY = 'asciia-study-ab-subfold';
 // a person's preference across the Tally criteria: the variant they chose more often
 // (and the timing question of Teil 2: before = A, after = B)
 const personPref = (r: { p1: Record<string, string | null | undefined>; choice: Record<string, string> }) => {
@@ -375,6 +376,24 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   const [q, setQ] = useState('');
   const [searching, setSearching] = useState(false);
   const [rename, setRename] = useState<string | null>(null);
+  // Einzelbewertungen and Hypothesen & Belege can be folded (remembered in the browser)
+  const [sub, setSub] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(SUB_FOLD_KEY) ?? '[]') as string[];
+    } catch {
+      return [];
+    }
+  });
+  const flipSub = (k: string) =>
+    setSub((o) => {
+      const n = o.includes(k) ? o.filter((x) => x !== k) : [...o, k];
+      try {
+        localStorage.setItem(SUB_FOLD_KEY, JSON.stringify(n));
+      } catch {
+        // (not remembered)
+      }
+      return n;
+    });
   const results = useMemo(() => part1(slice.survey).filter((r) => r.n), [slice.survey]);
   // (every Teil 1 question of the study is a criterion, also one nobody in the filter answered)
   const allQs = useMemo(() => part1(model.survey).filter((r) => r.n).map((r) => r.question), [model.survey]);
@@ -500,6 +519,7 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
             <i>1</i>
             <b>Einzelbewertungen</b>
             <span className="st-ab-rtools">
+              {!sub.includes('rows') && (
               <span className="st-seg st-cx-seg" role="group" aria-label="Quelle">
                 {(
                   [
@@ -512,9 +532,11 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
                   </button>
                 ))}
               </span>
+              )}
             </span>
+            <FoldBtn compact folded={sub.includes('rows')} label="Einzelbewertungen" onClick={() => flipSub('rows')} />
           </div>
-          {rows.length ? (
+          {sub.includes('rows') ? null : rows.length ? (
             <>
               <div className="st-ab-rows">
                 {rows.map((r) =>
@@ -599,6 +621,9 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
             <>
               <div className={`st-ab-hhead${searching ? ' is-searching' : ''}`}>
                 <h3>Hypothesen &amp; Belege</h3>
+                {!sub.includes('hyps') && (
+                <>
+                <span className="st-ab-hbreak" aria-hidden="true" />
                 <label className="st-ab-hsearch">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                     <circle cx="11" cy="11" r="7" />
@@ -642,12 +667,19 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
                     Hypothese hinzufügen
                   </span>
                 </span>
+                </>
+                )}
+                <FoldBtn compact folded={sub.includes('hyps')} label="Hypothesen & Belege" onClick={() => flipSub('hyps')} />
               </div>
+              {!sub.includes('hyps') && (
+              <>
               {!shownHyps.length && <p className="st-muted st-ab-empty">{qWords.length ? 'Keine Hypothese gefunden.' : 'Noch keine Hypothese: mit + anlegen.'}</p>}
               {shownHyps.map((h) => (
                 <HypCard key={h.id} h={h} items={items} allItems={allItems} persons={slice.persons.map((x) => x.id)} startEdit={fresh === h.id} onSave={(x, what) => putHyp(x, what)} onDelete={() => delHyp(h)} />
               ))}
               <p className="st-muted st-ab-note">Hypothesen sind Interpretationen, keine bestätigten Erkenntnisse. Tally-Werte und Originalaussagen bleiben unverändert.</p>
+              </>
+              )}
             </>
           )}
 

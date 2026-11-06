@@ -276,9 +276,10 @@ function LinkText({ value, onChange, rows, label, placeholder, belegPicker }: { 
 const uid = (p: string) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 const pText = (p: number) => (Number.isFinite(p) ? `p = ${p < 0.001 ? '< 0,001' : p.toFixed(2).replace('.', ',')}` : '');
 const lead = (q: string) => q.replace(/[\s?:.]+$/, '');
-// a person's preference across the Teil 1 questions: the variant they chose more often
-const personPref = (r: { p1: Record<string, string | null | undefined> }) => {
-  const v = Object.values(r.p1);
+// a person's preference across the Tally criteria: the variant they chose more often
+// (and the timing question of Teil 2: before = A, after = B)
+const personPref = (r: { p1: Record<string, string | null | undefined>; choice: Record<string, string> }) => {
+  const v = [...Object.values(r.p1), ...Object.entries(r.choice).filter(([q]) => TIMING_Q.test(q)).map(([, a]) => timingSide(a))];
   const a = v.filter((x) => x === 'A').length;
   const b = v.filter((x) => x === 'B').length;
   return a > b ? 'A' : b > a ? 'B' : null;
@@ -391,7 +392,14 @@ export function AbSection({ folded, onFold, show: shown, setShow: setShown }: { 
   }, [slice.survey, doc.dims]);
   const rows = src === 'tally' ? [...tallyRows, ...timingRows] : game;
   // (in the study's order; a question nobody here answered is listed, not counted)
-  const tallyAll = acrossCriteria('all-tally', [...allQs.map((q): Vote => tallyRows.find((r) => r.key === q) ?? { key: q, title: label(q), sub: q, A: 0, B: 0, tie: 0 }), ...tallyRows.filter((r) => !allQs.includes(r.key))]); // (the five Teil 1 questions; the timing question is shown, not counted)
+  // (in the study's order, the timing question last; a question nobody here answered is listed, not counted)
+  const allTimingQs = useMemo(() => [...new Set(model.survey.flatMap((x) => Object.keys(x.choice)))].filter((q) => TIMING_Q.test(q)), [model.survey]);
+  const empty = (q: string, title: string): Vote => ({ key: q, title, sub: q, A: 0, B: 0, tie: 0 });
+  const tallyAll = acrossCriteria('all-tally', [
+    ...allQs.map((q) => tallyRows.find((r) => r.key === q) ?? empty(q, label(q))),
+    ...tallyRows.filter((r) => !allQs.includes(r.key)),
+    ...allTimingQs.map((q) => timingRows.find((r) => r.key === q) ?? empty(q, doc.dims?.[q]?.trim() || 'Zeitpunkt der Unterstützung')),
+  ]);
   const gameAll = acrossCriteria('all-game', game);
   const nPeople = new Set([...slice.survey.filter((r) => r.person && Object.keys(r.p1).length).map((r) => r.person), ...slice.feedback.filter((r) => r.rating && r.participant).map((r) => r.participant)]).size;
 

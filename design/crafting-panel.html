@@ -117,9 +117,23 @@ pre { font-family: inherit; }
 .ds-msg-bubbles { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; max-width: min(480px, 64%); }
 .ds-msg.right .ds-msg-bubbles { align-items: flex-end; }
 .ds-bubble { position: relative; max-width: 100%; padding: 12px 20px; border: 1px solid var(--ds-line-strong); border-radius: var(--ds-radius-sm); background: var(--ds-bubble); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.ds-msg .ds-bubble:first-child::before { content: ""; position: absolute; top: 28px; width: 9px; height: 9px; background: inherit; border: 0 solid var(--ds-line-strong); transform: rotate(45deg); }
-.ds-msg.left .ds-bubble:first-child::before { left: -6px; border-left-width: 1px; border-bottom-width: 1px; }
-.ds-msg.right .ds-bubble:first-child::before { right: -6px; border-right-width: 1px; border-top-width: 1px; }
+/* the speech-bubble shape: soft round corners, a name tag on the top edge and a
+   curled tail at the bottom corner on the speaker's side */
+.ds-msg .ds-bubble { --bub-line: 2px; border-width: var(--bub-line); border-radius: 18px; }
+.ds-msg .ds-bubble:first-child { margin-top: 12px; padding-top: 16px; }
+.ds-msg .ds-bubble:last-child { margin-bottom: 12px; }
+.ds-tag { position: absolute; top: -12px; left: 18px; padding: 2px 12px; border: var(--bub-line) solid var(--ds-line-strong); border-radius: 999px; background: var(--ds-name); color: #2a2412; font-size: 12px; font-weight: 600; line-height: 1.4; letter-spacing: 0.3px; white-space: nowrap; }
+.ds-msg.right .ds-tag { left: auto; right: 18px; }
+/* the tail: a small curl that hangs from the bottom edge and bends away to the
+   speaker's side (::before), and a patch that opens the border where it joins (::after) */
+.ds-msg .ds-bubble:last-child::before { content: ""; position: absolute; bottom: -13px; left: 14px; width: 16px; height: 14px; background: inherit; border: 0 solid var(--ds-line-strong); border-right-width: var(--bub-line); border-bottom-width: var(--bub-line); border-bottom-right-radius: 100% 100%; }
+.ds-msg .ds-bubble:last-child::after { content: ""; position: absolute; bottom: calc(-1 * var(--bub-line)); left: 14px; width: 16px; height: calc(var(--bub-line) + 1px); background: inherit; }
+.ds-msg.right .ds-bubble:last-child::before { left: auto; right: 14px; border-right-width: 0; border-left-width: var(--bub-line); border-bottom-right-radius: 0; border-bottom-left-radius: 100% 100%; }
+.ds-msg.right .ds-bubble:last-child::after { left: auto; right: 14px; }
+/* (room for the name tag on short bubbles) */
+.ds-msg .ds-bubble:first-child { min-width: 150px; }
+/* (the name is on the tag now; the portrait keeps only the face) */
+.ds-msg .ds-portrait-name { display: none; }
 .ds-muted { color: var(--ds-text-muted); }
 
 .cw3-card { display: flex; flex-direction: column; gap: 6px; white-space: normal; }
@@ -308,7 +322,7 @@ const artLine = (l) => l.map(([t, c]) => `<span class="${c}">${esc(t)}</span>`).
 function msg(side, name, bubbles) {
   const el = document.createElement('div');
   el.className = `ds-msg ${side}`;
-  el.innerHTML = `<div class="ds-portrait"><div class="ds-portrait-box"><img alt="" src="${PORTRAIT[name]}"></div><div class="ds-portrait-name">${name}</div></div><div class="ds-msg-bubbles">${bubbles.map((b) => `<div class="ds-bubble">${b}</div>`).join('')}</div>`;
+  el.innerHTML = `<div class="ds-portrait"><div class="ds-portrait-box"><img alt="" src="${PORTRAIT[name]}"></div><div class="ds-portrait-name">${name}</div></div><div class="ds-msg-bubbles">${bubbles.map((b, i) => `<div class="ds-bubble">${i === 0 ? `<span class="ds-tag">${name}</span>` : ''}${b}</div>`).join('')}</div>`;
   chat.append(el);
   chat.scrollTop = chat.scrollHeight;
   return el;

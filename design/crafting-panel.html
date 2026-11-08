@@ -181,6 +181,73 @@ pre { font-family: inherit; }
   .cw3-history { position: absolute; inset: 0 0 0 auto; width: 70%; background: var(--ds-panel); padding: 12px; }
 }
 
+
+/* ========== details: tags above the prompt, each opens a small modal ========== */
+.cw3-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--ds-line-soft); }
+.cw3-tags + .cw3-bottom { margin-top: 10px; padding-top: 0; border-top: 0; }
+.cw3-tag { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px 7px 10px; border: 1px solid var(--ds-line); border-radius: 999px; background: var(--ds-surface); color: var(--ds-text-soft); font-size: 13px; cursor: pointer; }
+.cw3-tag:hover { border-color: var(--ds-line-strong); color: var(--ds-text); }
+.cw3-tag svg { color: var(--ds-name); }
+.cw3-tag.is-set { border-color: var(--ds-line-strong); background: var(--ds-pill); color: var(--ds-text); }
+.cw3-tag b { font-weight: 600; }
+.cw3-tag:disabled { opacity: 0.45; cursor: default; }
+/* the chosen details inside the prompt field */
+.cw3-chosen { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 1 auto; min-width: 0; }
+.cw3-chosen:empty { display: none; }
+.cw3-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px 3px 10px; border-radius: 999px; background: var(--ds-pill); color: var(--ds-text); font-size: 12px; white-space: nowrap; }
+.cw3-chip i { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.15); }
+.cw3-chip button { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ds-text-soft); font-size: 13px; line-height: 1; cursor: pointer; }
+.cw3-chip button:hover { background: var(--ds-surface); color: var(--ds-text); }
+.ds-bubble .cw3-chosen { margin-top: 8px; justify-content: flex-end; }
+/* the modal: over the panel, a cream card */
+.cw3-modal { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; padding: 20px; border-radius: inherit; background: rgba(255, 248, 232, 0.72); backdrop-filter: blur(3px); }
+.cw3-modal[hidden] { display: none; }
+.cw3-modal-card { width: min(560px, 100%); max-height: 100%; overflow-y: auto; padding: 20px 22px 18px; border: 2px solid var(--ds-line-strong); border-radius: 20px; background: var(--ds-panel); box-shadow: 0 14px 40px rgba(170, 120, 40, 0.18); animation: msg-in 0.18s ease; }
+.cw3-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cw3-modal-head h3 { font-size: 17px; font-weight: 600; color: var(--ds-text); }
+.cw3-modal-head .ds-iconbtn { width: 36px; height: 36px; }
+.cw3-modal-sub { margin: 4px 0 16px; color: var(--ds-text-muted); font-size: 13px; }
+.cw3-modal-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.cw3-btn { padding: 9px 18px; border: 1px solid var(--ds-line); border-radius: 999px; background: var(--ds-surface); color: var(--ds-text); font-size: 14px; cursor: pointer; }
+.cw3-btn.is-pri { border-color: var(--ds-go); background: var(--ds-go-fill); color: var(--ds-go-ink); }
+.cw3-btn.is-pri:disabled { opacity: 0.45; cursor: default; }
+.cw3-btn:not(.is-pri):hover { border-color: var(--ds-line-strong); }
+/* choices: preview tiles (size, density) and adjective pills (atmosphere) */
+.cw3-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.cw3-tile { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--ds-line); border-radius: 14px; background: var(--ds-bubble); color: var(--ds-text); text-align: center; cursor: pointer; }
+.cw3-tile:hover { border-color: var(--ds-line-strong); }
+.cw3-tile.on { border-color: var(--ds-line-strong); box-shadow: 0 0 0 2px var(--ds-line-strong) inset; background: #fff0c9; }
+.cw3-tile .pv { height: 110px; display: grid; place-items: center; overflow: hidden; border-radius: 10px; background: var(--ds-field); }
+.cw3-tile .pv pre { line-height: 1; white-space: pre; }
+.cw3-tile small { color: var(--ds-text-muted); font-size: 11px; }
+.cw3-moods { display: flex; flex-wrap: wrap; gap: 8px; }
+.cw3-mood { padding: 8px 14px; border: 1px solid var(--ds-line); border-radius: 999px; background: var(--ds-bubble); color: var(--ds-text); font-size: 13px; cursor: pointer; }
+.cw3-mood:hover { border-color: var(--ds-line-strong); }
+.cw3-mood.on { border-color: var(--ds-line-strong); background: var(--ds-pill); font-weight: 600; }
+/* the colour picker */
+.cw3-colors { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start; }
+.cw3-picker { position: relative; width: 120px; height: 120px; border: 2px solid var(--ds-line-strong); border-radius: 16px; overflow: hidden; }
+.cw3-picker input { position: absolute; inset: -10px; width: calc(100% + 20px); height: calc(100% + 20px); border: 0; padding: 0; cursor: pointer; }
+.cw3-swatches { display: grid; grid-template-columns: repeat(6, 28px); gap: 8px; }
+.cw3-swatch { width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12) inset; cursor: pointer; }
+.cw3-swatch.on { border-color: var(--ds-text); }
+.cw3-cname { margin-top: 12px; display: flex; align-items: center; gap: 8px; color: var(--ds-text); font-size: 14px; }
+.cw3-cname i { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.15); }
+@media (max-width: 820px) {
+  .cw3-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .cw3-tile .pv { height: 80px; }
+  .cw3-colors { grid-template-columns: 1fr; }
+  .cw3-picker { width: 100%; height: 90px; }
+  /* (phones: the tags in one row to swipe; the chosen ones above the text in the field) */
+  .cw3-tags { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -14px; padding-right: 14px; }
+  .cw3-tag { flex: 0 0 auto; }
+  .cw3-prompt { flex-wrap: wrap; padding: 6px 14px; gap: 4px 10px; }
+  .cw3-prompt .cw3-chosen { flex: 1 1 100%; padding-top: 4px; }
+  .cw3-input { padding: 10px 0; }
+  .cw3-tile .pv pre { zoom: 0.62; }
+  .cw3-craft { align-self: flex-end; height: 52px; }
+}
+
 /* ========== the try-out bar (not part of the panel) ========== */
 body.stage-checker { background: repeating-conic-gradient(#d8d8d8 0% 25%, #f2f2f2 0% 50%) 0 0 / 22px 22px; }
 body.stage-game { background: radial-gradient(circle at 30% 40%, #6f8a52, #3c4d2c 60%, #23301b); }
@@ -247,16 +314,33 @@ body:has(.dev-bar:not(.min)) .ds-sheet { padding-top: 70px; }
           <div class="cw3-chat" id="chat"></div>
           <div class="cw3-history" id="history"><h3>Past crafts</h3></div>
         </div>
+        <div class="cw3-tags" id="tags" role="group" aria-label="Details"><button type="button" class="cw3-tag" data-tag="size"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/></svg><span>Size</span></button><button type="button" class="cw3-tag" data-tag="color"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c4 4.5 6 7.6 6 10a6 6 0 0 1-12 0c0-2.4 2-5.5 6-10z"/></svg><span>Color</span></button><button type="button" class="cw3-tag" data-tag="mood"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg><span>Atmosphere</span></button><button type="button" class="cw3-tag" data-tag="density"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span>Density</span></button></div>
         <div class="cw3-bottom">
           <div class="ds-frame cw3-prompt">
             <span class="ds-bracket tl"></span><span class="ds-bracket tr"></span><span class="ds-bracket bl"></span><span class="ds-bracket br"></span>
-            <input class="cw3-input" id="input" maxlength="80" placeholder="Describe what you'd like to craft …" aria-label="Describe what you'd like to craft" />
+            <span class="cw3-chosen" id="chosen"></span><input class="cw3-input" id="input" maxlength="80" placeholder="Describe what you'd like to craft …" aria-label="Describe what you'd like to craft" />
             <span class="cw3-count" id="count">0/80</span>
           </div>
           <button class="cw3-craft" id="craft" disabled>
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 6.5 5 15a1.8 1.8 0 0 0 2.5 2.5L16 9"/><path d="M11.5 4.5 15 3l6 6-1.5 3.5-2-2-2 2-4-4 2-2z"/></svg>
             <span>Craft it!</span>
           </button>
+        </div>
+        <div class="cw3-modal" id="modal" hidden>
+          <div class="cw3-modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <div class="cw3-modal-head">
+              <h3 id="modal-title"></h3>
+              <button type="button" class="ds-iconbtn is-round" id="modal-x" aria-label="close">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+            </div>
+            <p class="cw3-modal-sub" id="modal-sub"></p>
+            <div class="cw3-modal-body" id="modal-body"></div>
+            <div class="cw3-modal-foot">
+              <button type="button" class="cw3-btn" id="modal-clear">Remove</button>
+              <button type="button" class="cw3-btn is-pri" id="modal-ok">Add to prompt</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -267,6 +351,7 @@ body:has(.dev-bar:not(.min)) .ds-sheet { padding-top: 70px; }
 /* ========== 3. TEXTS ========== */
 const TEXT = {
   welcome: 'Welcome to the workshop! Tell me what you want and what it should do. Anything you like.',
+  inspire: 'If you need inspiration, pick a size, colour, atmosphere or density below.',
   placeholder: "Describe what you'd like to craft …",
   placeholderPick: 'Pick an option above',
   placeholderAdjust: 'What should I change?',
@@ -287,7 +372,7 @@ const PORTRAIT = { Mitchy: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOQAAA
 /* the example results: picked by keyword (no AI here). Each line: text + colour classes
    ([chars, class] pairs). Add your own to try other result sizes. */
 const SPRITES = [
-  { key: /boat|ship|sail|raft|canoe|kayak/i, name: 'Small wooden rowboat', punch: 'sail it out onto the ocean.', art: [
+  { key: /boat|ship|sail|raft|canoe|kayak/i, main: ['c-sail', 'c-sail2'], name: 'Small wooden rowboat', punch: 'sail out onto the ocean.', art: [
     [['        |', 'c-dark']],
     [['        |', 'c-dark'], ['\\', 'c-sail']],
     [['        |', 'c-dark'], ['▓▓\\', 'c-sail']],
@@ -301,14 +386,14 @@ const SPRITES = [
     [['   ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀', 'c-dark']],
     [[' ≈≈', 'c-foam'], ['∽∽∽≈≈∽∽∽≈≈∽∽∽≈≈∽', 'c-water'], ['≈', 'c-foam']],
   ] },
-  { key: /hat|cap|helmet/i, name: 'Straw sun hat', punch: 'keeps the sun off your nose.', art: [
+  { key: /hat|cap|helmet/i, main: ['c-band'], name: 'Straw sun hat', punch: 'keeps the sun off your nose.', art: [
     [['      ▄▄▄▄▄▄▄', 'c-straw']],
     [['     ▐▓▒▓▒▓▒▓▌', 'c-straw']],
     [['     ▐', 'c-straw'], ['▀▀▀▀▀▀▀', 'c-band'], ['▌', 'c-straw']],
     [['  ▄▄▄█▓▒▓▒▓▒▓█▄▄▄', 'c-straw']],
     [[' ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀', 'c-straw']],
   ] },
-  { key: /lamp|lantern|light|torch/i, name: 'Brass lantern', punch: 'lights the way home.', art: [
+  { key: /lamp|lantern|light|torch/i, main: ['c-gold'], name: 'Brass lantern', punch: 'lights the way home.', art: [
     [['     ▄▀▀▄', 'c-metal']],
     [['    ▄████▄', 'c-gold']],
     [['    █', 'c-gold'], ['░▒▒░', 'c-glass'], ['█', 'c-gold']],
@@ -317,7 +402,7 @@ const SPRITES = [
     [['    ▀████▀', 'c-gold']],
   ] },
 ];
-const FALLBACK = { name: 'Wooden crate', punch: 'holds whatever you need.', art: [
+const FALLBACK = { main: ['c-wood'], name: 'Wooden crate', punch: 'holds whatever you need.', art: [
   [[' ▄▄▄▄▄▄▄▄▄▄▄▄', 'c-wood']],
   [[' █', 'c-dark'], ['▓▓▓▓▓▓▓▓▓▓', 'c-wood'], ['█', 'c-dark']],
   [[' █', 'c-dark'], ['══════════', 'c-dark'], ['█', 'c-dark']],
@@ -352,7 +437,9 @@ function setInput(enabled, placeholder) {
 }
 function update() {
   count.textContent = `${input.value.length}/80`;
-  craft.disabled = input.disabled || !input.value.trim() || phase === 'working';
+  const any = !!input.value.trim() || Object.keys(chosen).length > 0;
+  craft.disabled = input.disabled || !any || phase === 'working';
+  document.querySelectorAll('.cw3-tag').forEach((b) => (b.disabled = input.disabled));
 }
 function pickSprite(prompt) {
   return SPRITES.find((s) => s.key.test(prompt)) ?? FALLBACK;
@@ -366,17 +453,23 @@ function setCoins(n) {
 }
 
 function submit() {
-  const prompt = input.value.trim();
-  if (!prompt || craft.disabled) return;
+  const text = input.value.trim();
+  if (craft.disabled) return;
   const adjusting = phase === 'adjusting';
-  msg('right', 'Villager', [esc(prompt)]);
+  const ch = { ...chosen };
+  const prompt = [text, ...Object.entries(ch).map(([k, v]) => chipText[k](v))].filter(Boolean).join(', ');
+  msg('right', 'Villager', [`${esc(text || '…')}${Object.keys(ch).length ? `<span class="cw3-chosen">${chipsHtml(ch, false)}</span>` : ''}`]);
   input.value = '';
+  chosen = {};
+  renderChosen();
   phase = 'working';
   setInput(false, TEXT.placeholderPick);
   clearOptions();
-  const sprite = adjusting ? current.sprite : pickSprite(prompt);
+  const base = adjusting ? current.base : pickSprite(prompt);
+  // the details shape the drawing: density (shades), colour (its main part), size (scale), atmosphere (the line)
+  const sprite = { ...base, art: tinted(densify(base.art, ch.density ?? 'regular'), base.main, ch.color?.hex), punch: ch.mood ? `${ch.mood[0].toUpperCase()}${ch.mood.slice(1)} — ${base.punch}` : base.punch, fs: { small: 9, medium: 12, large: 15 }[ch.size ?? 'medium'] };
   // the working bubble: the drawing appears line by line
-  const el = msg('left', 'Mitchy', [`<div class="cw3-card"><div class="ds-frame cw3-art"><span class="ds-bracket tl"></span><span class="ds-bracket tr"></span><span class="ds-bracket bl"></span><span class="ds-bracket br"></span><pre></pre></div><div class="ds-muted"><span class="cw-status">${TEXT.thinking}</span><span class="cw-ellipsis"></span></div><div class="cw-progress-bar"><span></span></div></div>`]);
+  const el = msg('left', 'Mitchy', [`<div class="cw3-card"><div class="ds-frame cw3-art"><span class="ds-bracket tl"></span><span class="ds-bracket tr"></span><span class="ds-bracket bl"></span><span class="ds-bracket br"></span><pre style="font-size:${sprite.fs}px"></pre></div><div class="ds-muted"><span class="cw-status">${TEXT.thinking}</span><span class="cw-ellipsis"></span></div><div class="cw-progress-bar"><span></span></div></div>`]);
   const pre = el.querySelector('pre'), status = el.querySelector('.cw-status');
   const step = 260;
   sprite.art.forEach((line, i) =>
@@ -387,11 +480,11 @@ function submit() {
   );
   later(() => {
     el.remove();
-    current = { sprite, prompt };
+    current = { sprite, base, prompt };
     history.unshift({ name: sprite.name, prompt });
     renderHistory();
     msg('left', 'Mitchy', [
-      `<div class="cw3-card"><div class="ds-frame cw3-art"><span class="ds-bracket tl"></span><span class="ds-bracket tr"></span><span class="ds-bracket bl"></span><span class="ds-bracket br"></span><pre>${sprite.art.map(artLine).join('\n')}</pre></div><div class="cw3-card-name">${esc(sprite.name)}</div><div class="ds-muted">“${esc(sprite.punch)}”</div></div>`,
+      `<div class="cw3-card"><div class="ds-frame cw3-art"><span class="ds-bracket tl"></span><span class="ds-bracket tr"></span><span class="ds-bracket bl"></span><span class="ds-bracket br"></span><pre style="font-size:${sprite.fs}px">${sprite.art.map(artLine).join('\n')}</pre></div><div class="cw3-card-name">${esc(sprite.name)}</div><div class="ds-muted">“${esc(sprite.punch)}”</div></div>`,
       esc(TEXT.result(sprite.name)),
     ]);
     phase = 'success';
@@ -467,8 +560,10 @@ function reset() {
   current = null;
   coins = 120;
   $('coins').querySelector('span').textContent = coins;
-  msg('left', 'Mitchy', [esc(TEXT.welcome)]);
+  msg('left', 'Mitchy', [esc(TEXT.welcome), esc(TEXT.inspire)]);
   input.value = '';
+  chosen = {};
+  renderChosen();
   setInput(true, TEXT.placeholder);
 }
 function typeExample() {
@@ -489,6 +584,124 @@ function toast(t) {
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove('on'), 1600);
 }
+
+
+/* ========== details (size, colour, atmosphere, density) ========== */
+const COLOR_NAMES = [
+  ['red', '#d9473f'], ['crimson', '#a8202f'], ['orange', '#f08a24'], ['amber', '#f2b53c'], ['yellow', '#f4d03f'],
+  ['lime', '#a6d14b'], ['green', '#5fa04e'], ['teal', '#2e9c94'], ['sky blue', '#7cc3ea'], ['blue', '#3b74c0'],
+  ['navy', '#22346b'], ['purple', '#7e57c2'], ['lavender', '#b9a3e3'], ['pink', '#f08fb4'], ['brown', '#8a5a2b'],
+  ['beige', '#e8d5b0'], ['white', '#f7f5ef'], ['grey', '#9a9a9a'], ['black', '#2a2a2a'],
+];
+const SWATCHES = ['#d9473f', '#f08a24', '#f4d03f', '#5fa04e', '#2e9c94', '#3b74c0', '#22346b', '#7e57c2', '#f08fb4', '#8a5a2b', '#f7f5ef', '#2a2a2a'];
+const MOODS = ['cozy', 'magical', 'cheerful', 'calm', 'mysterious', 'spooky', 'dreamy', 'rustic', 'festive', 'ancient'];
+const SIZES = [['small', 'Small', 7], ['medium', 'Medium', 10], ['large', 'Large', 13]];
+const DENSITIES = [['low', 'Low', 'few, simple shapes'], ['regular', 'Regular', 'as usual'], ['detailed', 'Detailed', 'more texture']];
+const TAGS = {
+  size: { title: 'Size', sub: 'How big should it be?' },
+  color: { title: 'Color', sub: 'Pick its main colour.' },
+  mood: { title: 'Atmosphere', sub: 'How should it feel?' },
+  density: { title: 'Density', sub: 'How much detail should it have?' },
+};
+let chosen = {}; // size, color {hex, name}, mood, density
+
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+function colorName(hex) {
+  const [r, g, b] = hexRgb(hex);
+  let best = COLOR_NAMES[0], d = Infinity;
+  for (const c of COLOR_NAMES) {
+    const [r2, g2, b2] = hexRgb(c[1]);
+    const x = (r - r2) ** 2 * 0.3 + (g - g2) ** 2 * 0.59 + (b - b2) ** 2 * 0.11;
+    if (x < d) (d = x), (best = c);
+  }
+  return best[0];
+}
+// density: fewer or more shades of the same drawing
+function densify(art, level) {
+  if (level === 'low') return art.map((l) => l.map(([t, c]) => [t.replace(/[▓▒]/g, '░').replace(/█/g, '▓'), c]));
+  if (level === 'detailed') return art.map((l, y) => l.map(([t, c]) => [[...t].map((ch, x) => (ch === '▓' && (x + y) % 2 ? '▒' : ch === '▒' && (x + y) % 3 === 0 ? '░' : ch)).join(''), c]));
+  return art;
+}
+const tinted = (art, main, hex) => (hex && main ? art.map((l) => l.map(([t, c]) => [t, main.includes(c) ? `${c}" style="color:${hex}` : c])) : art);
+const chipText = { size: (v) => v, color: (v) => v.name, mood: (v) => v, density: (v) => (v === 'detailed' ? 'detailed' : `${v} detail`) };
+function chipsHtml(ch, removable) {
+  return Object.entries(ch)
+    .map(([k, v]) => `<span class="cw3-chip">${k === 'color' ? `<i style="background:${v.hex}"></i>` : ''}${esc(chipText[k](v))}${removable ? `<button type="button" data-unset="${k}" aria-label="remove ${k}">×</button>` : ''}</span>`)
+    .join('');
+}
+function renderChosen() {
+  $('chosen').innerHTML = chipsHtml(chosen, true);
+  document.querySelectorAll('.cw3-tag').forEach((b) => {
+    const k = b.dataset.tag, v = chosen[k];
+    b.classList.toggle('is-set', v != null);
+    b.querySelector('span').innerHTML = v != null ? `${TAGS[k].title} · <b>${esc(chipText[k](v))}</b>` : TAGS[k].title;
+  });
+  update();
+}
+$('chosen').addEventListener('click', (e) => {
+  const k = e.target.closest('[data-unset]')?.dataset.unset;
+  if (k) (delete chosen[k], renderChosen());
+});
+
+// the modal
+let editing = null, draft = null;
+const preview = (art, fs) => `<pre style="font-size:${fs}px">${art.map(artLine).join('\n')}</pre>`;
+function openTag(k) {
+  if (input.disabled && phase !== 'input' && phase !== 'adjusting') return;
+  editing = k;
+  draft = chosen[k] ?? null;
+  $('modal-title').textContent = TAGS[k].title;
+  $('modal-sub').textContent = TAGS[k].sub;
+  renderModal();
+  $('modal').hidden = false;
+  $('modal-x').focus();
+}
+function renderModal() {
+  const body = $('modal-body'), boat = SPRITES[0].art;
+  if (editing === 'size')
+    body.innerHTML = `<div class="cw3-tiles">${SIZES.map(([v, l, fs]) => `<button type="button" class="cw3-tile${draft === v ? ' on' : ''}" data-v="${v}"><span class="pv">${preview(boat, fs * 0.62)}</span>${l}</button>`).join('')}</div>`;
+  if (editing === 'density')
+    body.innerHTML = `<div class="cw3-tiles">${DENSITIES.map(([v, l, h]) => `<button type="button" class="cw3-tile${draft === v ? ' on' : ''}" data-v="${v}"><span class="pv">${preview(densify(boat, v), 6.5)}</span>${l}<small>${h}</small></button>`).join('')}</div>`;
+  if (editing === 'mood')
+    body.innerHTML = `<div class="cw3-moods">${MOODS.map((m) => `<button type="button" class="cw3-mood${draft === m ? ' on' : ''}" data-v="${m}">${m}</button>`).join('')}</div>`;
+  if (editing === 'color') {
+    const hex = draft?.hex ?? '#d9473f';
+    body.innerHTML = `<div class="cw3-colors"><label class="cw3-picker" title="pick any colour"><input type="color" id="picker" value="${hex}" aria-label="colour picker"></label><div><div class="cw3-swatches">${SWATCHES.map((c) => `<button type="button" class="cw3-swatch${draft?.hex === c ? ' on' : ''}" data-v="${c}" style="background:${c}" aria-label="${colorName(c)}"></button>`).join('')}</div><div class="cw3-cname"><i style="background:${hex}"></i><span>${draft ? esc(draft.name) : 'pick a colour'}</span></div></div></div>`;
+    $('picker').addEventListener('input', (e) => ((draft = { hex: e.target.value, name: colorName(e.target.value) }), updateColor()));
+  }
+  $('modal-ok').disabled = draft == null;
+  $('modal-clear').hidden = chosen[editing] == null;
+}
+function updateColor() {
+  const n = document.querySelector('.cw3-cname');
+  n.querySelector('i').style.background = draft.hex;
+  n.querySelector('span').textContent = draft.name;
+  document.querySelectorAll('.cw3-swatch').forEach((b) => b.classList.toggle('on', b.dataset.v === draft.hex));
+  $('modal-ok').disabled = false;
+}
+$('modal-body').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-v]');
+  if (!b) return;
+  if (editing === 'color') {
+    draft = { hex: b.dataset.v, name: colorName(b.dataset.v) };
+    $('picker').value = b.dataset.v;
+    return updateColor();
+  }
+  draft = b.dataset.v;
+  renderModal();
+});
+// (a double click on a choice adds it right away)
+$('modal-body').addEventListener('dblclick', (e) => e.target.closest('[data-v]') && $('modal-ok').click());
+const closeModal = () => (($('modal').hidden = true), (editing = null), input.disabled || input.focus());
+$('modal-x').onclick = closeModal;
+$('modal').addEventListener('click', (e) => e.target.id === 'modal' && closeModal());
+$('modal-ok').onclick = () => (draft != null && (chosen[editing] = draft), renderChosen(), closeModal());
+$('modal-clear').onclick = () => (delete chosen[editing], renderChosen(), closeModal());
+document.addEventListener('keydown', (e) => e.key === 'Escape' && !$('modal').hidden && closeModal());
+$('tags').addEventListener('click', (e) => {
+  const k = e.target.closest('[data-tag]')?.dataset.tag;
+  if (k) openTag(k);
+});
 
 input.addEventListener('input', update);
 input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());

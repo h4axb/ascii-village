@@ -121,21 +121,15 @@ pre { font-family: inherit; }
 .ds-msg-bubbles { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; max-width: min(480px, 64%); }
 .ds-msg.right .ds-msg-bubbles { align-items: flex-end; }
 .ds-bubble { position: relative; max-width: 100%; padding: 12px 20px; border: 1px solid var(--ds-line-strong); border-radius: var(--ds-radius-sm); background: var(--ds-bubble); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-/* the speech-bubble shape: soft round corners, a name tag on the top edge and a
-   curled tail at the bottom corner on the speaker's side */
+/* the speech-bubble shape: soft round corners and a curled tail at the top on
+   the speaker's side (an inline SVG, see TAIL in the script) */
 .ds-msg .ds-bubble { --bub-line: 2px; border-width: var(--bub-line); border-radius: 18px; }
-.ds-msg .ds-bubble:first-child { margin-top: 12px; padding-top: 16px; }
-.ds-msg .ds-bubble:last-child { margin-bottom: 14px; }
-.ds-tag { position: absolute; top: -12px; left: 18px; padding: 2px 12px; border: var(--bub-line) solid var(--ds-line-strong); border-radius: 999px; background: var(--ds-name); color: #2a2412; font-size: 12px; font-weight: 600; line-height: 1.4; letter-spacing: 0.3px; white-space: nowrap; }
-.ds-msg.right .ds-tag { left: auto; right: 18px; }
-/* the tail: an inline SVG (the curl and a strip that hides the bubble's border
-   where it joins), so the line runs on without a seam; mirrored on the right */
-.ds-tail { position: absolute; left: 16px; bottom: -15px; width: 22px; height: 17px; overflow: visible; pointer-events: none; }
+.ds-tail { position: absolute; left: -17px; top: 10px; width: 17px; height: 22px; overflow: visible; pointer-events: none; }
 .ds-tail .fill { fill: var(--ds-bubble); }
 .ds-tail .line { fill: none; stroke: var(--ds-line-strong); stroke-width: var(--bub-line); stroke-linecap: round; stroke-linejoin: round; }
-.ds-msg.right .ds-tail { left: auto; right: 16px; transform: scaleX(-1); }
-/* (room for the name tag on short bubbles) */
-.ds-msg .ds-bubble:first-child { min-width: 150px; }
+.ds-msg.right .ds-tail { left: auto; right: -17px; transform: scaleX(-1); }
+/* Mitchy's portrait: a circle */
+.ds-msg.left .ds-portrait-box { border-radius: 50%; }
 .ds-muted { color: var(--ds-text-muted); }
 
 .cw3-card { display: flex; flex-direction: column; gap: 6px; white-space: normal; }
@@ -314,8 +308,8 @@ const FALLBACK = { name: 'Wooden crate', punch: 'holds whatever you need.', art:
 
 /* ========== behaviour (a mock of CraftModal.tsx) ========== */
 const $ = (id) => document.getElementById(id);
-// the bubble's tail (see .ds-tail): y 0–2 is the bubble's bottom border
-const TAIL = '<svg class="ds-tail" viewBox="0 0 22 17" aria-hidden="true"><path class="fill" d="M5 0 H21 V1 C21 9 13 14 2 16 C6 12 7 7 6 1 V0 Z"/><path class="line" d="M21 1 C21 9 13 14 2 16 C6 12 7 7 6 1"/></svg>';
+// the bubble's tail (see .ds-tail): x 15–17 is the bubble's left border; it curls up and out
+const TAIL = '<svg class="ds-tail" viewBox="0 0 17 22" aria-hidden="true"><path class="fill" d="M17 5 V21 H16 C8 21 3 13 1 2 C5 6 10 7 16 6 H17 Z"/><path class="line" d="M16 21 C8 21 3 13 1 2 C5 6 10 7 16 6"/></svg>';
 const chat = $('chat'), input = $('input'), craft = $('craft'), count = $('count');
 let phase = 'input';      // input → working → success → (adjusting → working → success) → done
 let coins = 120, speed = 1, current = null, options = [], sel = 0, timers = [], history = [];
@@ -326,7 +320,7 @@ const artLine = (l) => l.map(([t, c]) => `<span class="${c}">${esc(t)}</span>`).
 function msg(side, name, bubbles) {
   const el = document.createElement('div');
   el.className = `ds-msg ${side}`;
-  el.innerHTML = `<div class="ds-portrait"><div class="ds-portrait-box"><img alt="" src="${PORTRAIT[name]}"></div><div class="ds-portrait-name">${name}</div></div><div class="ds-msg-bubbles">${bubbles.map((b, i) => `<div class="ds-bubble">${i === 0 ? `<span class="ds-tag">${name}</span>` : ''}${b}${i === bubbles.length - 1 ? TAIL : ''}</div>`).join('')}</div>`;
+  el.innerHTML = `<div class="ds-portrait"><div class="ds-portrait-box"><img alt="" src="${PORTRAIT[name]}"></div><div class="ds-portrait-name">${name}</div></div><div class="ds-msg-bubbles">${bubbles.map((b, i) => `<div class="ds-bubble">${i === 0 ? TAIL : ''}${b}</div>`).join('')}</div>`;
   chat.append(el);
   chat.scrollTop = chat.scrollHeight;
   return el;

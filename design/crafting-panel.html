@@ -276,9 +276,8 @@ pre { font-family: inherit; }
 .ds-msg-bubbles { max-width: min(560px, 80%); }
 .ds-msg .ds-bubble { padding: 9px 16px; border-radius: 12px; }
 .ds-tail { top: 8px; }
-.cw3-chat:has(> .cw3-empty) > .ds-msg:first-child .ds-msg-bubbles { flex: 1 1 auto; max-width: none; }
-.cw3-chat:has(> .cw3-empty) > .ds-msg:first-child .ds-bubble { width: 100%; }
-.cw3-empty { margin: auto; padding-bottom: 24px; color: var(--ds-text-muted); font-size: 14px; text-align: center; }
+.cw3.is-fresh .cw3-chat > .ds-msg:first-child .ds-msg-bubbles { flex: 1 1 auto; max-width: none; }
+.cw3.is-fresh .cw3-chat > .ds-msg:first-child .ds-bubble { width: 100%; }
 /* inspiration: a quiet label, small text-only tags */
 .cw3-hint { margin: 10px 0 8px; color: var(--ds-text-soft); font-size: 12px; }
 .cw3-tags { margin: 0; padding: 0; border: 0; gap: 6px; }
@@ -299,6 +298,26 @@ pre { font-family: inherit; }
   .cw3-input { padding: 16px 0; }
   .cw3-prompt { padding: 4px 8px 4px 14px; }
   .ds-msg-bubbles { max-width: 82%; }
+}
+
+
+/* tags: a short hover text above each one */
+.cw3-tag { position: relative; }
+.cw3-tag[data-tip]::after { content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 5; width: max-content; max-width: 220px; padding: 6px 10px; border-radius: 8px; background: var(--ds-text); color: #fffaf0; font-size: 11px; line-height: 1.4; white-space: normal; text-align: left; opacity: 0; pointer-events: none; transition: opacity 0.12s; }
+.cw3-tag[data-tip]:hover::after, .cw3-tag[data-tip]:focus-visible::after { opacity: 1; }
+.cw3-modal:not([hidden]) ~ * .cw3-tag::after, body:has(.cw3-modal:not([hidden])) .cw3-tag::after { opacity: 0 !important; }
+.cw3-hint[hidden], .cw3-tags[hidden] { display: none; }
+/* the field: a textarea that grows */
+textarea.cw3-input { display: block; resize: none; overflow-y: auto; padding: 22px 0; line-height: 1.5; font: inherit; font-size: 14px; max-height: 25vh; scrollbar-width: thin; scrollbar-color: var(--ds-line-strong) transparent; }
+.cw3-prompt { align-items: flex-end; }
+.cw3-prompt .cw3-chosen { align-self: center; }
+.cw3-prompt .cw3-craft { margin-bottom: 14px; }
+/* the result again (adjusting): smaller */
+.cw3-card.is-small .cw3-art { width: 220px; height: 120px; }
+.cw3-card .cw3-chosen { margin-top: 4px; }
+@media (max-width: 820px) {
+  textarea.cw3-input { padding: 14px 0; }
+  .cw3-prompt .cw3-craft { margin-bottom: 6px; }
 }
 
 /* ========== the try-out bar (not part of the panel) ========== */
@@ -366,11 +385,11 @@ body.stage-checker .ds-sheet, body.stage-none .ds-sheet, body.stage-cream .ds-sh
           <div class="cw3-history" id="history"><h3>Past crafts</h3></div>
         </div>
         <p class="cw3-hint">Need some inspiration?</p>
-        <div class="cw3-tags" id="tags" role="group" aria-label="Details"><button type="button" class="cw3-tag" data-tag="size"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/></svg><span>Size</span></button><button type="button" class="cw3-tag" data-tag="color"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c4 4.5 6 7.6 6 10a6 6 0 0 1-12 0c0-2.4 2-5.5 6-10z"/></svg><span>Color</span></button><button type="button" class="cw3-tag" data-tag="mood"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg><span>Atmosphere</span></button><button type="button" class="cw3-tag" data-tag="density"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span>Density</span></button></div>
+        <div class="cw3-tags" id="tags" role="group" aria-label="Details"><button type="button" class="cw3-tag" data-tag="size" data-tip="How big it turns out: small, medium or large" aria-description="How big it turns out: small, medium or large"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/></svg><span>Size</span></button><button type="button" class="cw3-tag" data-tag="color" data-tip="Its main colour, picked from a colour wheel" aria-description="Its main colour, picked from a colour wheel"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c4 4.5 6 7.6 6 10a6 6 0 0 1-12 0c0-2.4 2-5.5 6-10z"/></svg><span>Color</span></button><button type="button" class="cw3-tag" data-tag="mood" data-tip="The feeling it gives off, e.g. cozy or spooky" aria-description="The feeling it gives off, e.g. cozy or spooky"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg><span>Atmosphere</span></button><button type="button" class="cw3-tag" data-tag="density" data-tip="How much detail it has: low, regular or detailed" aria-description="How much detail it has: low, regular or detailed"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span>Density</span></button></div>
         <div class="cw3-bottom">
           <div class="ds-frame cw3-prompt">
             <span class="ds-bracket tl"></span><span class="ds-bracket tr"></span><span class="ds-bracket bl"></span><span class="ds-bracket br"></span>
-            <span class="cw3-chosen" id="chosen"></span><input class="cw3-input" id="input" maxlength="80" placeholder="Describe your idea…" aria-label="Describe what you'd like to craft" />
+            <span class="cw3-chosen" id="chosen"></span><textarea class="cw3-input" id="input" rows="1" maxlength="300" placeholder="Describe your idea…" aria-label="Describe what you'd like to craft"></textarea>
             <span class="cw3-count" id="count">0/80</span>
             <button class="cw3-craft" id="craft" disabled aria-label="Craft it!" title="Craft it!">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16.5v-9M8 11l4-4 4 4"/></svg>
@@ -403,7 +422,6 @@ body.stage-checker .ds-sheet, body.stage-none .ds-sheet, body.stage-cream .ds-sh
 /* ========== 3. TEXTS ========== */
 const TEXT = {
   welcome: 'What would you like to craft today?',
-  empty: 'Crafting results appear here',
   inspire: 'If you need inspiration, pick a size, colour, atmosphere or density below.',
   placeholder: 'Describe your idea…',
   placeholderPick: 'Pick an option above',
@@ -412,7 +430,7 @@ const TEXT = {
   thinking: 'thinking it over',
   drawing: (n) => `drawing line ${n}`,
   result: (name) => `Here you go: ${name}! Want to hold it, or keep it in your inventory?`,
-  adjustAsk: 'Sure! What should I change? (12 coins)',
+  adjustAsk: 'What do you want to adjust? Tell me, or pick a tag below.',
   adjustPoor: 'You need 12 coins for that.',
   equipped: (name) => `Enjoy your ${name}! It's in your hands now.`,
   stored: (name) => `Your ${name} is in your inventory.`,
@@ -467,7 +485,9 @@ const FALLBACK = { main: ['c-wood'], name: 'Wooden crate', punch: 'holds whateve
 const $ = (id) => document.getElementById(id);
 // the bubble's tail (see .ds-tail): x 15–17 is the bubble's left border; it curls up and out
 const TAIL = '<svg class="ds-tail" viewBox="0 0 17 22" aria-hidden="true"><path class="fill" d="M17 5 V21 H16 C8 21 3 13 1 2 C5 6 10 7 16 6 H17 Z"/><path class="line" d="M16 21 C8 21 3 13 1 2 C5 6 10 7 16 6"/></svg>';
-const chat = $('chat'), input = $('input'), craft = $('craft'), count = $('count');
+const chat = $('chat'), input = $('input'), craft = $('craft'), count = $('count'), cw3 = document.querySelector('.cw3');
+// the inspiration tags: shown for a new idea and when adjusting, hidden once there is a result
+const showTags = (on) => document.querySelectorAll('.cw3-hint, .cw3-tags').forEach((el) => (el.hidden = !on));
 let phase = 'input';      // input → working → success → (adjusting → working → success) → done
 let coins = 120, speed = 1, current = null, options = [], sel = 0, timers = [], history = [];
 const later = (fn, ms) => timers.push(setTimeout(fn, ms * speed));
@@ -488,8 +508,15 @@ function setInput(enabled, placeholder) {
   if (enabled) input.focus();
   update();
 }
+// the field grows with the text, up to a quarter of the screen; then it scrolls
+function grow() {
+  input.style.height = 'auto';
+  input.style.height = `${Math.min(input.scrollHeight, innerHeight * 0.25)}px`;
+}
+addEventListener('resize', grow);
 function update() {
-  count.textContent = `${input.value.length}/80`;
+  count.textContent = `${input.value.length}/300`;
+  grow();
   const any = !!input.value.trim() || Object.keys(chosen).length > 0;
   craft.disabled = input.disabled || !any || phase === 'working';
   document.querySelectorAll('.cw3-tag').forEach((b) => (b.disabled = input.disabled));
@@ -508,9 +535,10 @@ function setCoins(n) {
 function submit() {
   const text = input.value.trim();
   if (craft.disabled) return;
-  $('empty')?.remove();
+  cw3.classList.remove('is-fresh');
   const adjusting = phase === 'adjusting';
-  const ch = { ...chosen };
+  // (adjusting keeps the details of the result and adds or replaces the new ones)
+  const ch = adjusting ? { ...(current.ch ?? {}), ...chosen } : { ...chosen };
   const prompt = [text, ...Object.entries(ch).map(([k, v]) => chipText[k](v))].filter(Boolean).join(', ');
   msg('right', 'Villager', [`${esc(text || '…')}${Object.keys(ch).length ? `<span class="cw3-chosen">${chipsHtml(ch, false)}</span>` : ''}`]);
   input.value = '';
@@ -534,7 +562,7 @@ function submit() {
   );
   later(() => {
     el.remove();
-    current = { sprite, base, prompt };
+    current = { sprite, base, prompt, ch };
     history.unshift({ name: sprite.name, prompt });
     renderHistory();
     msg('left', 'Mitchy', [
@@ -542,6 +570,7 @@ function submit() {
       esc(TEXT.result(sprite.name)),
     ]);
     phase = 'success';
+    showTags(false);
     showOptions([
       { label: TEXT.options.equip, go: () => finish(TEXT.equipped(sprite.name)) },
       { label: TEXT.options.store, go: () => finish(TEXT.stored(sprite.name)) },
@@ -591,7 +620,14 @@ function choose(i) {
 function adjust() {
   if (coins < ADJUST_PRICE) return msg('left', 'Mitchy', [esc(TEXT.adjustPoor)]);
   setCoins(coins - ADJUST_PRICE);
-  msg('left', 'Mitchy', [esc(TEXT.adjustAsk)]);
+  // the result again, its details under it, and the question; the tags come back
+  const c = current.sprite, used = current.ch ?? {};
+  msg('left', 'Mitchy', [
+    `<div class="cw3-card is-small"><div class="ds-frame cw3-art"><pre style="font-size:${Math.round(c.fs * 0.7)}px">${c.art.map(artLine).join('\n')}</pre></div><div class="cw3-card-name">${esc(c.name)}</div>${Object.keys(used).length ? `<span class="cw3-chosen">${chipsHtml(used, false)}</span>` : ''}</div>`,
+    esc(TEXT.adjustAsk),
+  ]);
+  showTags(true);
+  chat.scrollTop = chat.scrollHeight;
   phase = 'adjusting';
   setInput(true, TEXT.placeholderAdjust);
 }
@@ -615,7 +651,8 @@ function reset() {
   coins = 120;
   $('coins').querySelector('span').textContent = coins;
   msg('left', 'Mitchy', [esc(TEXT.welcome)]);
-  chat.insertAdjacentHTML('beforeend', `<p class="cw3-empty" id="empty">${esc(TEXT.empty)}</p>`);
+  cw3.classList.add('is-fresh');
+  showTags(true);
   input.value = '';
   chosen = {};
   renderChosen();
@@ -774,7 +811,7 @@ $('tags').addEventListener('click', (e) => {
 });
 
 input.addEventListener('input', update);
-input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+input.addEventListener('keydown', (e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), submit()));
 craft.addEventListener('click', submit);
 document.addEventListener('keydown', (e) => {
   if (!options.length || document.activeElement === input) return;

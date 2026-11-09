@@ -199,10 +199,13 @@ pre { font-family: inherit; }
 .cw3-chip button { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ds-text-soft); font-size: 13px; line-height: 1; cursor: pointer; }
 .cw3-chip button:hover { background: var(--ds-surface); color: var(--ds-text); }
 .ds-bubble .cw3-chosen { margin-top: 8px; justify-content: flex-end; }
-/* the modal: over the panel, a cream card */
-.cw3-modal { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; padding: 20px; border-radius: inherit; background: rgba(255, 248, 232, 0.72); backdrop-filter: blur(3px); }
+/* the modal: a popover above the tag that opened it (no dim, no blur) */
+.cw3-modal { position: absolute; z-index: 10; left: 0; bottom: 0; width: min(520px, calc(100% - 24px)); }
 .cw3-modal[hidden] { display: none; }
-.cw3-modal-card { width: min(560px, 100%); max-height: 100%; overflow-y: auto; padding: 20px 22px 18px; border: 2px solid var(--ds-line-strong); border-radius: 20px; background: var(--ds-panel); box-shadow: 0 14px 40px rgba(170, 120, 40, 0.18); animation: msg-in 0.18s ease; }
+.cw3-modal-card { position: relative; max-height: min(70vh, 520px); overflow-y: auto; padding: 18px 20px 16px; border: 2px solid var(--ds-line-strong); border-radius: 20px; background: var(--ds-panel); box-shadow: 0 12px 34px rgba(170, 120, 40, 0.2); animation: pop-up 0.16s ease; }
+/* (the little arrow down to the tag) */
+.cw3-modal::after { content: ""; position: absolute; left: var(--arrow-x, 40px); bottom: -8px; width: 14px; height: 14px; background: var(--ds-panel); border: 0 solid var(--ds-line-strong); border-right-width: 2px; border-bottom-width: 2px; transform: translateX(-50%) rotate(45deg); }
+@keyframes pop-up { 0% { opacity: 0; transform: translateY(6px); } }
 .cw3-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .cw3-modal-head h3 { font-size: 17px; font-weight: 600; color: var(--ds-text); }
 .cw3-modal-head .ds-iconbtn { width: 36px; height: 36px; }
@@ -654,8 +657,24 @@ function openTag(k) {
   $('modal-sub').textContent = TAGS[k].sub;
   renderModal();
   $('modal').hidden = false;
+  placeModal();
   $('modal-x').focus();
 }
+// above the tag that opened it, kept inside the panel; the arrow points at the tag
+function placeModal() {
+  const m = $('modal'), box = m.offsetParent.getBoundingClientRect();
+  const btn = document.querySelector(`.cw3-tag[data-tag="${editing}"]`).getBoundingClientRect();
+  const w = m.offsetWidth;
+  const left = Math.max(12, Math.min(btn.left - box.left, box.width - w - 12));
+  m.style.left = `${left}px`;
+  m.style.bottom = `${box.bottom - btn.top + 12}px`;
+  m.style.setProperty('--arrow-x', `${btn.left - box.left - left + btn.width / 2}px`);
+}
+addEventListener('resize', () => editing && placeModal());
+document.addEventListener('mousedown', (e) => {
+  if (!editing || $('modal').contains(e.target) || e.target.closest('.cw3-tag')) return;
+  closeModal();
+});
 function renderModal() {
   const body = $('modal-body'), boat = SPRITES[0].art;
   if (editing === 'size')
@@ -694,7 +713,6 @@ $('modal-body').addEventListener('click', (e) => {
 $('modal-body').addEventListener('dblclick', (e) => e.target.closest('[data-v]') && $('modal-ok').click());
 const closeModal = () => (($('modal').hidden = true), (editing = null), input.disabled || input.focus());
 $('modal-x').onclick = closeModal;
-$('modal').addEventListener('click', (e) => e.target.id === 'modal' && closeModal());
 $('modal-ok').onclick = () => (draft != null && (chosen[editing] = draft), renderChosen(), closeModal());
 $('modal-clear').onclick = () => (delete chosen[editing], renderChosen(), closeModal());
 document.addEventListener('keydown', (e) => e.key === 'Escape' && !$('modal').hidden && closeModal());

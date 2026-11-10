@@ -2,10 +2,10 @@
 // /api/journal and shown at once. Signed in with the dashboard's password
 // (the same session as /feedback); on the site, the unlock cookie does it.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_MILESTONES, DEFAULT_OVERVIEW, OVERVIEW_V2, type Coll, type FileMeta, type JournalDocs, type OverviewSection } from './types';
+import { DEFAULT_MILESTONES, DEFAULT_OVERVIEW, OVERVIEW_V2, type Coll, type FileMeta, type JournalDocs, type OverviewSection, type ZoteroItem, type ZoteroState } from './types';
 
 const PASS_KEY = 'asciia-feedback-pass'; // shared with /feedback
-const EMPTY: JournalDocs = { entries: {}, milestones: {}, deadlines: {}, pages: {}, overview: {}, settings: {}, days: {}, weeks: {}, files: {} };
+const EMPTY: JournalDocs = { entries: {}, milestones: {}, deadlines: {}, pages: {}, overview: {}, settings: {}, days: {}, weeks: {}, files: {}, zotero: {} };
 
 export interface Put {
   coll: Coll;
@@ -27,6 +27,37 @@ export interface JournalStore {
   upload: (f: File) => Promise<FileMeta>;
   removeFile: (id: string) => Promise<void>;
   fileUrl: (id: string) => string;
+  zotero: ZoteroApi;
+}
+
+// the Zotero sources (functions/api/zotero.ts); the API key stays on the server
+export interface ZoteroDraft {
+  itemType: string;
+  title?: string;
+  creators?: { creatorType?: string; firstName?: string; lastName?: string; name?: string }[];
+  date?: string;
+  [field: string]: unknown;
+}
+export interface ZoteroSyncResult {
+  added: number;
+  changed: number;
+  removed: number;
+  count: number;
+}
+export interface ZoteroApi {
+  state: ZoteroState | null;
+  busy: boolean;
+  sync: (full?: boolean) => Promise<ZoteroSyncResult>;
+  preview: (input: string) => Promise<{ item: ZoteroDraft; existing?: ZoteroItem }>;
+  create: (item: ZoteroDraft, collection?: string) => Promise<{ item: ZoteroItem; existing?: boolean }>;
+}
+const ZOTERO_AUTO_MS = 6 * 60 * 60 * 1000; // a sync on opening, when the last is older
+
+// the stored buckets ({items}) as one map by key
+function zoteroItems(raw: Record<string, unknown>): Record<string, ZoteroItem> {
+  const out: Record<string, ZoteroItem> = {};
+  for (const b of Object.values(raw)) Object.assign(out, (b as { items?: Record<string, ZoteroItem> }).items ?? {});
+  return out;
 }
 
 export function useJournal(): JournalStore {
@@ -48,6 +79,7 @@ export function useJournal(): JournalStore {
       }
       if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
       const d = { ...EMPTY, ...((await r.json()) as Partial<JournalDocs>) };
+      d.zotero = zoteroItems(d.zotero ?? {});
       // first visit: the Overview's sections and the example milestones, all editable
       if (!d.settings.seeded) {
         const put: Put[] = [
@@ -144,7 +176,45 @@ export function useJournal(): JournalStore {
   // files are fetched with the password (an <img> cannot send it): see FileLink
   const fileUrl = (id: string) => `/api/journal/files/${encodeURIComponent(id)}`;
 
-  return { docs, state, error, saving: pending > 0, signIn, commit, history, upload, removeFile, fileUrl };
+  // ---- Zotero ----
+  const [zBusy, setZBusy] = useState(false);
+  const post = async <T,>(path: string, body: unknown): Promise<T> => {
+    const r = await fetch(`/api/journal/zotero/${path}`, { method: 'POST', headers: headers(true), body: JSON.stringify(body) });
+    const out = (await r.json().catch(() => ({}))) as T & { error?: string };
+    if (!r.ok) throw new Error(out.error ?? String(r.status));
+    return out;
+  };
+  const zSync = async (full = false) => {
+    setZBusy(true);
+    try {
+      const res = await post<ZoteroSyncResult & { items: Record<string, ZoteroItem>; state: ZoteroState }>('sync', { full });
+      setDocs((d) => ({ ...d, zotero: res.items, settings: { ...d.settings, zoteroSync: res.state } }));
+      return res;
+    } catch (e) {
+      // the server keeps the error with the time, so opening again waits
+      setDocs((d) => ({ ...d, settings: { ...d.settings, zoteroSync: { ...((d.settings.zoteroSync as ZoteroState | undefined) ?? { version: 0, count: 0 }), at: Date.now(), error: String((e as Error).message) } } }));
+      throw e;
+    } finally {
+      setZBusy(false);
+    }
+  };
+  const zCreate = async (item: ZoteroDraft, collection?: string) => {
+    const res = await post<{ item: ZoteroItem; existing?: boolean }>('items', { item, collection });
+    setDocs((d) => ({ ...d, zotero: { ...d.zotero, [res.item.key]: res.item } }));
+    return res;
+  };
+  const zState = (docs.settings.zoteroSync as ZoteroState | undefined) ?? null;
+  // on opening: a quiet sync, when the last one is older than 6 hours
+  const auto = useRef(false);
+  useEffect(() => {
+    if (state !== 'ready' || auto.current) return;
+    auto.current = true;
+    if (!zState || Date.now() - zState.at > ZOTERO_AUTO_MS) void zSync().catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+  const zotero: ZoteroApi = { state: zState, busy: zBusy, sync: zSync, preview: (input) => post('preview', { input }), create: zCreate };
+
+  return { docs, state, error, saving: pending > 0, signIn, commit, history, upload, removeFile, fileUrl, zotero };
 }
 
 // a file's content as a blob URL (sent with the password)

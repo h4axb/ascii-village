@@ -6,10 +6,11 @@
 import { useEffect, useRef } from 'react';
 import { Markdown } from './markdown';
 import type { JournalStore } from './store';
-import { ENTRY_STATUS, ENTRY_TYPES, PALETTE, blockKinds, kindOf, blockTitle, fmtMinutes, shortDate, taskMinutes, tasksTotal, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
+import { ENTRY_STATUS, ENTRY_TYPES, PALETTE, blockKinds, kindOf, blockTitle, fmtMinutes, shortDate, taskMinutes, tasksTotal, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Source, type Task, type Week } from './types';
 import { sectionTitle } from './EntryEditor';
 import { CheckinStrip, weekday, weekLabel } from './EntryForm';
 import { FileThumb, Icon, type IconName } from './ui';
+import { ZoteroSource } from './zotero';
 
 export interface EditAt {
   task?: string;
@@ -142,7 +143,7 @@ export function BlockCard({ b, kinds }: { b: Block; kinds: BlockKind[] }) {
   );
 }
 
-function Refs({ store, files, links }: { store: JournalStore; files: string[]; links: { label: string; url: string }[] }) {
+function Refs({ store, files, links }: { store: JournalStore; files: string[]; links: Source[] }) {
   if (!files.length && !links.length) return null;
   return (
     <div className="jr-vrefs">
@@ -151,12 +152,16 @@ function Refs({ store, files, links }: { store: JournalStore; files: string[]; l
           {files.map((id) => (store.docs.files[id] ? <FileThumb key={id} meta={store.docs.files[id]} /> : null))}
         </div>
       )}
-      {links.map((l, i) => (
-        <a key={i} href={l.url} target="_blank" rel="noreferrer noopener" className="jr-vlink">
-          <Icon name="link" />
-          {l.label || l.url}
-        </a>
-      ))}
+      {links.map((l, i) =>
+        l.zotero ? (
+          <ZoteroSource key={i} s={l} zotero={store.docs.zotero} />
+        ) : (
+          <a key={i} href={l.url} target="_blank" rel="noreferrer noopener" className="jr-vlink">
+            <Icon name="link" />
+            {l.label || l.url}
+          </a>
+        ),
+      )}
     </div>
   );
 }

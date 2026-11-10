@@ -11,6 +11,7 @@ import { allTopics, sectionTitle } from './EntryEditor';
 import { taskTime } from './EntryForm';
 import { EntryCard, ImportDialog, PageHead, TaskCard } from './pages';
 import { Icon, IconBtn } from './ui';
+import { MatchDialog, SyncButton } from './zotero';
 
 const PAGE = 10;
 
@@ -39,6 +40,9 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
   const [n, setN] = useState(0); // the page of the table
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState(false);
+  const [matching, setMatching] = useState(false);
+  // the Zotero sync: on the Project Log and on Research & Findings
+  const zoteroHere = page === 'log' || page === 'research';
   const [importing, setImporting] = useState<{ name: string; data: LogImport } | null>(null);
   const isSection = SECTIONS.some((s) => s.id === page);
   const kinds = blockKinds(store.docs.settings);
@@ -77,7 +81,7 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
   const open = (i: LogItem) => openEntry(i.e.id, i.t?.id);
   const exportMd = () => {
     setMenu(false);
-    const md = writeLog(isSection ? [...new Set(sectionItems(all, page).map((i) => i.e))] : all, isSection ? [] : Object.values(store.docs.deadlines), (id) => sectionTitle(store, id), blockKinds(store.docs.settings));
+    const md = writeLog(isSection ? [...new Set(sectionItems(all, page).map((i) => i.e))] : all, isSection ? [] : Object.values(store.docs.deadlines), (id) => sectionTitle(store, id), blockKinds(store.docs.settings), store.docs.zotero);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
     a.download = `${page === 'log' ? 'project-log' : page}.md`;
@@ -139,6 +143,7 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
                   <Icon name="grid" />
                 </button>
               </span>
+              {zoteroHere && <SyncButton store={store} />}
               <button type="button" className="is-primary" onClick={() => newEntry(isSection ? page : undefined)}>
                 <Icon name="plus" /> New Entry
               </button>
@@ -164,6 +169,33 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
                     <button type="button" className="jr-menu-item" role="menuitem" onClick={exportMd} disabled={!list.length && page !== 'log'}>
                       Export Markdown
                     </button>
+                    {zoteroHere && (
+                      <>
+                        <button
+                          type="button"
+                          className="jr-menu-item"
+                          role="menuitem"
+                          disabled={store.zotero.busy}
+                          onClick={() => {
+                            setMenu(false);
+                            void store.zotero.sync(true).catch(() => undefined);
+                          }}
+                        >
+                          Reload all sources from Zotero
+                        </button>
+                        <button
+                          type="button"
+                          className="jr-menu-item"
+                          role="menuitem"
+                          onClick={() => {
+                            setMenu(false);
+                            setMatching(true);
+                          }}
+                        >
+                          Match existing links with Zotero …
+                        </button>
+                      </>
+                    )}
                   </span>
                 )}
               </span>
@@ -355,6 +387,7 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
       </div>
 
       {importing && <ImportDialog store={store} name={importing.name} data={importing.data} onClose={() => setImporting(null)} />}
+      {matching && <MatchDialog store={store} onClose={() => setMatching(false)} />}
     </div>
   );
 }

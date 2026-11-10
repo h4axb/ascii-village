@@ -26,6 +26,10 @@ interface Env extends FeedbackEnv {
   LLM_MAX_TOKENS?: string;
   ALLOWED_ORIGINS?: string;
   LLM_OPEN_DAILY_LIMIT?: string;
+  // the journal's sources (functions/api/zotero.ts): the key is a secret
+  ZOTERO_API_KEY?: string;
+  ZOTERO_LIBRARY_TYPE?: string;
+  ZOTERO_LIBRARY_ID?: string;
 }
 
 const TITLE = 'Asciia Bay';

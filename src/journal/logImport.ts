@@ -12,7 +12,8 @@
 //   (everything up to the next ### or ## heading)       → the entry's Markdown
 //
 // Only proposals: the journal shows them before anything is stored.
-import { BLOCK_KINDS, ENTRY_STATUS, blockKindOf, blockTitle, fmtMinutes, newId, taskMinutes, type Deadline, type DeadlineChange, type Entry, type EntryStatus } from './types';
+import { BLOCK_KINDS, ENTRY_STATUS, blockKindOf, blockTitle, fmtMinutes, newId, taskMinutes, type Deadline, type DeadlineChange, type Entry, type EntryStatus, type ZoteroItem } from './types';
+import { sourceMd } from './zotero';
 
 const yearOf = (y: string | undefined, fallback: number) => (y ? (y.length === 2 ? 2000 + Number(y) : Number(y)) : fallback);
 const iso = (d: string, m: string, y: number) => `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
@@ -120,7 +121,8 @@ function mergeMoves(list: (Deadline & { note?: string })[]): Deadline[] {
 const short = (d: string) => (d ? `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(2, 4)}` : '');
 const shortSpan = (a: string, b?: string | null) => (b && b !== a ? `${a.slice(8, 10)}.${a.slice(5, 7)}.-${short(b)}` : short(a));
 
-export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: (id: string) => string, kinds?: { id: string; label: string }[]): string {
+// zotero: the library's copies, so a Zotero source is written with its current data
+export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: (id: string) => string, kinds?: { id: string; label: string }[], zotero: Record<string, ZoteroItem> = {}): string {
   const out: string[] = [];
   const open = deadlines.filter((d) => !d.done).sort((a, b) => a.date.localeCompare(b.date));
   const done = deadlines.filter((d) => d.done).sort((a, b) => b.date.localeCompare(a.date));
@@ -140,7 +142,7 @@ export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: 
       if (e.blocks.length > 1 || b.label !== 'Notes') out.push('', `**${b.label}**`);
       out.push(b.md);
     }
-    for (const s of e.sources) out.push(`- [${s.label || s.url}](${s.url})`);
+    for (const s of e.sources) out.push(sourceMd(s, zotero));
     // each task with its time, sections, tags and documentation
     for (const t of e.tasks ?? []) {
       const m = taskMinutes(t);
@@ -152,7 +154,7 @@ export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: 
         const k = (kinds ?? BLOCK_KINDS).find((x) => x.id === blockKindOf(b))?.label ?? 'Notes';
         out.push('', `*${k}${blockTitle(b) ? `: ${blockTitle(b)}` : ''}*`, b.md);
       }
-      for (const s of t.sources ?? []) out.push(`- [${s.label || s.url}](${s.url})`);
+      for (const s of t.sources ?? []) out.push(sourceMd(s, zotero));
     }
     out.push('', '');
   }

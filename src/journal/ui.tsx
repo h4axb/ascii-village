@@ -5,8 +5,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Markdown } from './markdown';
 import { fileBlobUrl, type JournalStore } from './store';
 import type { FileMeta, Source, Visibility } from './types';
+import { itemUrl, ZoteroPicker, ZoteroSource } from './zotero';
 
-export type IconName = 'user' | 'edit' | 'up' | 'down' | 'trash' | 'eye' | 'eyeoff' | 'plus' | 'x' | 'menu' | 'lock' | 'globe' | 'clip' | 'link' | 'history' | 'minus' | 'check' | 'calendar' | 'target' | 'hourglass' | 'flag' | 'layers' | 'sprout' | 'doc' | 'flask' | 'branch' | 'scale' | 'chat' | 'list' | 'grid' | 'filter' | 'more' | 'expand' | 'search' | 'note' | 'left' | 'right';
+export type IconName = 'user' | 'edit' | 'up' | 'down' | 'trash' | 'eye' | 'eyeoff' | 'plus' | 'x' | 'menu' | 'lock' | 'globe' | 'clip' | 'link' | 'history' | 'minus' | 'check' | 'calendar' | 'target' | 'hourglass' | 'flag' | 'layers' | 'sprout' | 'doc' | 'flask' | 'branch' | 'scale' | 'chat' | 'list' | 'grid' | 'filter' | 'more' | 'expand' | 'search' | 'note' | 'left' | 'right' | 'refresh' | 'book';
 export function Icon({ name }: { name: IconName }) {
   const d: Record<string, string> = {
     edit: 'M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4',
@@ -45,6 +46,8 @@ export function Icon({ name }: { name: IconName }) {
     expand: 'M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7',
     search: 'M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4',
     note: 'M5 4h14v16H5zM9 9h6M9 13h6',
+    refresh: 'M20 11a8 8 0 10-2.3 5.7M20 4v7h-7',
+    book: 'M5 5a2 2 0 012-2h11v15H7a2 2 0 00-2 2zM5 20a2 2 0 002 1h11v-3M9 7h6',
     sprout: 'M12 21v-8M12 13c0-4 3-7 8-7 0 4-3 7-8 7zM12 13c0-3-2-5-6-5 0 3 2 5 6 5z',
   };
   return (
@@ -276,9 +279,18 @@ export function FileThumb({ meta, onRemove }: { meta: FileMeta; onRemove?: () =>
   );
 }
 
-// attachments: uploaded files and links, both editable
+// attachments: uploaded files, links and sources from Zotero, all editable
 export function Attachments({ store, files, links, onChange }: { store: JournalStore; files: string[]; links: Source[]; onChange: (files: string[], links: Source[]) => void }) {
   const [busy, setBusy] = useState<string | null>(null);
+  // the Zotero window: to add a source (index -1) or to link an older link (its index)
+  const [pick, setPick] = useState<{ index: number; q: string } | null>(null);
+  const picked = (key: string) => {
+    const it = store.docs.zotero[key];
+    const src: Source = { label: it?.title ?? '', url: it ? itemUrl(it) : '', zotero: key };
+    if (pick && pick.index >= 0) onChange(files, links.map((l, i) => (i === pick.index ? { ...l, zotero: key, label: l.label || src.label, url: l.url || src.url } : l)));
+    else if (!links.some((l) => l.zotero === key)) onChange(files, [...links, src]);
+    setPick(null);
+  };
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
   return (
@@ -305,18 +317,28 @@ export function Attachments({ store, files, links, onChange }: { store: JournalS
       )}
       {links.length > 0 && (
         <ul className="jr-links">
-          {links.map((l, i) => (
-            <li key={i}>
-              <Icon name="link" />
-              <a href={l.url} target="_blank" rel="noreferrer">
-                {l.label || l.url}
-              </a>
-              <IconBtn icon="trash" label="Remove link" danger onClick={() => onChange(files, links.filter((_, j) => j !== i))} />
-            </li>
-          ))}
+          {links.map((l, i) =>
+            l.zotero ? (
+              <li key={i}>
+                <ZoteroSource s={l} zotero={store.docs.zotero} actions={<IconBtn icon="trash" label="Remove source" danger onClick={() => onChange(files, links.filter((_, j) => j !== i))} />} />
+              </li>
+            ) : (
+              <li key={i}>
+                <Icon name="link" />
+                <a href={l.url} target="_blank" rel="noreferrer">
+                  {l.label || l.url}
+                </a>
+                <IconBtn icon="book" label="Link to a Zotero source" onClick={() => setPick({ index: i, q: l.label })} />
+                <IconBtn icon="trash" label="Remove link" danger onClick={() => onChange(files, links.filter((_, j) => j !== i))} />
+              </li>
+            ),
+          )}
         </ul>
       )}
       <div className="jr-attach-add">
+        <button type="button" className="jr-btn" onClick={() => setPick({ index: -1, q: '' })}>
+          <Icon name="book" /> Zotero source
+        </button>
         <label className="jr-btn">
           <Icon name="clip" /> Upload file
           <input
@@ -357,6 +379,7 @@ export function Attachments({ store, files, links, onChange }: { store: JournalS
         </span>
       </div>
       {busy && <p className="jr-muted" role="status">{busy}</p>}
+      {pick && <ZoteroPicker store={store} initial={pick.q} onPick={picked} onClose={() => setPick(null)} />}
     </div>
   );
 }

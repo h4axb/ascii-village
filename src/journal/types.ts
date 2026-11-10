@@ -41,9 +41,43 @@ export interface Block {
 }
 export const BLOCK_PRESETS = ['Context', 'Method / Approach', 'Decision / Action', 'Rationale', 'Outcome', 'Reflection', 'Notes'];
 
+// a link of an entry or task; with `zotero` it is a source of the Zotero
+// library (its item key): title, authors and reference are then read from the
+// library's copy (docs.zotero), so they follow every change made in Zotero.
+// label and url stay as they were, shown if the item is gone from Zotero.
 export interface Source {
   label: string;
   url: string;
+  zotero?: string;
+}
+
+// the journal's copy of a Zotero item (functions/api/zotero.ts, ZItem)
+export interface ZoteroItem {
+  key: string;
+  version: number;
+  itemType: string;
+  title: string;
+  creators: string[];
+  year: string;
+  date: string;
+  doi: string;
+  isbn: string;
+  url: string;
+  publication: string;
+  bib: string;
+  tags: string[];
+  collections: string[];
+  modified: string;
+}
+// settings/zoteroSync: the last sync (written by the server)
+export interface ZoteroState {
+  version: number;
+  at: number;
+  count: number;
+  write?: boolean;
+  library?: string;
+  collections?: { key: string; name: string; parent: string | null }[];
+  error?: string;
 }
 
 // a task of a day's entry: the smallest unit documented on its own. It has its
@@ -193,8 +227,9 @@ export interface JournalDocs {
   days: Record<string, Day>;
   weeks: Record<string, Week>;
   files: Record<string, FileMeta>;
+  zotero: Record<string, ZoteroItem>; // by item key (stored in buckets, see store.ts)
 }
-export type Coll = Exclude<keyof JournalDocs, 'files'>;
+export type Coll = Exclude<keyof JournalDocs, 'files' | 'zotero'>;
 
 // the pages, in the order of /journal's navigation; "log" lists every entry
 export const PAGES: { id: string; path: string; title: string; description: string; section: boolean }[] = [

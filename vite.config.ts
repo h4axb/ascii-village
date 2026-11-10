@@ -278,6 +278,11 @@ function workerApiDevPlugin(): Plugin {
       STUDY_FAKE_AI: e.STUDY_FAKE_AI,
       LLM_ALLOWED_MODELS: e.LLM_ALLOWED_MODELS,
       LLM_OPEN_DAILY_LIMIT: e.LLM_OPEN_DAILY_LIMIT,
+      // the journal's Zotero sources; ZOTERO_FAKE=1: a made-up library (dev only)
+      ZOTERO_API_KEY: e.ZOTERO_API_KEY,
+      ZOTERO_LIBRARY_TYPE: e.ZOTERO_LIBRARY_TYPE,
+      ZOTERO_LIBRARY_ID: e.ZOTERO_LIBRARY_ID,
+      ZOTERO_FAKE: e.ZOTERO_FAKE,
     };
     return env;
   }

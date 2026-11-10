@@ -1183,11 +1183,12 @@ h3.jr-inline {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  flex: 1;
+  flex: 1 1 280px;
   min-width: 0;
 }
 .jr-attach-link input {
-  flex: 1 1 140px;
+  flex: 1 1 120px;
+  min-width: 0;
 }
 
 /* login */
@@ -3826,4 +3827,309 @@ h3.jr-inline {
   text-overflow: ellipsis;
   white-space: nowrap;
   margin-top: -2px;
+}
+
+/* ---------- Zotero sources (zotero.tsx) ---------- */
+.jr-zsrc {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+  flex: 1;
+  font-size: 13.5px;
+}
+.jr-zsrc > .jr-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--jr-accent);
+}
+.jr-zsrc-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.jr-zsrc-title {
+  overflow-wrap: anywhere;
+}
+.jr-zsrc-title b {
+  font-weight: 600;
+}
+.jr-zsrc-title a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+.jr-zsrc-bib {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--jr-muted);
+  overflow-wrap: anywhere;
+}
+.jr-zsrc.is-missing > .jr-icon {
+  color: var(--jr-muted);
+}
+.jr-zsrc.is-missing .jr-zsrc-bib:last-child {
+  color: var(--jr-warn);
+}
+.jr-zsrc-actions {
+  flex: none;
+  display: inline-flex;
+}
+.jr-links li > .jr-zsrc {
+  width: 100%;
+}
+
+/* the sync button in a page head */
+.jr-zsync {
+  position: relative;
+  display: inline-flex;
+}
+.jr-root .jr-zsync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--jr-line);
+  border-radius: 999px;
+  background: var(--jr-paper);
+  color: var(--jr-ink);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.jr-root .jr-zsync-btn:hover:not(:disabled) {
+  background: var(--jr-soft);
+}
+.jr-root .jr-zsync-btn.is-error {
+  border-color: #e7b9a3;
+  color: var(--jr-warn);
+}
+.jr-zsync-btn.is-busy .jr-icon {
+  animation: jr-zspin 0.9s linear infinite;
+}
+@keyframes jr-zspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jr-zsync-btn.is-busy .jr-icon {
+    animation: none;
+  }
+}
+.jr-zsync-msg {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  white-space: nowrap;
+  max-width: min(320px, 80vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--jr-ink);
+  color: #fff;
+  font-size: 12.5px;
+}
+
+/* the window: pick from the library, or add a new source */
+.jr-zpick {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.jr-zpick-tabs {
+  justify-self: start;
+}
+.jr-modal .jr-zpick-tabs button {
+  border: 0;
+  border-radius: 0;
+}
+.jr-modal .jr-zpick-tabs button.is-on {
+  background: var(--jr-soft);
+  color: var(--jr-ink);
+}
+.jr-zpick-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.jr-zpick-bar .jr-search {
+  flex: 1;
+  min-width: 0;
+}
+.jr-zpick-bar .jr-search input {
+  width: 100%;
+  min-width: 0;
+}
+.jr-zpick-count {
+  margin: 0;
+  font-size: 12.5px;
+}
+.jr-zpick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+  border: 1px solid var(--jr-line);
+  border-radius: 8px;
+  padding: 4px;
+}
+.jr-modal .jr-zpick-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: transparent;
+  min-height: 44px;
+  white-space: normal;
+  min-width: 0;
+}
+.jr-zpick-title {
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+.jr-zpick-title b {
+  font-weight: 600;
+}
+.jr-zpick-meta {
+  font-size: 12px;
+  color: var(--jr-muted);
+  overflow-wrap: anywhere;
+}
+.jr-zpick-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--jr-soft);
+  font-size: 13.5px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.jr-zpick-note.is-error {
+  background: var(--jr-accent-soft);
+  color: var(--jr-warn);
+}
+.jr-znew {
+  display: grid;
+  gap: 12px;
+}
+.jr-znew-look {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.jr-znew-look input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.jr-znew-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.jr-znew-form label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--jr-muted);
+}
+.jr-znew-form label input,
+.jr-znew-form label select,
+.jr-znew-form label textarea {
+  width: 100%;
+  min-width: 0;
+  color: var(--jr-ink);
+}
+.jr-znew-form .is-wide {
+  grid-column: 1 / -1;
+}
+.jr-znew-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 560px) {
+  .jr-root .jr-zsync-btn {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+  .jr-zsync-btn span {
+    display: none;
+  }
+  .jr-znew-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .jr-zsync-msg {
+    right: auto;
+    left: 0;
+  }
+}
+
+/* matching older links */
+.jr-zmatch {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.jr-zmatch label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid var(--jr-line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.jr-zmatch input {
+  margin-top: 3px;
+  flex: none;
+}
+.jr-zmatch-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13.5px;
+}
+.jr-zmatch-where {
+  font-size: 12px;
+  color: var(--jr-muted);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.jr-zmatch-by {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--jr-soft);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.jr-zmatch-by.is-title {
+  background: var(--jr-accent-soft);
+  color: var(--jr-warn);
+}
+.jr-zmatch-old {
+  color: var(--jr-muted);
+  text-decoration: line-through;
+  overflow-wrap: anywhere;
+}
+.jr-zmatch-new {
+  overflow-wrap: anywhere;
 }

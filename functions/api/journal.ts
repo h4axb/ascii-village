@@ -12,12 +12,15 @@
 //   POST   /api/journal/files              upload {name, type, data (base64)} → {id, name, type, size}
 //   GET    /api/journal/files/<id>         the file itself
 //   DELETE /api/journal/files/<id>         remove it
+//   POST   /api/journal/zotero/…           the sources from Zotero (functions/api/zotero.ts)
 //
 // Every replaced or removed document is kept in journal_history first, so an
 // edit can always be looked up and restored.
 import { dbOf, isAdmin, json, type D1Database, type SessionEnv } from './session';
+import { handleZotero, type ZoteroEnv } from './zotero';
 
-export const JOURNAL_COLLS = ['entries', 'milestones', 'deadlines', 'pages', 'overview', 'settings', 'days', 'weeks', 'files'] as const;
+// zotero: the copies of the Zotero library's items, written by a sync only
+export const JOURNAL_COLLS = ['entries', 'milestones', 'deadlines', 'pages', 'overview', 'settings', 'days', 'weeks', 'files', 'zotero'] as const;
 type Coll = (typeof JOURNAL_COLLS)[number];
 const isColl = (c: string): c is Coll => (JOURNAL_COLLS as readonly string[]).includes(c);
 
@@ -65,7 +68,7 @@ async function delDoc(db: D1Database, coll: Coll, id: string, at: number) {
   await db.prepare('DELETE FROM journal WHERE coll = ? AND id = ?').bind(coll, id).run();
 }
 
-export async function handleJournal(request: Request, env: SessionEnv): Promise<Response> {
+export async function handleJournal(request: Request, env: SessionEnv & ZoteroEnv): Promise<Response> {
   if (!isAdmin(request, env)) return json(401, { error: 'unauthorized' });
   const db = dbOf(env);
   if (!db) return json(503, { error: 'no database' });
@@ -84,6 +87,8 @@ export async function handleJournal(request: Request, env: SessionEnv): Promise<
     const { results } = await db.prepare('SELECT at, data FROM journal_history WHERE coll = ? AND id = ? ORDER BY at DESC').bind(parts[1], parts[2]).all<{ at: number; data: string }>();
     return json(200, results.map((r) => ({ at: r.at, data: JSON.parse(r.data) })));
   }
+
+  if (parts[0] === 'zotero') return handleZotero(request, env, db, parts.slice(1), now);
 
   if (parts[0] === 'files') {
     if (request.method === 'POST' && parts.length === 1) {
@@ -129,15 +134,15 @@ export async function handleJournal(request: Request, env: SessionEnv): Promise<
   if (parts[0] === 'batch' && request.method === 'POST') {
     const body = (await request.json().catch(() => null)) as { put?: { coll: string; id: string; data: unknown }[]; del?: { coll: string; id: string }[] } | null;
     for (const p of body?.put ?? []) {
-      if (!isColl(p.coll) || p.coll === 'files') return json(400, { error: `unknown collection: ${p.coll}` });
+      if (!isColl(p.coll) || p.coll === 'files' || p.coll === 'zotero') return json(400, { error: `unknown collection: ${p.coll}` });
       const err = await putDoc(db, p.coll, p.id, p.data, now);
       if (err) return json(400, { error: err });
     }
-    for (const d of body?.del ?? []) if (isColl(d.coll) && d.coll !== 'files' && validId(d.id)) await delDoc(db, d.coll, d.id, now);
+    for (const d of body?.del ?? []) if (isColl(d.coll) && d.coll !== 'files' && d.coll !== 'zotero' && validId(d.id)) await delDoc(db, d.coll, d.id, now);
     return json(200, { ok: true });
   }
 
-  if (parts.length === 2 && isColl(parts[0]) && parts[0] !== 'files') {
+  if (parts.length === 2 && isColl(parts[0]) && parts[0] !== 'files' && parts[0] !== 'zotero') {
     const [coll, id] = parts as [Coll, string];
     if (request.method === 'PUT') {
       const err = await putDoc(db, coll, id, await request.json(), now);

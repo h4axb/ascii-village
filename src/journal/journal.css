@@ -4133,3 +4133,15 @@ h3.jr-inline {
 .jr-zmatch-new {
   overflow-wrap: anywhere;
 }
+.jr-zpick-kind {
+  display: inline-block;
+  padding: 0 6px;
+  margin-right: 2px;
+  border-radius: 4px;
+  background: var(--jr-accent-soft);
+  color: var(--jr-warn);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  vertical-align: 1px;
+}

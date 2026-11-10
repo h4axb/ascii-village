@@ -11,6 +11,9 @@ import { Icon, Modal } from './ui';
 
 export const authorsShort = (cs: string[]) => (cs.length === 0 ? '' : cs.length === 1 ? cs[0] : cs.length === 2 ? `${cs[0]} & ${cs[1]}` : `${cs[0]} et al.`);
 export const citeShort = (it: ZoteroItem) => [authorsShort(it.creators), it.year ? `(${it.year})` : ''].filter(Boolean).join(' ');
+// a PDF or file on its own in Zotero: no authors, year or reference yet
+export const noDetails = (it: ZoteroItem) => it.itemType === 'attachment';
+const fileKind = (it: ZoteroItem) => (/pdf/i.test(it.contentType ?? '') ? 'PDF' : it.contentType === 'link' ? 'Link' : 'File');
 export const itemUrl = (it: ZoteroItem) => it.url || (it.doi ? `https://doi.org/${it.doi}` : '');
 
 export interface SourceView {
@@ -23,7 +26,7 @@ export interface SourceView {
 }
 export function sourceView(s: Source, zotero: Record<string, ZoteroItem>): SourceView {
   const it = s.zotero ? zotero[s.zotero] : undefined;
-  if (it) return { label: it.title || s.label, url: itemUrl(it) || s.url, cite: citeShort(it), bib: it.bib, item: it, missing: false };
+  if (it) return { label: it.title || s.label, url: itemUrl(it) || s.url, cite: noDetails(it) ? fileKind(it) : citeShort(it), bib: it.bib, item: it, missing: false };
   return { label: s.label || s.url, url: s.url, cite: '', bib: '', item: null, missing: !!s.zotero };
 }
 // a source as one Markdown line (the log's export)
@@ -136,15 +139,21 @@ export function ZoteroPicker({ store, initial = '', onPick, onClose }: { store: 
               <p className="jr-zpick-note">{z.busy ? 'Loading the library …' : 'The library is empty, or not loaded yet: sync with Zotero.'}</p>
             ) : (
               <>
-                <p className="jr-muted jr-zpick-count">{found.length === items.length ? `${items.length} sources` : `${found.length} of ${items.length} sources`}</p>
+                <p className="jr-muted jr-zpick-count">
+                  {found.length === items.length ? `${items.length} sources` : `${found.length} of ${items.length} sources`}
+                  {(z.state?.noDetails ?? 0) > 0 && ` · ${z.state!.noDetails} without details (files on their own)`}
+                  {(z.state?.notes ?? 0) > 0 && ` · ${z.state!.notes} ${z.state!.notes === 1 ? 'note' : 'notes'} left out`}
+                </p>
                 <ul className="jr-zpick-list">
                   {found.slice(0, 200).map((it) => (
                     <li key={it.key}>
                       <button type="button" className="jr-zpick-item" onClick={() => onPick(it.key)}>
                         <span className="jr-zpick-title">
-                          {citeShort(it) && <b>{citeShort(it)}</b>} {it.title}
+                          {noDetails(it) ? <span className="jr-zpick-kind">{fileKind(it)}</span> : citeShort(it) && <b>{citeShort(it)}</b>} {it.title}
                         </span>
-                        <span className="jr-zpick-meta">{[it.publication, it.doi ? `DOI ${it.doi}` : ''].filter(Boolean).join(' · ')}</span>
+                        <span className="jr-zpick-meta">
+                          {noDetails(it) ? 'No authors or year yet: in Zotero, right-click → “Retrieve Metadata for PDF” or “Create Parent Item”, then sync' : [it.publication, it.doi ? `DOI ${it.doi}` : ''].filter(Boolean).join(' · ')}
+                        </span>
                       </button>
                     </li>
                   ))}
@@ -320,7 +329,7 @@ function NewSource({ store, onPick }: { store: JournalStore; onPick: (key: strin
 
 export function syncTitle(st: ZoteroState | null) {
   if (!st) return 'Not synced with Zotero yet';
-  return [`Last synced ${ago(st.at)}`, `${st.count} sources`, st.error ? `Error: ${st.error}` : ''].filter(Boolean).join(' · ');
+  return [`Last synced ${ago(st.at)}`, `${st.count} sources`, st.noDetails ? `${st.noDetails} without details` : '', st.error ? `Error: ${st.error}` : ''].filter(Boolean).join(' · ');
 }
 
 export function SyncButton({ store, compact, full }: { store: JournalStore; compact?: boolean; full?: boolean }) {

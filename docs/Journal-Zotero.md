@@ -33,6 +33,10 @@ sync, every entry shows the current title, authors and APA reference.
     links it. A source already in the library is offered instead of a duplicate.
   - The 🕮 button next to an ordinary link links that link to a library item.
   - Uploaded files and ordinary links stay as they were.
+- PDFs and files that sit on their own in Zotero (no parent item) are listed
+  too, marked "PDF", without authors or year. In Zotero, right-click →
+  "Retrieve Metadata for PDF" or "Create Parent Item", then sync: the source then
+  has its full data. Notes on their own are left out.
 - A linked source that was deleted in Zotero keeps its old title and link and is
   marked "No longer in Zotero".
 

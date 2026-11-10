@@ -41,6 +41,7 @@ export interface ZItem {
   tags: string[];
   collections: string[];
   modified: string;
+  contentType?: string; // a PDF or file kept on its own, without a parent item (no details)
 }
 export interface ZState {
   version: number;
@@ -50,7 +51,12 @@ export interface ZState {
   library?: string;
   collections?: { key: string; name: string; parent: string | null }[];
   error?: string;
+  schema?: number; // what a sync keeps (SCHEMA): a newer one loads the whole library once
+  noDetails?: number; // PDFs and files on their own: kept, but without authors or year
+  notes?: number; // notes on their own: not sources, left out (counted on a full sync)
 }
+// 2: PDFs and files on their own are kept too (1 left them out)
+const SCHEMA = 2;
 
 const API = 'https://api.zotero.org';
 const BUCKETS = 16;
@@ -68,6 +74,9 @@ interface ZData {
   DOI?: string;
   ISBN?: string;
   url?: string;
+  filename?: string;
+  contentType?: string;
+  parentItem?: string;
   publicationTitle?: string;
   proceedingsTitle?: string;
   bookTitle?: string;
@@ -113,6 +122,26 @@ export const normUrl = (s: string) =>
 
 function reduce(a: ZApiItem): ZItem {
   const d = a.data;
+  // a PDF, snapshot or link on its own: its title (or file name) and address
+  if (d.itemType === 'attachment')
+    return {
+      key: a.key,
+      version: a.version,
+      itemType: 'attachment',
+      title: (d.title || d.filename || 'Untitled file').replace(/\.pdf$/i, ''),
+      creators: [],
+      year: (d.date ?? '').match(/\d{4}/)?.[0] ?? '',
+      date: d.date ?? '',
+      doi: normDoi(`${d.title ?? ''} ${d.filename ?? ''} ${d.url ?? ''}`),
+      isbn: '',
+      url: d.url ?? '',
+      publication: '',
+      bib: '',
+      tags: (d.tags ?? []).map((t) => t.tag),
+      collections: d.collections ?? [],
+      modified: d.dateModified ?? '',
+      contentType: d.contentType || (d.url ? 'link' : 'file'),
+    };
   const doi = d.DOI || (d.extra ?? '').match(/^DOI:\s*(\S+)/im)?.[1] || '';
   return {
     key: a.key,
@@ -188,6 +217,8 @@ function fakeLib(): Lib {
       { itemType: 'book', title: 'The Design of Everyday Things', creators: [{ creatorType: 'author', firstName: 'Don', lastName: 'Norman' }], date: '2013', publisher: 'Basic Books', ISBN: '9780465050659', tags: [{ tag: 'usability' }] },
       { itemType: 'conferencePaper', title: 'Guidelines for Human-AI Interaction', creators: [{ creatorType: 'author', firstName: 'Saleema', lastName: 'Amershi' }, { creatorType: 'author', firstName: 'Dan', lastName: 'Weld' }], date: '2019', proceedingsTitle: 'Proceedings of the 2019 CHI Conference on Human Factors in Computing Systems', DOI: '10.1145/3290605.3300233', url: 'https://dl.acm.org/doi/10.1145/3290605.3300233', tags: [{ tag: 'human-ai' }, { tag: 'control' }] },
       { itemType: 'journalArticle', title: 'Human-Centered Artificial Intelligence: Reliable, Safe & Trustworthy', creators: [{ creatorType: 'author', firstName: 'Ben', lastName: 'Shneiderman' }], date: '2020', publicationTitle: 'International Journal of Human–Computer Interaction', DOI: '10.1080/10447318.2020.1741118', tags: [{ tag: 'control' }] },
+      { itemType: 'attachment', title: 'Kaur et al 2024 - Trust in generative tools.pdf', filename: 'Kaur et al 2024 - Trust in generative tools.pdf', contentType: 'application/pdf', tags: [] },
+      { itemType: 'note', title: 'Reading list', tags: [] },
       { itemType: 'webpage', title: '10 Usability Heuristics for User Interface Design', creators: [{ creatorType: 'author', firstName: 'Jakob', lastName: 'Nielsen' }], date: '1994', websiteTitle: 'Nielsen Norman Group', url: 'https://www.nngroup.com/articles/ten-usability-heuristics/', tags: [{ tag: 'heuristics' }] },
     ];
     const items = new Map<string, ZApiItem>();
@@ -295,6 +326,8 @@ async function sync(db: D1Database, env: ZoteroEnv, full: boolean, now: number):
     return json(status, { error });
   };
   if (typeof lib === 'string') return fail(lib, 503);
+  // stored by an older sync: load everything once
+  if ((prev?.schema ?? 1) < SCHEMA) full = true;
   const since = full ? 0 : prev?.version ?? 0;
   const stored = await readItems(db);
   const items = new Map(stored);
@@ -302,6 +335,7 @@ async function sync(db: D1Database, env: ZoteroEnv, full: boolean, now: number):
   let added = 0,
     changed = 0,
     removed = 0,
+    notes = 0,
     version = since;
 
   // what the key may do (read / write), and the library's collections
@@ -325,7 +359,10 @@ async function sync(db: D1Database, env: ZoteroEnv, full: boolean, now: number):
     version = Number(r.headers.get('Last-Modified-Version') ?? version);
     const page = (await r.json()) as ZApiItem[];
     for (const a of page) {
-      if (a.data.itemType === 'note' || a.data.itemType === 'attachment' || a.data.itemType === 'annotation') continue;
+      if (a.data.itemType === 'note' || a.data.itemType === 'annotation') {
+        notes++;
+        continue;
+      }
       const it = reduce(a);
       seen.add(it.key);
       const old = items.get(it.key);
@@ -345,6 +382,16 @@ async function sync(db: D1Database, env: ZoteroEnv, full: boolean, now: number):
     const r = await lib.get(`/deleted?since=${since}`);
     if (r.ok) gone.push(...((await r.json()) as { items?: string[] }).items ?? []);
   }
+  // a file on its own that got a parent item in Zotero ("Create Parent Item",
+  // "Retrieve Metadata"): no longer a source of its own
+  if (!full && since > 0)
+    for (let start = 0; start < 500; start += 100) {
+      const r = await lib.get(`/items?format=json&itemType=attachment&limit=100&start=${start}&since=${since}`);
+      if (!r.ok) break;
+      const page = (await r.json()) as ZApiItem[];
+      for (const a of page) if (a.data.parentItem && items.has(a.key)) gone.push(a.key);
+      if (page.length < 100) break;
+    }
   for (const k of gone)
     if (items.delete(k)) {
       removed++;
@@ -352,7 +399,17 @@ async function sync(db: D1Database, env: ZoteroEnv, full: boolean, now: number):
     }
 
   await writeBuckets(db, items, touched, now);
-  const state: ZState = { version, at: now, count: items.size, write: write ?? undefined, library: `${env.ZOTERO_LIBRARY_TYPE === 'group' ? 'groups' : 'users'}/${env.ZOTERO_LIBRARY_ID ?? 'dev'}`, collections };
+  const state: ZState = {
+    version,
+    at: now,
+    count: items.size,
+    write: write ?? undefined,
+    library: `${env.ZOTERO_LIBRARY_TYPE === 'group' ? 'groups' : 'users'}/${env.ZOTERO_LIBRARY_ID ?? 'dev'}`,
+    collections,
+    schema: SCHEMA,
+    noDetails: [...items.values()].filter((i) => i.itemType === 'attachment').length,
+    notes: full ? notes : prev?.notes ?? 0,
+  };
   await writeState(db, state, now);
   return json(200, { added, changed, removed, count: items.size, items: Object.fromEntries(items), state });
 }

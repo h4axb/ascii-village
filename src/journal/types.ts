@@ -68,6 +68,7 @@ export interface ZoteroItem {
   tags: string[];
   collections: string[];
   modified: string;
+  contentType?: string; // itemType "attachment": a PDF or file on its own, without details
 }
 // settings/zoteroSync: the last sync (written by the server)
 export interface ZoteroState {
@@ -78,6 +79,9 @@ export interface ZoteroState {
   library?: string;
   collections?: { key: string; name: string; parent: string | null }[];
   error?: string;
+  schema?: number;
+  noDetails?: number; // PDFs and files on their own (kept, without authors or year)
+  notes?: number; // notes on their own (left out)
 }
 
 // a task of a day's entry: the smallest unit documented on its own. It has its

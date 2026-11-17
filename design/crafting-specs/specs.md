@@ -24,6 +24,14 @@ Desktop 1440 × 900 · alle Werte in px · Schrift **Asciia Mono 400**
 | Eingabe | H · fill | × 56 · pad 0 20 · gap 12 · Text 15 · Zähler 12 · r 7 · Ecken 10 |
 | Craft | H | 200 × 56 · pad 0 34 · gap 16 · 17 px · r 7 |
 
+## Icons & Schrift
+- **Schrift:** Asciia Mono ist Cascadia Code (Microsoft, frei: github.com/microsoft/cascadia-code). Installieren und in Figma „Cascadia Code“ Regular 400 wählen.
+- **Zeichen im Text:** ▶ ▲ ▼ ✦ → sind Schriftzeichen, keine Icons.
+- **Linien-Icons** (`shared/icons/`): Raster 24, angezeigt 22 × 22, Strich 1.5, runde Enden.
+  - X, Zurück, Verlauf: #DEDDB6
+  - Hammer im Craft-Button: #EFC862 inaktiv, #E6F4DC aktiv
+- **Münze:** Pixel-Icon 16 × 16 aus einzelnen 1-px-Rechtecken (`icon-coin-16.svg`). Beim Skalieren nur ganze Vielfache (16, 32 …) verwenden, damit es scharf bleibt.
+
 ## Eck-Winkel (einzelne Striche)
 Strich 2 px · #DEDDB6 · 30 % · eckige Enden · Aufteilung je Arm: leer 3.5 · Strich 6.5 · Lücke 3.5 · Strich 2.5 = 16 (10er: leer 3.5 · Strich 6.5). Die Außenecke bleibt leer. Die Maße gelten für oben links und werden für die anderen Ecken gespiegelt.
 SVGs je Ecke: `shared/ecken/` (einzelne Rechtecke, direkt in Figma ziehen).

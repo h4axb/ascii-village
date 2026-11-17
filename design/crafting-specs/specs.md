@@ -25,13 +25,13 @@ Desktop 1440 × 900 · alle Werte in px · Schrift **Asciia Mono 400**
 | Craft | H | 200 × 56 · pad 0 34 · gap 16 · 17 px · r 7 |
 
 ## Eck-Winkel (einzelne Striche)
-Strich 2 px · #DEDDB6 · 30 % · eckige Enden. Die Außenecke bleibt leer. Die Maße gelten für oben links und werden für die anderen Ecken gespiegelt.
+Strich 2 px · #DEDDB6 · 30 % · eckige Enden · Strichlänge 6 (3 × Stärke), am Ende vom Rand gekürzt. Die Außenecke bleibt leer. Die Maße gelten für oben links und werden für die anderen Ecken gespiegelt.
 SVGs je Ecke: `shared/ecken/` (einzelne Rechtecke, direkt in Figma ziehen).
 
 | Winkel | waagerecht (x, Länge) | senkrecht (y, Länge) |
 |---|---|---|
-| Frame 16 × 16 · 9 vom Rand | 3.5 → 6.5 · 13.5 → 2.5 | 3.5 → 6 · 13.5 → 2.5 |
-| Eingabe / Bild 10 × 10 · 5 vom Rand | 3.5 → 6.5 | 5.5 → 4.5 |
+| Frame 16 × 16 · 9 vom Rand | 3.5 → 6 · 13.5 → 2.5 | 3.5 → 6 · 13.5 → 2.5 |
+| Eingabe / Bild 10 × 10 · 5 vom Rand | 4 → 6 | 5.5 → 4.5 |
 
 ## Variante 1 · Pre-Clarification
 | Komponente | Maße |

@@ -314,6 +314,32 @@ export function taskMinutes(t: { start: string; end: string }): number | null {
   if (a == null || b == null) return null;
   return (b - a + 1440) % 1440;
 }
+// the order of a day's tasks makes sense in time: the start times rise (a
+// task that runs past midnight moves every later start to the next day);
+// tasks without a start time fit anywhere. null = fine, else the reason.
+const hm = (x: string) => (/^\d{1,2}:\d{2}$/.test(x) ? Number(x.split(':')[0]) * 60 + Number(x.split(':')[1]) : null);
+export function orderProblem(tasks: { title: string; start: string; end: string }[]): string | null {
+  let day = 0,
+    prev: { at: number; t: { title: string; start: string } } | null = null;
+  for (const t of tasks) {
+    const a = hm(t.start);
+    if (a == null) continue;
+    const at = a + day;
+    if (prev && at < prev.at) return `${t.start}${t.title ? ` (${t.title})` : ''} would come after ${prev.t.start}${prev.t.title ? ` (${prev.t.title})` : ''}`;
+    prev = { at, t };
+    const b = hm(t.end);
+    if (b != null && b < a) day += 1440;
+  }
+  return null;
+}
+// the tasks with one of them moved to another place
+export function moveTask<T extends { id: string }>(tasks: T[], id: string, to: number): T[] {
+  const from = tasks.findIndex((t) => t.id === id);
+  if (from < 0) return tasks;
+  const rest = tasks.filter((t) => t.id !== id);
+  rest.splice(Math.max(0, Math.min(to, rest.length)), 0, tasks[from]);
+  return rest;
+}
 export const fmtMinutes = (n: number) => (n < 60 ? `${n}m` : `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}m` : ''}`);
 
 // the block categories: each with its colour (changeable, settings/blockKinds)

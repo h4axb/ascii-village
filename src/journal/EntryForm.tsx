@@ -9,10 +9,10 @@
 //   weekly      an optional weekly review, added by hand, stored once per ISO
 //               week (weeks/<2026-W45>) and linked from the entry
 //   day notes   an older entry's own sections, tags and notes, kept as they were
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Del, JournalStore, Put } from './store';
 import { suggestSections } from './suggest';
-import { CHECKIN, ENTRY_ICONS, ENTRY_STATUS, ENTRY_TYPES, PALETTE, SECTIONS, blockKinds, kindOf, kindsSetting, type BlockKindsSetting, blockTitle, entryTopics, fmtMinutes, isoWeek, newId, runsMs, shortDate, taskMinutes, tasksTotal, today, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
+import { CHECKIN, ENTRY_ICONS, ENTRY_STATUS, ENTRY_TYPES, PALETTE, SECTIONS, blockKinds, kindOf, kindsSetting, type BlockKindsSetting, blockTitle, entryTopics, fmtMinutes, isoWeek, moveTask, newId, orderProblem, runsMs, shortDate, taskMinutes, tasksTotal, today, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
 import { allTopics, sectionTitle } from './EntryEditor';
 import { Attachments, Chips, Icon, IconBtn, type IconName } from './ui';
 import { PLAN_PRESETS, RunsEditor } from './timer';
@@ -205,10 +205,11 @@ export function EntryForm({ store, f, set, titleErr, titleRef }: { store: Journa
           <h3 id="jr-f-tasks">Tasks</h3>
           {total > 0 && <span className="jr-dw-total">{`${fmtMinutes(total)} total`}</span>}
         </header>
-        <ul className="jr-tasks">
-          {tasks.map((t, i) => (
+        <TaskList tasks={tasks} onMove={(next) => set((x) => ({ ...x, entry: { ...x.entry, tasks: next } }))}>
+          {(t, i, grip) => (
             <TaskEdit
               key={t.id}
+              grip={grip}
               store={store}
               t={t}
               n={i + 1}
@@ -222,8 +223,8 @@ export function EntryForm({ store, f, set, titleErr, titleRef }: { store: Journa
                 set((x) => ({ ...x, entry: { ...x.entry, tasks: (x.entry.tasks ?? []).filter((y) => y.id !== t.id) } }));
               }}
             />
-          ))}
-        </ul>
+          )}
+        </TaskList>
         <button
           type="button"
           className="jr-linkbtn jr-dw-add"
@@ -339,7 +340,120 @@ export function CheckinStrip({ ratings }: { ratings: Partial<Record<CheckinKey, 
   );
 }
 
-function TaskEdit({ store, t, n, open, known, onToggle, onChange, onRemove, onRename }: { store: JournalStore; t: Task; n: number; open: boolean; known: string[]; onToggle: () => void; onChange: (p: Partial<Task>) => void; onRemove: () => void; onRename: (from: string, to: string) => void }) {
+// the task list, reordered by dragging a task's grip (mouse, touch) or with
+// its arrow keys; only to places where the start times still rise
+// (orderProblem), else the place is blocked and says why
+function TaskList({ tasks, onMove, children }: { tasks: Task[]; onMove: (tasks: Task[]) => void; children: (t: Task, i: number, grip: Grip) => React.ReactNode }) {
+  const [drag, setDrag] = useState<string | null>(null);
+  const [drop, setDrop] = useState<{ index: number; problem: string | null } | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const dropRef = useRef<typeof drop>(null);
+  useEffect(() => {
+    if (!hint) return;
+    const h = window.setTimeout(() => setHint(null), 3500);
+    return () => window.clearTimeout(h);
+  }, [hint]);
+  const target = (id: string, y: number) => {
+    const others = [...(listRef.current?.querySelectorAll<HTMLElement>(':scope > li[data-tid]') ?? [])].filter((el) => el.dataset.tid !== id);
+    const index = others.filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top + r.height / 2 < y;
+    }).length;
+    return { index, problem: orderProblem(moveTask(tasks, id, index)) };
+  };
+  const start = (id: string) => (e: React.PointerEvent) => {
+    if (e.button !== 0 || tasks.length < 2) return;
+    e.preventDefault();
+    setDrag(id);
+    setHint(null);
+    const first = target(id, e.clientY);
+    dropRef.current = first;
+    setDrop(first);
+    let lastY = e.clientY;
+    // near the edge of the drawer or window, it scrolls along
+    let scroller: HTMLElement | null = listRef.current?.parentElement ?? null;
+    while (scroller && !(/(auto|scroll)/.test(getComputedStyle(scroller).overflowY) && scroller.scrollHeight > scroller.clientHeight)) scroller = scroller.parentElement;
+    const timer = window.setInterval(() => {
+      const box = scroller?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+      const edge = 60;
+      const v = lastY < box.top + edge ? -(box.top + edge - lastY) / 3 : lastY > box.bottom - edge ? (lastY - (box.bottom - edge)) / 3 : 0;
+      if (v) (scroller ?? window).scrollBy(0, v);
+    }, 16);
+    const move = (ev: PointerEvent) => {
+      lastY = ev.clientY;
+      const to = target(id, ev.clientY);
+      dropRef.current = to;
+      setDrop(to);
+    };
+    const end = (ev: Event) => {
+      window.clearInterval(timer);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      window.removeEventListener('keydown', esc);
+      const to = ev.type === 'pointerup' ? dropRef.current : null;
+      setDrag(null);
+      setDrop(null);
+      if (!to) return;
+      if (to.problem) setHint(`Not there: ${to.problem}.`);
+      else {
+        const next = moveTask(tasks, id, to.index);
+        if (next.some((t, i) => t.id !== tasks[i].id)) onMove(next);
+      }
+    };
+    const esc = (ev: KeyboardEvent) => ev.key === 'Escape' && end(ev);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    window.addEventListener('keydown', esc);
+  };
+  const key = (id: string) => (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    const i = tasks.findIndex((t) => t.id === id);
+    const to = e.key === 'ArrowUp' ? i - 1 : i + 1;
+    if (to < 0 || to >= tasks.length) return;
+    const next = moveTask(tasks, id, to);
+    const p = orderProblem(next);
+    if (p) return setHint(`Not there: ${p}.`);
+    setHint(null);
+    onMove(next);
+    // the grip keeps the focus at the task's new place
+    window.requestAnimationFrame(() => listRef.current?.querySelector<HTMLElement>(`li[data-tid="${id}"] .jr-task-grip`)?.focus());
+  };
+  // the line where the task would land, among the other tasks
+  const line = drop && drag ? <li key="drop-line" className={`jr-drop-line${drop.problem ? ' is-blocked' : ''}`} aria-hidden="true">{drop.problem && <span>{drop.problem}</span>}</li> : null;
+  const out: React.ReactNode[] = [];
+  let k = 0;
+  tasks.forEach((t, i) => {
+    if (t.id !== drag) {
+      if (line && drop!.index === k) out.push(line);
+      k++;
+    }
+    out.push(children(t, i, { dragging: t.id === drag, onPointerDown: start(t.id), onKeyDown: key(t.id) }));
+  });
+  if (line && drop!.index === k) out.push(line);
+  return (
+    <>
+      <ul className={`jr-tasks${drag ? ' is-sorting' : ''}`} ref={listRef}>
+        {out}
+      </ul>
+      {hint && (
+        <p className="jr-sort-hint" role="status">
+          {hint}
+        </p>
+      )}
+    </>
+  );
+}
+
+interface Grip {
+  dragging: boolean;
+  onPointerDown: (e: React.PointerEvent) => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+}
+function TaskEdit({ store, t, n, open, known, grip, onToggle, onChange, onRemove, onRename }: { store: JournalStore; t: Task; n: number; open: boolean; known: string[]; grip?: Grip; onToggle: () => void; onChange: (p: Partial<Task>) => void; onRemove: () => void; onRename: (from: string, to: string) => void }) {
   const [adding, setAdding] = useState(false);
   const [mode, setMode] = useState<'new' | 'manage' | null>(null);
   const [att, setAtt] = useState(() => !!((t.files ?? []).length || (t.sources ?? []).length));
@@ -356,7 +470,15 @@ function TaskEdit({ store, t, n, open, known, onToggle, onChange, onRemove, onRe
   };
   const time = taskTime(t);
   return (
-    <li className={`jr-task${open ? ' is-open' : ''}`}>
+    <li className={`jr-task${open ? ' is-open' : ''}${grip?.dragging ? ' is-dragging' : ''}`} data-tid={t.id}>
+      <div className="jr-task-top">
+      {grip && (
+        <button type="button" className="jr-task-grip" aria-label={`Move task ${t.title || n} (arrow keys)`} title="Drag to reorder" onPointerDown={grip.onPointerDown} onKeyDown={grip.onKeyDown}>
+          <svg viewBox="0 0 10 16" aria-hidden="true">
+            {[3, 8, 13].flatMap((y) => [<circle key={`a${y}`} cx="3" cy={y} r="1.3" />, <circle key={`b${y}`} cx="7" cy={y} r="1.3" />])}
+          </svg>
+        </button>
+      )}
       <button type="button" className="jr-task-head" aria-expanded={open} onClick={onToggle}>
         <Icon name="down" />
         <span className="jr-task-name">
@@ -373,6 +495,7 @@ function TaskEdit({ store, t, n, open, known, onToggle, onChange, onRemove, onRe
           </span>
         )}
       </button>
+      </div>
       {open && (
         <div className="jr-task-body">
           <div className="jr-task-row">

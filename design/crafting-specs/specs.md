@@ -45,26 +45,46 @@ Desktop 1440 × 900 · alle Werte in px · Schrift **Asciia Mono 400**
 | Fortschritt | Punkte 9 · gap 7 · aktuell Gold |
 
 ## Farben
-| Token | Wert |
-|---|---|
-| Text | #DEDDB6 |
-| Text soft | #A3B190 |
-| Muted | #707D5F |
-| Name | #EFC862 |
-| Coin | #F2B53C |
-| Coin dunkel | #B07A1C |
-| Go | #7FB069 |
-| Go Fläche | #7FB069 · 22 % |
-| Auswahl | #F3E7C4 |
-| Bubble / Option | #262B1C |
-| Surface | #262B1C · 55 % |
-| Chat-Rahmen (Frame) | #1C2014 · 72 % |
-| Dialog | #1C2014 · 88 % |
-| Linie | #DEDDB6 · 30 % |
-| Linie soft | #DEDDB6 · 15 % |
-| Linie stark | #DEDDB6 · 85 % |
-| Nicht ganz | Rand #D29A85 · Fläche #D27864 · 18 % |
-| Chip aktiv | Rand #F2B53C · Fläche 12 % |
+Transparente Werte als Hex + Deckkraft (in Figma: Fill-Opacity).
+
+| Gruppe | Name | Wert | Wo |
+|---|---|---|---|
+| Text | Text | #DEDDB6 | Bubble, Buttons |
+| Text | Text soft | #A3B190 | You decide, Typ-Tag |
+| Text | Muted | #707D5F | Zähler, Hinweise |
+| Text | Name | #EFC862 | Name, Craft inaktiv |
+| Text | Go-Text | #E6F4DC | Craft aktiv, Zurück |
+| Text | Auswahl | #F3E7C4 | ▶ vor Option, Tab-Hover |
+| Akzent | Coin | #F2B53C | Chip on, Fokus, Punkt aktuell |
+| Akzent | Coin dunkel | #B07A1C | Punkt erledigt |
+| Akzent | Go | #7FB069 | Craft aktiv Rand |
+| Akzent | Nicht ganz | #D29A85 | Vote ▼ Rand |
+| Fläche | Bubble | #262B1C | Bubble, Option, Panels |
+| Fläche | Craft inaktiv | #262B1C · 90 % | Craft-Button |
+| Fläche | Surface | #262B1C · 55 % | Icon-Buttons, Coins, Chips |
+| Fläche | Hover | #DEDDB6 · 9 % | Hover |
+| Fläche | Chat-Rahmen | #1C2014 · 72 % | Frame |
+| Fläche | Avatar-Box | #1C2014 · 88 % | Avatar, Verlauf |
+| Fläche | Verlauf-Tab | #1C2014 · 90 % | Tab |
+| Fläche | Tab Hover | #2E3422 · 95 % | Tab offen |
+| Fläche | Eingabe | #000000 · 20 % | Prompt |
+| Fläche | Bildfläche | #000000 · 18 % | Ergebnis-Bild |
+| Fläche | Kommentar | #000000 · 25 % | Feld V2 |
+| Fläche | Tooltip | #10140B | Tune-Hinweis |
+| Fläche | Sheet | #181B11 · 42 % + Blur 14 | Panel |
+| Fläche | Overlay | #050505 · 78 % | über Spielwelt |
+| Fläche | Scrim | #050505 · 35 % | hinter Verlauf |
+| Zustand | Go Fläche | #7FB069 · 22 % | Craft aktiv |
+| Zustand | Go Hover | #7FB069 · 34 % | Craft Hover |
+| Zustand | Nicht ganz Fläche | #D27864 · 18 % | Vote ▼ aktiv |
+| Zustand | Gold 12 % | #F2B53C · 12 % | Chip on, Fokus-Ring 4 |
+| Zustand | Peer-Chip | Rand #7FB069 · 45 %, Fläche 16 % | Tags anderer (V1) |
+| Linie | Linie | #DEDDB6 · 30 % | Standard, Ecken |
+| Linie | Linie soft | #DEDDB6 · 15 % | Trenner |
+| Linie | Linie stark | #DEDDB6 · 85 % | Bubble, Frame, aktiv |
+| Münze | Pixel-Icon | #5A2A12 · #FFF4C2 · #FFFFFF · #FDD23A · #FFE57A · #F8B616 · #E8960F · #D9761A | Coins |
+
+Deaktiviert: Deckkraft 45 %. Schatten Verlauf: −10 0 28 · #000 35 %.
 
 ## Typo
 22 Tune-Titel · 17 Craft, Coins · 16 Vote-Titel, Karten-Titel · 15 Eingabe, Antwort-Name ·

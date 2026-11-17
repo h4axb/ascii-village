@@ -98,7 +98,16 @@ export interface Task {
   blocks?: Block[];
   files?: string[];
   sources?: Source[];
+  plan?: number; // the time planned for it, in minutes (the timer counts down from it)
+  runs?: Run[]; // the timer's periods, oldest first (editable, see timer.tsx)
 }
+// one period of the timer on a task: started, paused or stopped (ms)
+export interface Run {
+  id: string;
+  start: number;
+  end: number;
+}
+export const runsMs = (runs: Run[] | undefined) => (runs ?? []).reduce((n, r) => n + Math.max(0, r.end - r.start), 0);
 export interface Entry {
   id: string;
   date: string; // ISO yyyy-mm-dd

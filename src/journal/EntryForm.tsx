@@ -12,9 +12,10 @@
 import { useMemo, useState } from 'react';
 import type { Del, JournalStore, Put } from './store';
 import { suggestSections } from './suggest';
-import { CHECKIN, ENTRY_ICONS, ENTRY_STATUS, ENTRY_TYPES, PALETTE, SECTIONS, blockKinds, kindOf, kindsSetting, type BlockKindsSetting, blockTitle, entryTopics, fmtMinutes, isoWeek, newId, shortDate, taskMinutes, tasksTotal, today, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
+import { CHECKIN, ENTRY_ICONS, ENTRY_STATUS, ENTRY_TYPES, PALETTE, SECTIONS, blockKinds, kindOf, kindsSetting, type BlockKindsSetting, blockTitle, entryTopics, fmtMinutes, isoWeek, newId, runsMs, shortDate, taskMinutes, tasksTotal, today, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
 import { allTopics, sectionTitle } from './EntryEditor';
 import { Attachments, Chips, Icon, IconBtn, type IconName } from './ui';
+import { PLAN_PRESETS, RunsEditor } from './timer';
 
 export interface Form {
   entry: Entry;
@@ -44,7 +45,7 @@ export const formOf = (e: Entry, opts: { task?: string; addTask?: boolean; check
   return { entry: { ...e, tasks: [...tasks, ...add] }, ratings: null, week: null, weekDrop: null, open: [...(opts.task ? [opts.task] : []), ...add.map((t) => t.id)], checkin: !!opts.checkin };
 };
 
-const taskEmpty = (t: Task) => !t.title.trim() && !t.start && !t.end && !(t.blocks ?? []).some((b) => b.md.trim()) && !(t.files ?? []).length && !(t.sources ?? []).length && !(t.topics ?? []).length;
+const taskEmpty = (t: Task) => !t.title.trim() && !t.start && !t.end && !(t.blocks ?? []).some((b) => b.md.trim()) && !(t.files ?? []).length && !(t.sources ?? []).length && !(t.topics ?? []).length && !t.plan && !(t.runs ?? []).length;
 export const formEmpty = (f: Form) => !f.entry.title.trim() && (f.entry.tasks ?? []).every(taskEmpty) && !f.ratings && !f.entry.week;
 
 // the entry as stored: empty tasks and empty blocks left out
@@ -383,6 +384,7 @@ function TaskEdit({ store, t, n, open, known, onToggle, onChange, onRemove, onRe
             </span>
             <span className="jr-dw-dur">{taskMinutes(t) != null ? fmtMinutes(taskMinutes(t)!) : '–'}</span>
           </div>
+          <PlanEdit t={t} onChange={onChange} />
 
           <div className="jr-task-part">
             <span className="jr-task-label">{`Show in sections · ${sections.length} selected`}</span>
@@ -447,6 +449,39 @@ function TaskEdit({ store, t, n, open, known, onToggle, onChange, onRemove, onRe
         </div>
       )}
     </li>
+  );
+}
+
+// the time planned for the task, and the timer's history (editable)
+function PlanEdit({ t, onChange }: { t: Task; onChange: (p: Partial<Task>) => void }) {
+  const runs = t.runs ?? [];
+  const spent = runsMs(runs);
+  const over = !!t.plan && spent > t.plan * 60000;
+  const [hist, setHist] = useState(false);
+  return (
+    <div className="jr-task-part jr-plan">
+      <span className="jr-task-label">Plan</span>
+      <div className="jr-chips" role="group" aria-label="Planned time">
+        {PLAN_PRESETS.map((m) => (
+          <button key={m} type="button" className={`jr-chip is-small${t.plan === m ? ' is-on' : ''}`} aria-pressed={t.plan === m} onClick={() => onChange({ plan: t.plan === m ? undefined : m })}>
+            {fmtMinutes(m)}
+          </button>
+        ))}
+        <span className="jr-plan-own">
+          <input value={t.plan && !PLAN_PRESETS.includes(t.plan) ? String(t.plan) : ''} inputMode="numeric" placeholder="own" aria-label="Own time in minutes" onChange={(e) => {
+            const m = Number(e.target.value.replace(/\D/g, ''));
+            onChange({ plan: m > 0 ? m : undefined });
+          }} />
+          min
+        </span>
+        {runs.length > 0 && !over && (
+          <button type="button" className="jr-linkbtn jr-small" aria-expanded={hist} onClick={() => setHist(!hist)}>
+            {`History (${runs.length}) · ${fmtMinutes(Math.round(spent / 60000))}`}
+          </button>
+        )}
+      </div>
+      {(hist || over) && <RunsEditor runs={runs} over={over} onChange={(r, p) => onChange({ runs: r, ...p })} />}
+    </div>
   );
 }
 

@@ -4145,3 +4145,414 @@ h3.jr-inline {
   letter-spacing: 0.03em;
   vertical-align: 1px;
 }
+
+/* ---------- task timer (timer.tsx) ---------- */
+.jr-timer {
+  --tm-or: #f5a524;
+  --tm-red: #e5484d;
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(calc(-50% + var(--x, 0px)));
+  z-index: 2000;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  height: 124px;
+  padding: 0 22px;
+  box-sizing: border-box;
+  border-radius: 34px;
+  background: #050505;
+  color: #fff;
+  font-family: Inter, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.jr-timer:active {
+  cursor: grabbing;
+}
+.jr-timer.is-over {
+  --tm-or: var(--tm-red);
+}
+.jr-timer-edge {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.jr-timer-edge rect {
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.jr-timer-edge .trk {
+  stroke: #2b2b2b;
+}
+.jr-timer-edge .bar {
+  stroke: var(--tm-or);
+  transition: stroke-dasharray 0.9s linear;
+}
+.jr-timer button {
+  font: inherit;
+  cursor: pointer;
+}
+.jr-timer-btn {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 50%;
+  background: #2c2c2e;
+  color: #fff;
+  padding: 0;
+}
+.jr-timer-btn svg {
+  width: 26px;
+  height: 26px;
+  fill: currentColor;
+}
+.jr-timer-btn.is-stop {
+  background: #4a1414;
+  color: #ff453a;
+}
+.jr-timer-btn.is-stop svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+}
+.jr-timer-btn:hover {
+  filter: brightness(1.18);
+}
+.jr-timer-btn:focus-visible,
+.jr-timer-tools button:focus-visible,
+.jr-timer-pill:focus-visible {
+  outline: 2px solid var(--tm-or);
+  outline-offset: 2px;
+}
+.jr-timer-mid {
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+  line-height: 1.1;
+}
+.jr-timer-sub {
+  font-size: 13px;
+  color: #8e8e93;
+  white-space: nowrap;
+}
+.jr-timer-t {
+  font-size: 44px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin: 2px 0 1px;
+}
+.jr-timer.is-over .jr-timer-t {
+  color: var(--tm-red);
+}
+.jr-timer.is-paused .jr-timer-t {
+  color: #c7c7cc;
+}
+.jr-timer-name {
+  font-size: 13px;
+  color: #8e8e93;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jr-timer-tools {
+  position: absolute;
+  top: 9px;
+  right: 22px;
+  display: flex;
+  gap: 2px;
+}
+.jr-timer-tools button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #8e8e93;
+  padding: 0;
+}
+.jr-timer-tools button:hover {
+  color: #fff;
+  background: #2c2c2e;
+}
+.jr-timer-tools svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.jr-timer-tools svg .fill {
+  fill: currentColor;
+  stroke: none;
+}
+/* small: a pill with a ring and the time */
+.jr-timer.is-compact {
+  display: block;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border-radius: 999px;
+}
+.jr-timer-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  min-width: 220px;
+  height: 46px;
+  padding: 0 18px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tm-or);
+}
+.jr-timer-ring {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+.jr-timer-ring circle {
+  fill: none;
+  stroke-width: 3.6;
+  stroke-linecap: round;
+}
+.jr-timer-ring .trk {
+  stroke: #2b2b2b;
+}
+.jr-timer-ring .bar {
+  stroke: var(--tm-or);
+  transition: stroke-dasharray 0.9s linear;
+}
+.jr-timer-pill-t {
+  font-size: 19px;
+  font-weight: 650;
+}
+/* in its own window (Picture-in-Picture) */
+body.jr-pip {
+  margin: 0;
+  background: #050505;
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.jr-timer.in-pip {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  width: min(calc(100vw - 8px), 440px);
+  max-width: none;
+  height: min(calc(100vh - 8px), 132px);
+  box-shadow: none;
+  cursor: default;
+}
+.jr-timer.in-pip.is-compact {
+  height: auto;
+}
+@media (max-width: 420px) {
+  .jr-timer:not(.is-compact) {
+    height: 108px;
+    gap: 10px;
+    padding: 0 16px;
+  }
+  .jr-timer-btn {
+    width: 48px;
+    height: 48px;
+  }
+  .jr-timer-t {
+    font-size: 36px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jr-timer-edge .bar,
+  .jr-timer-ring .bar {
+    transition: none;
+  }
+}
+
+/* on a task: progress, start, plan */
+.jr-tt {
+  display: grid;
+  gap: 8px;
+  margin: 2px 0 6px;
+}
+.jr-tt-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.jr-tt-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--jr-muted);
+  font-variant-numeric: tabular-nums;
+}
+.jr-tt-bar i {
+  display: block;
+  width: 96px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--jr-soft);
+  overflow: hidden;
+}
+.jr-tt-bar b {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #f5a524;
+}
+.jr-tt.is-over .jr-tt-bar b {
+  background: #e5484d;
+}
+.jr-tt-bar em {
+  font-style: normal;
+  color: #c2410c;
+  font-weight: 600;
+}
+.jr-root .jr-tt-btn {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--jr-line);
+  border-radius: 999px;
+  background: var(--jr-paper);
+  color: var(--jr-ink);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.jr-root .jr-tt-btn.is-go {
+  background: #111;
+  border-color: #111;
+  color: #fff;
+}
+.jr-root .jr-tt-btn:hover {
+  filter: brightness(0.96);
+}
+.jr-tt-plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.jr-tt-plan form {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.jr-tt-plan input,
+.jr-plan-own input {
+  width: 58px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--jr-line);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12.5px;
+  background: var(--jr-paper);
+}
+.jr-plan-own {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--jr-muted);
+}
+/* the history */
+.jr-runs {
+  border: 1px solid var(--jr-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--jr-paper);
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.jr-tt.is-over .jr-runs,
+.jr-plan .jr-runs:has(strong) {
+  border-color: #f2c9a6;
+}
+.jr-runs-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.jr-runs ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.jr-runs li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.jr-runs li input {
+  width: 64px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--jr-line);
+  border-radius: 7px;
+  font: inherit;
+  text-align: center;
+  background: var(--jr-bg);
+}
+.jr-runs-day {
+  color: var(--jr-muted);
+  width: 44px;
+}
+.jr-runs-dur {
+  margin-left: auto;
+  color: var(--jr-muted);
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .jr-runs li {
+    gap: 6px;
+  }
+  .jr-runs li input {
+    width: 56px;
+  }
+  .jr-runs-day {
+    width: 38px;
+  }
+}
+.jr-runs-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.jr-linkbtn.is-danger {
+  color: var(--jr-warn);
+}

@@ -11,6 +11,7 @@ import { sectionTitle } from './EntryEditor';
 import { CheckinStrip, weekday, weekLabel } from './EntryForm';
 import { FileThumb, Icon, type IconName } from './ui';
 import { ZoteroSource } from './zotero';
+import { TaskTimer } from './timer';
 
 export interface EditAt {
   task?: string;
@@ -48,7 +49,7 @@ export function EntryView({ store, e, ratings, week, focusTask, onEdit }: { stor
           </div>
         </li>
         {tasks.map((t) => (
-          <TaskItem key={t.id} store={store} t={t} kinds={kinds} focus={t.id === focusTask} onEdit={onEdit ? () => onEdit({ task: t.id }) : undefined} />
+          <TaskItem key={t.id} store={store} e={e} t={t} kinds={kinds} focus={t.id === focusTask} onEdit={onEdit ? () => onEdit({ task: t.id }) : undefined} />
         ))}
         {onEdit && (
           <li className="jr-act-add">
@@ -167,7 +168,7 @@ function Refs({ store, files, links }: { store: JournalStore; files: string[]; l
 }
 
 // a task on the timeline: its time on the left, its blocks as cards
-function TaskItem({ store, t, kinds, focus, onEdit }: { store: JournalStore; t: Task; kinds: BlockKind[]; focus: boolean; onEdit?: () => void }) {
+function TaskItem({ store, e, t, kinds, focus, onEdit }: { store: JournalStore; e: Entry; t: Task; kinds: BlockKind[]; focus: boolean; onEdit?: () => void }) {
   const ref = useRef<HTMLLIElement>(null);
   useEffect(() => {
     if (focus) ref.current?.scrollIntoView({ block: 'nearest' });
@@ -191,6 +192,15 @@ function TaskItem({ store, t, kinds, focus, onEdit }: { store: JournalStore; t: 
             </button>
           )}
         </div>
+        <TaskTimer
+          store={store}
+          entry={e}
+          task={t}
+          onRuns={(runs, p) => {
+            const cur = store.docs.entries[e.id] as Entry | undefined;
+            if (cur) void store.commit([{ coll: 'entries', id: cur.id, data: { ...cur, tasks: (cur.tasks ?? []).map((x) => (x.id === t.id ? { ...x, runs, ...p } : x)), updated: Date.now() } }]);
+          }}
+        />
         {((t.sections ?? []).length > 0 || (t.topics ?? []).length > 0) && <Chipline store={store} sections={t.sections ?? []} topics={t.topics ?? []} />}
         {blocks.map((b) => (
           <BlockCard key={b.id} b={b} kinds={kinds} />

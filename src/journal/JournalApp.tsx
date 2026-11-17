@@ -11,6 +11,7 @@ import { pageConfig, Timeline } from './pages';
 import { LogList } from './LogList';
 import { EntryPanel } from './EntryPanel';
 import { Icon, IconBtn } from './ui';
+import { TimerProvider } from './timer';
 
 const BASE = '/journal';
 const pageOfPath = (p: string) => {
@@ -84,6 +85,7 @@ export default function JournalApp() {
   const pathOf = (id: string) => `${BASE}${PAGES.find((p) => p.id === id)?.path ? `/${PAGES.find((p) => p.id === id)!.path}` : ''}`;
 
   return (
+    <TimerProvider store={store}>
     <div className={`jr-root${menu ? ' is-menu' : ''}`}>
       <header className="jr-topbar">
         <button type="button" className="jr-iconbtn jr-menubtn" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>
@@ -173,6 +175,7 @@ export default function JournalApp() {
         </p>
       )}
     </div>
+    </TimerProvider>
   );
 }
 

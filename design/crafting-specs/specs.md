@@ -12,7 +12,7 @@ Desktop 1440 × 900 · alle Werte in px · Schrift **Asciia Mono 400**
 | Back / Close | Icon-Button | 46 × 42 · r 7 · Rand 1 |
 | Corner | V · end | gap 14 |
 | Coins | H | 94 × 36 · pad 7 18 7 14 · gap 12 · 17 px · ls 0.5 |
-| Frame | V · fill | 1100 × fill · pad 24 28 20 28 · r 12 · Rand 1 · Ecken 2 / 16 |
+| Frame | V · fill · Fläche #1C2014 · 72 % | min(1100, 86vw) × fill · pad 24 28 20 28 · r 12 · Rand 1 · 85 % · Ecken 16 × 16, 2 px gestrichelt, 9 vom Rand |
 | Verlauf-Tab | rechts am Frame | 38 × 58 · r 0 7 7 0 |
 | Chat | V · scrollt | gap 18 · pad 4 8 4 4 |
 | Msg | H (rechts: gespiegelt) | gap 18 |
@@ -58,6 +58,7 @@ Desktop 1440 × 900 · alle Werte in px · Schrift **Asciia Mono 400**
 | Auswahl | #F3E7C4 |
 | Bubble / Option | #262B1C |
 | Surface | #262B1C · 55 % |
+| Chat-Rahmen (Frame) | #1C2014 · 72 % |
 | Dialog | #1C2014 · 88 % |
 | Linie | #DEDDB6 · 30 % |
 | Linie soft | #DEDDB6 · 15 % |

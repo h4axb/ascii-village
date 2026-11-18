@@ -112,6 +112,13 @@ export function useJournal(): JournalStore {
         const r3 = await fetch('/api/journal/batch', { method: 'POST', headers: headers(true), body: JSON.stringify({ put }) });
         if (r3.ok) for (const p of put) (d[p.coll] as Record<string, unknown>)[p.id] = p.data;
       }
+      // once: the methods and instruments of the WDHA list the catalogue lacks (existing ones stay)
+      if (d.settings.methodsSeeded && !d.settings.methodsV2) {
+        const { addMethods } = await import('./methodSeed');
+        const put: Put[] = [...addMethods(d), { coll: 'settings', id: 'methodsV2', data: { at: Date.now() } }];
+        const r4 = await fetch('/api/journal/batch', { method: 'POST', headers: headers(true), body: JSON.stringify({ put }) });
+        if (r4.ok) for (const p of put) (d[p.coll] as Record<string, unknown>)[p.id] = p.data;
+      }
       setDocs(d);
       setState('ready');
     } catch (e) {

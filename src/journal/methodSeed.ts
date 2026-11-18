@@ -80,3 +80,82 @@ export function seedMethods(d: JournalDocs): Put[] {
   ALONG.forEach((r, j) => method(ALONGSIDE, '', r, j));
   return put;
 }
+
+// ---- the WDHA reconciliation (settings.methodsV2): what the list names and the
+// catalogue does not have yet. Existing methods stay as they are; a name that is
+// already in the catalogue (anywhere) is skipped. phase: a code (M1 …) or ALONGSIDE.
+type Add = [name: string, type: MethodType, phase: string, area: string, desc: string, source?: string];
+const ADDITIONS: Add[] = [
+  // W
+  ['Standardisierte Befragung', 'W', 'M3', 'Datenerhebung', 'Vergleichbare Bewertungen erheben'],
+  ['Qualitative Befragung', 'W', 'M3', 'Datenerhebung', 'Individuelle Erfahrungen und Einschätzungen erfassen'],
+  ['Explorative Datenanalyse', 'W', 'M4', 'Ergebnisinterpretation', 'Auffälligkeiten, Muster und Zusammenhänge entdecken'],
+  ['Vergleichende Einzelfallanalyse', 'W', 'M4', 'Ergebnisinterpretation', 'Einzelne Teilnehmer und ihre Ergebnisse genauer betrachten'],
+  // D
+  ['Exploratives Prototyping', 'D', 'M1', 'Exploratives Prototyping', 'Verschiedene Konzepte praktisch erproben', 'Floyd (1984)'],
+  ['Experimentelles Prototyping', 'D', 'M1', 'Exploratives Prototyping', 'Technische und gestalterische Lösungsansätze überprüfen'],
+  ['Iterative Gestaltung', 'D', 'M1', 'Exploratives Prototyping', 'Entwürfe schrittweise überprüfen und verbessern · auch M2, M5'],
+  ['Gestalterische Referenzanalyse', 'D', 'M2', 'Gestalterische Recherche', 'Bestehende Gestaltungslösungen untersuchen · auch M1'],
+  ['Visuelle Stilexploration', 'D', 'M2', 'Gestalterische Recherche', 'Unterschiedliche visuelle Richtungen erproben'],
+  ['Paper Sketching', 'D', 'M5', 'Systematische Interface-Gestaltung', 'Screens, Layouts und benötigte Elemente schnell vorplanen'],
+  ['Wireframing', 'D', 'M5', 'Systematische Interface-Gestaltung', 'Strukturellen Aufbau der Benutzeroberfläche entwickeln'],
+  ['Low-Fidelity-Prototyping', 'D', 'M5', 'Systematische Interface-Gestaltung', 'Frühe Interface-Entwürfe mit geringem Detailgrad'],
+  ['High-Fidelity-Prototyping', 'D', 'M5', 'Systematische Interface-Gestaltung', 'Visuell und funktional detaillierte Entwürfe'],
+  ['Komponentenbasierte Gestaltung', 'D', 'M5', 'Systematische Interface-Gestaltung', 'Wiederverwendbare UI-Elemente systematisch entwickeln', 'Frost (2016)'],
+  // H
+  ['Forschungsorientiertes Prototyping', 'H', 'M1', 'Exploratives Prototyping', 'Offene Forschungsfragen durch Prototypen untersuchen · auch M2'],
+  ['Forschungsorientierte Variantenentwicklung', 'H', 'M2', 'Interaktionsgestaltung', 'Zwei Interface-Varianten für einen kontrollierten Vergleich'],
+  ['Research through Design', 'H', 'M2', 'Interaktionsgestaltung', 'Erkenntnisgewinn durch den Gestaltungsprozess · M2–M5, nur wenn nachweisbar'],
+  // A
+  ['Themenfindung', 'A', 'M1', 'Konzeptfindung und -selektion', 'Mögliche Forschungsschwerpunkte identifizieren'],
+  ['Konzeptselektion', 'A', 'M1', 'Konzeptfindung und -selektion', 'Geeignetes Spielkonzept auswählen'],
+  ['Anforderungsdefinition', 'A', 'M1', 'Konzeptfindung und -selektion', 'Projekt- und Gestaltungsanforderungen festlegen · auch M2, M5'],
+  ['Technische Implementierung', 'A', 'M2', 'Umsetzung', 'Spielmechaniken programmieren'],
+  ['Asset-Erstellung', 'A', 'M2', 'Umsetzung', 'Visuelle Spielinhalte erstellen'],
+  ['Teilnehmerkategorisierung', 'A', 'M3', 'Testvorbereitung', 'Testpersonen nach relevanten Merkmalen gruppieren'],
+  ['Datenbereinigung', 'A', 'M4', 'Datenaufbereitung', 'Fehlerhafte oder unvollständige Daten überprüfen'],
+  ['Visuelle Systematisierung', 'A', 'M5', 'Systematische Interface-Gestaltung', 'Farben, Typografie und Abstände vereinheitlichen'],
+  ['Komponentenentwicklung', 'A', 'M5', 'Systematische Interface-Gestaltung', 'Einzelne UI-Komponenten erstellen'],
+  ['Styleguide-Erstellung', 'A', 'M5', 'Systematische Interface-Gestaltung', 'Gestaltungsrichtlinien dokumentieren'],
+  ['Kompetenzerwerb in Figma', 'A', 'M5', 'Systematische Interface-Gestaltung', 'Auto Layout, Variables und Komponenten erlernen'],
+  ['Projektplanung', 'A', ALONGSIDE, '', 'Aufgaben, Zeit und Ressourcen organisieren'],
+  // I: instruments, techniques and tools (the list's "Typ" as the description)
+  ['Within-Subject-Design', 'I', 'M2', 'Nutzertestkonzeption', 'Forschungsdesign'],
+  ['AB-/BA-Counterbalancing', 'I', 'M2', 'Nutzertestkonzeption', 'Kontrolle von Reihenfolgeeffekten'],
+  ['React', 'I', 'M2', 'Umsetzung', 'Entwicklungswerkzeug'],
+  ['UEQ-S', 'I', 'M3', 'Datenerhebung', 'Standardisiertes Erhebungsinstrument'],
+  ['Likert-Skalen', 'I', 'M3', 'Datenerhebung', 'Erhebungsinstrument / numerische Bewertungsskalen'],
+  ['Tally', 'I', 'M3', 'Datenerhebung', 'Erhebungswerkzeug'],
+  ['Visual Information-Seeking Mantra', 'I', 'M4', 'Ergebnisinterpretation', 'Analyse- und Visualisierungsprinzip', 'Shneiderman (1996)'],
+  ['Auswertungsdashboard', 'I', 'M4', 'Datenvisualisierung', 'Analysewerkzeug und Artefakt'],
+  ['Atomic Design', 'I', 'M5', 'Systematische Interface-Gestaltung', 'Gestaltungsmethodik / konzeptioneller Rahmen', 'Frost (2016)'],
+  ['Auto Layout', 'I', 'M5', 'Systematische Interface-Gestaltung', 'Gestaltungstechnik'],
+  ['Variables / Design Tokens', 'I', 'M5', 'Systematische Interface-Gestaltung', 'Technik zur visuellen Systematisierung'],
+  ['Component Variants', 'I', 'M5', 'Systematische Interface-Gestaltung', 'Gestaltungstechnik'],
+  ['Figma', 'I', 'M5', 'Systematische Interface-Gestaltung', 'Gestaltungswerkzeug'],
+  ['Zotero', 'I', ALONGSIDE, '', 'Quellenverwaltungswerkzeug'],
+];
+
+const norm = (s: string) => slug(s).replace(/-/g, '');
+export function addMethods(d: JournalDocs): Put[] {
+  const phases = Object.values(d.phases ?? {});
+  const methods = Object.values(d.methods ?? {});
+  const have = new Set(methods.map((m) => norm(m.name)));
+  const now = Date.now();
+  const put: Put[] = [];
+  const changed = new Map<string, MethodPhase>();
+  for (const [name, type, code, area, desc, source] of ADDITIONS) {
+    if (have.has(norm(name))) continue;
+    const ph = code === ALONGSIDE ? phases.find((p) => p.id === ALONGSIDE) : phases.find((p) => p.code.trim().toUpperCase() === code);
+    if (!ph) continue;
+    const cur = changed.get(ph.id) ?? ph;
+    // an area the phase does not have yet (M2 › Umsetzung) is added at its end
+    if (!cur.areas.includes(area)) changed.set(ph.id, { ...cur, areas: [...cur.areas, area] });
+    const order = methods.filter((m) => m.phase === ph.id && m.area === area).length + put.filter((p) => p.coll === 'methods' && (p.data as Method).phase === ph.id && (p.data as Method).area === area).length;
+    const m: Method = { id: `mt-${ph.id}-${slug(area)}-${slug(name)}`.slice(0, 120), name, desc, type, phase: ph.id, area, order, created: now, ...(source ? { source } : {}) };
+    put.push({ coll: 'methods', id: m.id, data: m });
+    have.add(norm(name));
+  }
+  for (const p of changed.values()) put.push({ coll: 'phases', id: p.id, data: p });
+  return put;
+}

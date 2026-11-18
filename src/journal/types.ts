@@ -247,13 +247,16 @@ export interface JournalDocs {
 }
 
 // ---- the methodical process model: macro (phase) → meso (area) → micro (method) ----
-export type MethodType = 'W' | 'D' | 'H' | 'A';
+export type MethodType = 'W' | 'D' | 'H' | 'A' | 'I';
 export const METHOD_TYPES: { id: MethodType; label: string; de: string; tag: string; color: string }[] = [
   { id: 'W', label: 'Scientific', de: 'Wissenschaftlich', tag: 'WISS', color: '#2f6fd6' },
   { id: 'D', label: 'Design', de: 'Design', tag: 'DESIGN', color: '#c2571a' },
   { id: 'H', label: 'Hybrid', de: 'Hybrid', tag: 'HYBRID', color: '#7b4fd0' },
   { id: 'A', label: 'Activity', de: 'Aktivität', tag: 'AKTIV', color: '#7d7d76' },
+  // instruments, techniques and tools: named in tasks, but not counted as methods
+  { id: 'I', label: 'Instrument', de: 'Instrument / Werkzeug', tag: 'INSTR', color: '#9a8f6a' },
 ];
+export const isInstrument = (m: { type: MethodType }) => m.type === 'I';
 // a phase's colour group (the reference's colour coding)
 export type PhaseTone = 'ex' | 'fu' | 'wa';
 export const PHASE_TONES: { id: PhaseTone; label: string }[] = [
@@ -279,6 +282,7 @@ export interface Method {
   type: MethodType;
   phase: string; // a phase id (ALONGSIDE for the project-wide ones)
   area: string; // one of the phase's areas
+  source?: string; // the literature it rests on, e.g. Floyd (1984)
   order: number;
   created: number;
 }

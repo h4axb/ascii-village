@@ -4,7 +4,7 @@
 // process model, where every method row tells how often it was used.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JournalStore, Put } from './store';
-import { ALONGSIDE, METHOD_TYPES, PHASE_TONES, fmtDate, fmtMinutes, newId, taskMinutes, type Entry, type Method, type MethodPhase, type MethodType, type PhaseTone, type Task } from './types';
+import { ALONGSIDE, METHOD_TYPES, PHASE_TONES, fmtDate, fmtMinutes, isInstrument, newId, taskMinutes, type Entry, type Method, type MethodPhase, type MethodType, type PhaseTone, type Task } from './types';
 import { Icon, IconBtn, Modal } from './ui';
 
 export type MethodTab = 'entries' | 'methods' | 'model';
@@ -12,6 +12,19 @@ const typeOf = (t: MethodType) => METHOD_TYPES.find((x) => x.id === t) ?? METHOD
 export const sortedPhases = (store: JournalStore) => Object.values(store.docs.phases ?? {}).sort((a, b) => a.order - b.order);
 const byOrder = (a: Method, b: Method) => a.order - b.order || a.name.localeCompare(b.name);
 const phaseLabel = (p?: MethodPhase) => (!p ? '–' : p.id === ALONGSIDE ? 'Projektbegleitend' : `${p.code} ${p.name}`);
+
+// W01, D01 …: numbered per type in the order of the model (phase, area, row)
+export function methodCodes(store: JournalStore): Map<string, string> {
+  const phases = sortedPhases(store);
+  const pi = (m: Method) => {
+    const i = phases.findIndex((p) => p.id === m.phase);
+    return i < 0 ? 999 : i;
+  };
+  const ai = (m: Method) => store.docs.phases?.[m.phase]?.areas.indexOf(m.area) ?? 0;
+  const all = Object.values(store.docs.methods ?? {}).sort((a, b) => pi(a) - pi(b) || ai(a) - ai(b) || byOrder(a, b));
+  const n: Record<string, number> = {};
+  return new Map(all.map((m) => [m.id, `${m.type}${String((n[m.type] = (n[m.type] ?? 0) + 1)).padStart(2, '0')}`]));
+}
 
 // ---- usage: which tasks name a method ----
 export interface Use {
@@ -79,21 +92,22 @@ export function MethodsPane({ store, tab, openEntry }: { store: JournalStore; ta
   const [open, setOpen] = useState<string | null>(null); // a method id, or 'new'
   const [phasesOpen, setPhasesOpen] = useState(false);
   const usage = useMemo(() => methodUsage(store.docs.entries), [store.docs.entries]);
+  const codes = useMemo(() => methodCodes(store), [store.docs.methods, store.docs.phases]);
   return (
     <>
       {tab === 'methods' ? (
-        <MethodTable store={store} usage={usage} onOpen={setOpen} onNew={() => setOpen('new')} />
+        <MethodTable store={store} usage={usage} codes={codes} onOpen={setOpen} onNew={() => setOpen('new')} />
       ) : (
         <ProcessModel store={store} usage={usage} onOpen={setOpen} onEditPhases={() => setPhasesOpen(true)} />
       )}
-      {open && <MethodDrawer key={open} store={store} id={open === 'new' ? null : open} usage={usage} onClose={() => setOpen(null)} onOpen={setOpen} openEntry={openEntry} />}
+      {open && <MethodDrawer key={open} store={store} id={open === 'new' ? null : open} usage={usage} codes={codes} onClose={() => setOpen(null)} onOpen={setOpen} openEntry={openEntry} />}
       {phasesOpen && <PhaseEditor store={store} onClose={() => setPhasesOpen(false)} />}
     </>
   );
 }
 
 // ---- table ----
-function MethodTable({ store, usage, onOpen, onNew }: { store: JournalStore; usage: Map<string, Usage>; onOpen: (id: string) => void; onNew: () => void }) {
+function MethodTable({ store, usage, codes, onOpen, onNew }: { store: JournalStore; usage: Map<string, Usage>; codes: Map<string, string>; onOpen: (id: string) => void; onNew: () => void }) {
   const [q, setQ] = useState('');
   const [type, setType] = useState<MethodType | ''>('');
   const [phase, setPhase] = useState('');
@@ -145,6 +159,7 @@ function MethodTable({ store, usage, onOpen, onNew }: { store: JournalStore; usa
       {rows.length ? (
         <div className="jr-table jr-mt" role="table" aria-label="Methods">
           <div className="jr-mt-row is-head" role="row">
+            <span role="columnheader">ID</span>
             <span role="columnheader">Method · Mikro</span>
             <span role="columnheader">Type</span>
             <span role="columnheader">Phase · Makro</span>
@@ -162,9 +177,11 @@ function MethodTable({ store, usage, onOpen, onNew }: { store: JournalStore; usa
                 const u = usage.get(m.id);
                 return (
                   <button key={m.id} type="button" className="jr-mt-row" role="row" onClick={() => onOpen(m.id)}>
+                    <span className="jr-mt-code">{codes.get(m.id)}</span>
                     <span className="jr-mt-name">
                       <strong>{m.name}</strong>
                       {m.desc && <small>{m.desc}</small>}
+                      {m.source && <small className="jr-mt-src">{m.source}</small>}
                     </span>
                     <span>
                       <span className="jr-mtype">
@@ -174,7 +191,7 @@ function MethodTable({ store, usage, onOpen, onNew }: { store: JournalStore; usa
                     </span>
                     <span className="jr-mt-phase">
                       <span className={`jr-mt-tone is-${g.p?.tone ?? 'fu'}`} aria-hidden="true" />
-                      {g.p ? (g.p.id === ALONGSIDE ? 'Projektbegleitend' : g.p.code) : '–'}
+                      {g.p ? (g.p.id === ALONGSIDE ? 'Begleitend' : g.p.code) : '–'}
                     </span>
                     <span className="jr-mt-area">{m.area || '–'}</span>
                     <span className={`jr-mt-use${u ? '' : ' is-zero'}`}>
@@ -206,7 +223,9 @@ function ProcessModel({ store, usage, onOpen, onEditPhases }: { store: JournalSt
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const phases = sortedPhases(store);
-  const methods = Object.values(store.docs.methods ?? {});
+  const everything = Object.values(store.docs.methods ?? {});
+  const methods = everything.filter((m) => !isInstrument(m));
+  const instruments = everything.filter(isInstrument);
   const along = phases.find((p) => p.id === ALONGSIDE);
   const flow = phases.filter((p) => p.id !== ALONGSIDE);
   const visible = (m: Method) => show === 'all' || (show === 'used') === !!usage.get(m.id);
@@ -334,6 +353,27 @@ function ProcessModel({ store, usage, onOpen, onEditPhases }: { store: JournalSt
               </div>
             </>
           )}
+          {instruments.some(visible) && (
+            <>
+              <div className="vm-sec">Instrumente, Techniken und Werkzeuge</div>
+              <div className="vm-ins">
+                {instruments
+                  .filter(visible)
+                  .sort((a, b) => (store.docs.phases?.[a.phase]?.order ?? 99) - (store.docs.phases?.[b.phase]?.order ?? 99) || byOrder(a, b))
+                  .map((m) => {
+                    const n = usage.get(m.id)?.uses.length ?? 0;
+                    const p = store.docs.phases?.[m.phase];
+                    return (
+                      <button key={m.id} type="button" className={n ? '' : 'is-planned'} onClick={() => onOpen(m.id)}>
+                        <b>{m.name}</b>
+                        <span>{[p ? (p.id === ALONGSIDE ? 'projektbegleitend' : p.code) : '', m.desc].filter(Boolean).join(' · ')}</span>
+                        {n > 0 && <em>{n}×</em>}
+                      </button>
+                    );
+                  })}
+              </div>
+            </>
+          )}
           <div className="vm-sec">Projektablauf</div>
           {flow.map((p) => {
             const mine = methods.filter((m) => m.phase === p.id);
@@ -440,6 +480,12 @@ const VM_CSS = `
 .jr-vm .vm-pb{background:#ecedf0;padding:20px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:24px}
 .jr-vm .vm-pb button{background:#c9ccd4;text-align:center;font-size:10.5px;font-weight:700;padding:8px;color:#3b3d44;display:flex;align-items:center;justify-content:center;gap:8px}
 .jr-vm .vm-pb em{font-style:normal;font-weight:600;font-size:9px;opacity:.7}
+.jr-vm .vm-ins{background:#f4f2ec;padding:14px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:24px}
+.jr-vm .vm-ins button{background:#fff;border:1px solid #ddd8c8;padding:6px 8px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 6px;align-items:baseline}
+.jr-vm .vm-ins button.is-planned{border-style:dashed}
+.jr-vm .vm-ins b{font-size:10px;font-weight:650;color:#4a4636;overflow-wrap:anywhere}
+.jr-vm .vm-ins span{grid-column:1;font-size:8px;color:#8a8470}
+.jr-vm .vm-ins em{grid-column:2;grid-row:1;font-style:normal;font-size:8.5px;font-weight:700;color:#8a7a3e}
 .jr-vm .vm-ph{display:flex;margin-bottom:22px}
 .jr-vm .vm-body{flex:1;min-width:0;padding:12px 12px 12px 10px}
 .jr-vm .vm-grid{display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));gap:12px}
@@ -472,6 +518,7 @@ ${(['ex', 'fu', 'wa'] as const)
 .jr-vm h3{font-size:19px;margin-bottom:20px}
 .jr-vm .vm-top{grid-template-columns:1fr;gap:16px}
 .jr-vm .vm-pb{grid-template-columns:1fr;padding:12px;gap:8px}
+.jr-vm .vm-ins{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px}
 .jr-vm .vm-grid{grid-template-columns:minmax(0,1fr)}
 .jr-vm .vm-bar{width:26px}
 .jr-vm .vm-pg{margin-left:0;width:100%}
@@ -479,7 +526,7 @@ ${(['ex', 'fu', 'wa'] as const)
 `;
 
 // ---- a method: details, uses, edit ----
-function MethodDrawer({ store, id, usage, onClose, onOpen, openEntry }: { store: JournalStore; id: string | null; usage: Map<string, Usage>; onClose: () => void; onOpen: (id: string) => void; openEntry: (id: string, task?: string) => void }) {
+function MethodDrawer({ store, id, usage, codes, onClose, onOpen, openEntry }: { store: JournalStore; id: string | null; usage: Map<string, Usage>; codes: Map<string, string>; onClose: () => void; onOpen: (id: string) => void; openEntry: (id: string, task?: string) => void }) {
   const m = id ? store.docs.methods?.[id] : undefined;
   const [editing, setEditing] = useState(!id);
   useEffect(() => {
@@ -508,7 +555,7 @@ function MethodDrawer({ store, id, usage, onClose, onOpen, openEntry }: { store:
       <aside className="jr-drawer jr-mdrawer" role="dialog" aria-modal="true" aria-labelledby="jr-md-h">
         <header className="jr-drawer-head">
           <div>
-            <span className="jr-eyebrow">{m ? `Method · ${phaseLabel(phase)}` : 'Methods'}</span>
+            <span className="jr-eyebrow">{m ? [isInstrument(m) ? 'Instrument' : 'Method', codes.get(m.id), phaseLabel(phase)].filter(Boolean).join(' · ') : 'Methods'}</span>
             <h2 id="jr-md-h">{m ? m.name : 'New method'}</h2>
           </div>
           <IconBtn icon="x" label="Close" onClick={onClose} />
@@ -536,6 +583,8 @@ function MethodDrawer({ store, id, usage, onClose, onOpen, openEntry }: { store:
                 <dd>{phaseLabel(phase)}</dd>
                 <dt>Meso</dt>
                 <dd>{m.area || '–'}</dd>
+                <dt>Source</dt>
+                <dd>{m.source || <span className="jr-muted">–</span>}</dd>
                 {u && u.minutes > 0 && (
                   <>
                     <dt>Time logged</dt>
@@ -600,7 +649,7 @@ function MethodDrawer({ store, id, usage, onClose, onOpen, openEntry }: { store:
 // name, description, type, phase, area; a new area is added to its phase
 function MethodForm({ store, m, init, onDone }: { store: JournalStore; m?: Method; init?: Partial<Method>; onDone: (savedId: string | null) => void }) {
   const phases = sortedPhases(store);
-  const [f, setF] = useState(() => ({ name: m?.name ?? init?.name ?? '', desc: m?.desc ?? '', type: m?.type ?? init?.type ?? ('W' as MethodType), phase: m?.phase ?? init?.phase ?? phases.find((p) => p.id !== ALONGSIDE)?.id ?? ALONGSIDE, area: m?.area ?? init?.area ?? '' }));
+  const [f, setF] = useState(() => ({ name: m?.name ?? init?.name ?? '', desc: m?.desc ?? '', source: m?.source ?? '', type: m?.type ?? init?.type ?? ('W' as MethodType), phase: m?.phase ?? init?.phase ?? phases.find((p) => p.id !== ALONGSIDE)?.id ?? ALONGSIDE, area: m?.area ?? init?.area ?? '' }));
   const [newArea, setNewArea] = useState('');
   const ph = store.docs.phases?.[f.phase];
   const areas = ph?.areas ?? [];
@@ -610,7 +659,7 @@ function MethodForm({ store, m, init, onDone }: { store: JournalStore; m?: Metho
     if (!ok) return;
     const id = m?.id ?? newId('mt');
     const order = m?.order ?? Object.values(store.docs.methods ?? {}).filter((x) => x.phase === f.phase && x.area === area).length;
-    const put: Put[] = [{ coll: 'methods', id, data: { id, name: f.name.trim(), desc: f.desc.trim(), type: f.type, phase: f.phase, area, order, created: m?.created ?? Date.now() } satisfies Method }];
+    const put: Put[] = [{ coll: 'methods', id, data: { id, name: f.name.trim(), desc: f.desc.trim(), type: f.type, phase: f.phase, area, order, created: m?.created ?? Date.now(), ...(f.source.trim() ? { source: f.source.trim() } : {}) } satisfies Method }];
     if (ph && !ph.areas.includes(area)) put.push({ coll: 'phases', id: ph.id, data: { ...ph, areas: [...ph.areas, area] } });
     await store.commit(put);
     onDone(id);
@@ -632,6 +681,12 @@ function MethodForm({ store, m, init, onDone }: { store: JournalStore; m?: Metho
           Short description <span className="jr-muted">optional</span>
         </span>
         <input value={f.desc} onChange={(e) => setF({ ...f, desc: e.target.value })} />
+      </label>
+      <label className="jr-field">
+        <span>
+          Source <span className="jr-muted">optional</span>
+        </span>
+        <input value={f.source} placeholder="e.g. Floyd (1984)" onChange={(e) => setF({ ...f, source: e.target.value })} />
       </label>
       <div className="jr-field">
         <span>Type</span>
@@ -825,9 +880,14 @@ export function MethodField({ store, chosen, label, onChange }: { store: Journal
   const toggle = (id: string) => onChange(chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id]);
   const needle = q.trim().toLowerCase();
   const hits = Object.values(all).filter((m) => !needle || `${m.name} ${m.desc} ${m.area}`.toLowerCase().includes(needle));
-  const groups = phases
-    .map((p) => ({ p, areas: [...new Set([...p.areas, ...hits.filter((m) => m.phase === p.id).map((m) => m.area)])].map((a) => ({ a, ms: hits.filter((m) => m.phase === p.id && m.area === a).sort(byOrder) })).filter((x) => x.ms.length) }))
-    .filter((g) => g.areas.length);
+  const meth = hits.filter((m) => !isInstrument(m));
+  const instr = hits.filter(isInstrument).sort((a, b) => (store.docs.phases?.[a.phase]?.order ?? 99) - (store.docs.phases?.[b.phase]?.order ?? 99) || byOrder(a, b));
+  const groups = [
+    ...phases
+      .map((p) => ({ key: p.id, tone: p.tone, title: p.id === ALONGSIDE ? 'Projektbegleitend' : `${p.code} ${p.name}`, areas: [...new Set([...p.areas, ...meth.filter((m) => m.phase === p.id).map((m) => m.area)])].map((a) => ({ a, ms: meth.filter((m) => m.phase === p.id && m.area === a).sort(byOrder) })).filter((x) => x.ms.length) }))
+      .filter((g) => g.areas.length),
+    ...(instr.length ? [{ key: 'instr', tone: 'instr', title: 'Instrumente, Techniken und Werkzeuge', areas: [{ a: '', ms: instr }] }] : []),
+  ];
   const exact = hits.some((m) => m.name.toLowerCase() === needle);
   const sug = together(store.docs.entries, chosen).filter((id) => all[id]);
   return (
@@ -885,12 +945,12 @@ export function MethodField({ store, chosen, label, onChange }: { store: Journal
               ) : (
                 <>
                   <div className="jr-mpick-list">
-                    {groups.map(({ p, areas }) =>
+                    {groups.map(({ key, tone, title, areas }) =>
                       areas.map(({ a, ms }) => (
-                        <div key={`${p.id}/${a}`}>
+                        <div key={`${key}/${a}`}>
                           <div className="jr-mpick-grp">
-                            <span className={`jr-mt-tone is-${p.tone}`} aria-hidden="true" />
-                            {[p.id === ALONGSIDE ? 'Projektbegleitend' : `${p.code} ${p.name}`, a].filter(Boolean).join(' › ')}
+                            <span className={`jr-mt-tone is-${tone}`} aria-hidden="true" />
+                            {[title, a].filter(Boolean).join(' › ')}
                           </div>
                           {ms.map((m) => {
                             const on = chosen.includes(m.id);

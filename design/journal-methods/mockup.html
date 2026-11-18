@@ -148,6 +148,19 @@ table.mt{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
 .fu .bar{background:var(--fuB)}.fu{background:var(--fuL)}.fu .meso{outline:1px solid var(--fuC)}.fu .mz{color:var(--fuB);border-color:var(--fuC)}.fu .mi2{background:var(--fuR)}.fu .mi2.un{border-color:var(--fuB);color:var(--fuB)}.fu .erg{background:#dfe2f7}
 .wa .bar{background:var(--waB)}.wa{background:var(--waL)}.wa .meso{outline:1px solid var(--waC)}.wa .mz{color:var(--waB);border-color:var(--waC)}.wa .mi2{background:var(--waR)}.wa .mi2.un{border-color:var(--waB);color:var(--waB)}.wa .erg{background:#d1ecdc}
 .mi2 .bd{display:inline-flex;margin:0;opacity:1;font-size:8.5px;line-height:1}
+/* type tag: tone on tone in the row, one coloured dot */
+.mi2{align-items:stretch}
+.mi2 .rs{display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;gap:4px;flex:none;padding:1px 0}
+.mi2 .ct{font-style:normal;font-size:8.5px;font-weight:700;opacity:.92;line-height:1}
+.tg{font-style:normal;display:inline-flex;align-items:center;gap:3px;min-width:34px;justify-content:center;font-size:7px;font-weight:700;letter-spacing:.4px;background:rgba(255,255,255,.2);border-radius:2px;padding:2px 4px;line-height:1;color:#fff;white-space:nowrap}
+.tg u{width:5px;height:5px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.65);display:inline-block}
+.tg.W u{background:var(--tW)}.tg.D u{background:var(--tD)}.tg.H u{background:var(--tH)}.tg.A u{background:#9a9a92}
+.mi2.un .tg{background:transparent;box-shadow:inset 0 0 0 1px currentColor;color:inherit}
+.mi2.un .tg u{box-shadow:none}
+.mi2.un .ct{font-weight:600;opacity:.8;font-size:7.5px;letter-spacing:.2px}
+.tg.lg{background:#5f636e;margin-right:5px;padding:3px 5px 3px 4px}
+.tg.lg.un{background:transparent;color:#6c7be0;box-shadow:inset 0 0 0 1px #6c7be0;border:0;outline:1px dashed #6c7be0;outline-offset:-1px}
+.fk .tl span{gap:0;margin-right:6px}
 .mi2.sel{outline:2px solid #1d1d1b;outline-offset:2px}
 /* method drawer */
 .md .facts{display:grid;grid-template-columns:110px 1fr;gap:10px 14px;font-size:14px;margin:16px 0 6px}
@@ -227,7 +240,8 @@ const head = (tab) => `<div class="head"><h1>Methods &amp; Methodology</h1><div 
 <div class="tabs"><span class="tab ${tab === 'entries' ? 'on' : ''}">Entries<span class="n">20</span></span><span class="tab ${tab === 'table' ? 'on' : ''}">Methods<span class="n">69</span><span class="new">NEW</span></span><span class="tab ${tab === 'model' ? 'on' : ''}">Process model<span class="new">NEW</span></span></div>`;
 
 function model(selName) {
-  const mi = ([n, s, t, u]) => `<div class="mi2 ${u ? '' : 'un'} ${n === selName ? 'sel' : ''}"><div class="tx"><b>${n}</b><span>${s}</span></div>${u ? `<span class="ct">${u}×</span>` : ''}<span class="bd ${t}">${t}</span></div>`;
+  const TAG = { W: 'WISS', D: 'DESIGN', H: 'HYBRID', A: 'AKTIV' };
+  const mi = ([n, s, t, u]) => `<div class="mi2 ${u ? '' : 'un'} ${n === selName ? 'sel' : ''}"><div class="tx"><b>${n}</b><span>${s}</span></div><div class="rs"><em class="ct">${u ? u + '×' : 'geplant'}</em><i class="tg ${t}">${TAG[t]}</i></div></div>`;
   const phase = (p) => {
     const all = p.meso.flatMap((m) => m[1]); const used = all.filter((x) => x[3]).length;
     return `<div class="ph ${p.c}"><div class="bar"><span class="vt">${p.id} - ${p.name}</span></div><div class="body">
@@ -239,8 +253,8 @@ function model(selName) {
     <div class="meso"><div class="mt2">MESO - Tätigkeitsbereich</div>${[0, 1, 2].map(() => `<div class="mi"><b>MIKRO - Methoden, Instrumente und Arbeitsschritte</b><span>Kurzbeschreibung der Methode</span></div>`).join('')}</div>
     <div class="erg"><b>ERGEBNIS</b>Resultat der Projektphase</div></div></div></div>
    <div><div class="sec">Farbkodierung</div><div class="fk"><div class="k1">Exploration</div><div class="k2">Forschung &amp; Entwicklung</div><div class="k3">Wissenschaftliche Ausarbeitung</div><div class="k4">Projektbegleitende Tätigkeiten</div>
-    <div class="tl">${Object.entries(T).map(([k, v]) => `<span><span class="bd ${k} o">${k}</span>${({ W: 'Wissenschaftlich', D: 'Design', H: 'Hybrid', A: 'Aktivität' })[k]}</span>`).join('')}</div>
-    <div class="tl"><span><span class="bd o" style="background:#7b89e6;color:#fff;box-shadow:none;width:auto;padding:0 4px">3×</span>verwendet</span><span><span class="bd o" style="border:1px dashed #6c7be0;box-shadow:none;width:22px"></span>geplant, noch nicht verwendet</span></div></div></div></div>
+    <div class="tl">${Object.entries(T).map(([k]) => `<span><i class="tg ${k} lg">${({ W: 'WISS', D: 'DESIGN', H: 'HYBRID', A: 'AKTIV' })[k]}</i>${({ W: 'Wissenschaftlich', D: 'Design', H: 'Hybrid', A: 'Aktivität' })[k]}</span>`).join('')}</div>
+    <div class="tl"><span><i class="tg lg"><b style="font-size:7.5px">3×</b></i>verwendet</span><span><i class="tg lg un">geplant</i>noch nicht verwendet</span></div></div></div></div>
   <div class="sec">Projektbegleitende Tätigkeiten</div>
   <div class="pb"><div>Project Log <em>42×</em></div><div>Weekly Reviews <em>6×</em></div><div>Quellenverwaltung <em>18×</em></div></div>
   <div class="sec">Projektablauf</div>${PHASES.map(phase).join('')}</div>`;

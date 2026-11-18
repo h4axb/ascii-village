@@ -13,5 +13,5 @@ Noch nicht umgesetzt. `mockup.html?v=task|picker|newm|table|model|drawer|mtable`
 | 07–08 | Mobil: Modell einspaltig, Tabelle als Karten |
 | 09 | Das ganze Vorgehensmodell (Export-Ansicht) |
 
-- Zeilenfarbe = Phase (wie Referenz); Typ als Badge W / D / H / A; „3×“ = verwendet, gestrichelt = geplant.
+- Zeilenfarbe = Phase (wie Referenz); Typ als Ton-in-Ton-Tag unten rechts in der Zeile (WISS · DESIGN · HYBRID · AKTIV), oben rechts „3×“ = verwendet bzw. „geplant“ (Zeile gestrichelt).
 - Fortschritt je Phase im Ergebnis-Band („6/14 verwendet“).

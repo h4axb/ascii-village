@@ -16,7 +16,7 @@ import { Bubble, ChatMessage, Frame, Sheet, type Speaker } from './ui';
 import { useMitchyLook } from './useMitchyLook';
 
 // his portrait follows his current look (the world editor can swap it)
-const mitchySpeaker = (): Speaker => ({ name: MITCHY_NAME, look: S.MITCHY_FACE_LOOK, solid: {} });
+const mitchySpeaker = (): Speaker => ({ name: MITCHY_NAME, look: S.MITCHY_PORTRAIT_LOOK, solid: {}, cover: true, fill: 1 });
 
 // the first talk ever plugs the craft tokens; after that, a greeting
 const TOKEN_LINE =

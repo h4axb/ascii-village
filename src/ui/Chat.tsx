@@ -14,13 +14,14 @@ export interface Speaker {
   look: SpriteLook;
   solid?: { eyeRow?: number }; // the player's per-cell backing (see FitSprite)
   cover?: boolean; // crop a wide face to fill the box (the player's) instead of fitting it whole
+  fill?: number; // how far the art fills the box (default 1.1 with cover, else 0.9)
 }
 
 export function Portrait({ who }: { who: Speaker }) {
   return (
     <div className="ds-portrait">
       <div className="ds-portrait-box">
-        <FitSprite look={who.look} solid={who.solid} cover={!!who.cover} fill={who.cover ? 1.1 : 0.9} maxScale={3} />
+        <FitSprite look={who.look} solid={who.solid} cover={!!who.cover} fill={who.fill ?? (who.cover ? 1.1 : 0.9)} maxScale={3} />
       </div>
       <div className="ds-portrait-name">{who.name}</div>
     </div>
@@ -51,13 +52,17 @@ export function Bubble({ children, className }: { children: ReactNode; className
 }
 
 // A framed box with the dashed corner brackets of the dialogue box.
-export function Frame({ children, className }: { children: ReactNode; className?: string }) {
+export function Frame({ children, className, brackets = true }: { children: ReactNode; className?: string; brackets?: boolean }) {
   return (
     <div className={'ds-frame' + (className ? ' ' + className : '')}>
-      <span className="ds-bracket tl" />
-      <span className="ds-bracket tr" />
-      <span className="ds-bracket bl" />
-      <span className="ds-bracket br" />
+      {brackets && (
+        <>
+          <span className="ds-bracket tl" />
+          <span className="ds-bracket tr" />
+          <span className="ds-bracket bl" />
+          <span className="ds-bracket br" />
+        </>
+      )}
       {children}
     </div>
   );

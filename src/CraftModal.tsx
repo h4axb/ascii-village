@@ -71,7 +71,7 @@ export const PROMPT_MAX = 80;
 export const ADJUST_PRICE = 12;
 
 // his portrait follows his current look (the world editor can swap it)
-const mitchySpeaker = (): Speaker => ({ name: MITCHY_NAME, look: S.MITCHY_FACE_LOOK, solid: {} });
+const mitchySpeaker = (): Speaker => ({ name: MITCHY_NAME, look: S.MITCHY_PORTRAIT_LOOK, solid: {}, cover: true, fill: 1 });
 
 // input → working → (choosing | clarifying →) working → failed | success → folded
 // offline: the AI couldn't be reached; a popup explains and retries
@@ -1295,7 +1295,7 @@ export default function CraftModal({
         </div>
 
         <div className="cw3-bottom">
-          <Frame className="cw3-prompt">
+          <Frame className="cw3-prompt" brackets={false}>
             <input
               ref={inputRef}
               className="cw3-input"
@@ -1316,9 +1316,9 @@ export default function CraftModal({
               {input.length}/{PROMPT_MAX}
             </span>
           </Frame>
-          <button className="cw3-craft" onClick={submit} disabled={!canSend}>
+          <button className="cw3-craft" onClick={submit} disabled={!canSend} aria-label={busy ? 'Send' : 'Craft it!'}>
             <IconHammer />
-            <span>{busy ? 'Send' : 'Craft it!'}</span>
+            <span className="cw3-craft-label">{busy ? 'Send' : 'Craft it!'}</span>
           </button>
         </div>
       </Frame>

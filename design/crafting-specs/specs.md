@@ -16,12 +16,12 @@ Desktop 1440 × 900 · alle Werte in px · Schrift **Asciia Mono 400**
 | Verlauf-Tab | rechts am Frame, 11 unter Oberkante | 38 × 58 · r 0 7 7 0 · Kerbe 8 · Rand oben + rechts · Icon 20 bei 8.5/15 · `shared/icons/bookmark(-hover).svg` |
 | Chat | V · scrollt | gap 18 · pad 4 8 4 4 |
 | Msg | H (rechts: gespiegelt) | gap 18 |
-| Avatar | V | 84 breit · Box 76 × 76 · r 7 · gap 7 · Name 14 · ls 0.5 · #EFC862 |
+| Avatar | V | 84 breit · Box 76 × 76 · r 7 · gap 7 · Name 14 · ls 0.5 · #EFC862 · Mitchy: Close-up (`shared/portraits/mitchy-face`) füllt die Box |
 | Bubbles | V | gap 10 · Bubble max min(480, 64 %) |
 | Bubble | Text | pad 12 20 · r 7 · Rand 1 · 85 % · Fläche #262B1C · 14 / 22 |
 | Optionen | V · rechtsbündig | 360 breit · gap 8 · Option 360 × 40 · pad 11 30 · r 7 |
 | Bottom | H · Linie oben 1 | pt 16 · gap 16 |
-| Eingabe | H · fill | × 56 · pad 0 20 · gap 12 · Text 15 · Zähler 12 · r 7 · Ecken 10 |
+| Eingabe | H · fill | × 56 · pad 0 20 · gap 12 · Text 15 · Zähler 12 · r 7 · keine Ecken |
 | Craft | H | 200 × 56 · pad 0 34 · gap 16 · 17 px · r 7 |
 
 ## Icons & Schrift
@@ -53,7 +53,7 @@ SVGs je Ecke: `shared/ecken/` (einzelne Rechtecke, direkt in Figma ziehen).
 | Winkel | waagerecht (x, Länge) | senkrecht (y, Länge) |
 |---|---|---|
 | Frame 16 × 16 · 9 vom Rand | 3.5 → 6.5 · 13.5 → 2.5 | 3.5 → 6.5 · 13.5 → 2.5 |
-| Eingabe / Bild 10 × 10 · 5 vom Rand | 3.5 → 6.5 | 3.5 → 6.5 |
+| Bild 10 × 10 · 5 vom Rand | 3.5 → 6.5 | 3.5 → 6.5 |
 
 ## Variante 1 · Pre-Clarification
 | Komponente | Maße |

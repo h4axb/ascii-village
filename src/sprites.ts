@@ -866,6 +866,18 @@ export const TITLE = [
 // Ready-made looks (sprite + colours + palette) for Mitchy's portraits.
 export let MITCHY_LOOK = { sprite: MITCHY, colors: MITCHY_COLORS, palette: MITCHY_PALETTE };
 export let MITCHY_FACE_LOOK = { sprite: MITCHY_FACE, colors: MITCHY_FACE_COLORS, palette: MITCHY_PALETTE };
+// The chat portrait: a close-up from the brow down to the top of the
+// shoulders, the ear tips and the cheeks' outer edge cut off (for cat8: rows
+// 3-22, columns 6-41). Shown with `cover` so it fills the face box.
+function portraitCrop(sprite: string[], colors: string[], headRows: number) {
+  const w = Math.max(...sprite.map((l) => l.length));
+  const top = Math.round(headRows * 0.18);
+  const bottom = Math.min(sprite.length - 1, Math.round(headRows * 1.3));
+  const left = Math.round(w * 0.125);
+  const cut = (rows: string[]) => rows.slice(top, bottom + 1).map((l) => l.padEnd(w, ' ').slice(left, w - left));
+  return { sprite: cut(sprite), colors: cut(colors) };
+}
+export let MITCHY_PORTRAIT_LOOK = { ...portraitCrop(MITCHY, MITCHY_COLORS, MITCHY_ORIGINAL.headRows), palette: MITCHY_PALETTE };
 
 // Swap Mitchy's art (world.ts applyMitchyLook). headRows: how many rows from
 // the top make his portrait crop (the head).
@@ -886,6 +898,7 @@ export function setMitchyArt(a: MitchyArt) {
   MITCHY_FACE_COLORS = a.colors.slice(0, a.headRows);
   MITCHY_LOOK = { sprite: MITCHY, colors: MITCHY_COLORS, palette: MITCHY_PALETTE };
   MITCHY_FACE_LOOK = { sprite: MITCHY_FACE, colors: MITCHY_FACE_COLORS, palette: MITCHY_PALETTE };
+  MITCHY_PORTRAIT_LOOK = { ...portraitCrop(a.sprite, a.colors, a.headRows), palette: MITCHY_PALETTE };
   mitchyRev += 1;
   for (const fn of [...mitchyListeners]) fn();
 }

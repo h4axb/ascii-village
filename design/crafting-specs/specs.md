@@ -12,17 +12,18 @@ Desktop 1440 × 900 · alle Werte in px · Schrift **Asciia Mono 400**
 | Back / Close | Icon-Button | 46 × 42 · r 7 · Rand 1 |
 | Corner | V · end | gap 14 |
 | Coins | H | 94 × 36 · pad 7 18 7 14 · gap 12 · 17 px · ls 0.5 |
-| Frame | V · fill · Fläche #1C2014 · 72 % | min(1100, 86vw) × fill · pad 24 28 20 28 · r 12 · Rand 1 · 85 % · Ecken 16 × 16, 2 px gestrichelt, 9 vom Rand |
-| Verlauf-Tab | rechts am Frame, 11 unter Oberkante | 38 × 58 · r 0 7 7 0 · Kerbe 8 · Rand oben + rechts · Icon 20 bei 8.5/15 · `shared/icons/bookmark(-hover).svg` |
-| Chat | V · scrollt | gap 18 · pad 4 8 4 4 |
+| Frame | V · fill · Fläche #1C2014 · 72 % | min(1100, 86vw) × fill · pad 24 28 20 28 ab Innenkante (+1 Rand) · r 12 · Rand 1 · 85 % · Ecken 16 × 16, 2 px gestrichelt, 9 vom Rand |
+| Verlauf-Tab | an der Außenkante rechts · 10 unter Innenkante (11 außen) | 38 × 58 · r 0 7 7 0 · Kerbe 8 · Rand oben + rechts · Icon 20 bei 8.5/15 · `shared/icons/bookmark(-hover).svg` |
+| Chat | V · scrollt · Clip | gap 18 · pad 4 8 4 4 (zusätzlich zum Frame-Padding) |
 | Msg | H (rechts: gespiegelt) | gap 18 |
-| Avatar | V | 84 breit · Box 76 × 76 · r 7 · gap 7 · Name 14 · ls 0.5 · #EFC862 · Mitchy: Close-up (`shared/portraits/mitchy-face`) füllt die Box |
+| Avatar | V | 84 breit · Box 76 × 76 · r 7 · Box ab Außenkante oben 29 · links 37 · Name 14 · LH 16 · ls 0.5 · #EFC862 · Abstand 6 (Figma; Spiel 7) · Mitchy: Close-up (`shared/portraits/mitchy-face`) füllt die Box |
 | Bubbles | V | gap 10 · Bubble max min(480, 64 %) |
-| Bubble | Text | pad 12 20 · r 7 · Rand 1 · 85 % · Fläche #262B1C · 14 / 22 |
+| Bubble | Text | pad 12 20 · r 7 · Rand 1 · 85 % · Fläche #262B1C · 14 / 22,4 · Schweif ragt 7 über · erste Bubble links 135 ab Außenkante |
 | Optionen | V · rechtsbündig | 360 breit · gap 8 · Option 360 × 40 · pad 11 30 · r 7 |
-| Bottom | H · Linie oben 1 | pt 16 · gap 16 |
-| Eingabe | H · fill | × 56 · pad 0 20 · gap 12 · Text 15 · Zähler 12 · r 7 · keine Ecken |
-| Craft | H | 200 × 56 · pad 0 34 · gap 16 · 17 px · r 7 |
+| Bottom | H · Linie oben 1 · #DEDDB6 15 % | 16 Abstand · Linie 1 · 16 · gap 16 |
+| Eingabe | H · fill | 826 × 56 · pad 18 20 · gap 12 · Text 15 · Zähler 12 · r 7 · keine Ecken |
+| Craft | H | 200 × 56 · pad 0 34 · gap 16 · 17 px · r 7 · inaktiv ganzer Button 45 % · aktiv Fläche #7FB069 22 % · Hover 34 % |
+| Mobil | ≤ 820 / ≤ 480 | Sheet seitlich 16 · Frame 100 % · pad 18 14 14 · Avatar 60 (Box 56) · Tab links über dem Frame · ≤ 480 Craft nur Hammer, Gap 10 |
 
 ## Icons & Schrift
 - **Schrift:** Asciia Mono ist Cascadia Code (Microsoft, frei: github.com/microsoft/cascadia-code). Installieren und in Figma „Cascadia Code“ Regular 400 wählen.

@@ -13,7 +13,7 @@ Desktop 1440 × 900 · alle Werte in px · Schrift **Asciia Mono 400**
 | Corner | V · end | gap 14 |
 | Coins | H | 94 × 36 · pad 7 18 7 14 · gap 12 · 17 px · ls 0.5 |
 | Frame | V · fill · Fläche #1C2014 · 72 % | min(1100, 86vw) × fill · pad 24 28 20 28 · r 12 · Rand 1 · 85 % · Ecken 16 × 16, 2 px gestrichelt, 9 vom Rand |
-| Verlauf-Tab | rechts am Frame | 38 × 58 · r 0 7 7 0 |
+| Verlauf-Tab | rechts am Frame, 11 unter Oberkante | 38 × 58 · r 0 7 7 0 · Kerbe 8 · Rand oben + rechts · Icon 20 bei 8.5/15 · `shared/icons/bookmark(-hover).svg` |
 | Chat | V · scrollt | gap 18 · pad 4 8 4 4 |
 | Msg | H (rechts: gespiegelt) | gap 18 |
 | Avatar | V | 84 breit · Box 76 × 76 · r 7 · gap 7 · Name 14 · ls 0.5 · #EFC862 |

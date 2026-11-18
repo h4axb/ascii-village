@@ -12,6 +12,7 @@ import { taskTime } from './EntryForm';
 import { EntryCard, ImportDialog, PageHead, TaskCard } from './pages';
 import { Icon, IconBtn } from './ui';
 import { MatchDialog, SyncButton } from './zotero';
+import { MethodTabs, MethodsPane, type MethodTab } from './methods';
 
 const PAGE = 10;
 
@@ -44,6 +45,23 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
   // the Zotero sync: on the Project Log and on Research & Findings
   const zoteroHere = page === 'log' || page === 'research';
   const [importing, setImporting] = useState<{ name: string; data: LogImport } | null>(null);
+  // Methods & Methodology: its entries, the methods table and the process model
+  const [mtab, setMtab] = useState<MethodTab>(() => {
+    try {
+      const v = localStorage.getItem('jr-meth-tab');
+      return v === 'methods' || v === 'model' ? v : 'entries';
+    } catch {
+      return 'entries';
+    }
+  });
+  const pickTab = (t: MethodTab) => {
+    setMtab(t);
+    try {
+      localStorage.setItem('jr-meth-tab', t);
+    } catch {
+      /* per viewer only */
+    }
+  };
   const isSection = SECTIONS.some((s) => s.id === page);
   const kinds = blockKinds(store.docs.settings);
   const all = Object.values(store.docs.entries);
@@ -120,6 +138,16 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
     );
     setChecked(new Set());
   };
+
+  const tabs = page === 'methodology' ? <MethodTabs tab={mtab} onTab={pickTab} counts={{ entries: sectionItems(all, page).length, methods: Object.keys(store.docs.methods ?? {}).length }} /> : null;
+  if (tabs && mtab !== 'entries')
+    return (
+      <div className="jr-log">
+        <PageHead store={store} id={page} />
+        {tabs}
+        <MethodsPane store={store} tab={mtab} openEntry={openEntry} />
+      </div>
+    );
 
   return (
     <div className="jr-log">
@@ -202,6 +230,7 @@ export function LogList({ store, page, selected, selectedTask, openEntry, newEnt
             </>
           }
         />
+        {tabs}
         {showFilters && (
           <div className="jr-filters" role="search">
             {!isSection && (

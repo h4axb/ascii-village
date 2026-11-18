@@ -3,6 +3,7 @@
 // cards in their category's colour; below, the day's check-in, the weekly
 // review if one is added, and an older entry's own notes. The entry panel
 // shows it with "Edit"; the new-entry drawer shows it as "Review entry".
+import { MethodChips } from './methods';
 import { useEffect, useRef } from 'react';
 import { Markdown } from './markdown';
 import type { JournalStore } from './store';
@@ -202,6 +203,7 @@ function TaskItem({ store, e, t, kinds, focus, onEdit }: { store: JournalStore; 
           }}
         />
         {((t.sections ?? []).length > 0 || (t.topics ?? []).length > 0) && <Chipline store={store} sections={t.sections ?? []} topics={t.topics ?? []} />}
+        <MethodChips store={store} ids={t.methods ?? []} />
         {blocks.map((b) => (
           <BlockCard key={b.id} b={b} kinds={kinds} />
         ))}

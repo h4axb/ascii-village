@@ -19,8 +19,9 @@
 import { dbOf, isAdmin, json, type D1Database, type SessionEnv } from './session';
 import { handleZotero, type ZoteroEnv } from './zotero';
 
-// zotero: the copies of the Zotero library's items, written by a sync only
-export const JOURNAL_COLLS = ['entries', 'milestones', 'deadlines', 'pages', 'overview', 'settings', 'days', 'weeks', 'files', 'zotero'] as const;
+// zotero: the copies of the Zotero library's items, written by a sync only;
+// methods / phases: the methods catalogue and the process model's phases
+export const JOURNAL_COLLS = ['entries', 'milestones', 'deadlines', 'pages', 'overview', 'settings', 'days', 'weeks', 'files', 'zotero', 'methods', 'phases'] as const;
 type Coll = (typeof JOURNAL_COLLS)[number];
 const isColl = (c: string): c is Coll => (JOURNAL_COLLS as readonly string[]).includes(c);
 

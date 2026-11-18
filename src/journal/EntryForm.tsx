@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Del, JournalStore, Put } from './store';
 import { suggestSections } from './suggest';
+import { MethodField } from './methods';
 import { CHECKIN, ENTRY_ICONS, ENTRY_STATUS, ENTRY_TYPES, PALETTE, SECTIONS, blockKinds, kindOf, kindsSetting, type BlockKindsSetting, blockTitle, entryTopics, fmtMinutes, isoWeek, moveTask, newId, orderProblem, runsMs, shortDate, taskMinutes, tasksTotal, today, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week } from './types';
 import { allTopics, sectionTitle } from './EntryEditor';
 import { Attachments, Chips, Icon, IconBtn, type IconName } from './ui';
@@ -45,7 +46,7 @@ export const formOf = (e: Entry, opts: { task?: string; addTask?: boolean; check
   return { entry: { ...e, tasks: [...tasks, ...add] }, ratings: null, week: null, weekDrop: null, open: [...(opts.task ? [opts.task] : []), ...add.map((t) => t.id)], checkin: !!opts.checkin };
 };
 
-const taskEmpty = (t: Task) => !t.title.trim() && !t.start && !t.end && !(t.blocks ?? []).some((b) => b.md.trim()) && !(t.files ?? []).length && !(t.sources ?? []).length && !(t.topics ?? []).length && !t.plan && !(t.runs ?? []).length;
+const taskEmpty = (t: Task) => !t.title.trim() && !t.start && !t.end && !(t.blocks ?? []).some((b) => b.md.trim()) && !(t.files ?? []).length && !(t.sources ?? []).length && !(t.topics ?? []).length && !(t.methods ?? []).length && !t.plan && !(t.runs ?? []).length;
 export const formEmpty = (f: Form) => !f.entry.title.trim() && (f.entry.tasks ?? []).every(taskEmpty) && !f.ratings && !f.entry.week;
 
 // the entry as stored: empty tasks and empty blocks left out
@@ -517,6 +518,8 @@ function TaskEdit({ store, t, n, open, known, grip, onToggle, onChange, onRemove
           <div className="jr-task-part">
             <TagEdit tags={t.topics ?? []} known={known} label={`task ${n}`} onChange={(topics) => onChange({ topics })} onRename={onRename} />
           </div>
+
+          <MethodField store={store} chosen={t.methods ?? []} label={`task ${n}`} onChange={(methods) => onChange({ methods })} />
 
           <div className="jr-task-part">
             <span className="jr-task-label">{`Documentation · ${blocks.length} ${blocks.length === 1 ? 'block' : 'blocks'}`}</span>

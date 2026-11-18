@@ -98,6 +98,7 @@ export interface Task {
   blocks?: Block[];
   files?: string[];
   sources?: Source[];
+  methods?: string[]; // method ids (the methods catalogue, see methods.tsx)
   plan?: number; // the time planned for it, in minutes (the timer counts down from it)
   runs?: Run[]; // the timer's periods, oldest first (editable, see timer.tsx)
 }
@@ -241,6 +242,45 @@ export interface JournalDocs {
   weeks: Record<string, Week>;
   files: Record<string, FileMeta>;
   zotero: Record<string, ZoteroItem>; // by item key (stored in buckets, see store.ts)
+  methods: Record<string, Method>; // the methods catalogue (micro level)
+  phases: Record<string, MethodPhase>; // the project phases (macro) with their areas (meso)
+}
+
+// ---- the methodical process model: macro (phase) → meso (area) → micro (method) ----
+export type MethodType = 'W' | 'D' | 'H' | 'A';
+export const METHOD_TYPES: { id: MethodType; label: string; de: string; tag: string; color: string }[] = [
+  { id: 'W', label: 'Scientific', de: 'Wissenschaftlich', tag: 'WISS', color: '#2f6fd6' },
+  { id: 'D', label: 'Design', de: 'Design', tag: 'DESIGN', color: '#c2571a' },
+  { id: 'H', label: 'Hybrid', de: 'Hybrid', tag: 'HYBRID', color: '#7b4fd0' },
+  { id: 'A', label: 'Activity', de: 'Aktivität', tag: 'AKTIV', color: '#7d7d76' },
+];
+// a phase's colour group (the reference's colour coding)
+export type PhaseTone = 'ex' | 'fu' | 'wa';
+export const PHASE_TONES: { id: PhaseTone; label: string }[] = [
+  { id: 'ex', label: 'Exploration' },
+  { id: 'fu', label: 'Forschung & Entwicklung' },
+  { id: 'wa', label: 'Wissenschaftliche Ausarbeitung' },
+];
+export const ALONGSIDE = 'pb'; // the phase id of the activities that run alongside the whole project
+export interface MethodPhase {
+  id: string;
+  code: string; // M1 …
+  name: string;
+  tone: PhaseTone;
+  result: string; // ERGEBNIS
+  cols: number; // the areas side by side (1–3)
+  areas: string[]; // the meso level, in order
+  order: number;
+}
+export interface Method {
+  id: string;
+  name: string;
+  desc: string;
+  type: MethodType;
+  phase: string; // a phase id (ALONGSIDE for the project-wide ones)
+  area: string; // one of the phase's areas
+  order: number;
+  created: number;
 }
 export type Coll = Exclude<keyof JournalDocs, 'files' | 'zotero'>;
 

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_MILESTONES, DEFAULT_OVERVIEW, OVERVIEW_V2, type Coll, type FileMeta, type JournalDocs, type OverviewSection, type ZoteroItem, type ZoteroState } from './types';
 
 const PASS_KEY = 'asciia-feedback-pass'; // shared with /feedback
-const EMPTY: JournalDocs = { entries: {}, milestones: {}, deadlines: {}, pages: {}, overview: {}, settings: {}, days: {}, weeks: {}, files: {}, zotero: {} };
+const EMPTY: JournalDocs = { entries: {}, milestones: {}, deadlines: {}, pages: {}, overview: {}, settings: {}, days: {}, weeks: {}, files: {}, zotero: {}, methods: {}, phases: {} };
 
 export interface Put {
   coll: Coll;
@@ -104,6 +104,13 @@ export function useJournal(): JournalStore {
         ];
         const r2 = await fetch('/api/journal/batch', { method: 'POST', headers: headers(true), body: JSON.stringify({ put }) });
         if (r2.ok) for (const p of put) (d[p.coll] as Record<string, unknown>)[p.id] = p.data;
+      }
+      // once: the process model and its methods from the methodical framework, all editable
+      if (!d.settings.methodsSeeded) {
+        const { seedMethods } = await import('./methodSeed');
+        const put: Put[] = [...seedMethods(d), { coll: 'settings', id: 'methodsSeeded', data: { at: Date.now() } }];
+        const r3 = await fetch('/api/journal/batch', { method: 'POST', headers: headers(true), body: JSON.stringify({ put }) });
+        if (r3.ok) for (const p of put) (d[p.coll] as Record<string, unknown>)[p.id] = p.data;
       }
       setDocs(d);
       setState('ready');

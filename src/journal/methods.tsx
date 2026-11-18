@@ -470,12 +470,13 @@ const VM_CSS = `
 .jr-vm .vm-lmi b{font-size:9.5px;display:block}.jr-vm .vm-lmi span{font-size:7.5px;opacity:.75}
 .jr-vm .vm-lerg{display:flex;align-items:center;background:#e2e4ea;font-size:9.5px;padding:7px 8px;gap:8px}
 .jr-vm .vm-lerg b{font-size:9px;letter-spacing:.3px;padding-right:8px;border-right:1px solid #b9bcc6}
-.jr-vm .vm-fk{display:flex;flex-direction:column;gap:5px;max-width:320px}
+.jr-vm .vm-fk{display:flex;flex-direction:column;gap:5px;max-width:380px}
 .jr-vm .vm-k{font-size:10.5px;padding:5px 7px}
 .jr-vm .vm-k.is-ex{background:var(--exL);color:var(--exB)}.jr-vm .vm-k.is-fu{background:var(--fuL);color:var(--fuB)}.jr-vm .vm-k.is-wa{background:var(--waL);color:var(--waB)}.jr-vm .vm-k.is-pb{background:#ecedf0;color:#444}
-.jr-vm .vm-tl{display:flex;gap:4px 12px;flex-wrap:wrap;margin-top:6px}
-.jr-vm .vm-tl span{display:inline-flex;align-items:center;font-size:10px;color:#444}
-.jr-vm .vm-tl i{font-style:normal;display:inline-flex;align-items:center;justify-content:center;min-width:34px;font-size:7px;font-weight:700;letter-spacing:.4px;background:#5f636e;color:#fff;border-radius:2px;padding:3px 5px;line-height:1;margin-right:5px}
+.jr-vm .vm-tl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 20px;margin-top:14px}
+.jr-vm .vm-tl+.vm-tl{border-top:1px solid #ecedf0;padding-top:12px}
+.jr-vm .vm-tl span{display:flex;align-items:center;font-size:10px;color:#444;white-space:nowrap;min-width:0}
+.jr-vm .vm-tl i{font-style:normal;display:inline-flex;align-items:center;justify-content:center;flex:none;width:46px;font-size:7px;font-weight:700;letter-spacing:.4px;background:#5f636e;color:#fff;border-radius:2px;padding:3px 0;line-height:1;margin-right:8px}
 .jr-vm .vm-tl i.is-planned{background:transparent;color:#6c7be0;outline:1px dashed #6c7be0;outline-offset:-1px}
 .jr-vm .vm-pb{background:#ecedf0;padding:20px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:24px}
 .jr-vm .vm-pb button{background:#c9ccd4;text-align:center;font-size:10.5px;font-weight:700;padding:8px;color:#3b3d44;display:flex;align-items:center;justify-content:center;gap:8px}

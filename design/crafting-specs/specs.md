@@ -32,6 +32,15 @@ Desktop 1440 × 900 · alle Werte in px · Schrift **Asciia Mono 400**
   - Hammer im Craft-Button: #EFC862 inaktiv, #E6F4DC aktiv
 - **Münze:** Pixel-Icon 16 × 16 aus einzelnen 1-px-Rechtecken (`icon-coin-16.svg`). Beim Skalieren nur ganze Vielfache (16, 32 …) verwenden, damit es scharf bleibt.
 
+## Chat-Bubble (weiche Form)
+SVGs in `shared/bubble/`: Mitchy (Ohr links) und Spieler (Ohr rechts), je 480 × 2 Zeilen und 300 × 1 Zeile, jeweils auch ohne Ohr für Folge-Bubbles.
+- **Form:** ein geschlossener Pfad. Radius 18, Ohr 18 hoch und 6 nach außen. Fill #262B1C, Stroke 1,5 #DEDDB6 · 85 %, runde Ecken.
+- **In Figma:** als Vektor einfügen, darüber einen Text-Frame mit Auto Layout legen (Padding 12 · 20, mit Ohr oben 12 + 18).
+- **Andere Breite:** Im Vektor-Bearbeitungsmodus die Punkte der rechten Seite verschieben (bzw. der linken beim Spieler). Die Rundungen bleiben dabei glatt.
+
+## Craft-Ergebnisse
+Drei Piratenschiffe (Variante A und zweimal B) als SVG und PNG in `shared/craft/`; Werte in `shared/craft/werte.md`.
+
 ## Eck-Winkel (einzelne Striche)
 Strich 2 px · #DEDDB6 · 30 % · eckige Enden · Aufteilung je Arm: leer 3.5 · Strich 6.5 · Lücke 3.5 · Strich 2.5 = 16 (10er: leer 3.5 · Strich 6.5). Die Außenecke bleibt leer. Die Maße gelten für oben links und werden für die anderen Ecken gespiegelt.
 SVGs je Ecke: `shared/ecken/` (einzelne Rechtecke, direkt in Figma ziehen).

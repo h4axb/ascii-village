@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+@font-face{font-family:Inter;font-weight:100 900;src:url(file:///home/user/ascii-village/public/fonts/inter-latin-wght-normal.woff2) format('woff2')}
+@font-face{font-family:Inter;font-weight:100 900;src:url(file:///home/user/ascii-village/public/fonts/inter-latin-ext-wght-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+1E00-1EFF}
+:root{--ink:#1d1d1b;--muted:#6b6b66;--line:#e4e3de;--soft:#f5f4f0;--bg:#fbfbf9;--paper:#fff;--accent:#c2571a;
+ --tW:#2f6fd6;--tD:#c2571a;--tH:#7b4fd0;--tA:#7d7d76;
+ --exB:#3d9be0;--exL:#e6f1fa;--exR:#4fa6e4;--exC:#c4def3;
+ --fuB:#6c7be0;--fuL:#eeeffa;--fuR:#7b89e6;--fuC:#d2d6f5;
+ --waB:#2aab6f;--waL:#e5f4eb;--waR:#33b878;--waC:#bfe5cf;
+ --pbL:#ecedf0;--pbR:#c9ccd4}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+.app{display:flex;min-height:100vh}
+.side{width:232px;flex:none;background:var(--soft);border-right:1px solid var(--line);padding:24px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.brand{padding:0 10px 22px}.brand b{display:block;font-size:16px;letter-spacing:.3px}.brand span{font-size:13px;color:var(--muted)}
+.nav a{display:block;padding:9px 10px;border-radius:8px;font-size:15px;color:var(--ink);text-decoration:none;margin-bottom:3px}
+.nav a.on{background:#e8e7e2;font-weight:600}
+.side .foot{margin-top:auto;padding:0 10px;font-size:13px;color:var(--muted);line-height:2}
+.main{flex:1;min-width:0;padding:30px 40px 60px}
+.head{display:flex;align-items:flex-start;gap:12px}
+.head h1{margin:0;font-size:28px;letter-spacing:-.3px;font-weight:650}
+.head .tools{margin-left:auto;display:flex;gap:10px;align-items:center}
+.search{border:1px solid var(--line);background:var(--paper);border-radius:20px;padding:8px 14px;font-size:14px;color:var(--muted);width:220px}
+.btn{border:1px solid var(--line);background:var(--paper);border-radius:20px;padding:8px 14px;font-size:14px;color:var(--ink);white-space:nowrap}
+.btn.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+.desc{color:var(--muted);font-size:15px;margin:12px 0 18px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.tab{padding:10px 14px;font-size:14px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--ink);font-weight:600;border-color:var(--ink)}
+.tab .n{font-size:12px;color:var(--muted);margin-left:4px;font-weight:500}
+.new{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--accent);background:var(--accent-soft,#f6e6dc);border-radius:4px;padding:2px 5px;margin-left:6px;vertical-align:2px}
+/* type dots + pills */
+.td{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
+.tW{background:var(--tW)}.tD{background:var(--tD)}.tH{background:var(--tH)}.tA{background:var(--tA)}
+.tp{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 9px;border-radius:12px;background:var(--soft);white-space:nowrap}
+.mchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:16px;padding:6px 10px 6px 10px;font-size:13.5px;white-space:nowrap}
+.mchip .pp{font-size:11.5px;color:var(--muted)}
+.mchip .x{color:var(--muted);margin-left:2px}
+.mchip.sug{border-style:dashed;color:var(--muted);background:transparent}
+/* ---- drawer (edit entry) ---- */
+.scrim{position:fixed;inset:0;background:rgba(40,40,36,.28)}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:640px;background:var(--paper);box-shadow:-10px 0 30px rgba(0,0,0,.08);display:flex;flex-direction:column}
+.dh{padding:18px 22px 14px;border-bottom:1px solid var(--line)}
+.eyebrow{font-size:11.5px;letter-spacing:1px;color:var(--muted);font-weight:600;text-transform:uppercase}
+.dh h2{margin:6px 0 0;font-size:18px;font-weight:600}
+.db{padding:18px 22px;overflow:hidden;flex:1;position:relative}
+.df{border-top:1px solid var(--line);padding:12px 22px;display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted)}
+.df .save{margin-left:auto}
+.lbl{font-size:11.5px;letter-spacing:.8px;color:var(--muted);font-weight:600;text-transform:uppercase;margin:16px 0 8px;display:flex;align-items:center;gap:6px}
+.lbl .r{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;text-decoration:underline;font-size:13px;color:var(--ink)}
+.inp{border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:14px;background:var(--paper)}
+.task{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--paper)}
+.task .top{display:flex;gap:10px;align-items:center}
+.task .grip{color:#bbb;font-size:14px}
+.row{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.chip{border:1px solid var(--line);border-radius:16px;padding:6px 11px;font-size:13px;background:var(--paper)}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.hl{outline:2px solid var(--accent);outline-offset:6px;border-radius:10px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:8px}
+/* picker */
+.pop{position:absolute;left:22px;right:22px;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.14);overflow:hidden}
+.pop .ps{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}
+.pop .ps .inp{flex:1;border-color:#cfcdc6}
+.pop .grp{padding:8px 14px 4px;font-size:11px;letter-spacing:.8px;font-weight:600;color:var(--muted);text-transform:uppercase;display:flex;gap:6px;align-items:center}
+.pop .it{display:flex;align-items:center;gap:10px;padding:8px 14px;font-size:14px}
+.pop .it.on{background:var(--soft)}
+.pop .it .ck{width:16px;height:16px;border:1.5px solid #bdbbb4;border-radius:4px;flex:none}
+.pop .it .ck.y{background:var(--ink);border-color:var(--ink);position:relative}
+.pop .it .ck.y:after{content:'';position:absolute;left:4.5px;top:1.5px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.pop .it .sub{font-size:12px;color:var(--muted)}
+.pop .it .r{margin-left:auto;display:flex;gap:8px;align-items:center}
+.pop .pf{border-top:1px solid var(--line);padding:10px 14px;font-size:14px;display:flex;gap:8px;align-items:center}
+.pop .pf b{font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg>span{padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:6px;border-right:1px solid var(--line)}
+.seg>span:last-child{border-right:0}
+.seg>span.on{background:var(--ink);color:#fff}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fl{font-size:13px;font-weight:600;margin:0 0 6px}
+/* table */
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.fchip{display:inline-flex;gap:7px;align-items:center;border:1px solid var(--line);border-radius:16px;padding:6px 12px;font-size:13.5px;background:var(--paper)}
+.fchip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.fchip .c{color:var(--muted);font-size:12px}.fchip.on .c{color:#cfcfca}
+select.sel{border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit;font-size:13.5px;background:var(--paper)}
+table.mt{width:100%;border-collapse:separate;border-spacing:0;background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
+.mt th{text-align:left;font-weight:500;color:var(--muted);font-size:13px;padding:11px 14px;border-bottom:1px solid var(--line);background:#fcfcfa}
+.mt td{padding:11px 14px;border-bottom:1px solid #efeee9;vertical-align:middle}
+.mt tr:last-child td{border-bottom:0}
+.mt .nm{font-weight:550}.mt .ds{font-size:12.5px;color:var(--muted);margin-top:2px}
+.mt .phc{display:inline-flex;gap:7px;align-items:center;white-space:nowrap}
+.mt .phc i{width:4px;height:16px;border-radius:2px;display:inline-block}
+.mt .use{font-variant-numeric:tabular-nums;white-space:nowrap}
+.mt .use .bar{display:inline-block;height:6px;border-radius:3px;background:var(--ink);vertical-align:middle;margin-left:8px;opacity:.75}
+.mt .zero{color:#b2b0a8}
+.mt tr.grp td{background:#faf9f6;font-size:12px;letter-spacing:.8px;font-weight:600;color:var(--muted);text-transform:uppercase;padding:8px 14px}
+/* ---- process model (the reference look) ---- */
+.pm-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.pm-tools .sp{margin-left:auto}
+.canvas{background:#fff;border:1px solid var(--line);border-radius:12px;padding:38px 42px 48px}
+.vm{font-family:Inter,sans-serif;color:#2b2d33}
+.vm h3{font-size:24px;font-weight:550;margin:0 0 34px;letter-spacing:-.2px}
+.vm .sec{font-size:10.5px;letter-spacing:.6px;color:#5d6068;border-left:1.5px solid #5d6068;padding-left:6px;margin:0 0 10px;text-transform:uppercase}
+.vm .top{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:22px}
+.leg{background:#f1f2f6;padding:10px;display:flex;gap:10px;width:350px}
+.leg .bar{width:26px;background:#5f636e;color:#fff;display:flex;align-items:center;justify-content:center}
+.vt{writing-mode:vertical-rl;transform:rotate(180deg);font-weight:700;font-size:11.5px;white-space:nowrap;letter-spacing:.2px}
+.leg .in{flex:1;display:flex;flex-direction:column;gap:8px}
+.leg .meso{background:#fff;border:1px solid #d6d8de;padding:8px}
+.leg .mt2{font-size:9.5px;font-weight:700;margin-bottom:6px}
+.leg .mi{background:#5f636e;color:#fff;padding:5px 7px;margin-top:5px}
+.leg .mi b{font-size:9.5px;display:block}.leg .mi span{font-size:7.5px;opacity:.75}
+.leg .erg{display:flex;align-items:center;background:#e2e4ea;font-size:9.5px;padding:7px 8px;gap:8px}
+.leg .erg b{font-size:9px;letter-spacing:.3px;padding-right:8px;border-right:1px solid #b9bcc6}
+.fk{display:flex;flex-direction:column;gap:5px;width:300px}
+.fk div{font-size:10.5px;padding:5px 7px}
+.fk .k1{background:var(--exL);color:var(--exB)}.fk .k2{background:var(--fuL);color:var(--fuB)}.fk .k3{background:var(--waL);color:var(--waB)}.fk .k4{background:var(--pbL);color:#444}
+.fk .tl{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding:0;background:none}
+.fk .tl span{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#444}
+.bd{display:inline-flex;width:14px;height:14px;border-radius:3px;background:#fff;align-items:center;justify-content:center;font-size:8.5px;font-weight:800;flex:none}
+.bd.W{color:var(--tW)}.bd.D{color:var(--tD)}.bd.H{color:var(--tH)}.bd.A{color:var(--tA)}
+.bd.o{box-shadow:inset 0 0 0 1px #cfd1d8}
+.pb{background:var(--pbL);padding:22px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:26px}
+.pb div{background:var(--pbR);text-align:center;font-size:10.5px;font-weight:700;padding:8px;color:#3b3d44;display:flex;align-items:center;justify-content:center;gap:8px}
+.pb div em{font-style:normal;font-weight:600;font-size:9px;opacity:.7}
+.ph{display:flex;margin-bottom:22px}
+.ph .bar{width:30px;flex:none;color:#fff;display:flex;align-items:center;justify-content:center}
+.ph .bar .vt{font-size:12.5px}
+.ph .body{flex:1;min-width:0;padding:12px 12px 12px 10px}
+.ph .grid{display:grid;gap:12px}
+.ph .meso{min-width:0;background:#fff;padding:9px 9px 11px;align-self:stretch}
+.ph .mz{font-size:10.5px;font-weight:600;margin:0 0 8px 2px;padding-bottom:7px;border-bottom:1px solid}
+.mi2{display:flex;align-items:center;gap:6px;color:#fff;padding:6px 7px;margin-top:5px;min-height:31px}
+.mi2 .tx{flex:1;min-width:0}
+.mi2 b{overflow-wrap:anywhere;display:block;font-size:10.5px;font-weight:650;line-height:1.25}
+.mi2 span{display:block;font-size:8px;opacity:.82;line-height:1.3;margin-top:1px}
+.mi2 .ct{font-size:9px;font-weight:700;opacity:.95;white-space:nowrap}
+.mi2.un{background:transparent!important;border:1px dashed;color:inherit}
+.mi2.un span{opacity:.75}
+.mi2.un .bd{box-shadow:inset 0 0 0 1px currentColor;background:transparent}
+.ph .erg{display:flex;align-items:center;margin-top:12px;padding:9px 10px;gap:10px;font-size:10.5px}
+.ph .erg b{font-size:9.5px;letter-spacing:.3px;padding-right:10px;border-right:1px solid rgba(0,0,0,.18);color:#3e4048}
+.ph .erg .pg{margin-left:auto;font-size:9.5px;color:#555;display:flex;align-items:center;gap:6px}
+.ph .erg .pg i{display:inline-block;width:70px;height:5px;border-radius:3px;background:rgba(0,0,0,.1);position:relative;overflow:hidden}
+.ph .erg .pg i u{position:absolute;left:0;top:0;bottom:0;background:currentColor}
+.ex .bar{background:var(--exB)}.ex{background:var(--exL)}.ex .meso{outline:1px solid var(--exC)}.ex .mz{color:var(--exB);border-color:var(--exC)}.ex .mi2{background:var(--exR)}.ex .mi2.un{border-color:var(--exB);color:var(--exB)}.ex .erg{background:#d3e7f7}
+.fu .bar{background:var(--fuB)}.fu{background:var(--fuL)}.fu .meso{outline:1px solid var(--fuC)}.fu .mz{color:var(--fuB);border-color:var(--fuC)}.fu .mi2{background:var(--fuR)}.fu .mi2.un{border-color:var(--fuB);color:var(--fuB)}.fu .erg{background:#dfe2f7}
+.wa .bar{background:var(--waB)}.wa{background:var(--waL)}.wa .meso{outline:1px solid var(--waC)}.wa .mz{color:var(--waB);border-color:var(--waC)}.wa .mi2{background:var(--waR)}.wa .mi2.un{border-color:var(--waB);color:var(--waB)}.wa .erg{background:#d1ecdc}
+.mi2 .bd{display:inline-flex;margin:0;opacity:1;font-size:8.5px;line-height:1}
+.mi2.sel{outline:2px solid #1d1d1b;outline-offset:2px}
+/* method drawer */
+.md .facts{display:grid;grid-template-columns:110px 1fr;gap:10px 14px;font-size:14px;margin:16px 0 6px}
+.md .facts dt{color:var(--muted)}.md .facts dd{margin:0}
+.md .use{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.md .use div{display:flex;gap:14px;padding:11px 14px;border-bottom:1px solid #efeee9;font-size:14px;align-items:center}
+.md .use div:last-child{border-bottom:0}
+.md .use .d{color:var(--muted);width:78px;font-variant-numeric:tabular-nums;flex:none}
+.md .use .t{flex:1}.md .use .t small{display:block;color:var(--muted);font-size:12.5px}
+.md .use .tm{color:var(--muted);font-size:12.5px}
+/* ---- phone ---- */
+@media (max-width:700px){
+ .side{display:none}.main{padding:18px 16px 40px}
+ .head h1{font-size:22px}.head .tools .search,.head .tools .btn:not(.dark){display:none}
+ .tabs{overflow:auto}.tab{white-space:nowrap}
+ .canvas{padding:18px 12px 24px;border-radius:10px}
+ .vm h3{font-size:19px;margin-bottom:20px}
+ .vm .top{grid-template-columns:1fr;gap:16px}.leg,.fk{width:auto}
+ .pb{grid-template-columns:1fr;padding:12px;gap:8px}
+ .ph .grid{grid-template-columns:1fr!important}
+ .ph .bar{width:26px}
+ .ph .erg{flex-wrap:wrap}.ph .erg .pg{margin-left:0;width:100%}
+ .pm-tools .btn.dark{display:none}
+ .cards .cd{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+ .cards .cd .t1{display:flex;gap:8px;align-items:center;font-weight:600;font-size:15px}
+ .cards .cd .t2{font-size:12.5px;color:var(--muted);margin:4px 0 8px}
+ .cards .cd .t3{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px}
+}
+</style></head>
+<body><div id="app"></div>
+<script>
+const T = { W: 'Scientific', D: 'Design', H: 'Hybrid', A: 'Activity' };
+// the model: macro (phase) → meso (area) → micro (method). [name, sub, type, uses]
+const PHASES = [
+ { id: 'M1', name: 'Exploration', c: 'ex', cols: 3, res: 'Machbarkeitsgeprüftes Spielkonzept', meso: [
+  ['Explorative Recherche', [['Literaturrecherche', 'Grundlagen zu Lernspielen und LLM-Einsatz', 'W', 3], ['Marktanalyse', 'Vergleichbare Spiele, Lücken, Zielgruppe', 'H', 2]]],
+  ['Konzeptfindung und -selektion', [['Ideenfindung', 'Sammeln und Clustern erster Spielideen', 'D', 4], ['Machbarkeitsbewertung', 'Technische und zeitliche Einschätzung', 'H', 2], ['Konzeptbegrenzung', 'Umfang auf das Kernkonzept reduzieren', 'D', 1]]],
+  ['Exploratives Prototyping', [['LLM-problemorientierte Konzeptentwicklung', 'Ideen aus konkreten Problemen ableiten', 'D', 2], ['LLM-gestützte Spielmechanikkonzeption', 'Mechaniken mit dem LLM durchspielen', 'H', 3], ['Iterative LLM-Mechanikexploration', 'Schnelle Varianten testen und verwerfen', 'D', 4], ['Inspirationsbasierte Konzeptentwicklung', 'Referenzen als Ausgangspunkt', 'D', 1], ['Machbarkeitsorientierte Konzeptentwicklung', 'Konzept an Ressourcen ausrichten', 'H', 1]]]] },
+ { id: 'M2', name: 'Prototypentwicklung', c: 'fu', cols: 3, res: 'Spielbarer Prototyp mit zwei Untersuchungsvarianten', meso: [
+  ['Wissenschaftliche Recherche', [['Literaturrecherche', 'Feedback, Personalisierung, Motivation', 'W', 5], ['Theorierecherche', 'Theoretische Grundlagen', 'W', 2]]],
+  ['Gestalterische Recherche', [['Naturkulturelle Recherche', 'Setting, Flora, Fauna', 'D', 2], ['Genrebezogene Spielanalyse', 'Cozy Games im Vergleich', 'H', 3], ['Visuelle Referenzanalyse', 'ASCII-Stile, Farbwelten', 'D', 4]]],
+  ['Narrative Konzeption', [['Referenzanalyse von Intro-Sequenzen', 'Aufbau und Tempo', 'D', 1], ['Storyboarding', 'Intro und Quests skizzieren', 'D', 2], ['Visuelle Referenzanalyse', 'Figuren und Szenen', 'D', 1]]],
+  ['Interaktionsgestaltung', [['Mechanikkonzeption', 'Crafting und Feedback-Loop', 'D', 6], ['Variantenentwicklung', 'Variante A und B', 'D', 4], ['Interaktionsgestaltung', 'Dialoge, Panels, Eingaben', 'D', 7]]],
+  ['Quest Design', [['Quest-Konzeption', 'Ablauf und Belohnungen', 'D', 3], ['Spielerzentrierte Questgestaltung', 'Ziele aus Sicht der Spielenden', 'H', 2]]],
+  ['Nutzertestkonzeption', [['Instrumentenrecherche', 'UEQ, SUS, Likert-Skalen', 'W', 2], ['Untersuchungsdesign', 'Within-Subjects, Ablauf', 'W', 3], ['Fragebogenentwicklung', 'In-Game und Abschluss', 'W', 3]]]] },
+ { id: 'M3', name: 'Nutzeruntersuchung', c: 'fu', cols: 2, res: 'Quantitativer und qualitativer Datensatz', meso: [
+  ['Wissenschaftliche Recherche', [['Literaturrecherche', 'Testmethoden und Stichprobe', 'W', 2], ['Auswertungsmethodenrecherche', 'Kodierung und Statistik', 'W', 1]]],
+  ['Testvorbereitung', [['Probandenrekrutierung', 'Aufruf, Termine, P-IDs', 'A', 3], ['Testorganisation', 'Ablaufplan und Material', 'A', 2], ['Technische Vorbereitung', 'Test-Links, Tracking, Deploy', 'A', 4]]],
+  ['Testdurchführung', [['Vergleichender Nutzertest', 'Variante A gegen B', 'W', 6], ['Moderierter Remote-Nutzertest', 'Per Call mit Bildschirmfreigabe', 'W', 4], ['Qualitative Beobachtung', 'Verhalten und Aussagen', 'W', 6]]],
+  ['Datenerhebung', [['In-Game Befragung', 'Fragen direkt im Spiel', 'H', 5], ['Abschlussfragebogen', 'Tally, UEQ-S', 'W', 5], ['Beobachtungsprotokoll', 'Notizen je Teilnehmer', 'W', 6]]]] },
+ { id: 'M4', name: 'Datenauswertung', c: 'fu', cols: 3, res: 'Empirisch abgeleitete Gestaltungsempfehlungen', meso: [
+  ['Datenaufbereitung', [['Datenintegration', 'Spiel, Tally und Notizen zusammenführen', 'A', 3], ['Datenvalidierung', 'Konflikte und Lücken prüfen', 'A', 2], ['Kontextualisierung', 'Zeiten und Versuche zuordnen', 'H', 1]]],
+  ['Qualitative Auswertung', [['Qualitative Kodierung', 'Aussagen taggen', 'W', 3], ['Kategorienbildung', 'Tags zu Kategorien', 'W', 1]]],
+  ['Quantitative Auswertung', [['Deskriptive Statistik', 'Mittelwerte, Verteilungen, n', 'W', 0]]],
+  ['Datenvisualisierung', [['Dashboard-Entwicklung', 'Auswertungs-Dashboard /feedback', 'D', 5], ['Grafische Ergebnisaufbereitung', 'Abbildungen für die Arbeit', 'D', 0]]],
+  ['Ergebnisinterpretation', [['Musteranalyse', 'Wiederkehrende Probleme', 'W', 0], ['Explorative Subgruppenanalyse', 'Unterschiede nach Profil', 'W', 0], ['Hypothesengenerierung', 'Annahmen für das Redesign', 'W', 0]]],
+  ['Ergebnissynthese', [['Befundintegration', 'Qual. und quant. Befunde', 'H', 0], ['Systematische Befundordnung', 'Nach Priorität ordnen', 'H', 0], ['Handlungsempfehlungen', 'Konkrete Gestaltungsschritte', 'D', 0]]]] },
+ { id: 'M5', name: 'Redesign', c: 'fu', cols: 3, res: 'Überarbeitetes UI/UX-Konzept und Designsystem', meso: [
+  ['Erkenntnisbasierte Gestaltungskonzeption', [['Erkenntnistransfer', 'Befunde in Anforderungen', 'H', 0], ['Zieldefinition', 'Was das Redesign lösen soll', 'D', 0], ['Gestaltungsentscheidungen', 'Begründet und dokumentiert', 'D', 0]]],
+  ['Systematische Interface-Gestaltung', [['Interface-Prototyping', 'Screens in Figma', 'D', 2], ['Designsystementwicklung', 'Komponenten, Farben, Specs', 'D', 3]]],
+  ['Designdokumentation', [['Entscheidungsdokumentation', 'Decision Log', 'A', 0], ['Vorher-Nachher-Vergleich', 'Aktuell gegen Neu', 'D', 0], ['Ergebnisdokumentation', 'Für die Arbeit aufbereitet', 'A', 0]]]] },
+ { id: 'M6', name: 'Ausarbeitung der Bachelorarbeit', c: 'wa', cols: 2, res: 'Schriftliche Bachelorarbeit', meso: [
+  ['Wissenschaftliche Recherche', [['Vertiefende Literaturrecherche', 'Ergänzung des Forschungsstands', 'W', 2]]],
+  ['Wissenschaftliche Reflexion', [['Theoretische Einordnung', 'Befunde im Forschungsstand', 'W', 0], ['Methodenkritik', 'Grenzen der Untersuchung', 'W', 0], ['Fazit und Ausblick', 'Beantwortung der Forschungsfrage', 'W', 0]]],
+  ['Wissenschaftliche Verschriftlichung', [['Inhaltliche Strukturierung', 'Gliederung der Arbeit', 'W', 3], ['Methodendokumentation', 'Vorgehen nachvollziehbar', 'W', 1], ['Ergebnisdarstellung', 'Tabellen und Abbildungen', 'W', 0]]],
+  ['Qualitätssicherung', [['Inhaltliche Revision', 'Argumentation prüfen', 'A', 0], ['Quellenprüfung', 'Zitate und Verzeichnis', 'A', 0], ['Formale Überarbeitung', 'Layout, Sprache, Abgabe', 'A', 0]]]] },
+];
+const CN = { ex: 'Exploration', fu: 'Forschung & Entwicklung', wa: 'Wissenschaftliche Ausarbeitung' };
+const CVAR = { ex: 'var(--exB)', fu: 'var(--fuB)', wa: 'var(--waB)' };
+const P = new URLSearchParams(location.search);
+const V = P.get('v') || 'model';
+const el = (h) => { const d = document.createElement('div'); d.innerHTML = h; return d.firstElementChild; };
+
+const side = (on) => `<aside class="side"><div class="brand"><b>ASCIIA BAY</b><span>Project Journal</span></div><nav class="nav">${['Overview', 'Timeline', 'Project Log', 'Decision Log', 'Methods & Methodology', 'Personal Development', 'Design Process', 'Research & Findings'].map((n) => `<a class="${n === on ? 'on' : ''}">${n}</a>`).join('')}</nav><div class="foot"><u>Edit pages</u><br>Saved<br>Usertesting dashboard →</div></aside>`;
+const head = (tab) => `<div class="head"><h1>Methods &amp; Methodology</h1><div class="tools"><span class="search">⌕&nbsp; Search methods…</span><span class="btn dark">＋ New Entry</span></div></div>
+<div class="desc">How the project is researched, tested and evaluated.</div>
+<div class="tabs"><span class="tab ${tab === 'entries' ? 'on' : ''}">Entries<span class="n">20</span></span><span class="tab ${tab === 'table' ? 'on' : ''}">Methods<span class="n">69</span><span class="new">NEW</span></span><span class="tab ${tab === 'model' ? 'on' : ''}">Process model<span class="new">NEW</span></span></div>`;
+
+function model(selName) {
+  const mi = ([n, s, t, u]) => `<div class="mi2 ${u ? '' : 'un'} ${n === selName ? 'sel' : ''}"><div class="tx"><b>${n}</b><span>${s}</span></div>${u ? `<span class="ct">${u}×</span>` : ''}<span class="bd ${t}">${t}</span></div>`;
+  const phase = (p) => {
+    const all = p.meso.flatMap((m) => m[1]); const used = all.filter((x) => x[3]).length;
+    return `<div class="ph ${p.c}"><div class="bar"><span class="vt">${p.id} - ${p.name}</span></div><div class="body">
+    <div class="grid" style="grid-template-columns:repeat(${p.cols},1fr)">${p.meso.map(([mz, ms]) => `<div class="meso"><div class="mz">${mz}</div>${ms.map(mi).join('')}</div>`).join('')}</div>
+    <div class="erg"><b>ERGEBNIS</b>${p.res}<span class="pg" style="color:${CVAR[p.c]}">${used}/${all.length} verwendet <i><u style="width:${Math.round((used / all.length) * 100)}%"></u></i></span></div></div></div>`;
+  };
+  return `<div class="vm"><h3>Methodisches Vorgehensmodell</h3>
+  <div class="top"><div><div class="sec">Legende</div><div class="leg"><div class="bar"><span class="vt">MAKRO - Projektphase</span></div><div class="in">
+    <div class="meso"><div class="mt2">MESO - Tätigkeitsbereich</div>${[0, 1, 2].map(() => `<div class="mi"><b>MIKRO - Methoden, Instrumente und Arbeitsschritte</b><span>Kurzbeschreibung der Methode</span></div>`).join('')}</div>
+    <div class="erg"><b>ERGEBNIS</b>Resultat der Projektphase</div></div></div></div>
+   <div><div class="sec">Farbkodierung</div><div class="fk"><div class="k1">Exploration</div><div class="k2">Forschung &amp; Entwicklung</div><div class="k3">Wissenschaftliche Ausarbeitung</div><div class="k4">Projektbegleitende Tätigkeiten</div>
+    <div class="tl">${Object.entries(T).map(([k, v]) => `<span><span class="bd ${k} o">${k}</span>${({ W: 'Wissenschaftlich', D: 'Design', H: 'Hybrid', A: 'Aktivität' })[k]}</span>`).join('')}</div>
+    <div class="tl"><span><span class="bd o" style="background:#7b89e6;color:#fff;box-shadow:none;width:auto;padding:0 4px">3×</span>verwendet</span><span><span class="bd o" style="border:1px dashed #6c7be0;box-shadow:none;width:22px"></span>geplant, noch nicht verwendet</span></div></div></div></div>
+  <div class="sec">Projektbegleitende Tätigkeiten</div>
+  <div class="pb"><div>Project Log <em>42×</em></div><div>Weekly Reviews <em>6×</em></div><div>Quellenverwaltung <em>18×</em></div></div>
+  <div class="sec">Projektablauf</div>${PHASES.map(phase).join('')}</div>`;
+}
+
+function drawerShell(eyebrow, title, body, foot) { return `<div class="scrim"></div><div class="drawer"><div class="dh"><div class="eyebrow">${eyebrow}</div><h2>${title}</h2></div><div class="db">${body}</div>${foot ? `<div class="df">${foot}</div>` : ''}</div>`; }
+
+function taskForm(extra) {
+  return `<div class="lbl" style="margin-top:0">Tasks · 2</div>
+  <div class="task"><div class="top"><span class="grip">⋮⋮</span><input class="inp" style="flex:1" value="Moderierter Remote-Test P004–P006"><span class="inp" style="width:130px">10:00 – 12:30</span></div>
+   <div class="lbl">Sections</div><div class="row"><span class="chip">Decision Log</span><span class="chip on">Methods &amp; Methodology</span><span class="chip">Design Process</span><span class="chip on">Research &amp; Findings</span></div>
+   <div class="lbl">Tags</div><div class="row"><span class="chip on">#Usertesting ×</span><span class="chip on">#Variante A ×</span><span class="chip" style="color:var(--muted)">+ tag</span></div>
+   <div class="hl" style="margin-top:6px"><div class="lbl">Methods · 3 <span class="new">NEW</span><span class="r">Process model →</span></div>
+    <div class="row">
+     <span class="mchip"><span class="td tW"></span>Moderierter Remote-Nutzertest <span class="pp">M3</span><span class="x">×</span></span>
+     <span class="mchip"><span class="td tW"></span>Qualitative Beobachtung <span class="pp">M3</span><span class="x">×</span></span>
+     <span class="mchip"><span class="td tW"></span>Beobachtungsprotokoll <span class="pp">M3</span><span class="x">×</span></span>
+     <span class="inp" id="minp" style="padding:6px 11px;border-radius:16px;color:${extra ? 'var(--ink)' : 'var(--muted)'};${extra ? 'border-color:#1d1d1b' : ''}">${extra ? 'remote' : '+ method'}</span></div>
+    <div class="row" style="margin-top:9px"><span style="font-size:12.5px;color:var(--muted)">Often used together:</span><span class="mchip sug">+ <span class="td tH"></span>In-Game Befragung</span><span class="mchip sug">+ <span class="td tW"></span>Abschlussfragebogen</span></div></div>
+   <div class="lbl">Notes</div><div class="inp" style="height:64px;color:var(--muted)">3 Sessions, je ca. 40 min. P005 brauchte Hilfe beim Crafting-Panel …</div>
+  </div>
+  <div class="task" style="margin-top:12px;opacity:.8"><div class="top"><span class="grip">⋮⋮</span><span style="flex:1;font-weight:550">Notizen kodieren</span><span class="mchip" style="padding:3px 9px"><span class="td tW"></span>Qualitative Kodierung</span></div></div>`;
+}
+const ent = (b) => `<div class="app">${side('Methods & Methodology')}<main class="main">${head('entries')}<div style="height:600px"></div></main></div>` + b;
+
+const views = {
+  task: () => ent(drawerShell('Project Log · Editing', 'Edit entry', taskForm(false), `<span class="btn">Cancel</span>Unsaved changes<span class="btn dark save">Save</span>`)),
+  picker: () => ent(drawerShell('Project Log · Editing', 'Edit entry', taskForm(true) + `
+   <div class="pop" style="top:388px">
+    <div class="ps"><span class="inp" style="flex:1;border-color:#1d1d1b">⌕&nbsp; remote<span style="color:#bbb">|</span></span><span class="sel" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px">All phases ▾</span></div>
+    <div class="grp"><span class="td" style="background:var(--fuB);border-radius:2px;width:4px;height:12px"></span>M3 Nutzeruntersuchung › Testdurchführung</div>
+    <div class="it on"><span class="ck y"></span><div><div>Moderierter <b>Remote</b>-Nutzertest</div><div class="sub">Per Call mit Bildschirmfreigabe</div></div><div class="r"><span class="tp"><span class="td tW"></span>Scientific</span><span class="sub">4×</span></div></div>
+    <div class="it"><span class="ck"></span><div><div>Vergleichender Nutzertest</div><div class="sub">Variante A gegen B</div></div><div class="r"><span class="tp"><span class="td tW"></span>Scientific</span><span class="sub">6×</span></div></div>
+    <div class="grp"><span class="td" style="background:var(--fuB);border-radius:2px;width:4px;height:12px"></span>M3 Nutzeruntersuchung › Testvorbereitung</div>
+    <div class="it"><span class="ck"></span><div><div>Technische Vorbereitung</div><div class="sub">Test-Links, Tracking, <b>Remote</b>-Setup</div></div><div class="r"><span class="tp"><span class="td tA"></span>Activity</span><span class="sub">4×</span></div></div>
+    <div class="pf"><span style="font-size:18px;line-height:1">＋</span>Create <b>“remote”</b> as a new method</div>
+   </div>`, `<span class="btn">Cancel</span>Unsaved changes<span class="btn dark save">Save</span>`)),
+  newm: () => ent(drawerShell('Project Log · Editing', 'Edit entry', taskForm(true) + `
+   <div class="pop" style="top:388px;padding:16px 16px 14px">
+    <div style="font-weight:600;font-size:15px;margin-bottom:12px">New method</div>
+    <div class="fl">Name</div><div class="inp" style="margin-bottom:12px">Remote-Think-Aloud</div>
+    <div class="fl">Short description <span style="font-weight:400;color:var(--muted)">optional</span></div><div class="inp" style="margin-bottom:12px;color:var(--ink)">Lautes Denken während des Remote-Tests</div>
+    <div class="fl">Type</div><div class="seg" style="margin-bottom:12px"><span class="on"><span class="td tW"></span>Scientific</span><span><span class="td tD"></span>Design</span><span><span class="td tH"></span>Hybrid</span><span><span class="td tA"></span>Activity</span></div>
+    <div class="grid2"><div><div class="fl">Macro · phase</div><div class="inp">M3 Nutzeruntersuchung ▾</div></div><div><div class="fl">Meso · area</div><div class="inp">Testdurchführung ▾</div></div></div>
+    <div class="hint">Shown in the process model under M3 › Testdurchführung. “Projektbegleitend” is a phase option too.</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><span class="btn">Cancel</span><span class="btn dark">Add method</span></div>
+   </div>`, `<span class="btn">Cancel</span>Unsaved changes<span class="btn dark save">Save</span>`)),
+  table: () => {
+    const rows = PHASES.flatMap((p) => p.meso.flatMap(([mz, ms]) => ms.map((m) => ({ p, mz, m }))));
+    const max = Math.max(...rows.map((r) => r.m[3]));
+    const last = (u, i) => (u ? ['03.11.26', '02.11.26', '28.10.26', '27.10.26', '23.10.26', '20.10.26', '17.10.26'][i % 7] : '–');
+    const pick = rows.filter((r) => ['M3', 'M4'].includes(r.p.id)).slice(0, 16);
+    let cur = '';
+    const body = pick.map((r, i) => { const g = r.p.id !== cur ? ((cur = r.p.id), `<tr class="grp"><td colspan="6">${r.p.id} · ${r.p.name}</td></tr>`) : '';
+      return g + `<tr><td><div class="nm">${r.m[0]}</div><div class="ds">${r.m[1]}</div></td><td><span class="tp"><span class="td t${r.m[2]}"></span>${T[r.m[2]]}</span></td><td><span class="phc"><i style="background:${CVAR[r.p.c]}"></i>${r.p.id} ${r.p.name}</span></td><td>${r.mz}</td><td class="use ${r.m[3] ? '' : 'zero'}">${r.m[3] ? `${r.m[3]}× <span class="bar" style="width:${Math.round((r.m[3] / max) * 60)}px"></span>` : 'planned'}</td><td class="${r.m[3] ? '' : 'zero'}">${last(r.m[3], i)}</td></tr>`; }).join('');
+    const cnt = (k) => rows.filter((r) => r.m[2] === k).length;
+    return `<div class="app">${side('Methods & Methodology')}<main class="main">${head('table')}
+    <div class="filters"><span class="fchip on">All <span class="c">${rows.length}</span></span>${Object.keys(T).map((k) => `<span class="fchip"><span class="td t${k}"></span>${T[k]} <span class="c">${cnt(k)}</span></span>`).join('')}
+     <span style="width:8px"></span><select class="sel"><option>All phases</option></select><select class="sel"><option>Used + planned</option></select><span style="margin-left:auto" class="btn">＋ New method</span></div>
+    <table class="mt"><thead><tr><th style="width:34%">Method · Mikro</th><th>Type</th><th>Phase · Makro</th><th>Area · Meso</th><th>Used</th><th style="white-space:nowrap">Last used</th></tr></thead><tbody>${body}</tbody></table>
+    <div class="hint" style="margin-top:12px">Showing M3–M4 · 16 of ${rows.length} methods · grouped by phase</div></main></div>`;
+  },
+  model: () => `<div class="app">${side('Methods & Methodology')}<main class="main">${head('model')}
+    <div class="pm-tools"><span class="fchip on">All methods</span><span class="fchip">Used only</span><span class="fchip">Planned only</span><span class="sp"></span><span class="btn">Edit model</span><span class="btn dark">Export PNG / SVG</span></div>
+    <div class="canvas">${model()}</div></main></div>`,
+  drawer: () => views.model() + drawerShell('Method · M3 Nutzeruntersuchung', 'Moderierter Remote-Nutzertest', `<div class="md">
+    <div class="row"><span class="tp"><span class="td tW"></span>Scientific</span><span class="tp"><i style="width:4px;height:12px;border-radius:2px;background:var(--fuB);display:inline-block"></i>M3 › Testdurchführung</span><span class="tp">Used 4×</span></div>
+    <dl class="facts"><dt>Description</dt><dd>Nutzertest per Videocall mit Bildschirmfreigabe; die Testleitung moderiert und beobachtet.</dd><dt>Makro</dt><dd>M3 Nutzeruntersuchung</dd><dt>Meso</dt><dd>Testdurchführung</dd><dt>Time logged</dt><dd>6 h 40 min across 4 tasks</dd></dl>
+    <div class="lbl">Used in</div><div class="use">
+     <div><span class="d">02.11.26</span><span class="t">Moderierter Remote-Test P010–P012<small>Pseudonymisierung, Tag-Codierung P004–P012</small></span><span class="tm">2 h 10</span></div>
+     <div><span class="d">28.10.26</span><span class="t">Remote-Test P007–P009<small>Methoden-Mix: Usability Test + kurzer Fragebogen</small></span><span class="tm">1 h 50</span></div>
+     <div><span class="d">23.10.26</span><span class="t">Moderierter Remote-Test P004–P006<small>Playtesting &amp; Teilnehmerverwaltung</small></span><span class="tm">2 h 30</span></div>
+     <div><span class="d">20.10.26</span><span class="t">Pilot-Session P001<small>Playtesting &amp; Teilnehmerverwaltung</small></span><span class="tm">10 min</span></div></div>
+    <div class="lbl">Often used together</div><div class="row"><span class="mchip"><span class="td tW"></span>Qualitative Beobachtung</span><span class="mchip"><span class="td tW"></span>Beobachtungsprotokoll</span><span class="mchip"><span class="td tH"></span>In-Game Befragung</span></div></div>`, `<span class="btn">Edit method</span><span class="btn">Archive</span><span class="btn dark save">Open in table</span>`),
+  mtable: () => {
+    const rows = PHASES.flatMap((p) => p.meso.flatMap(([mz, ms]) => ms.map((m) => ({ p, mz, m })))).filter((r) => r.p.id === 'M3');
+    return `<div class="app"><main class="main">${head('table')}<div class="filters" style="flex-wrap:nowrap;overflow:hidden"><span class="fchip on">All</span>${Object.keys(T).map((k) => `<span class="fchip"><span class="td t${k}"></span>${T[k]}</span>`).join('')}</div>
+     <div class="cards">${rows.slice(0, 7).map((r) => `<div class="cd"><div class="t1"><span class="td t${r.m[2]}"></span>${r.m[0]}<span style="margin-left:auto;font-weight:500;font-size:13px;color:${r.m[3] ? 'var(--ink)' : '#b2b0a8'}">${r.m[3] ? r.m[3] + '×' : 'planned'}</span></div><div class="t2">${r.m[1]}</div><div class="t3"><span class="tp">${T[r.m[2]]}</span><span class="tp"><i style="width:4px;height:12px;border-radius:2px;background:var(--fuB);display:inline-block"></i>M3 › ${r.mz}</span></div></div>`).join('')}</div></main></div>`;
+  },
+};
+document.getElementById('app').innerHTML = views[V]();
+if (P.get('sel')) document.querySelectorAll('.mi2').forEach((m) => { if (m.querySelector('b').textContent === P.get('sel')) m.classList.add('sel'); });
+</script></body></html>

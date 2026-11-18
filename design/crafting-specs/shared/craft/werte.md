@@ -4,11 +4,11 @@ Prompt bei allen drei: **„a pirate ship“**. Gecraftet mit dem echten Rendere
 
 | Datei | Variante | Eingaben | Raster | Glyphen |
 |---|---|---|---|---|
-| `variante-a-clarify` | A · Pre-Clarification, finales Ergebnis | Größe **Large** · Farbe **Red** · Überraschung **Keep it classic** | 88 × 44 | 2056 |
+| `variante-a-clarify` | A · Pre-Clarification, finales Ergebnis | Größe **Large** · Farbe **Blue** · Überraschung **Keep it classic** | 88 × 44 | 2056 |
 | `variante-b-standard` | B · erstes Ergebnis | keine Präferenzen | 82 × 40 | 1700 |
 | `variante-b-wenige-glyphen` | B · nach „Tune future crafts“ | Detail **Less** · Rest übersprungen · gilt für **All crafts** | 54 × 27 | 766 |
 
-- **A:** Größer und mit rotem Rumpf, so wie es die Antworten auf Mitchys Fragen festlegen.
+- **A:** Größer und blau, so wie es die Antworten auf Mitchys Fragen festlegen: blaue Flagge und Segel, dunkelblauer Rumpf. Das Asset ist umgefärbt aus dem gecrafteten Ergebnis; Raster und Glyphen sind gleich geblieben.
 - **B · wenige Glyphen:** Gleiche Form wie das Standard-Ergebnis, aber mit rund 45 % der Glyphen. Die Zeichen sind dafür größer. Im Spiel bleibt das Schiff gleich groß.
 
 Dateien:

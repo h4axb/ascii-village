@@ -130,3 +130,18 @@ Deaktiviert: Deckkraft 45 %. Schatten Verlauf: −10 0 28 · #000 35 %.
 - **Sheet:** min(1180, 96vw), Höhe 100dvh, die Inhalte füllen sie.
 - **Bubbles:** max min(480, 64 %), Optionen 360.
 - **390 px:** Sheet 374, Avatar 60, Bubbles füllen die Breite.
+
+## Klärungsfragen (Variante A)
+Durchlauf `v1/`: Prompt „the pirate ship“ → Größe **Medium** → Farbe **Blue** → Überraschung **Yes, surprise me** → Plan → Ergebnis.
+
+| Frage | Wann | Optionen |
+|---|---|---|
+| How big should it be? | Prompt nennt keine Größe | Small · Medium · Large · You decide |
+| What colour should it be? | Prompt nennt keine Farbe | Red · Orange · Yellow · Green · Sky blue · Blue · Purple · Pink · Black · White · You decide |
+| Should I add a little surprise? | immer | Yes, surprise me · Keep it classic · You decide |
+| Tierart ohne Muster („a bird“) | nur dann | Craft it anyway · Try another object |
+| Tippfehler beim Objekt | nur dann | Vorschlag · Craft it anyway · Surprise · Try another object |
+| Unbekanntes Objekt | nur dann | Craft it anyway · Surprise · Try another object |
+| Unbekanntes Wort / Detail ohne Muster | nur dann | (Vorschlag) · Craft it anyway · Skip this detail |
+
+Überraschungen beim Schiff: rot-weiße Streifen, Blumenmuster, Punkte, Herzen oder eine große Blume auf dem Segel, Sterne rund um das Schiff (Segel bleibt), ohne Segel auch Fisch oder Vogel. Welche kommt, hängt fest am Prompt-Text.

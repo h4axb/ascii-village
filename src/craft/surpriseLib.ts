@@ -11,8 +11,10 @@
 //            head. They sit on the head's upper edge, found pixel by pixel.
 //   ships    a new motif on the sail (the "sail" part; a pirate ship's skull
 //            is painted over first): red-white stripes, a flower pattern,
-//            polka dots, stars, hearts or one big flower. A ship without a
-//            sail gets a fish jumping by the hull or a bird on the deck.
+//            polka dots, hearts or one big flower; or stars sparkling
+//            around the whole ship (its sail and skull stay). A ship without
+//            a sail gets a fish jumping by the hull, a bird on the deck or
+//            the stars.
 //   cans     a flower where a flower fits: painted on the body, or standing
 //            on the lid; polka dots on the body, a bird on the lid, or a
 //            butterfly floating by.
@@ -61,7 +63,9 @@ const HEART = ['.OO...OO.', 'ORRO.ORRO', 'ORWRORRRO', 'ORRRRRRRO', '.ORRRRRO.', 
 const FISH = ['....OOOO....', '..OOBBBBO..O', '.OBWBBBBBOOB', 'OBKBBBBBBBBO', '.OBBBBBBBOOB', '..OOBBBBO..O', '....OOOO....'];
 // small stamps for the patterns (no outline: they're painted on cloth)
 const STAMP_FLOWER = ['.P.', 'PYP', '.P.'];
-const STAMP_STAR = ['..Y..', '.YYY.', 'YYYYY', '.Y.Y.'];
+// a four-pointed sparkle (a big and a small one), around a ship
+const SPARKLE = ['...Y...', '...Y...', '..YWY..', 'YYWWWYY', '..YWY..', '...Y...', '...Y...'];
+const SPARKLE_SMALL = ['.Y.', 'YWY', '.Y.'];
 const STAMP_HEART = ['RR.RR', 'RRRRR', '.RRR.', '..R..'];
 const STAMP_DOT = ['.WW.', 'WWWW', 'WWWW', '.WW.'];
 
@@ -70,7 +74,7 @@ const cols = (m: string[]) => Math.max(...m.map((r) => r.length));
 // Draw a picture at (x, y), `scale` picture pixels per pixel. `clip`: only
 // on that part's pixels (a pattern painted on the sail); else it is added
 // on top as its own opaque pixels.
-function stamp(l: Layer, map: string[], x: number, y: number, scale: number, clip?: string) {
+function stamp(l: Layer, map: string[], x: number, y: number, scale: number, clip?: string, onlyEmpty = false) {
   const d = l.img.data;
   const dw = Math.round(cols(map) * scale), dh = Math.round(map.length * scale);
   for (let py = 0; py < dh; py++)
@@ -82,6 +86,7 @@ function stamp(l: Layer, map: string[], x: number, y: number, scale: number, cli
       if (X < 0 || Y < 0 || X >= l.img.w || Y >= l.img.h) continue;
       const i = Y * l.img.w + X;
       if (clip && l.part[i] !== clip) continue;
+      if (onlyEmpty && d[i * 4 + 3] > 127) continue;
       d[i * 4] = rgb[0];
       d[i * 4 + 1] = rgb[1];
       d[i * 4 + 2] = rgb[2];
@@ -179,6 +184,25 @@ function clearMotif(l: Layer) {
   if (l.part.includes('motif')) blankPart(l, 'motif', 'sail');
 }
 const hasSail = (l: Layer) => l.part.includes('sail');
+// sparkles in a loose ring around the whole picture, only on empty pixels:
+// the item itself (a pirate ship's sail and skull) stays as it is
+function sparkleAround(l: Layer): boolean {
+  const b = solidBox(l);
+  if (!b || b.w < 8 || b.h < 8) return false;
+  const big = Math.max(1, (b.h * 0.16) / SPARKLE.length);
+  const small = Math.max(1, (b.h * 0.07) / SPARKLE_SMALL.length);
+  // [across, down] of the solid box (outside 0..1 = beside it), big or small
+  const at: [number, number, boolean][] = [
+    [-0.06, 0.08, true], [0.2, -0.1, false], [0.52, -0.14, true], [0.84, -0.06, false],
+    [1.04, 0.22, true], [1.08, 0.58, false], [-0.1, 0.5, false], [0.96, 0.92, false], [0.02, 0.9, true],
+  ];
+  for (const [ax, ay, isBig] of at) {
+    const map = isBig ? SPARKLE : SPARKLE_SMALL;
+    const k = isBig ? big : small;
+    stamp(l, map, b.x + b.w * ax - (cols(map) * k) / 2, b.y + b.h * ay - (map.length * k) / 2, k, undefined, true);
+  }
+  return true;
+}
 const onSail = (l: Layer, paint: () => boolean) => {
   if (!hasSail(l)) return false;
   clearMotif(l);
@@ -242,9 +266,10 @@ const SURPRISES: SurpriseDef[] = [
     id: 'sail-dots', name: 'polka dots on the sail', fits: 'ships',
     apply: ({ layer }) => onSail(layer, () => pattern(layer, 'sail', STAMP_DOT, 4)),
   },
+  // (in the stars' old place in the list, so a prompt keeps its surprise)
   {
-    id: 'sail-stars', name: 'stars on the sail', fits: 'ships',
-    apply: ({ layer }) => onSail(layer, () => pattern(layer, 'sail', STAMP_STAR, 3)),
+    id: 'star-sparkle', name: 'stars sparkling around the ship', fits: 'ships',
+    apply: ({ layer }) => sparkleAround(layer),
   },
   {
     id: 'sail-hearts', name: 'hearts on the sail', fits: 'ships',

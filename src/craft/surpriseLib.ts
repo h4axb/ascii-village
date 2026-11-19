@@ -50,6 +50,8 @@ const C: Record<string, RGB> = {
   W: [244, 241, 230], // white
   K: [43, 43, 51], // black
   U: [154, 108, 201], // purple
+  S: [241, 148, 58], // sparkle orange
+  T: [251, 221, 60], // sparkle yellow
 };
 
 // ---- pictures ('.' = clear) ----
@@ -63,9 +65,11 @@ const HEART = ['.OO...OO.', 'ORRO.ORRO', 'ORWRORRRO', 'ORRRRRRRO', '.ORRRRRO.', 
 const FISH = ['....OOOO....', '..OOBBBBO..O', '.OBWBBBBBOOB', 'OBKBBBBBBBBO', '.OBBBBBBBOOB', '..OOBBBBO..O', '....OOOO....'];
 // small stamps for the patterns (no outline: they're painted on cloth)
 const STAMP_FLOWER = ['.P.', 'PYP', '.P.'];
-// a four-pointed sparkle (a big and a small one), around a ship
-const SPARKLE = ['...Y...', '...Y...', '..YWY..', 'YYWWWYY', '..YWY..', '...Y...', '...Y...'];
-const SPARKLE_SMALL = ['.Y.', 'YWY', '.Y.'];
+// four-pointed pixel sparkles around a ship (big, medium, small): orange rays
+// and a yellow core, long rays up and down, no outline
+const SPARKLE = ['....S....', '....S....', '....S....', '...SST...', '..STTTS..', 'SSTTTTTSS', '..STTTS..', '...STS...', '....S....', '....S....', '....S....', '....S....'];
+const SPARKLE_MID = ['...S...', '...S...', '..STS..', 'SSTTTSS', '..STS..', '...S...', '...S...'];
+const SPARKLE_SMALL = ['.S.', '.S.', 'STS', '.S.', '.S.'];
 const STAMP_HEART = ['RR.RR', 'RRRRR', '.RRR.', '..R..'];
 const STAMP_DOT = ['.WW.', 'WWWW', 'WWWW', '.WW.'];
 
@@ -189,16 +193,15 @@ const hasSail = (l: Layer) => l.part.includes('sail');
 function sparkleAround(l: Layer): boolean {
   const b = solidBox(l);
   if (!b || b.w < 8 || b.h < 8) return false;
-  const big = Math.max(1, (b.h * 0.16) / SPARKLE.length);
-  const small = Math.max(1, (b.h * 0.07) / SPARKLE_SMALL.length);
-  // [across, down] of the solid box (outside 0..1 = beside it), big or small
-  const at: [number, number, boolean][] = [
-    [-0.06, 0.08, true], [0.2, -0.1, false], [0.52, -0.14, true], [0.84, -0.06, false],
-    [1.04, 0.22, true], [1.08, 0.58, false], [-0.1, 0.5, false], [0.96, 0.92, false], [0.02, 0.9, true],
+  // one picture pixel per scale step, the same for all three sizes
+  const k = Math.max(1, (b.h * 0.22) / SPARKLE.length);
+  // [across, down] of the solid box (outside 0..1 = beside it), size 0 big / 1 mid / 2 small
+  const at: [number, number, number][] = [
+    [-0.08, 0.12, 0], [0.12, -0.1, 2], [0.5, -0.16, 1], [0.86, -0.1, 2],
+    [1.06, 0.24, 0], [1.1, 0.62, 2], [-0.12, 0.6, 1], [0.98, 0.95, 1], [0.04, 0.96, 2],
   ];
-  for (const [ax, ay, isBig] of at) {
-    const map = isBig ? SPARKLE : SPARKLE_SMALL;
-    const k = isBig ? big : small;
+  for (const [ax, ay, size] of at) {
+    const map = [SPARKLE, SPARKLE_MID, SPARKLE_SMALL][size];
     stamp(l, map, b.x + b.w * ax - (cols(map) * k) / 2, b.y + b.h * ay - (map.length * k) / 2, k, undefined, true);
   }
   return true;

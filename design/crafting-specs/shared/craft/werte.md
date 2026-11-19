@@ -14,3 +14,6 @@ Prompt bei allen drei: **„a pirate ship“**. Gecraftet mit dem echten Rendere
 Dateien:
 - **SVG:** Jede Zelle ist ein Hintergrund-Rechteck plus ein Zeichen in Cascadia Code 10 px, Zelle 6 × 10. Angezeigt werden alle drei mit 300 px Breite.
 - **PNG:** 4×, transparenter Hintergrund. Nimm das PNG, wenn Figma die Zeichen im SVG verschiebt.
+
+## Variante A mit Überraschung
+`variante-a-sterne.svg` / `.png`: das blaue Piratenschiff aus `variante-a-clarify` (gleiches Raster, gleiche Glyphen) mit der Überraschung „stars sparkling around the ship“. Pixel-Sterne in drei Größen, orange Strahlen #F1943A, gelber Kern #FBDD3C, ohne Kontur, nur auf leeren Zellen; Segel und Totenkopf bleiben. Transparenter Hintergrund.

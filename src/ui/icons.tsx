@@ -31,6 +31,13 @@ export const IconBack = ({ size }: IconProps) => (
   </Icon>
 );
 
+// a right arrow, IconBack mirrored ("Tune future crafts", 10 px after the text)
+export const IconArrowRight = ({ size }: IconProps) => (
+  <Icon size={size}>
+    <path d="M4 12h15M13 6l6 6-6 6" />
+  </Icon>
+);
+
 export const IconClose = ({ size }: IconProps) => (
   <Icon size={size}>
     <path d="M6 6l12 12M18 6L6 18" />

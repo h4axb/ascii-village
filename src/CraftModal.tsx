@@ -58,6 +58,7 @@ import {
   ChoicePanel,
   FitSprite,
   Frame,
+  IconArrowRight,
   IconHammer,
   IconHistory,
   Sheet,
@@ -929,7 +930,7 @@ export default function CraftModal({
   const lastMitchy = [...thread].reverse().find((t) => t.who === 'mitchy');
   const lastAlts = !busy && phase === 'failed' && lastMitchy?.kind === 'alts' ? lastMitchy.options : null;
   const lastConcepts = phase === 'choosing' && lastMitchy?.kind === 'concepts' ? lastMitchy : null;
-  type Opt = { label: string; go: () => void; disabled?: boolean; title?: string; cls?: string };
+  type Opt = { label: string; go: () => void; disabled?: boolean; title?: string; cls?: string; icon?: ReactNode };
   const asked = phase === 'clarifying' && clar && !clar.locked && clar.step < clar.questions.length ? clar.questions[clar.step] : null;
   const options: Opt[] = viewRec
     ? []
@@ -969,7 +970,7 @@ export default function CraftModal({
                 { label: 'Into my inventory.', go: () => choose(false) },
               ]),
           ...(feedback && fb && fb.step === 'vote'
-            ? [{ label: 'Tune future crafts →', go: () => updFb({ step: 'tuning' }) }]
+            ? [{ label: 'Tune future crafts', icon: <IconArrowRight size={14} />, go: () => updFb({ step: 'tuning' }) }]
             : []),
           ...(adjusted || launch
             ? []
@@ -1253,13 +1254,14 @@ export default function CraftModal({
                     key={o.label}
                     role="option"
                     aria-selected={i === optSel}
-                    className={'ds-option' + (o.cls ? ' ' + o.cls : '') + (i === optSel ? ' sel' : '')}
+                    className={'ds-option' + (o.cls ? ' ' + o.cls : '') + (o.icon ? ' has-icon' : '') + (i === optSel ? ' sel' : '')}
                     onMouseEnter={() => setOptSel(i)}
                     onClick={o.go}
                     disabled={o.disabled}
                     title={o.title}
                   >
                     {o.label}
+                    {o.icon}
                   </button>
                 ))}
               </div>

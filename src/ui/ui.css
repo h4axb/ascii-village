@@ -416,6 +416,12 @@
   text-align: left;
   cursor: pointer;
 }
+/* an option with an icon after its label ("Tune future crafts" + arrow) */
+.ds-option.has-icon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .ds-option.sel {
   border-color: var(--ds-line-strong);
   box-shadow: 0 0 0 1px var(--ds-line-strong) inset;

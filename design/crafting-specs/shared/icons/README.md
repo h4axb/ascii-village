@@ -25,3 +25,16 @@ Spielschrift Asciia Mono, Größe und Farbe wie der umgebende Text.
 Die Bilder der Tune-Antworten, direkt aus dem Spiel übernommen.
 - **Detail, Colour:** Sprites, Zelle 6 × 10. Detail zeigt Palme / Spielerin / Haus, Colour die blaue Blume mit der jeweiligen Farbstärke.
 - **Surprise, Unknown words, Scope:** Glyph-Icons in Asciia Mono 14 px, Zeilenhöhe 14,7. Farben: Text #DEDDB6, Gold #F2B53C. In „Preferences saved“ sitzen sie in einer Box 64 × 52, Schrift 11 px.
+
+## Preferences saved (Slide 03)
+Eintrag 375 × 74 · Rand 1 #DEDDB6 15 % · Fläche #262B1C 55 % · Padding 10 / 12 · Gap 12 · Radius 7.
+Links eine Bildbox **64 × 52** (bei allen gleich), das Bild mittig darin. Rechts der Text (Name 14 #DEDDB6 + Wert 14 #707D5F, je 16 hoch), vertikal mittig.
+
+| Datei | Größe im Spiel |
+|---|---|
+| `summary-detail-less.png` | 38,7 × 47,8 (Sprite, 92 % der Box) |
+| `summary-color-pastel.png` | 43,1 × 47,8 (Sprite, 92 % der Box) |
+| `summary-surprise-surprise-me.png` / `.svg` | 59,4 × 57,75 (11 px, 5 Zeilen, ragt oben und unten ca. 3 über die Box) |
+| `summary-unknown-craft-them-anyway.png` / `.svg` | 59,4 × 46,2 (11 px, 4 Zeilen, oben und unten je eine leer) |
+
+PNGs in 4× mit transparentem Hintergrund. In Figma auf die angegebene Größe setzen.

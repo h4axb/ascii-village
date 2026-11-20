@@ -176,7 +176,7 @@ function ResultCard({
 }) {
   return (
     <div className="cw3-card">
-      <Frame className="cw3-art">
+      <Frame className="cw3-art" brackets={false}>
         <FitSprite look={look} fill={0.82} maxScale={2.4} cells />
       </Frame>
       <div className="cw3-card-name">
@@ -1110,7 +1110,7 @@ export default function CraftModal({
         </Bubble>,
         <Bubble key="drawing">
           <div className="cw3-card">
-            <Frame className="cw3-art">
+            <Frame className="cw3-art" brackets={false}>
               <pre className="cw3-drawing">{partial.join('\n') || ' '}</pre>
             </Frame>
             <div className="ds-muted">

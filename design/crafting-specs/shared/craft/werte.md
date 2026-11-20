@@ -17,3 +17,19 @@ Dateien:
 
 ## Variante A mit Überraschung
 `variante-a-sterne.svg` / `.png`: das blaue Piratenschiff aus `variante-a-clarify` (gleiches Raster, gleiche Glyphen) mit der Überraschung „stars sparkling around the ship“. Pixel-Sterne in drei Größen, orange Strahlen #F1943A, gelber Kern #FBDD3C, ohne Kontur, nur auf leeren Zellen; Segel und Totenkopf bleiben. Transparenter Hintergrund.
+
+## Variante B · Pastell, weniger Glyphen, Punkte (`variante-b-pastell-punkte.svg`)
+- **Raster:** 56 × 31 Zellen (Standard 82 × 40), 1 Bildpixel = 2 Zellen, Zelle 6 × 10. Rund 1.050 statt 1.700 belegte Zellen.
+- **Eine Glyphe pro Material:**
+  - Segel `+`
+  - Totenkopf `@`
+  - Deck und Rumpf `=`
+  - Schattenkante `_`
+  - Kiel `^`
+  - Masten `|`
+  - Bugspriet und Tau `/`
+  - Flaggen `~`
+  - Bullaugen `o`
+- **Pastell:** die Formel des Spiels (`adjustHex(hex, -1)`: Sättigung × 0,9, Helligkeit 60 % Richtung 0,86). Fläche = Pastellfarbe, Glyphe = Pastellfarbe × 0,72.
+- **Totenkopf:** 8 px breit und symmetrisch: zwei Augen, Nase, Kiefer mit Zahnlücken, gekreuzte Knochen. Fläche #F5F7FA, Augen und Nase #3A4148.
+- **Überraschung:** Punkte auf beiden vorderen Segeln. Raster: jedes 4. Pixel, jede 2. Reihe, versetzt. Fläche #FFF4E0, `•` #E8C4A0.

@@ -185,7 +185,7 @@ function ResultCard({
         {tag && <span className="fb-kind-tag">{tag}</span>}
       </div>
       {desc && <div className="ds-muted">“{desc}”</div>}
-      {made && made.length > 0 && <div className="fb-made">made with: {made.join(' · ')}</div>}
+      {made && made.length > 0 && <div className="fb-made">made with: {made.map((m) => m.replace(/ /g, '\u00a0')).join('\u00a0· ')}</div>}
     </div>
   );
 }

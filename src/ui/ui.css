@@ -899,10 +899,14 @@
   color: var(--ds-text-soft);
   font-size: 13px;
 }
+/* as wide as its picture: longer lines ("made with: …") wrap instead of
+   widening the card and its bubble */
 .cw3-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 300px;
+  max-width: 100%;
   white-space: normal;
 }
 .cw3-art {

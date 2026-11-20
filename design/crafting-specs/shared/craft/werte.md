@@ -19,14 +19,8 @@ Dateien:
 `variante-a-sterne.svg` / `.png`: das blaue Piratenschiff aus `variante-a-clarify` (gleiches Raster, gleiche Glyphen) mit der Überraschung „stars sparkling around the ship“. Pixel-Sterne in drei Größen, orange Strahlen #F1943A, gelber Kern #FBDD3C, ohne Kontur, nur auf leeren Zellen; Segel und Totenkopf bleiben. Transparenter Hintergrund.
 
 ## Variante B · Pastell, weniger Glyphen, Punkte (`variante-b-pastell-punkte.svg`)
-- **Grundlage:** das Ergebnis des Spiels bei Detail „Less“ („a pirate ship“). 54 × 27 Zellen statt 82 × 40, Zelle 6 × 10.
-- **Pastell, weich:**
-  - Fläche = 65 % Pastell des Spiels (`adjustHex(hex, -1)`) + 35 % Originalfarbe.
-  - Glyphe = Fläche, 45 % Richtung Weiß.
-  - Dunkle Zellen: Fläche #363531, Glyphe #5F5C58.
-- **Totenkopf:** der des Spiels, ergänzt:
-  - Kuppel 6 Zellen, Kopf 10 Zellen breit;
-  - zwei gespiegelte Augen `_` (#6E6C68, je 2 Zellen, 2 Reihen);
-  - keine Zähne;
-  - `@` #C9C9CC auf #EBEBEB.
+- **Grundlage:** das Ergebnis des Spiels mit Detail „Less“ und „Pastel“ („a pirate ship“). Die Farben sind Zelle für Zelle aus dem Referenzbild übernommen. 54 × 27 Zellen, Zelle 6 × 10.
+- **Totenkopf:**
+  - zweites Auge `__` links vom vorhandenen, in Reihe 10–11 und Zellen 34–35, gleich wie das erste (Glyphe #6F6D69);
+  - Zähne: in der untersten Reihe fehlen das 3., 5. und 7. `@` von links, bis zum 3. von rechts. Die Lücken zeigen das Segel.
 - **Überraschung:** Punkte auf beiden vorderen roten Fahnen, jede 3. Zelle diagonal versetzt (10 Punkte). `•` #D9A48C auf #FFF4E0.

@@ -65,6 +65,8 @@ SVGs je Ecke: `shared/ecken/` (einzelne Rechtecke, direkt in Figma ziehen).
 | Vote-Button | 255 × 48 · pad 14 10 · r 7 · gap 12 |
 
 ## Variante 2 · Feedback
+Durchlauf `v2/`: „the pirate ship“ → Ergebnis → I like it → Tune: Detail **Less**, Colour **Pastel**, Surprise **Surprise me**, Unknown words übersprungen, **This session** → Preferences saved → Back to the workshop → **Adjust it with these** → „a pirate ship“ → Recraft mit „made with: Fewer glyphs · Pastel colours · Surprise me“ (Asset `shared/craft/variante-b-pastell-punkte.svg`).
+
 | Komponente | Maße |
 |---|---|
 | Ergebnis-Karte | in einer Bubble · 300 breit · Bild 300 × 170 · r 7 · Typ-Tag h 17 · 11 px |

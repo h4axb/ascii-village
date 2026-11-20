@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="59.4" height="46.2" viewBox="0 0 59.4 46.2">
-<!-- Preferences saved · Unknown words · Craft them anyway · Asciia Mono 11 px · Zeilenhöhe 11,55 · in „Preferences saved“ mittig in der 64 × 52 Box · transparent -->
-<g font-family="'Asciia Mono','Cascadia Mono',monospace" font-size="11" xml:space="preserve">
+<!-- Preferences saved · Unknown words · Craft them anyway · mittig in der 64 × 52 Box · Asciia Mono 11 px · Zeilenhöhe 11.55 · Zelle 6.6 breit · transparent -->
+<g font-family="'Asciia Mono','Cascadia Mono',monospace" font-size="11">
 
-<text y="20.57"><tspan x="0.0 6.6 13.2 19.8 26.4 33.0 39.6 46.2" fill="#DEDDB6"> ?word? </tspan></text>
-<text y="32.12"><tspan x="6.6" fill="#F2B53C">*</tspan><tspan x="19.8 26.4 33.0 39.6" fill="#DEDDB6">~~~~</tspan><tspan x="52.8" fill="#F2B53C">*</tspan></text>
+<text y="20.57"><tspan x="6.60" fill="#DEDDB6">?</tspan><tspan x="13.20" fill="#DEDDB6">w</tspan><tspan x="19.80" fill="#DEDDB6">o</tspan><tspan x="26.40" fill="#DEDDB6">r</tspan><tspan x="33.00" fill="#DEDDB6">d</tspan><tspan x="39.60" fill="#DEDDB6">?</tspan></text>
+<text y="32.12"><tspan x="6.60" fill="#F2B53C">*</tspan><tspan x="19.80" fill="#DEDDB6">~</tspan><tspan x="26.40" fill="#DEDDB6">~</tspan><tspan x="33.00" fill="#DEDDB6">~</tspan><tspan x="39.60" fill="#DEDDB6">~</tspan><tspan x="52.80" fill="#F2B53C">*</tspan></text>
 
 </g>
 </svg>

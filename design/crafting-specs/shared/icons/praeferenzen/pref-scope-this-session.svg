@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="42" height="59" viewBox="0 0 42 59">
-<!-- Tune · Scope · This session · Asciia Mono 14 px · Zeilenhöhe 14.7 · transparent -->
-<g font-family="'Asciia Mono','Cascadia Mono',monospace" font-size="14" xml:space="preserve">
-<text y="11.5"><tspan x="0.0 8.4 16.8 25.2 33.6" fill="#DEDDB6"> ___ </tspan></text>
-<text y="26.2"><tspan x="0.0 8.4 16.8 25.2 33.6" fill="#DEDDB6"> \ / </tspan></text>
-<text y="40.9"><tspan x="0.0 8.4 16.8 25.2 33.6" fill="#DEDDB6"> / \ </tspan></text>
-<text y="55.6"><tspan x="0.0 8.4 16.8 25.2 33.6" fill="#DEDDB6"> ‾‾‾ </tspan></text>
+<svg xmlns="http://www.w3.org/2000/svg" width="42" height="58.8" viewBox="0 0 42 58.8">
+<!-- Tune · Scope · This session · Asciia Mono 14 px · Zeilenhöhe 14.7 · Zelle 8.4 breit · transparent -->
+<g font-family="'Asciia Mono','Cascadia Mono',monospace" font-size="14">
+<text y="11.48"><tspan x="8.40" fill="#DEDDB6">_</tspan><tspan x="16.80" fill="#DEDDB6">_</tspan><tspan x="25.20" fill="#DEDDB6">_</tspan></text>
+<text y="26.18"><tspan x="8.40" fill="#DEDDB6">\</tspan><tspan x="25.20" fill="#DEDDB6">/</tspan></text>
+<text y="40.88"><tspan x="8.40" fill="#DEDDB6">/</tspan><tspan x="25.20" fill="#DEDDB6">\</tspan></text>
+<text y="55.58"><tspan x="8.40" fill="#DEDDB6">‾</tspan><tspan x="16.80" fill="#DEDDB6">‾</tspan><tspan x="25.20" fill="#DEDDB6">‾</tspan></text>
 </g>
 </svg>

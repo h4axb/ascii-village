@@ -34,7 +34,7 @@ Links eine Bildbox **64 × 52** (bei allen gleich), das Bild mittig darin. Recht
 |---|---|
 | `summary-detail-less.png` | 38,7 × 47,8 (Sprite, 92 % der Box) |
 | `summary-color-pastel.png` | 43,1 × 47,8 (Sprite, 92 % der Box) |
-| `summary-surprise-surprise-me.png` / `.svg` | 59,4 × 57,75 (11 px, 5 Zeilen, ragt oben und unten ca. 3 über die Box) |
-| `summary-unknown-craft-them-anyway.png` / `.svg` | 59,4 × 46,2 (11 px, 4 Zeilen, oben und unten je eine leer) |
+| `summary-surprise-surprise-me.png` / `.svg` | 52,8 × 57,75 (11 px, 5 Zeilen, ragt oben und unten ca. 3 über die Box) |
+| `summary-unknown-craft-them-anyway.png` / `.svg` | 56,1 × 46,2 (11 px, 4 Zeilen, oben und unten je eine leer) |
 
 PNGs in 4× mit transparentem Hintergrund. In Figma auf die angegebene Größe setzen.

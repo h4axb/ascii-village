@@ -1710,10 +1710,16 @@
   border-radius: var(--ds-radius-sm);
   background: var(--ds-surface);
 }
+/* the glyph icons (surprise, unknown words) sit in the same box as the
+   sprite previews, so every entry's text starts at the same place */
 .fb-summary-item .fb-glyph {
+  width: 64px;
+  height: 52px;
   min-height: 0;
   margin: 0;
-  font-size: 9px;
+  flex: none;
+  align-items: center;
+  font-size: 11px;
 }
 .fb-summary-item b {
   display: block;

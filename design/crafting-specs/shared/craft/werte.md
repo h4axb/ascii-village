@@ -20,6 +20,13 @@ Dateien:
 
 ## Variante B · Pastell, weniger Glyphen, Punkte (`variante-b-pastell-punkte.svg`)
 - **Grundlage:** das Ergebnis des Spiels bei Detail „Less“ („a pirate ship“). 54 × 27 Zellen statt 82 × 40, Zelle 6 × 10.
-- **Pastell:** die Formel des Spiels (`adjustHex(hex, -1)`: Sättigung × 0,9, Helligkeit 60 % Richtung 0,86). Fläche = Pastellfarbe, Glyphe = Pastellfarbe × 0,72. Die dunkle Kontur (Masten, Taue) bleibt dunkel.
-- **Totenkopf:** neu gesetzt, 12 Zellen breit und symmetrisch: zwei Augen (je 2 Zellen, 2 Reihen hoch), Nase (2 Zellen), Zahnreihe. `@` #C3CCD6 auf #F5F7FA, Augen und Nase #3A4148.
+- **Pastell, weich:**
+  - Fläche = 65 % Pastell des Spiels (`adjustHex(hex, -1)`) + 35 % Originalfarbe.
+  - Glyphe = Fläche, 45 % Richtung Weiß.
+  - Dunkle Zellen: Fläche #363531, Glyphe #5F5C58.
+- **Totenkopf:** der des Spiels, ergänzt:
+  - Kuppel 6 Zellen, Kopf 10 Zellen breit;
+  - zwei gespiegelte Augen `_` (#6E6C68, je 2 Zellen, 2 Reihen);
+  - keine Zähne;
+  - `@` #C9C9CC auf #EBEBEB.
 - **Überraschung:** Punkte auf beiden vorderen roten Fahnen, jede 3. Zelle diagonal versetzt (10 Punkte). `•` #D9A48C auf #FFF4E0.

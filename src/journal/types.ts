@@ -284,6 +284,8 @@ export interface Method {
   area: string; // one of the phase's areas
   source?: string; // the literature it rests on, e.g. Floyd (1984); typed, or the cite of the Zotero item
   zotero?: string; // a Zotero item key: the source then reads from the library's copy (zotero.tsx)
+  msources?: Source[]; // method sources (any number): Zotero items or typed cites (url ''); replaces source/zotero, which older methods still carry
+  sources?: Source[]; // content sources: literature on what the method is applied to (Zotero items or links)
   order: number;
   created: number;
 }

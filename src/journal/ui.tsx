@@ -280,7 +280,8 @@ export function FileThumb({ meta, onRemove }: { meta: FileMeta; onRemove?: () =>
 }
 
 // attachments: uploaded files, links and sources from Zotero, all editable
-export function Attachments({ store, files, links, onChange }: { store: JournalStore; files: string[]; links: Source[]; onChange: (files: string[], links: Source[]) => void }) {
+// files, links and Zotero sources of an entry or task; `noFiles`: links and Zotero sources only
+export function Attachments({ store, files, links, onChange, noFiles }: { store: JournalStore; files: string[]; links: Source[]; onChange: (files: string[], links: Source[]) => void; noFiles?: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
   // the Zotero window: to add a source (index -1) or to link an older link (its index)
   const [pick, setPick] = useState<{ index: number; q: string } | null>(null);
@@ -339,29 +340,31 @@ export function Attachments({ store, files, links, onChange }: { store: JournalS
         <button type="button" className="jr-btn" onClick={() => setPick({ index: -1, q: '' })}>
           <Icon name="book" /> Zotero source
         </button>
-        <label className="jr-btn">
-          <Icon name="clip" /> Upload file
-          <input
-            type="file"
-            multiple
-            onChange={async (e) => {
-              const list = [...(e.target.files ?? [])];
-              e.target.value = '';
-              const ids: string[] = [];
-              for (const f of list) {
-                setBusy(`Uploading ${f.name} …`);
-                try {
-                  ids.push((await store.upload(f)).id);
-                } catch (err) {
-                  setBusy(`${f.name}: ${String((err as Error).message)}`);
-                  return;
+        {!noFiles && (
+          <label className="jr-btn">
+            <Icon name="clip" /> Upload file
+            <input
+              type="file"
+              multiple
+              onChange={async (e) => {
+                const list = [...(e.target.files ?? [])];
+                e.target.value = '';
+                const ids: string[] = [];
+                for (const f of list) {
+                  setBusy(`Uploading ${f.name} …`);
+                  try {
+                    ids.push((await store.upload(f)).id);
+                  } catch (err) {
+                    setBusy(`${f.name}: ${String((err as Error).message)}`);
+                    return;
+                  }
                 }
-              }
-              setBusy(null);
-              onChange([...files, ...ids], links);
-            }}
-          />
-        </label>
+                setBusy(null);
+                onChange([...files, ...ids], links);
+              }}
+            />
+          </label>
+        )}
         <span className="jr-attach-link">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Link name" aria-label="Link name" />
           <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" aria-label="Link address" />

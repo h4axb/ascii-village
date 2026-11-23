@@ -141,6 +141,7 @@ export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: 
     for (const b of e.blocks) {
       if (e.blocks.length > 1 || b.label !== 'Notes') out.push('', `**${b.label}**`);
       out.push(b.md);
+      if (b.answer?.trim()) out.push('', `**Answer:** ${b.answer.trim()}`);
     }
     for (const s of e.sources) out.push(sourceMd(s, zotero));
     // each task with its time, sections, tags and documentation
@@ -153,6 +154,7 @@ export function writeLog(entries: Entry[], deadlines: Deadline[], sectionTitle: 
       for (const b of t.blocks ?? []) {
         const k = (kinds ?? BLOCK_KINDS).find((x) => x.id === blockKindOf(b))?.label ?? 'Notes';
         out.push('', `*${k}${blockTitle(b) ? `: ${blockTitle(b)}` : ''}*`, b.md);
+        if (b.answer?.trim()) out.push('', `**Answer:** ${b.answer.trim()}`);
       }
       for (const s of t.sources ?? []) out.push(sourceMd(s, zotero));
     }

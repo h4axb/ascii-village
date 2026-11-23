@@ -7,7 +7,7 @@ import { MethodChips } from './methods';
 import { useEffect, useRef } from 'react';
 import { Markdown } from './markdown';
 import type { JournalStore } from './store';
-import { ENTRY_STATUS, ENTRY_TYPES, PALETTE, blockKinds, kindOf, blockTitle, fmtMinutes, shortDate, taskMinutes, tasksTotal, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Source, type Task, type Week } from './types';
+import { ENTRY_STATUS, ENTRY_TYPES, PALETTE, blockKinds, isCoachingKind, kindOf, blockTitle, fmtMinutes, shortDate, taskMinutes, tasksTotal, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Source, type Task, type Week } from './types';
 import { sectionTitle } from './EntryEditor';
 import { CheckinStrip, weekday, weekLabel } from './EntryForm';
 import { FileThumb, Icon, type IconName } from './ui';
@@ -141,6 +141,13 @@ export function BlockCard({ b, kinds }: { b: Block; kinds: BlockKind[] }) {
       <span className="jr-bcard-kind">{k.label}</span>
       {title && <strong className="jr-bcard-title">{title}</strong>}
       <Markdown md={b.md} />
+      {/* a coaching question's answer: part of the block, shown apart from the question */}
+      {isCoachingKind(k) && (
+        <div className={`jr-bcard-answer${b.answer?.trim() ? '' : ' is-empty'}`}>
+          <span className="jr-coach-answer-h">Answer</span>
+          {b.answer?.trim() ? <Markdown md={b.answer} /> : <span className="jr-muted jr-small">Not answered yet · answer it under Coaching Questions</span>}
+        </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { LogList } from './LogList';
 import { EntryPanel } from './EntryPanel';
 import { Icon, IconBtn } from './ui';
 import { TimerProvider } from './timer';
+import { CoachingPage } from './coaching';
 
 const BASE = '/journal';
 const pageOfPath = (p: string) => {
@@ -53,8 +54,12 @@ export default function JournalApp() {
     setLoc({ path: loc.path, search: '' });
   };
 
-  const nav = PAGES.map((p) => pageConfig(store, p.id)).sort((a, b) => a.order - b.order);
-  const title = nav.find((p) => p.id === page)?.title ?? 'Overview';
+  const all = PAGES.map((p) => pageConfig(store, p.id)).sort((a, b) => a.order - b.order);
+  const parentOf = (id: string) => PAGES.find((p) => p.id === id)?.parent;
+  // the menu: the pages in their order, each sub page right under its page
+  const nav = all.filter((p) => !parentOf(p.id));
+  const subs = (id: string) => all.filter((p) => parentOf(p.id) === id);
+  const title = all.find((p) => p.id === page)?.title ?? 'Overview';
   useEffect(() => {
     document.title = `${title} · ASCIIA BAY Journal`;
   }, [title]);
@@ -100,21 +105,26 @@ export default function JournalApp() {
         </a>
         <ul>
           {nav
+            .flatMap((p) => [p, ...subs(p.id)])
             .filter((p) => editNav || !p.hidden)
-            .map((p, i) => (
-              <li key={p.id} className={`${p.id === page ? 'is-active' : ''}${p.hidden ? ' is-hidden' : ''}`}>
+            .map((p) => {
+              const sub = !!parentOf(p.id);
+              const i = nav.indexOf(p);
+              return (
+              <li key={p.id} className={`${p.id === page ? 'is-active' : ''}${p.hidden ? ' is-hidden' : ''}${sub ? ' is-sub' : ''}`}>
                 <a href={pathOf(p.id)} onClick={(e) => (e.preventDefault(), go(pathOf(p.id)))} aria-current={p.id === page ? 'page' : undefined}>
                   {p.title}
                 </a>
                 {editNav && (
                   <span className="jr-navtools">
-                    <IconBtn icon="up" label={`Move ${p.title} up`} disabled={i === 0} onClick={() => moveNav(i, -1)} />
-                    <IconBtn icon="down" label={`Move ${p.title} down`} disabled={i === nav.length - 1} onClick={() => moveNav(i, 1)} />
+                    {!sub && <IconBtn icon="up" label={`Move ${p.title} up`} disabled={i === 0} onClick={() => moveNav(i, -1)} />}
+                    {!sub && <IconBtn icon="down" label={`Move ${p.title} down`} disabled={i === nav.length - 1} onClick={() => moveNav(i, 1)} />}
                     {p.id !== 'overview' && <IconBtn icon={p.hidden ? 'eye' : 'eyeoff'} label={p.hidden ? `Show ${p.title}` : `Hide ${p.title}`} onClick={() => void store.commit([{ coll: 'pages', id: p.id, data: { ...p, hidden: !p.hidden } }])} />}
                   </span>
                 )}
               </li>
-            ))}
+              );
+            })}
         </ul>
         <div className="jr-side-foot">
           <button type="button" className="jr-linkbtn" onClick={() => setEditNav(!editNav)}>
@@ -139,6 +149,8 @@ export default function JournalApp() {
           <Overview store={store} openEntry={openEntry} newEntry={(s) => setAdding({ section: s })} go={go} />
         ) : page === 'timeline' ? (
           <Timeline store={store} openEntry={openEntry} />
+        ) : page === 'coaching' ? (
+          <CoachingPage store={store} openEntry={openEntry} />
         ) : (
           <LogList key={page} store={store} page={page} selected={entryId} selectedTask={taskId} openEntry={openEntry} newEntry={(s) => setAdding({ section: s })} />
         )}

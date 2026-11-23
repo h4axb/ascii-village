@@ -38,6 +38,7 @@ export interface Block {
   label: string; // the block's own title (older blocks: the preset name or an own name)
   md: string;
   kind?: string; // a BlockKind id
+  answer?: string; // a coaching question's answer (coaching.tsx): kept with the question, shown apart from it
 }
 export const BLOCK_PRESETS = ['Context', 'Method / Approach', 'Decision / Action', 'Rationale', 'Outcome', 'Reflection', 'Notes'];
 
@@ -308,10 +309,12 @@ export interface Method {
 export type Coll = Exclude<keyof JournalDocs, 'files' | 'zotero'>;
 
 // the pages, in the order of /journal's navigation; "log" lists every entry
-export const PAGES: { id: string; path: string; title: string; description: string; section: boolean }[] = [
+// parent: a sub page, listed under that page in the menu
+export const PAGES: { id: string; path: string; title: string; description: string; section: boolean; parent?: string }[] = [
   { id: 'overview', path: '', title: 'Overview', description: '', section: false },
   { id: 'timeline', path: 'timeline', title: 'Timeline', description: 'Every entry and milestone in the order it happened.', section: false },
   { id: 'log', path: 'log', title: 'Project Log', description: 'All documentation, activities and developments.', section: false },
+  { id: 'coaching', path: 'log/coaching', title: 'Coaching Questions', description: 'Every coaching question from the Project Log, answered right here. An answer is stored with its question in the entry.', section: false, parent: 'log' },
   { id: 'decisions', path: 'decisions', title: 'Decision Log', description: 'Design and project decisions, with their context and reasons.', section: true },
   { id: 'methodology', path: 'methodology', title: 'Methods & Methodology', description: 'How the project is researched, tested and evaluated.', section: true },
   { id: 'personal', path: 'personal', title: 'Personal Development', description: 'What I learned and how my way of working changed.', section: true },
@@ -453,6 +456,8 @@ export function blockKinds(settings: Record<string, unknown>): (BlockKind & { ow
   const own = s.colors ?? {};
   return [...BLOCK_KINDS.map((k) => ({ ...k, label: s.labels?.[k.id]?.trim() || k.label, color: own[k.id] ?? k.color })), ...(s.custom ?? []).map((k) => ({ ...k, color: own[k.id] ?? k.color, own: true }))];
 }
+// the coaching categories: one's own categories named "Coaching …" (coaching.tsx)
+export const isCoachingKind = (k: BlockKind) => /coach/i.test(k.label);
 // a block's category; a deleted one of one's own reads as Notes
 export const kindOf = (kinds: BlockKind[], b: Block) => kinds.find((x) => x.id === blockKindOf(b)) ?? kinds.find((x) => x.id === 'notes')!;
 

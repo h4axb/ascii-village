@@ -7,6 +7,8 @@
 //   POST /api/journal/zotero/sync           {full?} → {added, changed, removed, count, items, state}
 //   POST /api/journal/zotero/preview        {input: DOI | ISBN | URL} → {item, existing?}
 //   POST /api/journal/zotero/items          {item, collection?} → {item, existing?}  (new in Zotero)
+//   POST /api/journal/zotero/figure         {file, title, creator?, year?, collection?} → {item, warning?}
+//                                           (an image of the journal as an Artwork item, the image attached)
 //
 // The API key is a Worker secret (ZOTERO_API_KEY): it is sent to
 // api.zotero.org only and never appears in a response. Library:
@@ -168,6 +170,7 @@ interface Lib {
   write: boolean | null;
   get(path: string): Promise<Response>;
   post(path: string, body: unknown, headers?: Record<string, string>): Promise<Response>;
+  raw(path: string, init: RequestInit): Promise<Response>; // a file upload's form requests
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -196,6 +199,7 @@ function zoteroLib(env: ZoteroEnv): Lib | string {
     write: null,
     get: (path) => call(path, { method: 'GET' }),
     post: (path, body, headers = {}) => call(path, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json', ...headers } }),
+    raw: call,
   };
 }
 
@@ -243,7 +247,7 @@ function fakeLib(): Lib {
       }
       const start = Number(u.searchParams.get('start') ?? 0);
       const limit = Number(u.searchParams.get('limit') ?? 100);
-      const all = [...f.items.values()].filter((i) => !i.deletedAt && i.version > since);
+      const all = [...f.items.values()].filter((i) => !i.deletedAt && i.version > since && !(u.pathname === '/items/top' && i.data.parentItem));
       return new Response(JSON.stringify(all.slice(start, start + limit)), { status: 200, headers: { 'Content-Type': 'application/json', 'Last-Modified-Version': String(f.version), 'Total-Results': String(all.length) } });
     },
     post: async (path, body) => {
@@ -272,6 +276,8 @@ function fakeLib(): Lib {
       });
       return ok({ successful, success: {}, unchanged: {}, failed: {} });
     },
+    // a file upload: the made-up library already has every file
+    raw: async (path) => (/^\/items\/\w+\/file$/.test(path) && f.items.has(path.split('/')[2]) ? ok({ exists: 1 }) : new Response('Not found', { status: 404 })),
   };
 }
 
@@ -425,6 +431,7 @@ const FIELDS: Record<string, string[]> = {
   report: ['title', 'creators', 'date', 'institution', 'reportNumber', 'pages', 'url', 'abstractNote', 'accessDate', 'extra'],
   thesis: ['title', 'creators', 'date', 'university', 'thesisType', 'place', 'url', 'abstractNote', 'accessDate', 'extra'],
   webpage: ['title', 'creators', 'date', 'websiteTitle', 'url', 'abstractNote', 'accessDate', 'extra'],
+  artwork: ['title', 'creators', 'date', 'artworkMedium', 'url', 'abstractNote', 'accessDate', 'extra'], // a figure (figure())
 };
 export const ITEM_TYPES = Object.keys(FIELDS);
 function clean(d: ZData): ZData {
@@ -434,7 +441,7 @@ function clean(d: ZData): ZData {
     const v = d[f];
     if (f === 'creators') {
       const cs = (Array.isArray(v) ? (v as ZData['creators'])! : []).filter((c) => (c.lastName || c.name || '').trim());
-      out.creators = cs.map((c) => (c.name && !c.lastName ? { creatorType: 'author', name: c.name.trim() } : { creatorType: c.creatorType || 'author', firstName: (c.firstName ?? '').trim(), lastName: (c.lastName ?? '').trim() }));
+      out.creators = cs.map((c) => (c.name && !c.lastName ? { creatorType: c.creatorType || 'author', name: c.name.trim() } : { creatorType: c.creatorType || 'author', firstName: (c.firstName ?? '').trim(), lastName: (c.lastName ?? '').trim() }));
     } else if (typeof v === 'string' && v.trim()) out[f] = v.trim().slice(0, 2000);
   }
   // a DOI the type has no field for goes into Extra, as Zotero does it
@@ -610,6 +617,93 @@ async function create(db: D1Database, env: ZoteroEnv, body: { item?: ZData; coll
   return json(200, { item: it });
 }
 
+// ---------- a figure: an image of the journal as an Artwork item, the image attached ----------
+
+// MD5 of the file, which Zotero's upload asks for (the same in the Worker and in dev)
+function md5(b: Uint8Array): string {
+  const K = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) >>> 0);
+  const S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+  const words = (((b.length + 8) >>> 6) + 1) * 16;
+  const m = new Uint32Array(words);
+  for (let i = 0; i < b.length; i++) m[i >> 2] |= b[i] << ((i % 4) * 8);
+  m[b.length >> 2] |= 0x80 << ((b.length % 4) * 8);
+  m[words - 2] = (b.length * 8) >>> 0;
+  m[words - 1] = Math.floor(b.length / 0x20000000);
+  let [a0, b0, c0, d0] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476];
+  for (let o = 0; o < words; o += 16) {
+    let [A, B, C, D] = [a0, b0, c0, d0];
+    for (let i = 0; i < 64; i++) {
+      const [F, g] = i < 16 ? [(B & C) | (~B & D), i] : i < 32 ? [(D & B) | (~D & C), (5 * i + 1) % 16] : i < 48 ? [B ^ C ^ D, (3 * i + 5) % 16] : [C ^ (B | ~D), (7 * i) % 16];
+      const x = (F + A + K[i] + m[o + g]) >>> 0;
+      const r = S[(i >> 4) * 4 + (i % 4)];
+      [A, D, C] = [D, C, B];
+      B = (B + ((x << r) | (x >>> (32 - r)))) >>> 0;
+    }
+    [a0, b0, c0, d0] = [(a0 + A) >>> 0, (b0 + B) >>> 0, (c0 + C) >>> 0, (d0 + D) >>> 0];
+  }
+  return [a0, b0, c0, d0].map((v) => [0, 8, 16, 24].map((sh) => ((v >>> sh) & 255).toString(16).padStart(2, '0')).join('')).join('');
+}
+
+async function figure(db: D1Database, env: ZoteroEnv, body: { file?: string; title?: string; creator?: string; year?: string; collection?: string }, now: number): Promise<Response> {
+  const lib = libOf(env);
+  if (typeof lib === 'string') return json(503, { error: lib });
+  const title = String(body.title ?? '').trim();
+  if (!title) return json(400, { error: 'A figure needs a title' });
+  const { results: m } = await db.prepare("SELECT data FROM journal WHERE coll = 'files' AND id = ?").bind(String(body.file ?? '')).all<{ data: string }>();
+  if (!m.length) return json(404, { error: 'The image was not found' });
+  const meta = JSON.parse(m[0].data) as { name: string; type: string };
+  if (!/^image\//.test(meta.type)) return json(400, { error: 'Not an image' });
+  const { results: parts } = await db.prepare('SELECT data FROM journal_files WHERE id = ? ORDER BY part').bind(String(body.file)).all<{ data: string }>();
+  const bytes = Uint8Array.from(atob(parts.map((r) => r.data).join('')), (c) => c.charCodeAt(0));
+
+  // 1. the Artwork item
+  const creator = String(body.creator ?? '').trim();
+  const d = clean({ itemType: 'artwork', title, date: String(body.year ?? '').trim(), artworkMedium: 'Digital image', creators: creator ? [{ ...splitName(creator), creatorType: 'artist' }] : [] });
+  if (body.collection && /^[A-Z0-9]{8}$/.test(body.collection)) d.collections = [body.collection];
+  const token = () => [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const r = await lib.post('/items', [d], { 'Zotero-Write-Token': token() });
+  if (!r.ok) return json(r.status === 403 ? 403 : 502, { error: r.status === 403 ? 'The Zotero API key may only read: give it write access to add figures' : await zError(r) });
+  const made = ((await r.json()) as { successful?: Record<string, ZApiItem>; failed?: Record<string, { message?: string }> }).successful?.['0'];
+  if (!made) return json(502, { error: 'Zotero did not save the figure' });
+
+  // 2. the image as its attachment: an attachment item, then Zotero's file upload
+  let warning: string | undefined;
+  try {
+    const ra = await lib.post('/items', [{ itemType: 'attachment', parentItem: made.key, linkMode: 'imported_file', title: meta.name, filename: meta.name, contentType: meta.type, tags: [] }], { 'Zotero-Write-Token': token() });
+    const att = ra.ok ? ((await ra.json()) as { successful?: Record<string, ZApiItem> }).successful?.['0'] : undefined;
+    if (!att) throw new Error(ra.ok ? 'no attachment item' : await zError(ra));
+    const form = { 'Content-Type': 'application/x-www-form-urlencoded', 'If-None-Match': '*' };
+    const auth = await lib.raw(`/items/${att.key}/file`, { method: 'POST', headers: form, body: new URLSearchParams({ md5: md5(bytes), filename: meta.name, filesize: String(bytes.length), mtime: String(now) }).toString() });
+    if (auth.status === 413) throw new Error('the Zotero storage is full');
+    if (!auth.ok) throw new Error(await zError(auth));
+    const a = (await auth.json()) as { exists?: number; url?: string; contentType?: string; prefix?: string; suffix?: string; uploadKey?: string };
+    if (!a.exists) {
+      const enc = new TextEncoder();
+      const pre = enc.encode(a.prefix ?? ''), suf = enc.encode(a.suffix ?? '');
+      const all = new Uint8Array(pre.length + bytes.length + suf.length);
+      all.set(pre);
+      all.set(bytes, pre.length);
+      all.set(suf, pre.length + bytes.length);
+      const up = await fetch(a.url ?? '', { method: 'POST', headers: { 'Content-Type': a.contentType ?? 'application/octet-stream' }, body: all, signal: AbortSignal.timeout(30000) });
+      if (!up.ok) throw new Error(`the upload failed (${up.status})`);
+      const reg = await lib.raw(`/items/${att.key}/file`, { method: 'POST', headers: form, body: `upload=${encodeURIComponent(a.uploadKey ?? '')}` });
+      if (!reg.ok) throw new Error(await zError(reg));
+    }
+  } catch (e) {
+    warning = `The item is in Zotero, but the image could not be attached: ${String((e as Error).message || e)}`;
+  }
+
+  // 3. the item again, with its APA line, into the journal's copy
+  const full = await lib.get(`/items/${made.key}?format=json&include=data,bib&style=apa`);
+  const it = reduce(full.ok ? ((await full.json()) as ZApiItem) : made);
+  const items = await readItems(db);
+  items.set(it.key, it);
+  await writeBuckets(db, items, new Set([bucketOf(it.key)]), now);
+  const st = await readState(db);
+  if (st) await writeState(db, { ...st, count: items.size }, now);
+  return json(200, { item: it, warning });
+}
+
 export async function handleZotero(request: Request, env: ZoteroEnv, db: D1Database, parts: string[], now: number): Promise<Response> {
   if (request.method !== 'POST') return json(405, { error: 'method not allowed' });
   const body = ((await request.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
@@ -627,6 +721,7 @@ export async function handleZotero(request: Request, env: ZoteroEnv, db: D1Datab
       const dup = existingOf(await readItems(db), { ...item, DOI: normDoi(input) || item.DOI });
       return json(200, { item, existing: dup ?? undefined });
     }
+    if (parts[0] === 'figure') return await figure(db, env, body as { file?: string; title?: string; creator?: string; year?: string; collection?: string }, now);
     if (parts[0] === 'items') return await create(db, env, body as { item?: ZData; collection?: string }, now);
     if (parts[0] === '_fake' && env.ZOTERO_FAKE === '1') return await fakeLib().post('/_fake', body);
   } catch (e) {

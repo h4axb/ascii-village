@@ -4,9 +4,10 @@
 // process model, where every method row tells how often it was used.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JournalStore, Put } from './store';
-import { ALONGSIDE, METHOD_TYPES, PHASE_TONES, fmtDate, fmtMinutes, isInstrument, newId, taskMinutes, type Entry, type Method, type MethodPhase, type Source, type MethodType, type PhaseTone, type Task } from './types';
+import { ALONGSIDE, METHOD_TYPES, PHASE_TONES, fmtDate, fmtMinutes, isInstrument, newId, taskMinutes, type Entry, type Figure, type Method, type MethodPhase, type Source, type MethodType, type PhaseTone, type Task } from './types';
 import { Attachments, Icon, IconBtn, Modal } from './ui';
 import { citeShort, ZoteroPicker, ZoteroSource } from './zotero';
+import { FigureEditor, FigureList, syncFigures } from './figures';
 
 // a method's sources (method sources): the list, or the single source/zotero of older methods
 const methodSources = (m: Pick<Method, 'source' | 'zotero' | 'msources'>): Source[] => m.msources ?? (m.zotero ? [{ label: m.source ?? '', url: '', zotero: m.zotero }] : m.source ? [{ label: m.source, url: '' }] : []);
@@ -636,6 +637,12 @@ function MethodDrawer({ store, id, usage, codes, onClose, onOpen, openEntry }: {
                   </>
                 )}
               </dl>
+              {m.figures?.length ? (
+                <div className="jr-task-part">
+                  <span className="jr-task-label">Figures ({m.figures.length})</span>
+                  <FigureList store={store} figures={m.figures} />
+                </div>
+              ) : null}
               <div className="jr-task-part">
                 <span className="jr-task-label">Used in</span>
                 {u ? (
@@ -693,9 +700,10 @@ function MethodDrawer({ store, id, usage, codes, onClose, onOpen, openEntry }: {
 // name, description, type, phase, area; a new area is added to its phase
 function MethodForm({ store, m, init, onDone }: { store: JournalStore; m?: Method; init?: Partial<Method>; onDone: (savedId: string | null) => void }) {
   const phases = sortedPhases(store);
-  const [f, setF] = useState(() => ({ name: m?.name ?? init?.name ?? '', desc: m?.desc ?? '', source: '', msources: m ? methodSources(m) : ([] as Source[]), sources: m?.sources ?? ([] as Source[]), type: m?.type ?? init?.type ?? ('W' as MethodType), phase: m?.phase ?? init?.phase ?? phases.find((p) => p.id !== ALONGSIDE)?.id ?? ALONGSIDE, area: m?.area ?? init?.area ?? '' }));
+  const [f, setF] = useState(() => ({ name: m?.name ?? init?.name ?? '', desc: m?.desc ?? '', source: '', msources: m ? methodSources(m) : ([] as Source[]), sources: m?.sources ?? ([] as Source[]), figures: m?.figures ?? ([] as Figure[]), type: m?.type ?? init?.type ?? ('W' as MethodType), phase: m?.phase ?? init?.phase ?? phases.find((p) => p.id !== ALONGSIDE)?.id ?? ALONGSIDE, area: m?.area ?? init?.area ?? '' }));
   const [newArea, setNewArea] = useState('');
   const [pick, setPick] = useState(false);
+  const [saving, setSaving] = useState(false);
   // the typed cite becomes one more method source
   const addTyped = () => {
     if (f.source.trim()) setF({ ...f, msources: [...f.msources, { label: f.source.trim(), url: '' }], source: '' });
@@ -707,12 +715,17 @@ function MethodForm({ store, m, init, onDone }: { store: JournalStore; m?: Metho
   const save = async () => {
     if (!ok) return;
     const id = m?.id ?? newId('mt');
+    // Zotero items for the figures that ask for one (optional)
+    setSaving(true);
+    const { figures, errors } = await syncFigures(store, f.figures);
+    setSaving(false);
     // a cite still typed in the field counts too
     const msources = f.source.trim() ? [...f.msources, { label: f.source.trim(), url: '' }] : f.msources;
     const order = m?.order ?? Object.values(store.docs.methods ?? {}).filter((x) => x.phase === f.phase && x.area === area).length;
-    const put: Put[] = [{ coll: 'methods', id, data: { id, name: f.name.trim(), desc: f.desc.trim(), type: f.type, phase: f.phase, area, order, created: m?.created ?? Date.now(), ...(msources.length ? { msources } : {}), ...(f.sources.length ? { sources: f.sources } : {}) } satisfies Method }];
+    const put: Put[] = [{ coll: 'methods', id, data: { id, name: f.name.trim(), desc: f.desc.trim(), type: f.type, phase: f.phase, area, order, created: m?.created ?? Date.now(), ...(msources.length ? { msources } : {}), ...(f.sources.length ? { sources: f.sources } : {}), ...(figures.length ? { figures } : {}) } satisfies Method }];
     if (ph && !ph.areas.includes(area)) put.push({ coll: 'phases', id: ph.id, data: { ...ph, areas: [...ph.areas, area] } });
     await store.commit(put);
+    if (errors.length) alert(`Saved. Zotero:\n${errors.join('\n')}`);
     onDone(id);
   };
   return (
@@ -763,6 +776,12 @@ function MethodForm({ store, m, init, onDone }: { store: JournalStore; m?: Metho
           Content sources <span className="jr-muted">optional · literature on what it is applied to</span>
         </span>
         <Attachments store={store} files={[]} links={f.sources} noFiles onChange={(_, links) => setF({ ...f, sources: links })} />
+      </div>
+      <div className="jr-field">
+        <span>
+          Figures <span className="jr-muted">optional · images with their caption · Zotero optional</span>
+        </span>
+        <FigureEditor store={store} figures={f.figures} onChange={(figures) => setF({ ...f, figures })} />
       </div>
       {pick && (
         <ZoteroPicker
@@ -821,8 +840,8 @@ function MethodForm({ store, m, init, onDone }: { store: JournalStore; m?: Metho
         <button type="button" onClick={() => onDone(null)}>
           Cancel
         </button>
-        <button type="submit" className="is-primary" disabled={!ok}>
-          {m ? 'Save' : 'Add method'}
+        <button type="submit" className="is-primary" disabled={!ok || saving}>
+          {saving ? 'Saving …' : m ? 'Save' : 'Add method'}
         </button>
       </div>
     </form>

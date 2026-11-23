@@ -51,6 +51,21 @@ export interface Source {
   zotero?: string;
 }
 
+// a figure (an image with its caption, for the thesis): kept in the journal;
+// Zotero is optional: a linked original source, or an Artwork item made from it
+export type FigureOrigin = 'own' | 'foreign' | 'adapted';
+export interface Figure {
+  file: string; // FileMeta id of the image
+  title: string;
+  origin: FigureOrigin;
+  creator?: string; // who made it (third-party / adapted without a Zotero source, or for a new Zotero item)
+  year?: string;
+  zotero?: string; // the original source (link), or the item made from this image (zoteroOwn)
+  zoteroOwn?: boolean;
+  caption: string; // plain text for Word; generated until edited (captionEdited)
+  captionEdited?: boolean;
+}
+
 // the journal's copy of a Zotero item (functions/api/zotero.ts, ZItem)
 export interface ZoteroItem {
   key: string;
@@ -285,6 +300,7 @@ export interface Method {
   source?: string; // the literature it rests on, e.g. Floyd (1984); typed, or the cite of the Zotero item
   zotero?: string; // a Zotero item key: the source then reads from the library's copy (zotero.tsx)
   msources?: Source[]; // method sources (any number): Zotero items or typed cites (url ''); replaces source/zotero, which older methods still carry
+  figures?: Figure[]; // images with their captions (figures.tsx)
   sources?: Source[]; // content sources: literature on what the method is applied to (Zotero items or links)
   order: number;
   created: number;

@@ -50,6 +50,7 @@ export interface ZoteroApi {
   sync: (full?: boolean) => Promise<ZoteroSyncResult>;
   preview: (input: string) => Promise<{ item: ZoteroDraft; existing?: ZoteroItem }>;
   create: (item: ZoteroDraft, collection?: string) => Promise<{ item: ZoteroItem; existing?: boolean }>;
+  figure: (f: { file: string; title: string; creator?: string; year?: string; collection?: string }) => Promise<{ item: ZoteroItem; warning?: string }>; // an image as an Artwork item
 }
 const ZOTERO_AUTO_MS = 6 * 60 * 60 * 1000; // a sync on opening, when the last is older
 
@@ -217,6 +218,11 @@ export function useJournal(): JournalStore {
     setDocs((d) => ({ ...d, zotero: { ...d.zotero, [res.item.key]: res.item } }));
     return res;
   };
+  const zFigure: ZoteroApi['figure'] = async (f) => {
+    const res = await post<{ item: ZoteroItem; warning?: string }>('figure', f);
+    setDocs((d) => ({ ...d, zotero: { ...d.zotero, [res.item.key]: res.item } }));
+    return res;
+  };
   const zState = (docs.settings.zoteroSync as ZoteroState | undefined) ?? null;
   // on opening: a quiet sync, when the last one is older than 6 hours
   const auto = useRef(false);
@@ -226,7 +232,7 @@ export function useJournal(): JournalStore {
     if (!zState || Date.now() - zState.at > ZOTERO_AUTO_MS) void zSync().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
-  const zotero: ZoteroApi = { state: zState, busy: zBusy, sync: zSync, preview: (input) => post('preview', { input }), create: zCreate };
+  const zotero: ZoteroApi = { state: zState, busy: zBusy, sync: zSync, preview: (input) => post('preview', { input }), create: zCreate, figure: zFigure };
 
   return { docs, state, error, saving: pending > 0, signIn, commit, history, upload, removeFile, fileUrl, zotero };
 }

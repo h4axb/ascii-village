@@ -358,14 +358,17 @@ function Deadlines({ store }: { store: JournalStore }) {
   );
 }
 
-// one deadline; a new date for one that had a date asks why, in one short
-// sentence, before it is stored (kept with the old and new date)
+// one deadline; the date field is a draft until "Save". A new date for one
+// that had a saved date asks why, in one short sentence, and is kept with the
+// saved and the new date (one change per save, however often the draft changed)
 function DeadlineRow({ d, save, remove }: { d: Deadline; save: (d: Deadline) => void; remove: () => void }) {
   const [date, setDate] = useState(d.date);
   const [reason, setReason] = useState('');
   const [all, setAll] = useState(false);
   useEffect(() => setDate(d.date), [d.date]);
   const moving = !!d.date && !!date && date !== d.date;
+  // a first date, or one cleared: saved without a reason
+  const setting = date !== d.date && !moving;
   const commit = () => {
     const change = { at: Date.now(), from: d.date, to: date, reason: reason.trim().slice(0, REASON_MAX) };
     save({ ...d, date, changes: [...(d.changes ?? []), change] });
@@ -387,14 +390,31 @@ function DeadlineRow({ d, save, remove }: { d: Deadline; save: (d: Deadline) => 
           value={date}
           aria-label="Date"
           onChange={(e) => {
-            const v = e.target.value;
-            setDate(v);
-            // a first date, or one cleared: nothing to explain
-            if (!d.date || !v) save({ ...d, date: v });
+            setDate(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') cancel();
+            else if (e.key === 'Enter' && setting) {
+              e.preventDefault();
+              save({ ...d, date });
+            }
           }}
         />
         <IconBtn icon="trash" label="Delete deadline" danger onClick={remove} />
       </div>
+      {setting && (
+        <div className="jr-dl-why is-set">
+          <span className="jr-small">{date ? `Deadline on ${fmtDate(date)}` : 'Remove the date?'}</span>
+          <span className="jr-dl-why-actions">
+            <button type="button" onClick={cancel}>
+              Cancel
+            </button>
+            <button type="button" className="is-primary" onClick={() => save({ ...d, date })}>
+              Save
+            </button>
+          </span>
+        </div>
+      )}
       {moving && (
         <form
           className="jr-dl-why"

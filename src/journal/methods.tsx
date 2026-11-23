@@ -6,6 +6,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JournalStore, Put } from './store';
 import { ALONGSIDE, METHOD_TYPES, PHASE_TONES, fmtDate, fmtMinutes, isInstrument, newId, taskMinutes, type Entry, type Method, type MethodPhase, type MethodType, type PhaseTone, type Task } from './types';
 import { Icon, IconBtn, Modal } from './ui';
+import { citeShort, ZoteroPicker, ZoteroSource } from './zotero';
+
+// a method's source as one short line: the Zotero item's cite (it follows
+// changes made in Zotero), else the typed text
+const sourceText = (m: Pick<Method, 'source' | 'zotero'>, store: JournalStore) => {
+  const it = m.zotero ? store.docs.zotero?.[m.zotero] : undefined;
+  return it ? citeShort(it) || it.title : (m.source ?? '');
+};
 
 export type MethodTab = 'entries' | 'methods' | 'model';
 const typeOf = (t: MethodType) => METHOD_TYPES.find((x) => x.id === t) ?? METHOD_TYPES[0];
@@ -181,7 +189,7 @@ function MethodTable({ store, usage, codes, onOpen, onNew }: { store: JournalSto
                     <span className="jr-mt-name">
                       <strong>{m.name}</strong>
                       {m.desc && <small>{m.desc}</small>}
-                      {m.source && <small className="jr-mt-src">{m.source}</small>}
+                      {(m.source || m.zotero) && <small className="jr-mt-src">{sourceText(m, store)}</small>}
                     </span>
                     <span>
                       <span className="jr-mtype">
@@ -585,7 +593,7 @@ function MethodDrawer({ store, id, usage, codes, onClose, onOpen, openEntry }: {
                 <dt>Meso</dt>
                 <dd>{m.area || '–'}</dd>
                 <dt>Source</dt>
-                <dd>{m.source || <span className="jr-muted">–</span>}</dd>
+                <dd>{m.zotero ? <ZoteroSource s={{ label: m.source ?? '', url: '', zotero: m.zotero }} zotero={store.docs.zotero} /> : m.source || <span className="jr-muted">–</span>}</dd>
                 {u && u.minutes > 0 && (
                   <>
                     <dt>Time logged</dt>
@@ -650,8 +658,9 @@ function MethodDrawer({ store, id, usage, codes, onClose, onOpen, openEntry }: {
 // name, description, type, phase, area; a new area is added to its phase
 function MethodForm({ store, m, init, onDone }: { store: JournalStore; m?: Method; init?: Partial<Method>; onDone: (savedId: string | null) => void }) {
   const phases = sortedPhases(store);
-  const [f, setF] = useState(() => ({ name: m?.name ?? init?.name ?? '', desc: m?.desc ?? '', source: m?.source ?? '', type: m?.type ?? init?.type ?? ('W' as MethodType), phase: m?.phase ?? init?.phase ?? phases.find((p) => p.id !== ALONGSIDE)?.id ?? ALONGSIDE, area: m?.area ?? init?.area ?? '' }));
+  const [f, setF] = useState(() => ({ name: m?.name ?? init?.name ?? '', desc: m?.desc ?? '', source: m?.source ?? '', zotero: m?.zotero ?? '', type: m?.type ?? init?.type ?? ('W' as MethodType), phase: m?.phase ?? init?.phase ?? phases.find((p) => p.id !== ALONGSIDE)?.id ?? ALONGSIDE, area: m?.area ?? init?.area ?? '' }));
   const [newArea, setNewArea] = useState('');
+  const [pick, setPick] = useState(false);
   const ph = store.docs.phases?.[f.phase];
   const areas = ph?.areas ?? [];
   const area = f.area === '__new' ? newArea.trim() : f.area || areas[0] || '';
@@ -660,7 +669,7 @@ function MethodForm({ store, m, init, onDone }: { store: JournalStore; m?: Metho
     if (!ok) return;
     const id = m?.id ?? newId('mt');
     const order = m?.order ?? Object.values(store.docs.methods ?? {}).filter((x) => x.phase === f.phase && x.area === area).length;
-    const put: Put[] = [{ coll: 'methods', id, data: { id, name: f.name.trim(), desc: f.desc.trim(), type: f.type, phase: f.phase, area, order, created: m?.created ?? Date.now(), ...(f.source.trim() ? { source: f.source.trim() } : {}) } satisfies Method }];
+    const put: Put[] = [{ coll: 'methods', id, data: { id, name: f.name.trim(), desc: f.desc.trim(), type: f.type, phase: f.phase, area, order, created: m?.created ?? Date.now(), ...(f.source.trim() ? { source: f.source.trim() } : {}), ...(f.zotero ? { zotero: f.zotero } : {}) } satisfies Method }];
     if (ph && !ph.areas.includes(area)) put.push({ coll: 'phases', id: ph.id, data: { ...ph, areas: [...ph.areas, area] } });
     await store.commit(put);
     onDone(id);
@@ -683,12 +692,37 @@ function MethodForm({ store, m, init, onDone }: { store: JournalStore; m?: Metho
         </span>
         <input value={f.desc} onChange={(e) => setF({ ...f, desc: e.target.value })} />
       </label>
-      <label className="jr-field">
+      <div className="jr-field">
         <span>
-          Source <span className="jr-muted">optional</span>
+          Source <span className="jr-muted">optional · from Zotero or typed</span>
         </span>
-        <input value={f.source} placeholder="e.g. Floyd (1984)" onChange={(e) => setF({ ...f, source: e.target.value })} />
-      </label>
+        {f.zotero ? (
+          <ZoteroSource
+            s={{ label: f.source, url: '', zotero: f.zotero }}
+            zotero={store.docs.zotero}
+            actions={<IconBtn icon="x" label="Remove the Zotero source" onClick={() => setF({ ...f, zotero: '', source: '' })} />}
+          />
+        ) : (
+          <span className="jr-msrc">
+            <input value={f.source} placeholder="e.g. Floyd (1984)" aria-label="Source" onChange={(e) => setF({ ...f, source: e.target.value })} />
+            <button type="button" className="jr-btn" onClick={() => setPick(true)}>
+              <Icon name="book" /> Zotero
+            </button>
+          </span>
+        )}
+      </div>
+      {pick && (
+        <ZoteroPicker
+          store={store}
+          initial={f.source}
+          onPick={(key) => {
+            const it = store.docs.zotero[key];
+            setF({ ...f, zotero: key, source: it ? citeShort(it) || it.title : f.source });
+            setPick(false);
+          }}
+          onClose={() => setPick(false)}
+        />
+      )}
       <div className="jr-field">
         <span>Type</span>
         <span className="jr-seg jr-mseg" role="radiogroup" aria-label="Type">

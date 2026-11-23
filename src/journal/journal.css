@@ -5104,3 +5104,17 @@ body.jr-pip {
 .jr-mt-tone.is-instr {
   background: #b7ab7c;
 }
+
+/* a method's source: typed, or picked / added in Zotero */
+.jr-msrc {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.jr-msrc input {
+  flex: 1;
+  min-width: 0;
+}
+.jr-msrc .jr-btn {
+  flex: none;
+}

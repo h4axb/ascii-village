@@ -282,7 +282,8 @@ export interface Method {
   type: MethodType;
   phase: string; // a phase id (ALONGSIDE for the project-wide ones)
   area: string; // one of the phase's areas
-  source?: string; // the literature it rests on, e.g. Floyd (1984)
+  source?: string; // the literature it rests on, e.g. Floyd (1984); typed, or the cite of the Zotero item
+  zotero?: string; // a Zotero item key: the source then reads from the library's copy (zotero.tsx)
   order: number;
   created: number;
 }

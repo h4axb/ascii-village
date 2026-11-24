@@ -174,7 +174,7 @@ function sparkles(tick) {
 
 // ---------- the silhouette: the drawing's outer shape, its outline cells ----------
 // the outline is drawn from T0 to T1 (ticks of 0.1 s)
-const T0 = 12, T1 = 76;
+const T0 = 12, T1 = 140;
 const SH = (() => {
   const tmp = document.createElement('div');
   const rows = SHIP.map((h) => { tmp.innerHTML = h; return tmp.textContent; });
@@ -249,7 +249,7 @@ function fit() { pre.style.transform = `scale(${296 / pre.scrollWidth}, ${168 / 
 
 // ---------- the timeline (one loop ≈ 17 s), stepped at 10 frames per second ----------
 const st = document.getElementById('st'), pc = document.getElementById('pc'), bar = document.getElementById('bar');
-const SHIP_START = 90, SHIP_STEP = 2, HOLD = 25; // ticks
+const SHIP_START = 154, SHIP_STEP = 2, HOLD = 25; // ticks
 const LOOP = SHIP_START + 40 * SHIP_STEP + HOLD;
 let tick = 0;
 function frame() {

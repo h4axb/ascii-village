@@ -1,0 +1,7 @@
+/* the game behind, the panel see-through (frosted), as in the game */
+html, body { background: #000 url(WORLD) center / cover no-repeat !important; }
+.overlay:has(> .ds-sheet) { background: rgba(250, 244, 225, 0.12) !important; }
+.ds-sheet { background: rgba(250, 244, 225, 0.5) !important; backdrop-filter: blur(14px) saturate(1.1) !important; -webkit-backdrop-filter: blur(14px) saturate(1.1) !important; border-color: rgba(255, 255, 255, 0.45) !important; }
+.cw3 { background: rgba(250, 244, 225, 0.4) !important; }
+.ds-iconbtn, .ds-currency, .cw3-bookmark { background: rgba(255, 250, 238, 0.82) !important; }
+.cw3-prompt { background: rgba(255, 250, 238, 0.85) !important; }

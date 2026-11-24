@@ -1,0 +1,45 @@
+/* mockup only: the crafting panel in the reference's colours (blue bubble, cream) */
+:root, .ds-sheet {
+  --cream: #faf4e1;
+  --cream-hi: #fffaee;
+  --blue: #69bee3;
+  --blue-deep: #2f7fa8;
+  --ink: #2a5670;
+  --ds-text: #2a5670;
+  --ds-text-soft: #4d7d96;
+  --ds-text-muted: #93b3c4;
+  --ds-line: rgba(105, 190, 227, 0.45);
+  --ds-line-soft: rgba(105, 190, 227, 0.28);
+  --ds-line-strong: rgba(105, 190, 227, 0.85);
+  --ds-sheet: #faf4e1;
+  --ds-surface: #fffaee;
+  --ds-name: #2f7fa8;
+  --ds-go: #69bee3;
+  --ds-go-fill: #69bee3;
+}
+.overlay:has(> .ds-sheet) { background: #efe5c8 !important; }
+.ds-sheet, .ds-sheet *:not(pre):not(pre *) { font-family: 'Fredoka', sans-serif !important; }
+.ds-sheet { background: var(--cream) !important; backdrop-filter: none !important; border-color: rgba(105,190,227,.25) !important; box-shadow: 0 10px 40px rgba(120, 100, 50, 0.12); }
+.cw3 { background: var(--cream) !important; border-color: rgba(105,190,227,.5) !important; border-radius: 22px !important; }
+.ds-bracket { border-color: rgba(105,190,227,.55) !important; }
+/* the bubble: blue, cream text, no border, round; its tail points at the speaker, as in the reference */
+.ds-bubble { background: var(--blue) !important; color: #fbf4e4 !important; border: 0 !important; border-radius: 18px !important; padding: 13px 22px !important; font-size: 16px !important; font-weight: 500; line-height: 1.5 !important; letter-spacing: .1px; }
+.ds-msg .ds-bubble:first-child::before { border: 0 !important; transform: none !important; width: 22px !important; height: 18px !important; top: 16px !important; background: var(--blue) !important;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 18'><path d='M22 0 H4.2 C1.6 0 0.4 2.6 2.2 4.4 L15 17 C17.5 19 22 18 22 14 Z'/></svg>") no-repeat center / 100% 100%; }
+.ds-msg.left .ds-bubble:first-child::before { left: -18px !important; }
+.ds-msg.right .ds-bubble:first-child::before { right: -18px !important; transform: scaleX(-1) !important; }
+.ds-portrait-box { border-color: rgba(105,190,227,.6) !important; border-radius: 14px !important; background: var(--cream-hi) !important; }
+.ds-portrait-name { color: var(--blue-deep) !important; font-weight: 600; font-size: 15px !important; }
+/* buttons, coins, bookmark */
+.ds-iconbtn { background: var(--cream-hi) !important; border-color: rgba(105,190,227,.55) !important; color: var(--blue-deep) !important; border-radius: 12px !important; }
+.ds-currency { background: var(--cream-hi) !important; border-color: rgba(105,190,227,.55) !important; color: var(--ink) !important; border-radius: 999px !important; font-weight: 600; }
+.cw3-bookmark { background: var(--cream-hi) !important; border-color: rgba(105,190,227,.55) !important; color: var(--blue-deep) !important; }
+/* input and Craft */
+.cw3-bottom { border-top-color: rgba(105,190,227,.28) !important; }
+.cw3-prompt { background: var(--cream-hi) !important; border-color: rgba(105,190,227,.6) !important; border-radius: 16px !important; }
+.cw3-prompt > .ds-bracket { display: none; }
+.cw3-input { color: var(--ink) !important; font-size: 16px !important; }
+.cw3-count { color: var(--ds-text-muted) !important; }
+.cw3-craft { background: var(--blue) !important; border-color: var(--blue) !important; color: #fbf4e4 !important; border-radius: 16px !important; font-weight: 600; }
+.cw3-craft:disabled { opacity: .5 !important; }
+.ds-sheet pre, .ds-sheet pre * { font-family: var(--game-font) !important; }

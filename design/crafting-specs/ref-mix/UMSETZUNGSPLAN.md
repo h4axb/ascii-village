@@ -8,7 +8,7 @@ werden hier ergänzt, ältere Versionen (v2 bis v8) gelten nur noch als Verlauf.
 
 | Teil | Referenz (Mockup) | Werte |
 |---|---|---|
-| Panel, Standardansicht mit Chat | `crafting-panel-ref-mix-v10.png` | `look-v10.css` (v10 = v9 mit Punktmuster; v9 = v8 mit den SVG-Avataren) |
+| Panel, Standardansicht mit Chat | `crafting-panel-ref-mix-v11.png` | `look-v11.css` (v11 = v10 mit weißer Rahmenkontur und hellen Ecken-Buttons) |
 | Lade-Panel beim Craften | `bauplan-silhouette.html` / `.gif` / `-frames.png` | im HTML (Konstanten oben im Script) |
 | Avatare | `design/avatars/mitchy.svg`, `player.svg` | Erzeugung: `design/avatars/make-avatars.cjs` |
 
@@ -17,12 +17,13 @@ Nicht mehr aktuell: `bauplan-loading.*` (Maschinen-Variante, nur als Vergleich).
 ## 1. Panel-Look (`src/ui/ui.css`, Bereich Workshop `.cw3`)
 
 - **Hintergrund:** Eine Ebene über den ganzen Bildschirm, `rgba(28, 28, 26, 0.2)` mit `blur(6px)`. Das Sheet selbst bekommt keine eigene Fläche und keinen Blur.
-- **Chat-Rahmen:** Creme `rgba(246, 241, 227, 0.94)`, Radius 24.
+- **Chat-Rahmen:** Creme `rgba(246, 241, 227, 0.94)`, Radius 24, dünne weiße Kontur 2 px `#ffffff`.
   - Darauf ein dezentes Punktraster: hellbraune Punkte `rgba(214, 160, 92, 0.16)`, Ø 9 px, Raster 15 px.
   - Oben am kräftigsten, nach unten mit einem Creme-Verlauf ausgeblendet (0 → 55 % bei 60 % Höhe → 90 % unten).
-- **Ecken-Buttons** (Zurück, X, Münzen):
-  - dunkles Oliv `rgba(36, 40, 12, 0.7)`, ohne Rand;
-  - Icon und Zahl in Creme `#ebe6c8`;
+- **Ecken-Buttons** (Zurück, X, Münzen) in der Panel-Palette, luftig wie das Panel:
+  - Creme halbtransparent `rgba(246, 241, 227, 0.78)` mit `blur(6px)`;
+  - weiße Kontur 2 px wie der Rahmen;
+  - Icons warmbraun `#8b6f5c`, Münzzahl `#5a463c`;
   - Radius 12.
 - **Verlauf-Lasche:**
   - Buttergelb `#ffda6e`, Icon Ocker `#c0983f`, ohne Rand;
@@ -91,5 +92,5 @@ Nicht mehr aktuell: `bauplan-loading.*` (Maschinen-Variante, nur als Vergleich).
 ## Prüfung nach dem Einbau
 
 - `npx tsc --noEmit -p .`
-- Dev-Server mit `STUDY_FAKE_AI=1`, Ablauf „a pirate ship“, Screenshots gegen `crafting-panel-ref-mix-v10.png` und `bauplan-silhouette-frames.png` vergleichen.
+- Dev-Server mit `STUDY_FAKE_AI=1`, Ablauf „a pirate ship“, Screenshots gegen `crafting-panel-ref-mix-v11.png` und `bauplan-silhouette-frames.png` vergleichen.
 - Desktop, Tablet und Mobil prüfen.

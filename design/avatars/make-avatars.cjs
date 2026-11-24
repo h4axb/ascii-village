@@ -13,8 +13,15 @@ function build(who, rowsUsed, bg, P, name) {
   const box = 100, top = P.top, side = P.side;
   // a sprite pixel is two glyphs wide and one line high: in the game about 1.2 times as wide as high
   const A = P.aspect ?? 1.2;
-  const ph = Math.min((box - top) / h, (box - 2 * side) / (w * A)), pw = ph * A;
-  const x0 = (box - pw * w) / 2, y0 = box - ph * h; // anchored to the bottom: the body runs out of the frame
+  let ph = Math.min((box - top) / h, (box - 2 * side) / (w * A));
+  let y0 = box - ph * h; // anchored to the bottom: the body runs out of the frame
+  // matched to another head: the head (headRows) as tall as `headSize`, its top at `headTop`
+  if (P.headRows && P.headSize) {
+    ph = P.headSize / P.headRows;
+    y0 = P.headTop;
+  }
+  const pw = ph * A;
+  const x0 = (box - pw * w) / 2;
   let cells = '';
   const used = {};
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -40,4 +47,8 @@ const def = { l0: 0.3, lk: 0.66, sk: 1.0, sa: 0.12, smax: 0.85, top: 8, side: 6 
 const p = { ...def, ...P };
 const out = process.argv[3] || '/home/user/ascii-village/design/avatars';
 fs.writeFileSync(`${out}/mitchy.svg`, build('mitchy', 24, p.bgM || '#fbc08f', { ...p, sa: p.saM ?? 0.24, l0: p.l0M ?? 0.27, top: 7, aspect: 1 }, 'Mitchy'));
-fs.writeFileSync(`${out}/player.svg`, build('player', 22, p.bgP || '#fbb7cc', { ...p, top: 10 }, 'Player'));
+// Mitchy's head (ears to chin, his face rows) in his avatar: the player's head is made the same size
+const mRows = 24, mTop = 7, mSide = p.side, mW = Math.max(...d.mitchy.sprite.slice(0, mRows).map((l) => l.length)) / 2;
+const mPh = Math.min((100 - mTop) / mRows, (100 - 2 * mSide) / mW);
+const mHead = { size: mPh * d.mitchy.face, top: 100 - mPh * mRows };
+fs.writeFileSync(`${out}/player.svg`, build('player', 28, p.bgP || '#fbb7cc', { ...p, top: 10, headRows: 18, headSize: mHead.size, headTop: mHead.top }, 'Player'));

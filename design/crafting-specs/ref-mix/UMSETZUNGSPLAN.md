@@ -8,7 +8,7 @@ werden hier ergänzt, ältere Versionen (v2 bis v8) gelten nur noch als Verlauf.
 
 | Teil | Referenz (Mockup) | Werte |
 |---|---|---|
-| Panel, Standardansicht mit Chat | `crafting-panel-ref-mix-v11.png` | `look-v11.css` (v11 = v10 mit weißer Rahmenkontur und hellen Ecken-Buttons) |
+| Panel, Standardansicht mit Chat | `crafting-panel-ref-mix-v12.png` | `look-v12.css` (v12 = v11 mit gelben Ecken-Buttons und Spieler-Avatar mit Haarspitzen) |
 | Lade-Panel beim Craften | `bauplan-silhouette.html` / `.gif` / `-frames.png` | im HTML (Konstanten oben im Script) |
 | Avatare | `design/avatars/mitchy.svg`, `player.svg` | Erzeugung: `design/avatars/make-avatars.cjs` |
 
@@ -20,10 +20,9 @@ Nicht mehr aktuell: `bauplan-loading.*` (Maschinen-Variante, nur als Vergleich).
 - **Chat-Rahmen:** Creme `rgba(246, 241, 227, 0.94)`, Radius 24, dünne weiße Kontur 2 px `#ffffff`.
   - Darauf ein dezentes Punktraster: hellbraune Punkte `rgba(214, 160, 92, 0.16)`, Ø 9 px, Raster 15 px.
   - Oben am kräftigsten, nach unten mit einem Creme-Verlauf ausgeblendet (0 → 55 % bei 60 % Höhe → 90 % unten).
-- **Ecken-Buttons** (Zurück, X, Münzen) in der Panel-Palette, luftig wie das Panel:
-  - Creme halbtransparent `rgba(246, 241, 227, 0.78)` mit `blur(6px)`;
-  - weiße Kontur 2 px wie der Rahmen;
-  - Icons warmbraun `#8b6f5c`, Münzzahl `#5a463c`;
+- **Ecken-Buttons** (Zurück, X, Münzen) im Buttergelb der Verlauf-Lasche:
+  - Fläche `#ffda6e`, weiße Kontur 2 px wie der Rahmen;
+  - Icons Ocker `#c0983f`, Münzzahl `#8a6a24`;
   - Radius 12.
 - **Verlauf-Lasche:**
   - Buttergelb `#ffda6e`, Icon Ocker `#c0983f`, ohne Rand;
@@ -56,6 +55,7 @@ Nicht mehr aktuell: `bauplan-loading.*` (Maschinen-Variante, nur als Vergleich).
   - Abgerundetes Quadrat, Radius 22 %, weißer Rand 3 px, kein Schatten.
   - Die Hintergrundfläche ist in der SVG enthalten: Mitchy Pfirsich `#fbc08f`, Spieler Rosa `#fbb7cc`.
 - Gezeigt wird nur der Kopf, mittig. Beide Köpfe sind gleich hoch (56 % der Box).
+  - Beim Spieler zwei Zeilen mehr (Zeilen 0–19), damit die Haarspitzen an den Seiten zu sehen sind; der Kopf bleibt so groß wie Mitchys.
   - Spieler-Pixel 1,2 : 1 wie in der Spielwelt, Mitchy quadratisch.
   - Farben wie die Sprites im Spiel.
 - **Offen:** Der Spieler kann im Spiel sein Aussehen ändern. Dann wird die SVG zur Laufzeit aus dem Sprite erzeugt (gleiche Logik wie `make-avatars.cjs`), statt fest zu sein.
@@ -92,5 +92,5 @@ Nicht mehr aktuell: `bauplan-loading.*` (Maschinen-Variante, nur als Vergleich).
 ## Prüfung nach dem Einbau
 
 - `npx tsc --noEmit -p .`
-- Dev-Server mit `STUDY_FAKE_AI=1`, Ablauf „a pirate ship“, Screenshots gegen `crafting-panel-ref-mix-v11.png` und `bauplan-silhouette-frames.png` vergleichen.
+- Dev-Server mit `STUDY_FAKE_AI=1`, Ablauf „a pirate ship“, Screenshots gegen `crafting-panel-ref-mix-v12.png` und `bauplan-silhouette-frames.png` vergleichen.
 - Desktop, Tablet und Mobil prüfen.

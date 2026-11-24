@@ -56,4 +56,5 @@ const out = process.argv[3] || '/home/user/ascii-village/design/avatars';
 // the head only, centred: both heads the same height (the player's hat brim sets it: it must fit the width)
 const HEAD = 56;
 fs.writeFileSync(`${out}/mitchy.svg`, build('mitchy', d.mitchy.face, p.bgM || '#fbc08f', { ...p, aspect: 1, headOnly: HEAD }, 'Mitchy'));
-fs.writeFileSync(`${out}/player.svg`, build('player', 18, p.bgP || '#fbb7cc', { ...p, headOnly: HEAD }, 'Player'));
+// the player: two rows more, so the hair's ends at the sides show (the head stays as big as Mitchy's)
+fs.writeFileSync(`${out}/player.svg`, build('player', 20, p.bgP || '#fbb7cc', { ...p, headOnly: (HEAD * 20) / 18 }, 'Player'));

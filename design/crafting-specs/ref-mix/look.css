@@ -1,0 +1,23 @@
+/* mockup only: the current panel, with just these taken from the reference:
+   avatar framing + their background colours, the chat frame's colour, the
+   sheet's transparency, the corner buttons, the Craft button's green, and a
+   bright background behind the crafted drawing. Bubbles and the rest unchanged. */
+html, body { background: #000 url(WORLD) center / cover no-repeat !important; }
+/* the sheet: see-through, the world only softly blurred (no dark tint) */
+.overlay:has(> .ds-sheet) { background: transparent !important; }
+.ds-sheet { background: rgba(255, 255, 255, 0.04) !important; backdrop-filter: blur(5px) !important; -webkit-backdrop-filter: blur(5px) !important; border-color: transparent !important; }
+/* the chat frame: the reference's light cream */
+.cw3 { background: rgba(246, 241, 227, 0.94) !important; }
+/* back, close, coins, bookmark: a dark see-through fill, a light frame, white icon/text */
+.ds-iconbtn, .ds-currency, .cw3-bookmark { background: rgba(48, 52, 28, 0.3) !important; backdrop-filter: blur(6px); border: 2px solid #efeadb !important; color: #fbfaf4 !important; }
+.cw3-bookmark { border-left: none !important; }
+.ds-currency span { color: #fbfaf4 !important; }
+/* Craft: the reference's green */
+.cw3-craft, .cw3-craft:not(:disabled) { background: #8fbe58 !important; border-color: #8fbe58 !important; color: #ffffff !important; }
+/* the avatars: the framing of the reference (the whole head, front, a little room above), its colours */
+.ds-msg.left .ds-portrait-box { background: #ffd66d !important; }
+.ds-msg.right .ds-portrait-box { background: #f9abbe !important; }
+.ds-msg.left .ds-portrait-box .ds-fit { transform: translateY(7%) scale(0.84); }
+.ds-msg.right .ds-portrait-box .ds-fit { transform: translateY(8%) scale(0.84); }
+/* the crafted drawing (not the chat): the reference's bright background */
+.cw3-art { background: #fff5ed !important; }

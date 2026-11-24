@@ -39,7 +39,6 @@
 </head>
 <body>
 <div class="stage">
-  <div class="bubble dots"><span>•</span><span>•</span><span>•</span></div>
   <div class="bubble card">
     <!-- the plan as in the reference: the rolls (round tops, curled ends), the paper between them, a square grid -->
     <svg viewBox="105 120 1215 845" aria-hidden="true">
@@ -174,6 +173,8 @@ function sparkles(tick) {
 }
 
 // ---------- the silhouette: the drawing's outer shape, its outline cells ----------
+// the outline is drawn from T0 to T1 (ticks of 0.1 s)
+const T0 = 12, T1 = 76;
 const SH = (() => {
   const tmp = document.createElement('div');
   const rows = SHIP.map((h) => { tmp.innerHTML = h; return tmp.textContent; });
@@ -199,7 +200,6 @@ const SH = (() => {
   }
   // each cell's glyph starts somewhere on the paper and lands when the pen reaches it
   let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const T0 = 16, T1 = 56;
   path.forEach((o, i) => { o.sr = Math.floor(rnd() * R); o.sc = Math.floor(rnd() * C); o.arrive = T0 + ((T1 - T0) * i) / path.length; o.leave = o.arrive - 10 - Math.floor(rnd() * 8); });
   out.length = 0; out.push(...path);
   out.inside = inside;
@@ -215,12 +215,11 @@ function drift(t) {
   }
 }
 function silhouette(t) {
-  drift(t);
   // once the outline stands, the shape fills in softly
-  if (t >= 56) for (const o of SH.inside) put(o.c, o.r, ' ', PAPER, t >= 60 ? '#4a82ea' : '#4179e5');
+  if (t >= T1) for (const o of SH.inside) put(o.c, o.r, ' ', PAPER, t >= T1 + 4 ? '#4a82ea' : '#4179e5');
   for (const o of SH) {
-    if (t < o.leave) continue;
-    if (t >= o.arrive) { const tip = t - o.arrive < 1.2 && t < 57; put(o.c, o.r, tip ? '●' : o.ch === '·' || o.ch === ' ' ? '•' : o.ch, '#ffffff', tip ? '#9fdcfb' : '#6a9ef3'); continue; }
+    if (t < o.arrive) continue;
+    if (t >= o.arrive) { const tip = t - o.arrive < 1.2 && t < T1 + 1; put(o.c, o.r, tip ? '●' : o.ch === '·' || o.ch === ' ' ? '•' : o.ch, '#ffffff', tip ? '#9fdcfb' : '#6a9ef3'); continue; }
     // on its way: eased from the start to the outline, a random glyph each step
     const k = (t - o.leave) / (o.arrive - o.leave), e = k * k * (3 - 2 * k);
     const c = Math.round(o.sc + (o.c - o.sc) * e), r = Math.round(o.sr + (o.r - o.sr) * e);
@@ -250,7 +249,7 @@ function fit() { pre.style.transform = `scale(${296 / pre.scrollWidth}, ${168 / 
 
 // ---------- the timeline (one loop ≈ 17 s), stepped at 10 frames per second ----------
 const st = document.getElementById('st'), pc = document.getElementById('pc'), bar = document.getElementById('bar');
-const SHIP_START = 70, SHIP_STEP = 2, HOLD = 25; // ticks
+const SHIP_START = 90, SHIP_STEP = 2, HOLD = 25; // ticks
 const LOOP = SHIP_START + 40 * SHIP_STEP + HOLD;
 let tick = 0;
 function frame() {
@@ -263,7 +262,7 @@ function frame() {
   render(ship);
   if (!pre.dataset.fit) { fit(); pre.dataset.fit = 1; }
   const dots = '.'.repeat(1 + (Math.floor(t / 4) % 3));
-  st.innerHTML = t < 16 ? `sketching the blueprint${dots}` : t < 58 ? `something is taking shape${dots}` : t < SHIP_START ? `there it is${dots}` : ship < 40 ? `drawing line <b>${ship}</b>` : 'almost done ✦';
+  st.innerHTML = t < 16 ? `sketching the blueprint${dots}` : t < T1 + 2 ? `something is taking shape${dots}` : t < SHIP_START ? `there it is${dots}` : ship < 40 ? `drawing line <b>${ship}</b>` : 'almost done ✦';
   const prog = Math.min(1, t / (SHIP_START + 40 * SHIP_STEP));
   bar.style.width = (prog * 100).toFixed(1) + '%';
   pc.textContent = Math.round(prog * 100) + ' %';

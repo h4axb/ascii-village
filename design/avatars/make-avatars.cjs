@@ -22,6 +22,11 @@ function build(who, rowsUsed, bg, P, name) {
   }
   // zoomed in (the head's top stays where it is): the bottom rows run out of the frame
   ph *= P.zoom ?? 1;
+  // the head only, in the middle of the square, as tall as `headOnly`
+  if (P.headOnly) {
+    ph = P.headOnly / h;
+    y0 = (box - P.headOnly) / 2;
+  }
   const pw = ph * A;
   const x0 = (box - pw * w) / 2;
   let cells = '';
@@ -48,9 +53,7 @@ const P = JSON.parse(process.argv[2] || '{}');
 const def = { l0: 0.3, lk: 0.66, sk: 1.0, sa: 0.12, smax: 0.85, top: 8, side: 6 };
 const p = { ...def, zoom: 24 / 22, ...P }; // zoom: two fewer pixel rows at the bottom
 const out = process.argv[3] || '/home/user/ascii-village/design/avatars';
-fs.writeFileSync(`${out}/mitchy.svg`, build('mitchy', 24, p.bgM || '#fbc08f', { ...p, sa: p.saM ?? 0.24, l0: p.l0M ?? 0.27, top: 7, aspect: 1 }, 'Mitchy'));
-// Mitchy's head (ears to chin, his face rows) in his avatar: the player's head is made the same size
-const mRows = 24, mTop = 7, mSide = p.side, mW = Math.max(...d.mitchy.sprite.slice(0, mRows).map((l) => l.length)) / 2;
-const mPh = Math.min((100 - mTop) / mRows, (100 - 2 * mSide) / mW);
-const mHead = { size: mPh * d.mitchy.face, top: 100 - mPh * mRows };
-fs.writeFileSync(`${out}/player.svg`, build('player', 28, p.bgP || '#fbb7cc', { ...p, top: 10, headRows: 18, headSize: mHead.size, headTop: mHead.top }, 'Player'));
+// the head only, centred: both heads the same height (the player's hat brim sets it: it must fit the width)
+const HEAD = 56;
+fs.writeFileSync(`${out}/mitchy.svg`, build('mitchy', d.mitchy.face, p.bgM || '#fbc08f', { ...p, aspect: 1, headOnly: HEAD }, 'Mitchy'));
+fs.writeFileSync(`${out}/player.svg`, build('player', 18, p.bgP || '#fbb7cc', { ...p, headOnly: HEAD }, 'Player'));

@@ -37,6 +37,8 @@ function build(who, rowsUsed, bg, P, name) {
     const key = cols[y]?.[ch !== ' ' ? 2 * x : 2 * x + 1];
     const base = s.palette[key];
     if (!base) continue;
+    // below the chin only the hair's ends: no neck, no collar (red hair hues only)
+    if (P.hairFrom != null && y >= P.hairFrom) { const [hh, ss, ll] = rgb2hsl(hex2rgb(base)); if (!((hh < 0.06 || hh > 0.93) && ss > 0.45 && ll > 0.2 && ll < 0.75)) continue; }
     const c = pastel(base, P);
     used[c] = (used[c] || 0) + 1;
     cells += `<rect x="${(x0 + x * pw).toFixed(2)}" y="${(y0 + y * ph).toFixed(2)}" width="${(pw + 0.06).toFixed(2)}" height="${(ph + 0.06).toFixed(2)}" fill="${c}"/>`;
@@ -57,4 +59,4 @@ const out = process.argv[3] || '/home/user/ascii-village/design/avatars';
 const HEAD = 56;
 fs.writeFileSync(`${out}/mitchy.svg`, build('mitchy', d.mitchy.face, p.bgM || '#fbc08f', { ...p, aspect: 1, headOnly: HEAD }, 'Mitchy'));
 // the player: two rows more, so the hair's ends at the sides show (the head stays as big as Mitchy's)
-fs.writeFileSync(`${out}/player.svg`, build('player', 20, p.bgP || '#fbb7cc', { ...p, headOnly: (HEAD * 20) / 18 }, 'Player'));
+fs.writeFileSync(`${out}/player.svg`, build('player', 20, p.bgP || '#fbb7cc', { ...p, headOnly: (HEAD * 20) / 18, hairFrom: 18 }, 'Player'));

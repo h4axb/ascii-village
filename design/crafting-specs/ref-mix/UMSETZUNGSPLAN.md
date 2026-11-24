@@ -8,9 +8,10 @@ werden hier ergänzt, ältere Versionen (v2 bis v8) gelten nur noch als Verlauf.
 
 | Teil | Referenz (Mockup) | Werte |
 |---|---|---|
-| Panel, Standardansicht mit Chat | `crafting-panel-ref-mix-v12.png` | `look-v12.css` (v12 = v11 mit gelben Ecken-Buttons und Spieler-Avatar mit Haarspitzen) |
+| Panel, Standardansicht mit Chat | `crafting-panel-ref-mix-v13.png` | `look-v12.css` + Icons aus `design/icons/` (v13 = v12 mit neuen Hammer- und Münz-Icons, Spieler ohne Hals) |
 | Lade-Panel beim Craften | `bauplan-silhouette.html` / `.gif` / `-frames.png` | im HTML (Konstanten oben im Script) |
 | Avatare | `design/avatars/mitchy.svg`, `player.svg` | Erzeugung: `design/avatars/make-avatars.cjs` |
+| Icons | `design/icons/hammer.svg` (Craft-Button), `design/icons/coin.svg` (Münzanzeige) | Hammer 26 px, Münze 22 px |
 
 Nicht mehr aktuell: `bauplan-loading.*` (Maschinen-Variante, nur als Vergleich).
 
@@ -48,6 +49,7 @@ Nicht mehr aktuell: `bauplan-loading.*` (Maschinen-Variante, nur als Vergleich).
   - Text `#6b5048`, Platzhalter und Zähler `#a88c82`;
   - keine Eckklammern.
 - **Craft-Button:** Grün `#8fbe58`, weiße Schrift, Radius 16, Außenring 4 px `#fdffe8`.
+- **Icons:** Der Hammer im Craft-Button und die Münze in der Münzanzeige werden durch die Vektor-Icons aus `design/icons/` ersetzt (statt der heutigen Inline-SVGs in `CraftModal.tsx` bzw. der Pixel-Münze `ds-coin-icon`).
 
 ## 2. Avatare (`src/ui/Chat.tsx` `Portrait`, `src/CraftModal.tsx`)
 
@@ -55,7 +57,7 @@ Nicht mehr aktuell: `bauplan-loading.*` (Maschinen-Variante, nur als Vergleich).
   - Abgerundetes Quadrat, Radius 22 %, weißer Rand 3 px, kein Schatten.
   - Die Hintergrundfläche ist in der SVG enthalten: Mitchy Pfirsich `#fbc08f`, Spieler Rosa `#fbb7cc`.
 - Gezeigt wird nur der Kopf, mittig. Beide Köpfe sind gleich hoch (56 % der Box).
-  - Beim Spieler zwei Zeilen mehr (Zeilen 0–19), damit die Haarspitzen an den Seiten zu sehen sind; der Kopf bleibt so groß wie Mitchys.
+  - Beim Spieler zwei Zeilen mehr (Zeilen 0–19), damit die Haarspitzen an den Seiten zu sehen sind; in diesen beiden Zeilen nur die Haare (kein Hals, kein Kragen). Der Kopf bleibt so groß wie Mitchys.
   - Spieler-Pixel 1,2 : 1 wie in der Spielwelt, Mitchy quadratisch.
   - Farben wie die Sprites im Spiel.
 - **Offen:** Der Spieler kann im Spiel sein Aussehen ändern. Dann wird die SVG zur Laufzeit aus dem Sprite erzeugt (gleiche Logik wie `make-avatars.cjs`), statt fest zu sein.
@@ -92,5 +94,5 @@ Nicht mehr aktuell: `bauplan-loading.*` (Maschinen-Variante, nur als Vergleich).
 ## Prüfung nach dem Einbau
 
 - `npx tsc --noEmit -p .`
-- Dev-Server mit `STUDY_FAKE_AI=1`, Ablauf „a pirate ship“, Screenshots gegen `crafting-panel-ref-mix-v12.png` und `bauplan-silhouette-frames.png` vergleichen.
+- Dev-Server mit `STUDY_FAKE_AI=1`, Ablauf „a pirate ship“, Screenshots gegen `crafting-panel-ref-mix-v13.png` und `bauplan-silhouette-frames.png` vergleichen.
 - Desktop, Tablet und Mobil prüfen.

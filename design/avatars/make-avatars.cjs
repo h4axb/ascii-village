@@ -11,8 +11,10 @@ function build(who, rowsUsed, bg, P, name) {
   const s = d[who], rows = s.sprite.slice(0, rowsUsed), cols = s.colors.slice(0, rowsUsed);
   const w = Math.max(...rows.map((l) => l.length)) / 2, h = rows.length;
   const box = 100, top = P.top, side = P.side;
-  const px = Math.min((box - top) / h, (box - 2 * side) / w);
-  const x0 = (box - px * w) / 2, y0 = box - px * h; // anchored to the bottom: the body runs out of the frame
+  // a sprite pixel is two glyphs wide and one line high: in the game about 1.2 times as wide as high
+  const A = P.aspect ?? 1.2;
+  const ph = Math.min((box - top) / h, (box - 2 * side) / (w * A)), pw = ph * A;
+  const x0 = (box - pw * w) / 2, y0 = box - ph * h; // anchored to the bottom: the body runs out of the frame
   let cells = '';
   const used = {};
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -23,10 +25,10 @@ function build(who, rowsUsed, bg, P, name) {
     if (!base) continue;
     const c = pastel(base, P);
     used[c] = (used[c] || 0) + 1;
-    cells += `<rect x="${(x0 + x * px).toFixed(2)}" y="${(y0 + y * px).toFixed(2)}" width="${(px + 0.06).toFixed(2)}" height="${(px + 0.06).toFixed(2)}" fill="${c}"/>`;
+    cells += `<rect x="${(x0 + x * pw).toFixed(2)}" y="${(y0 + y * ph).toFixed(2)}" width="${(pw + 0.06).toFixed(2)}" height="${(ph + 0.06).toFixed(2)}" fill="${c}"/>`;
   }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="200" height="200" shape-rendering="crispEdges">
-<!-- ${name}: the chat avatar as pixel art (from the game sprite, one square per pixel, pastel colours) -->
+<!-- ${name}: the chat avatar as pixel art (from the game sprite, one square per pixel, in-game sprite colours) -->
 <defs><clipPath id="r"><rect width="100" height="100" rx="22"/></clipPath></defs>
 <g clip-path="url(#r)"><rect width="100" height="100" fill="${bg}"/>${cells}</g>
 </svg>
@@ -37,5 +39,5 @@ const P = JSON.parse(process.argv[2] || '{}');
 const def = { l0: 0.3, lk: 0.66, sk: 1.0, sa: 0.12, smax: 0.85, top: 8, side: 6 };
 const p = { ...def, ...P };
 const out = process.argv[3] || '/home/user/ascii-village/design/avatars';
-fs.writeFileSync(`${out}/mitchy.svg`, build('mitchy', 24, p.bgM || '#fbc08f', { ...p, sa: p.saM ?? 0.24, l0: p.l0M ?? 0.27, top: 7 }, 'Mitchy'));
+fs.writeFileSync(`${out}/mitchy.svg`, build('mitchy', 24, p.bgM || '#fbc08f', { ...p, sa: p.saM ?? 0.24, l0: p.l0M ?? 0.27, top: 7, aspect: 1 }, 'Mitchy'));
 fs.writeFileSync(`${out}/player.svg`, build('player', 22, p.bgP || '#fbb7cc', { ...p, top: 10 }, 'Player'));

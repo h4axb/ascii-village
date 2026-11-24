@@ -26,7 +26,15 @@
   .dots span:nth-child(2) { animation-delay: .15s; } .dots span:nth-child(3) { animation-delay: .3s; }
   @keyframes hop { 0%, 60%, 100% { transform: none; opacity: .5 } 30% { transform: translateY(-4px); opacity: 1 } }
   /* the card is the plan itself: one vector shape (rolls + paper, the reference's proportions), the content on its paper */
-  .card { left: 292px; top: 440px; width: 463px; height: 322px; }
+  /* the box: the in-game result card's (bright panel, soft edge); first the plan, then the result */
+  .box { position: absolute; left: 306px; top: 432px; width: 434px; height: 326px; box-sizing: border-box; background: #fff5ed; border: 2px solid #f3ddd5; border-radius: 18px; font-family: 'Fredoka', sans-serif; }
+  .card { left: 14px; top: 14px; width: 463px; height: 322px; transform: scale(0.873); transform-origin: 0 0; }
+  .result { position: absolute; inset: 14px 16px; opacity: 0; display: flex; flex-direction: column; }
+  .result .rart { flex: 1; position: relative; overflow: hidden; background: #fffdf8; border: 2px solid #f3ddd5; border-radius: 14px; }
+  .result .rart pre { position: absolute; left: 50%; top: 50%; margin: 0; font: 10px/10px 'Cascadia Mono', 'Cascadia Code', Menlo, Consolas, 'DejaVu Sans Mono', monospace; white-space: pre; transform-origin: 50% 50%; }
+  .result .rname { margin-top: 12px; display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 500; color: #4a3a30; }
+  .result .rtag { font-size: 13px; font-weight: 500; color: #4a3a30; border: 1.5px solid #d9c2b8; border-radius: 999px; padding: 1px 10px; }
+  .result .rdesc { margin-top: 8px; font-size: 17px; color: #8a7166; }
   .card > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   .paper { position: absolute; left: 68px; top: 91px; width: 300px; color: #fff; } /* the drawing centred on the grid paper (between the edge strips, top to bottom) */
   .art { width: 296px; height: 168px; overflow: hidden; position: relative; background: #3a74e0; border: 2px solid #ffffff; border-radius: 8px; box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
@@ -39,6 +47,7 @@
 </head>
 <body>
 <div class="stage">
+  <div class="box">
   <div class="bubble card">
     <!-- the plan as in the reference: the rolls (round tops, curled ends), the paper between them, a square grid -->
     <svg viewBox="105 120 1215 845" aria-hidden="true">
@@ -67,6 +76,13 @@
       <div class="status"><span id="st">sketching the blueprint</span><span id="pc"></span></div>
       <div class="bar"><i id="bar"></i></div>
     </div>
+  </div>
+  <!-- the result, as the in-game result card: the drawing on its panel, name, kind, line -->
+  <div class="result" id="result">
+    <div class="rart"><pre id="rp"></pre></div>
+    <div class="rname">Pirate ship <span class="rtag">Vehicle</span></div>
+    <div class="rdesc">“sail it out onto the ocean.”</div>
+  </div>
   </div>
 <script>
 // ---------- the grid: 130 × 44 cells (10 px glyphs, ~6 × 10 px), scaled into the 300 × 170 frame ----------
@@ -250,7 +266,11 @@ function fit() { pre.style.transform = `scale(${296 / pre.scrollWidth}, ${168 / 
 // ---------- the timeline (one loop ≈ 17 s), stepped at 10 frames per second ----------
 const st = document.getElementById('st'), pc = document.getElementById('pc'), bar = document.getElementById('bar');
 const SHIP_START = 154, SHIP_STEP = 2, HOLD = 25; // ticks
-const LOOP = SHIP_START + 40 * SHIP_STEP + HOLD;
+const DONE = SHIP_START + 40 * SHIP_STEP + HOLD, FADE = 8, SHOW = 40;
+const LOOP = DONE + FADE + SHOW;
+const card = document.querySelector('.card'), result = document.getElementById('result'), rp = document.getElementById('rp');
+rp.innerHTML = SHIP.join('\n').replaceAll('background:#3a74de', 'background:transparent'); // the blank cells: no paper blue on the result panel
+function fitResult() { const a = rp.parentElement; const k = Math.min(a.clientWidth / rp.scrollWidth, a.clientHeight / rp.scrollHeight) * 0.86; rp.style.transform = `translate(-50%, -50%) scale(${k})`; }
 let tick = 0;
 function frame() {
   const t = tick % LOOP;
@@ -266,6 +286,12 @@ function frame() {
   const prog = Math.min(1, t / (SHIP_START + 40 * SHIP_STEP));
   bar.style.width = (prog * 100).toFixed(1) + '%';
   pc.textContent = Math.round(prog * 100) + ' %';
+  // the plan fades out, the result card fades in (and back to the plan at the loop's start)
+  const f = Math.max(0, Math.min(1, (t - DONE) / FADE));
+  card.style.opacity = 1 - f;
+  result.style.opacity = f;
+  result.style.transform = `translateY(${(1 - f) * 8}px)`;
+  if (f > 0 && !rp.dataset.fit) { fitResult(); rp.dataset.fit = 1; }
   tick++;
 }
 document.fonts.ready.then(() => { frame(); setInterval(frame, 100); });

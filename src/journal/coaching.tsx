@@ -1,13 +1,13 @@
 // Coaching Questions (/journal/log/coaching), a sub page of the Project Log:
-// every block of a coaching category ("Coaching …", isCoachingKind) from the
-// log's entries and tasks, at once, with its answer typed right in. The
+// every block of the categories chosen here (settings/coaching, by hand) from
+// the log's entries and tasks, at once, with its answer typed right in. The
 // answer is stored on the question's own block (Block.answer), so the entry
 // in the Project Log shows it too: one record, shown in two places.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Markdown } from './markdown';
 import { PageHead } from './pages';
 import type { JournalStore } from './store';
-import { blockKindOf, blockKinds, blockTitle, fmtDate, isCoachingKind, type Block, type Entry, type Task } from './types';
+import { blockKindOf, blockKinds, blockTitle, coachingKinds, fmtDate, type Block, type Entry, type Task } from './types';
 import { Icon } from './ui';
 
 interface Question {
@@ -77,8 +77,14 @@ function AnswerBox({ store, q }: { store: JournalStore; q: Question }) {
 
 export function CoachingPage({ store, openEntry }: { store: JournalStore; openEntry: (id: string, task?: string) => void }) {
   const kinds = blockKinds(store.docs.settings);
-  const coach = kinds.filter(isCoachingKind);
-  const ids = new Set(coach.map((k) => k.id));
+  const ids = coachingKinds(store.docs.settings);
+  const coach = kinds.filter((k) => ids.has(k.id));
+  const [choosing, setChoosing] = useState(!coach.length);
+  // the categories shown here: chosen by hand, stored at once
+  const toggle = (id: string) => {
+    const next = ids.has(id) ? [...ids].filter((x) => x !== id) : [...ids, id];
+    void store.commit([{ coll: 'settings', id: 'coaching', data: { kinds: next } }]);
+  };
   const [show, setShow] = useState<Show>('all');
   const [q, setQ] = useState('');
   const all = useMemo(() => {
@@ -96,9 +102,34 @@ export function CoachingPage({ store, openEntry }: { store: JournalStore; openEn
   const list = all.filter((x) => (show === 'all' || (show === 'open') === !x.b.answer?.trim()) && (!needle || `${x.b.md} ${x.b.answer ?? ''} ${x.e.title} ${x.t?.title ?? ''}`.toLowerCase().includes(needle)));
   return (
     <div className="jr-log jr-coach">
-      <PageHead store={store} id="coaching" />
+      <PageHead
+        store={store}
+        id="coaching"
+        actions={
+          <button type="button" className={`jr-btn${choosing ? ' is-on' : ''}`} aria-expanded={choosing} onClick={() => setChoosing(!choosing)}>
+            <Icon name="filter" /> {coach.length ? `Categories · ${coach.length}` : 'Choose categories'}
+          </button>
+        }
+      />
+      {choosing && (
+        <div className="jr-coach-kinds">
+          <span className="jr-task-label">Shown here</span>
+          <div className="jr-chips" role="group" aria-label="Categories shown here">
+            {kinds.map((k) => {
+              const on = ids.has(k.id);
+              return (
+                <button key={k.id} type="button" className={`jr-chip jr-coach-kind${on ? ' is-on' : ''}`} aria-pressed={on} style={{ '--k': k.color } as React.CSSProperties} onClick={() => toggle(k.id)}>
+                  <span className="jr-kdot" aria-hidden="true" />
+                  {k.label}
+                </button>
+              );
+            })}
+          </div>
+          <span className="jr-muted jr-small">The blocks of the chosen categories are listed below, with an answer box. Stored at once.</span>
+        </div>
+      )}
       {!coach.length ? (
-        <p className="jr-muted">No coaching category yet. In an entry, add a block, choose “New category” and name it “Coaching …”: its blocks are listed here.</p>
+        <p className="jr-muted">No category chosen yet: choose above which categories are shown here, e.g. your “Coaching question”.</p>
       ) : (
         <>
           <div className="jr-coach-bar">

@@ -456,8 +456,8 @@ export function blockKinds(settings: Record<string, unknown>): (BlockKind & { ow
   const own = s.colors ?? {};
   return [...BLOCK_KINDS.map((k) => ({ ...k, label: s.labels?.[k.id]?.trim() || k.label, color: own[k.id] ?? k.color })), ...(s.custom ?? []).map((k) => ({ ...k, color: own[k.id] ?? k.color, own: true }))];
 }
-// the coaching categories: one's own categories named "Coaching …" (coaching.tsx)
-export const isCoachingKind = (k: BlockKind) => /coach/i.test(k.label);
+// the categories shown on Coaching Questions: chosen there by hand (settings/coaching, coaching.tsx)
+export const coachingKinds = (settings: Record<string, unknown>) => new Set((settings.coaching as { kinds?: string[] } | undefined)?.kinds ?? []);
 // a block's category; a deleted one of one's own reads as Notes
 export const kindOf = (kinds: BlockKind[], b: Block) => kinds.find((x) => x.id === blockKindOf(b)) ?? kinds.find((x) => x.id === 'notes')!;
 

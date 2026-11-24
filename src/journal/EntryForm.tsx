@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Del, JournalStore, Put } from './store';
 import { suggestSections } from './suggest';
 import { MethodField } from './methods';
-import { CHECKIN, ENTRY_ICONS, ENTRY_STATUS, ENTRY_TYPES, PALETTE, SECTIONS, blockKinds, kindOf, kindsSetting, type BlockKindsSetting, blockTitle, entryTopics, fmtMinutes, isoWeek, moveTask, newId, orderProblem, runsMs, shortDate, taskMinutes, tasksTotal, today, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week, isCoachingKind } from './types';
+import { CHECKIN, ENTRY_ICONS, ENTRY_STATUS, ENTRY_TYPES, PALETTE, SECTIONS, blockKinds, kindOf, kindsSetting, type BlockKindsSetting, blockTitle, entryTopics, fmtMinutes, isoWeek, moveTask, newId, orderProblem, runsMs, shortDate, taskMinutes, tasksTotal, today, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Task, type Week, coachingKinds } from './types';
 import { allTopics, sectionTitle } from './EntryEditor';
 import { Attachments, Chips, Icon, IconBtn, type IconName } from './ui';
 import { PLAN_PRESETS, RunsEditor } from './timer';
@@ -877,7 +877,7 @@ function BlockEdit({ store, b, onChange, onRemove }: { store: JournalStore; b: B
         </div>
       )}
       <textarea rows={Math.min(12, Math.max(3, b.md.split('\n').length + 1))} value={b.md} aria-label={`${k.label} text`} placeholder="Free text · Markdown: **bold**, - list, [link](https://…)" onChange={(x) => onChange({ md: x.target.value })} />
-      {isCoachingKind(k) && (
+      {(coachingKinds(store.docs.settings).has(k.id) || b.answer !== undefined) && (
         <label className="jr-tblock-answer">
           <span className="jr-coach-answer-h">Answer</span>
           <textarea rows={Math.min(12, Math.max(2, (b.answer ?? '').split('\n').length + 1))} value={b.answer ?? ''} aria-label={`Answer to ${title || k.label}`} placeholder="Optional · also on the Coaching Questions page" onChange={(x) => onChange({ answer: x.target.value || undefined })} />

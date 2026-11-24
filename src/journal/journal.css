@@ -5328,3 +5328,21 @@ body.jr-pip {
     margin-left: 0;
   }
 }
+/* Coaching Questions: the categories shown, chosen by hand */
+.jr-coach-kinds {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--jr-line);
+  border-radius: 12px;
+  background: var(--jr-paper);
+}
+.jr-coach-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.jr-coach-kind .jr-kdot {
+  background: var(--k);
+}

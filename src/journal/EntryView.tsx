@@ -7,7 +7,7 @@ import { MethodChips } from './methods';
 import { useEffect, useRef } from 'react';
 import { Markdown } from './markdown';
 import type { JournalStore } from './store';
-import { ENTRY_STATUS, ENTRY_TYPES, PALETTE, blockKinds, isCoachingKind, kindOf, blockTitle, fmtMinutes, shortDate, taskMinutes, tasksTotal, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Source, type Task, type Week } from './types';
+import { ENTRY_STATUS, ENTRY_TYPES, PALETTE, blockKinds, coachingKinds, kindOf, blockTitle, fmtMinutes, shortDate, taskMinutes, tasksTotal, type Block, type BlockKind, type CheckinKey, type Day, type Entry, type Source, type Task, type Week } from './types';
 import { sectionTitle } from './EntryEditor';
 import { CheckinStrip, weekday, weekLabel } from './EntryForm';
 import { FileThumb, Icon, type IconName } from './ui';
@@ -106,7 +106,7 @@ export function EntryView({ store, e, ratings, week, focusTask, onEdit }: { stor
           </header>
           {(e.sections.length > 0 || e.topics.length > 0) && <Chipline store={store} sections={e.sections} topics={e.topics} />}
           {e.blocks.map((b) => (
-            <BlockCard key={b.id} b={b} kinds={kinds} />
+            <BlockCard key={b.id} b={b} kinds={kinds} coach={coachingKinds(store.docs.settings)} />
           ))}
           <Refs store={store} files={e.files} links={e.sources} />
         </section>
@@ -133,7 +133,8 @@ function Chipline({ store, sections, topics }: { store: JournalStore; sections: 
 }
 
 // a documentation block: a card with its category's colour, title and text
-export function BlockCard({ b, kinds }: { b: Block; kinds: BlockKind[] }) {
+// coach: the categories shown on Coaching Questions (their blocks show the answer)
+export function BlockCard({ b, kinds, coach }: { b: Block; kinds: BlockKind[]; coach?: Set<string> }) {
   const k = kindOf(kinds, b);
   const title = blockTitle(b);
   return (
@@ -142,7 +143,7 @@ export function BlockCard({ b, kinds }: { b: Block; kinds: BlockKind[] }) {
       {title && <strong className="jr-bcard-title">{title}</strong>}
       <Markdown md={b.md} />
       {/* a coaching question's answer: part of the block, shown apart from the question */}
-      {isCoachingKind(k) && (
+      {(coach?.has(k.id) || !!b.answer?.trim()) && (
         <div className={`jr-bcard-answer${b.answer?.trim() ? '' : ' is-empty'}`}>
           <span className="jr-coach-answer-h">Answer</span>
           {b.answer?.trim() ? <Markdown md={b.answer} /> : <span className="jr-muted jr-small">Not answered yet · answer it under Coaching Questions</span>}
@@ -212,7 +213,7 @@ function TaskItem({ store, e, t, kinds, focus, onEdit }: { store: JournalStore; 
         {((t.sections ?? []).length > 0 || (t.topics ?? []).length > 0) && <Chipline store={store} sections={t.sections ?? []} topics={t.topics ?? []} />}
         <MethodChips store={store} ids={t.methods ?? []} />
         {blocks.map((b) => (
-          <BlockCard key={b.id} b={b} kinds={kinds} />
+          <BlockCard key={b.id} b={b} kinds={kinds} coach={coachingKinds(store.docs.settings)} />
         ))}
         <Refs store={store} files={t.files ?? []} links={t.sources ?? []} />
         {onEdit && !blocks.length && (

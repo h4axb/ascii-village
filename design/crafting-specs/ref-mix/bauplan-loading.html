@@ -60,7 +60,7 @@
       <path d="M1120 215 Q1120 120 1215 120 H1225 Q1320 120 1320 215 V884 H1120 Z" fill="#5a9bf4"/>
       <path d="M1120 215 Q1120 120 1215 120 H1225 Q1320 120 1320 215 V884 H1120 Z" fill="#7abbfa" clip-path="url(#rhalf)"/>
       <ellipse cx="1221" cy="885" rx="101" ry="80" fill="#3566cf"/>
-      <path d="M1205 811 H1223 V856 Q1223 870 1237 870 H1261 Q1295 888 1289 922 Q1277 961 1209 962 Q1137 960 1134 888 Q1137 822 1205 811 Z" fill="#2c55b5"/>
+      <path d="M1213 805.2 A100 80 0 1 0 1268 955.2 Q1296 935 1294 905 Q1291 872 1258 870 H1226 Q1213 870 1213 858 Z" fill="#2c55b5"/>
     </svg>
     <div class="paper">
       <div class="art"><pre id="bp"></pre></div>
@@ -201,7 +201,6 @@ function frame() {
   const t = tick % LOOP;
   blank();
   paper(Math.min(R, t * 3));
-  dims(Math.min(1, Math.max(0, (t - 6) / 16)));
   const mrows = Math.max(0, Math.min(26, (t - 16) * 1.2));
   if (t < SHIP_START + 6) machine(mrows, t);
   sparkles(Math.floor(t / 2));

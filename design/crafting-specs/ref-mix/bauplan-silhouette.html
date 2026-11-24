@@ -61,7 +61,7 @@
       <path d="M1120 215 Q1120 120 1215 120 H1225 Q1320 120 1320 215 V884 H1120 Z" fill="#5a9bf4"/>
       <path d="M1120 215 Q1120 120 1215 120 H1225 Q1320 120 1320 215 V884 H1120 Z" fill="#7abbfa" clip-path="url(#rhalf)"/>
       <ellipse cx="1221" cy="885" rx="101" ry="80" fill="#3566cf"/>
-      <path d="M1205 811 H1223 V856 Q1223 870 1237 870 H1261 Q1295 888 1289 922 Q1277 961 1209 962 Q1137 960 1134 888 Q1137 822 1205 811 Z" fill="#2c55b5"/>
+      <path d="M1213 805.2 A100 80 0 1 0 1268 955.2 Q1296 935 1294 905 Q1291 872 1258 870 H1226 Q1213 870 1213 858 Z" fill="#2c55b5"/>
     </svg>
     <div class="paper">
       <div class="art"><pre id="bp"></pre></div>
@@ -186,19 +186,41 @@ const SH = (() => {
     for (let dr = -1; dr <= 1; dr++) for (let dc = -2; dc <= 2; dc++) if ((dr || dc) && !on(r + dr, c + dc)) edge = true;
     (edge ? out : inside).push({ r: r + 2, c: c + 24, ch: rows[r][c] });
   }
-  // every outline cell gets a glyph that starts somewhere random and arrives at its own time
+  // the outline as one drawn line: start at its lowest left cell, then always the nearest
+  // cell not drawn yet (a jump only where the shape has a gap, e.g. a mast to the hull)
+  const left = out.slice(), path = [];
+  let cur = left.reduce((a, o) => (o.r > a.r || (o.r === a.r && o.c < a.c) ? o : a));
+  while (left.length) {
+    left.splice(left.indexOf(cur), 1); path.push(cur);
+    if (!left.length) break;
+    let best = left[0], bd = Infinity;
+    for (const o of left) { const d = (o.c - cur.c) ** 2 / 4 + (o.r - cur.r) ** 2; if (d < bd) { bd = d; best = o; } }
+    cur = best;
+  }
+  // each cell's glyph starts somewhere on the paper and lands when the pen reaches it
   let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  out.forEach((o) => { o.sr = Math.floor(rnd() * R); o.sc = Math.floor(rnd() * C); o.arrive = 22 + Math.floor(rnd() * 34); o.leave = o.arrive - 14 - Math.floor(rnd() * 6); });
+  const T0 = 16, T1 = 56;
+  path.forEach((o, i) => { o.sr = Math.floor(rnd() * R); o.sc = Math.floor(rnd() * C); o.arrive = T0 + ((T1 - T0) * i) / path.length; o.leave = o.arrive - 10 - Math.floor(rnd() * 8); });
+  out.length = 0; out.push(...path);
   out.inside = inside;
   return out;
 })();
 const NOISE = '#%&@*+=?/\\|<>~^:;!$§¤';
+const DRIFT = Array.from({ length: 70 }, (_, i) => ({ c: (i * 37) % C, r: (i * 11) % R, dc: ((i % 5) - 2) * 0.7 || 0.5, dr: ((i % 3) - 1) * 0.35 || 0.25 }));
+function drift(t) {
+  if (t < 6 || t > 60) return;
+  for (const d of DRIFT) {
+    const c = Math.round(((d.c + d.dc * t) % C + C) % C), r = Math.round(((d.r + d.dr * t) % R + R) % R);
+    put(c, r, NOISE[(c + r + t) % NOISE.length], '#9fdcfb', PAPER);
+  }
+}
 function silhouette(t) {
+  drift(t);
   // once the outline stands, the shape fills in softly
   if (t >= 56) for (const o of SH.inside) put(o.c, o.r, ' ', PAPER, t >= 60 ? '#4a82ea' : '#4179e5');
   for (const o of SH) {
     if (t < o.leave) continue;
-    if (t >= o.arrive) { put(o.c, o.r, o.ch === '·' || o.ch === ' ' ? '•' : o.ch, '#ffffff', '#6a9ef3'); continue; }
+    if (t >= o.arrive) { const tip = t - o.arrive < 1.2 && t < 57; put(o.c, o.r, tip ? '●' : o.ch === '·' || o.ch === ' ' ? '•' : o.ch, '#ffffff', tip ? '#9fdcfb' : '#6a9ef3'); continue; }
     // on its way: eased from the start to the outline, a random glyph each step
     const k = (t - o.leave) / (o.arrive - o.leave), e = k * k * (3 - 2 * k);
     const c = Math.round(o.sc + (o.c - o.sc) * e), r = Math.round(o.sr + (o.r - o.sr) * e);
@@ -235,7 +257,6 @@ function frame() {
   const t = tick % LOOP;
   blank();
   paper(Math.min(R, t * 3));
-  dims(Math.min(1, Math.max(0, (t - 6) / 16)));
   silhouette(t);
   sparkles(Math.floor(t / 2));
   const ship = t < SHIP_START ? 0 : Math.min(40, Math.floor((t - SHIP_START) / SHIP_STEP) + 1);

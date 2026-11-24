@@ -27,7 +27,7 @@
   /* the card is the plan itself: one vector shape (rolls + paper, the reference's proportions), the content on its paper */
   .card { left: 292px; top: 440px; width: 463px; height: 322px; }
   .card > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .paper { position: absolute; left: 62px; top: 62px; width: 300px; color: #fff; }
+  .paper { position: absolute; left: 68px; top: 91px; width: 300px; color: #fff; } /* the drawing centred on the grid paper (between the edge strips, top to bottom) */
   .art { width: 296px; height: 168px; overflow: hidden; position: relative; background: #3a74e0; border: 2px solid #ffffff; border-radius: 8px; box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
   .art pre { position: absolute; left: 0; top: 0; margin: 0; font: 10px/10px 'Cascadia Mono', 'Cascadia Code', Menlo, Consolas, 'DejaVu Sans Mono', monospace; white-space: pre; transform-origin: 0 0; }
   .status { margin-top: 12px; font-size: 16px; font-weight: 600; color: #fff; display: flex; justify-content: space-between; letter-spacing: .2px; }
@@ -43,19 +43,21 @@
     <!-- the plan as in the reference: the rolls (round tops, curled ends), the paper between them, a square grid -->
     <svg viewBox="105 120 1215 845" aria-hidden="true">
       <defs>
-        <pattern id="grid" x="232" y="205" width="33" height="33" patternUnits="userSpaceOnUse"><path d="M33 0 H0 V33" fill="none" stroke="#ffffff" stroke-opacity=".09" stroke-width="2"/></pattern>
+        <pattern id="grid" x="260" y="205" width="33.32" height="33" patternUnits="userSpaceOnUse"><path d="M33.32 0 H0 V33" fill="none" stroke="#ffffff" stroke-opacity=".09" stroke-width="2"/></pattern>
+        <clipPath id="rhalf"><rect x="1100" y="100" width="116" height="900"/></clipPath>
         <linearGradient id="rl" x1="0" x2="1"><stop offset="0" stop-color="#7fc0fb"/><stop offset="1" stop-color="#5a9ff5"/></linearGradient>
         <linearGradient id="rr" x1="0" x2="1"><stop offset="0" stop-color="#7cbcfa"/><stop offset=".47" stop-color="#78b9fa"/><stop offset=".48" stop-color="#5d9df4"/><stop offset="1" stop-color="#5596f1"/></linearGradient>
       </defs>
       <rect x="232" y="205" width="888" height="760" fill="#3a74e0"/>
-      <rect x="232" y="205" width="888" height="760" fill="url(#grid)"/>
+      <rect x="263" y="207" width="827" height="756" fill="url(#grid)"/>
       <rect x="232" y="205" width="28" height="760" fill="#3467d6"/>
       <rect x="1093" y="205" width="27" height="760" fill="#3467d6"/>
       <!-- left roll: the cylinder, then the paper's curl under it -->
       <path d="M105 886 Q105 760 200 760 H260 V965 H195 Q105 965 105 886 Z" fill="#3463cb"/>
       <path d="M105 215 Q105 120 205 120 H212 Q232 120 232 142 V780 Q232 802 210 802 C160 804 112 830 105 886 Z" fill="url(#rl)"/>
       <!-- right roll: two-tone cylinder, the curl with its core -->
-      <path d="M1120 215 Q1120 120 1215 120 H1225 Q1320 120 1320 215 V880 H1120 Z" fill="url(#rr)"/>
+      <path d="M1120 215 Q1120 120 1215 120 H1225 Q1320 120 1320 215 V880 H1120 Z" fill="#5a9bf4"/>
+      <path d="M1120 215 Q1120 120 1215 120 H1225 Q1320 120 1320 215 V880 H1120 Z" fill="#7abbfa" clip-path="url(#rhalf)"/>
       <path d="M1120 965 V870 Q1120 800 1215 800 H1225 Q1320 800 1320 882 Q1320 965 1225 965 Z" fill="#3566cf"/>
       <path d="M1215 805 H1232 V860 Q1232 872 1244 872 H1268 Q1300 890 1290 922 Q1275 960 1215 960 Q1140 958 1140 888 Q1140 820 1215 805 Z" fill="#2c55b5"/>
     </svg>

@@ -24,22 +24,42 @@
   .dots span { display: inline-block; animation: hop 1.2s infinite; }
   .dots span:nth-child(2) { animation-delay: .15s; } .dots span:nth-child(3) { animation-delay: .3s; }
   @keyframes hop { 0%, 60%, 100% { transform: none; opacity: .5 } 30% { transform: translateY(-4px); opacity: 1 } }
-  .card { left: 306px; top: 455px; width: 336px; box-sizing: border-box; background: #fff5ed; border: 2px solid #f3ddd5; border-radius: 18px; padding: 14px 16px; color: #5a463c; }
-  .art { width: 300px; height: 170px; border-radius: 14px; overflow: hidden; position: relative; background: #3a74de; border: 2px solid #f3ddd5; box-sizing: content-box; }
+  /* the card is the plan itself: blue grid paper between two rolls (2D vector), white bold Fredoka */
+  .card { left: 292px; top: 447px; width: 392px; padding: 14px 0 10px; }
+  .paper { position: relative; margin: 0 30px; padding: 16px 22px 40px; background-color: #3a74de;
+    background-image: linear-gradient(rgba(255,255,255,.10) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.10) 1px, transparent 1px),
+      linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size: 24px 24px, 24px 24px, 6px 6px, 6px 6px; color: #fff; }
+  .roll { position: absolute; top: 0; bottom: 0; width: 56px; pointer-events: none; }
+  .roll.l { left: 0; } .roll.r { right: 0; }
+  .roll i { position: absolute; display: block; }
+  .roll .cyl { top: 0; bottom: 24px; width: 32px; border-radius: 16px 16px 0 0; }
+  .roll .curl { bottom: 0; width: 56px; height: 44px; }
+  .roll.l .cyl { left: 0; background: linear-gradient(90deg, #93cbff 0%, #74b3fa 55%, #5a9af1 100%); }
+  .roll.l .curl { left: 0; border-radius: 22px 6px 6px 22px; background: linear-gradient(180deg, #3d70d8, #2f5fc4); }
+  .roll.r .cyl { right: 0; background: linear-gradient(90deg, #66a8f7 0%, #7cbafb 48%, #5c9cf3 50%, #4b8aec 100%); }
+  .roll.r .curl { right: 0; border-radius: 6px 22px 22px 6px; background: linear-gradient(180deg, #3566cf, #2a55b7); }
+  .roll.r .curl::after { content: ''; position: absolute; right: 6px; top: 7px; width: 30px; height: 30px; border-radius: 50%; background: #244c9f; }
+  .art { width: 296px; height: 168px; overflow: hidden; position: relative; background: #3a74de; }
   .art pre { position: absolute; left: 0; top: 0; margin: 0; font: 10px/10px 'Cascadia Mono', 'Cascadia Code', Menlo, Consolas, 'DejaVu Sans Mono', monospace; white-space: pre; transform-origin: 0 0; }
-  .status { margin-top: 10px; font-size: 15px; color: #8a7166; display: flex; justify-content: space-between; }
-  .status b { font-weight: 500; color: #4a3a30; }
-  .bar { margin-top: 8px; height: 6px; border-radius: 99px; background: #f3ddd5; overflow: hidden; }
-  .bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: #7fd3f0; transition: width .2s linear; }
+  .status { margin-top: 12px; font-size: 16px; font-weight: 600; color: #fff; display: flex; justify-content: space-between; letter-spacing: .2px; }
+  .status b { font-weight: 700; color: #fff; }
+  .bar { margin-top: 8px; height: 7px; border-radius: 99px; background: rgba(255,255,255,.22); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: #8be9fb; transition: width .2s linear; }
 </style>
 </head>
 <body>
 <div class="stage">
   <div class="bubble dots"><span>•</span><span>•</span><span>•</span></div>
   <div class="bubble card">
-    <div class="art"><pre id="bp"></pre></div>
-    <div class="status"><span id="st">sketching the blueprint</span><span id="pc"></span></div>
-    <div class="bar"><i id="bar"></i></div>
+    <div class="paper">
+      <div class="art"><pre id="bp"></pre></div>
+      <div class="status"><span id="st">sketching the blueprint</span><span id="pc"></span></div>
+      <div class="bar"><i id="bar"></i></div>
+    </div>
+    <!-- the rolls, as in the reference (2D vector): a cylinder each, round at the top, the paper curled up at the bottom -->
+    <div class="roll l"><i class="cyl"></i><i class="curl"></i></div>
+    <div class="roll r"><i class="cyl"></i><i class="curl"></i></div>
   </div>
 </div>
 <script>
@@ -61,10 +81,10 @@ const px = (x, y, col, glyph) => { const g = glyph ?? tex(x, y); put(x * 2, y, g
 // ---------- the paper ----------
 function paper(rows) {
   for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
-    const inPaper = c >= 12 && c < C - 12 && r >= 2 && r < R - 2;
+    const inPaper = true;
     if (!inPaper || r >= rows) continue;
-    const major = (c - 12) % 12 === 0 || (r - 2) % 6 === 0;
-    put(c, r, major ? ((c - 12) % 12 === 0 && (r - 2) % 6 === 0 ? '+' : (c - 12) % 12 === 0 ? '¦' : '-') : (c % 3 === 0 && r % 2 === 0 ? '·' : ' '), major ? PAPER_LINE : PAPER_DOT, PAPER);
+    const major = c % 12 === 0 || r % 6 === 0;
+    put(c, r, major ? (c % 12 === 0 && r % 6 === 0 ? '+' : c % 12 === 0 ? '¦' : '-') : (c % 3 === 0 && r % 2 === 0 ? '·' : ' '), major ? PAPER_LINE : PAPER_DOT, PAPER);
   }
 }
 // the rolls at both sides: a cylinder, light to dark, its ends curled
@@ -148,7 +168,7 @@ function render(shipRows, shipFade) {
   }
   pre.innerHTML = out.join('\n');
 }
-function fit() { const k = 300 / pre.scrollWidth; pre.style.transform = `scale(${k}, ${170 / pre.scrollHeight})`; }
+function fit() { pre.style.transform = `scale(${296 / pre.scrollWidth}, ${168 / pre.scrollHeight})`; }
 
 // ---------- the timeline (one loop ≈ 17 s), stepped at 10 frames per second ----------
 const st = document.getElementById('st'), pc = document.getElementById('pc'), bar = document.getElementById('bar');
@@ -157,7 +177,7 @@ const LOOP = SHIP_START + 40 * SHIP_STEP + HOLD;
 let tick = 0;
 function frame() {
   const t = tick % LOOP;
-  blank(); rolls();
+  blank();
   paper(Math.min(R, t * 3));
   dims(Math.min(1, Math.max(0, (t - 8) / 8)));
   const mrows = Math.max(0, Math.min(26, (t - 16) * 1.2));

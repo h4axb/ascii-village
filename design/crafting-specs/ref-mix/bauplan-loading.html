@@ -25,22 +25,23 @@
   .dots span:nth-child(2) { animation-delay: .15s; } .dots span:nth-child(3) { animation-delay: .3s; }
   @keyframes hop { 0%, 60%, 100% { transform: none; opacity: .5 } 30% { transform: translateY(-4px); opacity: 1 } }
   /* the card is the plan itself: blue grid paper between two rolls (2D vector), white bold Fredoka */
-  .card { left: 292px; top: 447px; width: 392px; padding: 14px 0 10px; }
-  .paper { position: relative; margin: 0 30px; padding: 16px 22px 40px; background-color: #3a74de;
+  .card { left: 292px; top: 447px; width: 392px; padding: 14px 0 0; }
+  .paper { position: relative; margin: 0 30px; padding: 16px 22px 56px; background-color: #3a74de;
     background-image: linear-gradient(rgba(255,255,255,.10) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.10) 1px, transparent 1px),
       linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
     background-size: 24px 24px, 24px 24px, 6px 6px, 6px 6px; color: #fff; }
   .roll { position: absolute; top: 0; bottom: 0; width: 56px; pointer-events: none; }
   .roll.l { left: 0; } .roll.r { right: 0; }
   .roll i { position: absolute; display: block; }
-  .roll .cyl { top: 0; bottom: 24px; width: 32px; border-radius: 16px 16px 0 0; }
-  .roll .curl { bottom: 0; width: 56px; height: 44px; }
+  .roll .cyl { top: 0; bottom: 30px; width: 32px; border-radius: 16px 16px 0 0; }
+  .roll .curl { bottom: 0; width: 60px; height: 46px; }
   .roll.l .cyl { left: 0; background: linear-gradient(90deg, #93cbff 0%, #74b3fa 55%, #5a9af1 100%); }
-  .roll.l .curl { left: 0; border-radius: 22px 6px 6px 22px; background: linear-gradient(180deg, #3d70d8, #2f5fc4); }
+  .roll.l .curl { left: 0; border-radius: 23px 0 0 23px; background: linear-gradient(180deg, #4378de, #3463c8); }
+  .roll.l .curl::before { content: ''; position: absolute; left: 0; top: -2px; width: 32px; height: 26px; background: linear-gradient(90deg, #93cbff 0%, #74b3fa 55%, #5a9af1 100%); border-radius: 0 0 16px 16px / 0 0 10px 10px; }
   .roll.r .cyl { right: 0; background: linear-gradient(90deg, #66a8f7 0%, #7cbafb 48%, #5c9cf3 50%, #4b8aec 100%); }
-  .roll.r .curl { right: 0; border-radius: 6px 22px 22px 6px; background: linear-gradient(180deg, #3566cf, #2a55b7); }
+  .roll.r .curl { right: 0; border-radius: 0 23px 23px 0; background: linear-gradient(180deg, #3566cf, #2a55b7); }
   .roll.r .curl::after { content: ''; position: absolute; right: 6px; top: 7px; width: 30px; height: 30px; border-radius: 50%; background: #244c9f; }
-  .art { width: 296px; height: 168px; overflow: hidden; position: relative; background: #3a74de; }
+  .art { width: 296px; height: 168px; overflow: hidden; position: relative; background: #3a74de; border: 2px solid #ffffff; border-radius: 8px; box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
   .art pre { position: absolute; left: 0; top: 0; margin: 0; font: 10px/10px 'Cascadia Mono', 'Cascadia Code', Menlo, Consolas, 'DejaVu Sans Mono', monospace; white-space: pre; transform-origin: 0 0; }
   .status { margin-top: 12px; font-size: 16px; font-weight: 600; color: #fff; display: flex; justify-content: space-between; letter-spacing: .2px; }
   .status b { font-weight: 700; color: #fff; }

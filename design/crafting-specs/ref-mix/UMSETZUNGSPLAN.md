@@ -15,6 +15,7 @@ Das Crafting-Panel wird als **neue Version neben den bestehenden** gebaut, in ei
 | Lade-Panel | `bauplan-silhouette.html` / `.gif` / `.mp4` / `-frames.png` | Konstanten oben im Script des HTML |
 | Avatare | `design/avatars/mitchy.svg`, `player.svg` | Erzeugung: `design/avatars/make-avatars.cjs` |
 | Icons | `design/icons/hammer.svg`, `design/icons/coin.svg` | Hammer 26 px, Münze 22 px |
+| **Styleguide** (alle Maße auf einem Sheet) | `styleguide-crafting-v13.png` | Quelle `styleguide-crafting-v13.html`; Farbnamen dort (Teil C) gelten für Figma und Code |
 
 Nur noch Verlauf: v2 bis v12 sowie `bauplan-loading.*` (Maschinen-Variante).
 
